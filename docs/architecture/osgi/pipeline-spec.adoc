@@ -235,10 +235,19 @@ Five decisions, taken together (2026-07-04), fix the model:
   `InContainerJUnitRunner` (osgi/runtime/junit-testkit) *already* drives `LauncherFactory.create(...)`
   with an explicit engine, a listener and a discovery request, *inside* OSGi. The launcher is engine-
   agnostic (Jupiter carries jgiven-junit5, already used: `DoctorScenarioTest extends ScenarioTest`).
-. *The fluent `during`/`then` grammar dissolves* — jGiven composes everything. Order and dependencies
-  are expressed by nested steps (`@NestedSteps` — already in production: `ClusterReadinessScenario`
-  replays `SystemdAdapterScenario`). No mince scheduler survives (the POC confirmed the launcher +
-  `@NestedSteps` carry all the ordering; there was nothing left for a grammar to do).
+. *The fluent `during`/`then` grammar dissolves ENTIRELY — the boot included* — jGiven composes
+  everything. Order and dependencies are expressed by nested steps (`@NestedSteps` — already in
+  production: `ClusterReadinessScenario` replays `SystemdAdapterScenario`). No mince scheduler survives
+  (the POC confirmed the launcher + `@NestedSteps` carry all the ordering; there was nothing left for a
+  grammar to do). *This reaches the boot too:* `FrameworkLaunchPipeline` is a `Topic.Execution` of
+  effect already chained first inside seed (`ClusterSeedTopic.seedCluster()` runs
+  `FrameworkLaunchPipeline.embedded().during(framework -> seedClusterWithinFramework(...))`). It becomes
+  the *first jGiven step of the seed scenario* — "when the framework is launched" — a plain effect step
+  (bouchonné-probe pattern E2, no runbook value folded). There is no amorce paradox: the JUnit launcher
+  runs on the HOST flat classpath, OUTSIDE Felix (`SeedLauncherMain` — `main()` creates it), so
+  launching Felix is a narrated step the launcher plays, not a pre-amorce that must precede it. So the
+  fluent grammar has NO surviving user once seed migrates — `pipeline-port` stops exporting it, and only
+  then do its types leave the specs (the `SPEC_COVERAGE` code-first ratchet).
 . *The value-DAG is carried by the jGiven state annotations*, not lost:
 +
 --
@@ -274,33 +283,37 @@ bench:
 ....
 flowchart TB
   operator(["Operator<br/>reads the runbook AND acts through it"])
-  subgraph osgi["OSGi world — OWNER (jGiven lives here, launcher runs here)"]
-    launch["JUnit Platform launcher<br/>embedded (InContainerJUnitRunner)<br/>orchestrates — engine-agnostic"]
-    scn["phases = jGiven Stages<br/>@NestedSteps compose ONE scenario tree"]
+  subgraph host["host — the JUnit launcher runs HERE (flat classpath, OUTSIDE Felix)"]
+    launch["JUnit Platform launcher<br/>(SeedLauncherMain: main() creates it)<br/>plays the seed scenario — engine-agnostic"]
+    edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]
+  end
+  subgraph scn["the seed scenario — jGiven Stages, @NestedSteps compose ONE tree"]
+    boot["1st phase = LAUNCH THE FRAMEWORK<br/>(BootPlanner→FrameworkLauncher, effect step)"]
+    phases["phases: preflight·bbox·incus·systemd·readiness·outputs"]
     state["scenario-state = the value DAG<br/>@Provided/ExpectedScenarioState"]
     ext["Jupiter extensions<br/>@PollUntilReady · ExecutionCondition · Store"]
+  end
+  subgraph osgi["OSGi world — OPENED BY the boot step (Felix)"]
     jg["pipeline-jgiven<br/>ReportModel = runbook"]
     doctor["doctor<br/>consult-on-failure → remediation"]
   end
-  subgraph host["host — CONSUMER (seed-master + pulumi-edge)"]
-    boot["boot pipeline<br/>BootPlanner→BootPlan→FrameworkLauncher"]
-    edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]
-  end
-  operator -->|understands + acts, via the runbook| scn
-  launch --> scn
-  scn --> state
-  scn -->|dynamics from| ext
-  scn -->|narrates into| jg
-  scn -->|consults on failure| doctor
-  boot -->|amorces the world it runs in embedded| launch
-  edge <==>|"SEAM: inject RunMode + Pulumi ctx / return runbook + contributions"| scn
+  operator -->|understands + acts, via the runbook| phases
+  launch -->|plays| boot
+  boot -->|opens Felix, then the chain reasons within| phases
+  phases --> state
+  phases -->|dynamics from| ext
+  phases -->|narrate into| jg
+  phases -->|consult on failure| doctor
+  edge <==>|"SEAM: inject RunMode + Pulumi ctx / return runbook + contributions"| phases
   classDef world fill:#0b7285,color:#fff;
   classDef hostc fill:#8250df,color:#fff;
+  classDef scnc fill:#d4f4dd,stroke:#2e7d32,color:#000;
   classDef person fill:#eee,stroke:#999,color:#000;
-  class launch,scn,state,ext,jg,doctor world
-  class boot,edge hostc
+  class jg,doctor world
+  class launch,edge hostc
+  class boot,phases,state,ext scnc
   class operator person
-  linkStyle 7 stroke:#d1242f,stroke-width:3px;
+  linkStyle 6 stroke:#d1242f,stroke-width:3px;
 ....
 
 === The scenario tree — a phase opens a nested scenario (the pièce maîtresse)
@@ -403,6 +416,13 @@ the output contributions across the remote frontier. The embedded exec (`Framewo
 embedded()`) is *one particular case* — the degenerate one where the host co-locates and boots OSGi
 in-process. The chicken-and-egg amorce ("what starts OSGi cannot run inside OSGi") is *real only in the
 embedded case*; detached, the OSGi world has its own internal amorce.
+
+*This does NOT bar the boot from being a jGiven step* (§ <<the-model>>). The thing that "starts OSGi"
+is the JUnit launcher + its `main()`, which run on the HOST flat classpath, OUTSIDE Felix — so they do
+not run *inside* OSGi, and the paradox does not touch them. The launcher plays the seed scenario whose
+*first step* is the boot effect (launch Felix); every later step reasons within the framework that
+first step opened. "What starts OSGi" (host launcher) and "what runs inside OSGi" (the reasoning
+steps) are different threads/classpaths — the frontier is exactly the gateway (Figure 2).
 
 The launcher does not change this — it is one more consumer of the R4 boot seam (Felix in `Pulumi.run`).
 `InContainerJUnitRunner` already drives a JUnit launcher *inside* Felix; `JGivenTestkit.felix()` proves
@@ -529,35 +549,11 @@ evolution figure — enough to read link:../atlas/host-pipeline.adoc#the-bdd-as-
 The full former text is in git: `pipeline-spec.adoc` at commit `39fe4d8a` (and the fluent grammar
 convention doc it folded in). It is NOT maintained.*
 
-The former seeding was a *fluent type-state pipeline*: a `during(label, lambda).then().during(...)`
-chain, ordered by the compiler. Its vocabulary, and where each concept goes in the après:
-
-[cols="1,2,2",options="header"]
-|===
-| Avant concept | What it was | Après (this spec)
-| `during`/`then` (fluent grammar) | the authoring surface — scoped topic lambdas, explicit conjunctions,
-  type-state ordering | dissolved → intro-words + `@NestedSteps` (§ <<the-model>>)
-| `Topic` (identification iface, `role()` + nested natures) | the unit of work | a jGiven `Stage` (one
-  phase)
-| `Topic.Execution` / `Topic.Checkpoint` / `Topic.Pipeline` (nature = nested type) | the three phase
-  bodies | a flat-step `Stage` / a `Stage` opening a nested G/W/T / a `Stage` composing sub-phases
-| `Topic.Sink` (the write-face, `Consumer<O>`) | how a phase pushed its output | `@ProvidedScenarioState`
-  (the out-edge)
-| the input record `I` (flux + ambient, fused) | what a phase read | `@ExpectedScenarioState` (the in-edge)
-| `State<I,B>` (compile-time type-state) | the ordering guarantee | scenario-state runtime + the
-  build-time DAG gate (§ <<dag-gate>>)
-| `PipelineContext` (`Class→record` ambient registry) | transverse ambient | `ExtensionContext.Store`
-  (JUnit-native)
-| `FluentTopicRunner` | the topic-execution loop | the embedded JUnit Platform launcher
-| `PIPELINE_PATTERN` (ASM gate) | policed the Topic/Sink shape | re-tooled into the DAG gate
-| `LiveGate` / `RunMode {STANDALONE,PREVIEW,APPLY}` | the living gate + its enum | erased / re-posed as an
-  `ExecutionCondition` + the `PreviewExecutor`
-|===
-
-The one true change of *guarantee* is `State<I,B>`: the DAG moves from compile-time (type-state) to
-runtime (scenario-state) *plus* the build-time gate. Everything else is a 1:1 vocabulary replacement.
-The `wip/runmode-absorbs-livegate` tag is *abandoned* — it presupposed a `LiveGate` to absorb, which
-this turn erases.
+The former seeding was a *fluent type-state pipeline*: a compiler-ordered chain of scoped topic
+lambdas. Its full vocabulary and the concept-by-concept avant→après correspondence are graved in the
+evolution figure — see link:../atlas/host-pipeline.adoc#the-bdd-as-engine-turn[Diagram Q and its
+correspondence table] (host-pipeline L1). The full former text is in git (`pipeline-spec.adoc` at
+commit `39fe4d8a`). It is NOT maintained here.
 
 == Migration — legibility first, then ClusterSeed-vertical
 
