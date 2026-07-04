@@ -47,7 +47,7 @@ All Maven commands must run through flox: `flox activate -- ./mvnw ...`
 
 - **Architecture**: Start with `docs/README.adoc` for navigation
 - **Bootstrap contract**: `docs/architecture/bootstrap/bootstrap-contract.adoc`
-- **Fluent pipeline grammar**: `docs/architecture/patterns/fluent-pipeline-grammar.adoc` (type-state workflow DSL)
+- **Pipeline (the seeding engine)**: `docs/architecture/osgi/pipeline-spec.adoc` (BDD-as-engine: jGiven scenarios on the embedded JUnit launcher)
 - **Manifest architecture**: `docs/architecture/manifests/manifests-architecture.adoc`
 - **Troubleshooting**: `docs/guides/troubleshooting-workflow.adoc`
 
@@ -62,17 +62,15 @@ All Maven commands must run through flox: `flox activate -- ./mvnw ...`
 - `<name>` in each pom is the relative directory path from the repo root.
 - Toolchain is JDK 25 via flox. Always run Maven through `flox activate -- ./mvnw …`. Claude may run any operation that does **not** mutate the provisioned system — compilation, tests, and dry-runs like `pulumi preview` are fine to run directly. Operations that change the live system (`pulumi up`, `kubectl apply`, and similar) are run by the user — propose them, don't execute them.
 
-## Fluent pipeline grammar
+## Pipeline architecture — BDD-as-engine (the seeding as jGiven scenarios)
 
-Multi-stage workflows in seed-master follow a documented fluent grammar. The full design lives at [docs/architecture/patterns/fluent-pipeline-grammar.adoc](docs/architecture/patterns/fluent-pipeline-grammar.adoc). Summary:
+The seeding pipeline is expressed as **jGiven scenarios orchestrated by the embedded JUnit Platform launcher** (GO reached 2026-07-04). A phase is a jGiven `Stage`; the tree is `@NestedSteps` composition; the value-DAG is carried by `@Provided/ExpectedScenarioState` + a build-time ASM DAG gate; the missing dynamics (temporal poll, live/preview gate, ambient) are contributed as Jupiter extensions. The full design lives at [docs/architecture/osgi/pipeline-spec.adoc](docs/architecture/osgi/pipeline-spec.adoc); the discovery record (learnings E1–E10) at [docs/architecture/osgi/bdd-pipeline-poc-design.adoc](docs/architecture/osgi/bdd-pipeline-poc-design.adoc); the reference implementation is pinned at tag `spike/bdd-pipeline-poc`.
 
-- **Topic blocks** are entered with `.during("label", lambda)`. The lambda receives a topic-specific builder so only that topic's verbs are callable inside.
-- **Conjunctions** between topics are explicit: `.then()` is mandatory between `during(...)` calls. It exists for readability, not data flow.
-- **Labels are real**: used for entry/exit logging and to wrap exceptions as `PipelineStageFailure(label, cause)`.
-- **Order is type-state-enforced**: each stage returns a distinct class, so reordering, skipping, or premature termination won't compile.
-- **Errors are per-topic** and fail-fast by default.
+- **Why these frameworks:** dogfooding / re-entrance — we already run jGiven (bundled by `pipeline-jgiven`) and the JUnit launcher (`InContainerJUnitRunner`) to *test* rke2lab; the runtime engine is the same machinery, at a second level. No richer model-level alternative exists.
+- **Owner:** the OSGi world owns the pipeline (scenarios + engine + reasoning). The host (`seed-master` + `pulumi-edge`) boots the framework, injects the `RunMode` fact + Pulumi context, renders/writes.
+- **Preview:** `RunMode` is an `ExecutionCondition` selecting a `PreviewExecutor` (rendering decoupled from execution — a rich PENDING plan). `LiveGate` is erased.
 
-When you encounter a builder with three or more boolean parameters or a sequence of method calls that need comments to explain stage boundaries, that's a candidate for the grammar. When in doubt, read the doc and look at the exemplar in `controlplane/pipeline/`.
+**Migration in progress — align ALL pipelines on this architecture (uniformity is the goal).** ClusterSeed migrates first (the POC transposed it); the other pipelines temporarily coexist on the former fluent `during/then` + `Topic`/`State<I,B>` model — an assumed transitional state, **NOT a legacy variant to keep**. The former model is documented only as the "avant" in [pipeline-spec.adoc](docs/architecture/osgi/pipeline-spec.adoc) (§ the-avant) and in git (`fluent-pipeline-grammar.adoc` at commit `39fe4d8a`). The `SPEC_COVERAGE` staging gate flags the not-yet-covered former-model types; run it as a WARNING and its count is the migration progress indicator — it reaches zero when every pipeline is aligned.
 
 ## Code style
 

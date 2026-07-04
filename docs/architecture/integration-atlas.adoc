@@ -236,8 +236,9 @@ monotone before/after figures.
 * link:atlas/manifests.adoc[Manifests subsystem] — the CDK8s manifest-synthesis layer resolved by the
   same Felix `UnitResolver`. Almost entirely shipped. See link:manifests/manifests-architecture.adoc[architecture].
 * link:atlas/host-pipeline.adoc[Host / control-plane pipeline] — the host side that runs `pulumi
-  preview`/`up`: the two gates (living + output), `RunMode`, the null-safety governance note. Folds in
-  link:osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)].
+  preview`/`up`: the output gate, the preview `ExecutionCondition` (`RunMode` re-posed off the erased
+  `LiveGate`), the null-safety governance note, and the graved avant/après of the BDD-as-engine turn
+  (Diagram Q). Folds in link:osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)].
 
 == Related documentation
 

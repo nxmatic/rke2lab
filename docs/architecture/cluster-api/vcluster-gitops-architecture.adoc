@@ -1232,7 +1232,7 @@ spec:
 
 * link:manifests-architecture.adoc[Manifests Architecture] - **READ THIS FIRST** - Canonical guide: nomenclature, Chart-vs-Construct, and the CDK8s synthesis flow
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Runtime config access pattern; parent-cluster-kubeconfig follows same principle
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow pattern for seed-layer3 synth
+* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model (once used for seed-layer3 synth), kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
 
 === Cross-Cutting Concerns
 

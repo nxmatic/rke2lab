@@ -573,7 +573,7 @@ void buildMetadata_registeredWithNull_thenUpdated() {
 == Related Documentation
 
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context pattern for manifest unit access
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Pipeline orchestration with scoped lambdas
+* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
 * link:manifests-architecture.adoc[Manifests Architecture] - How manifests flow through the pipeline
 
 == Implementation

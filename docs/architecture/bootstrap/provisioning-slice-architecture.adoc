@@ -306,6 +306,6 @@ slices:
 
 == Related Documentation
 
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow pattern used in slice checksum computation
+* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model (once used in slice checksum computation), kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
 * link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/ProvisioningSlice.java[ProvisioningSlice.java] - Interface definition
 * link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/NodeSlice.java[NodeSlice.java] - Implementation example

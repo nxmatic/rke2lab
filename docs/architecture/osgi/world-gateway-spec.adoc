@@ -406,7 +406,8 @@ steps 2–4, written from the worklist the gate prints (so the host edits are ex
 
 * link:../patterns/port-edge-domain-ownership.adoc[port/edge/domain ownership] — the seam law this
   spec specializes (a `-port` is `type=seam`; its verbs now speak `Document`).
-* link:../patterns/fluent-pipeline-grammar.adoc[fluent pipeline grammar] — the grammar the
-  GROUND/GATEWAY/APPLY decomposition is expressed in.
+* link:pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] — the former
+  model the GROUND/GATEWAY/APPLY decomposition was expressed in, kept as the avant reference; the
+  current model is BDD-as-engine (jGiven scenarios on the JUnit launcher).
 * link:staging-gates-governance-spec.adoc[staging-gates governance] — the `REALM_BOUNDARY` gate that
   mechanizes this spec's invariant at build time (`WARN` during migration, `ERROR` once clean).

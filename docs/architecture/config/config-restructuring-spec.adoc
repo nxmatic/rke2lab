@@ -356,9 +356,10 @@ graph LR
 === Deriving the runtime configs
 
 The DTO carries `Optional` and no defaults. Turning it into the Optional-free `BootstrapConfig`
-and `ControlplanePolicy` is a multi-stage workflow, so it uses the project's fluent pipeline
-grammar (see link:../patterns/fluent-pipeline-grammar.adoc[Fluent Pipeline
-Grammar]). This `resolve(...)` step is the single seam where `Optional` becomes concrete and
+and `ControlplanePolicy` is a multi-stage workflow, expressed in the former fluent pipeline
+grammar (see link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent
+grammar)]; that model is now superseded by BDD-as-engine — jGiven scenarios on the JUnit launcher).
+This `resolve(...)` step is the single seam where `Optional` becomes concrete and
 where every default lives.
 
 [mermaid]
@@ -814,8 +815,9 @@ variation axes.
 == Related documentation
 
 * link:../doctor/runbook-doctor.adoc[Runbook & Doctor design] - the doctor subsystem this is the first use case of
-* link:../patterns/fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - the
-  `resolve(...)` derivation grammar
+* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - the
+  superseded model the `resolve(...)` derivation was expressed in; the current model is BDD-as-engine
+  (jGiven scenarios on the JUnit launcher)
 * link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] - where config
   sits in Stage A
 * link:../manifests/manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog

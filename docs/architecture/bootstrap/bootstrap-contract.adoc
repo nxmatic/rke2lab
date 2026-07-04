@@ -237,4 +237,4 @@ See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for full implementa
 * link:manifests-architecture.adoc[Manifests Architecture] - How manifests are generated from identity
 * link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Stage B handoff implementation
 * link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] - How BDD scenarios verify deployment health and publish actor-specific reports
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - How verification stage integrates into the pipeline
+* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
