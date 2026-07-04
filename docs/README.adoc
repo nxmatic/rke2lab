@@ -82,7 +82,6 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 
 * link:architecture/cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan] (📋 Active Plan - Phase 1.5-6) - **START HERE** for current implementation roadmap. Complete phased plan for gitops-mgmt vCluster pattern with detailed actions, code examples, and validation criteria. Supersedes Phase 2+ from transition plan below.
 * link:architecture/cluster-api/vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] (📋 Architecture Reference) - Architecture decisions, C4 diagrams, and Option A/B/C/D analysis for management vCluster pattern. Implementation details in plan above.
-* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] (✅ Phase 1 Complete, 📋 Phase 2+ Superseded) - Original Phase 1-3 plan. Phase 1 complete (master node). Phase 2+ superseded by vCluster Implementation Plan.
 * link:architecture/cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup plan & flox webhook injection architecture (⚠️ Design Only)
 * link:architecture/bootstrap/stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition
 * link:architecture/cluster-api/post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap

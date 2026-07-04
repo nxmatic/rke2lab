@@ -11,7 +11,7 @@ The objective is to avoid drift between bootstrap assumptions and CAPI templates
 
 == Related plans
 
-For the detailed implementation plan of the GitOps + Cluster API transition (peer1 and beyond via seed-peers + Tekton-reactive), see link:gitops-cluster-api-transition-plan.md[GitOps Cluster API Transition Plan].
+The detailed seed-peers + Tekton-reactive design (peer1 and beyond) is a memory record (`gitops-cluster-api-transition-plan`, re-homed pending the seed-peers module); for the current roadmap see link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan].
 
 == Ownership boundary
 

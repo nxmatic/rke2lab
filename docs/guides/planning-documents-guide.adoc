@@ -27,7 +27,7 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
 * Phase 5: Lab vCluster deployment
 * Phase 6: Upgrade testing pattern
 
-**Supersedes**: Phase 2-4 sections in gitops-cluster-api-transition-plan.md
+**Supersedes**: Phase 2-4 sections in the original transition plan (now the `gitops-cluster-api-transition-plan` memory record)
 
 === 2. link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] 📐 **ARCHITECTURE REFERENCE**
 
@@ -51,20 +51,15 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
 
 == Historical/Superseded Plans
 
-=== link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan]
+=== GitOps + Cluster API Transition Plan (re-homed to memory)
 
-**Status**: ✅ Phase 1 Complete, 📋 Phase 2+ Superseded
+**Status**: ✅ Phase 1 Complete (as-built), 📋 Phase 2+ superseded/reorganized
 
-**Still relevant for**: Phase 1 implementation details (master node bootstrap)
+The original transition plan is no longer a doc — it was re-homed to `.claude/memory/gitops-cluster-api-transition-plan` (docs/ holds only `.adoc`; the `seed-peers` module it describes does not exist yet, so it has no co-located home). It survives as a design record whose go/no-go status a future memory-cleanup will settle.
 
-**Superseded by**: vCluster Implementation Plan (for Phase 2 onwards)
-
-**Reason for change**: Original plan had Flux in core cluster (Phase 2-3) then move to vCluster (Phase 4). Revised plan goes directly to gitops-mgmt vCluster pattern, skipping "Flux in core" step.
-
-**What to read**:
-* ✅ Phase 1 sections: Still accurate for master node bootstrap via Pulumi
-* ❌ Phase 2-3 sections: Superseded, use vCluster Implementation Plan instead
-* ❌ Phase 4 section: Replaced by link to vCluster Implementation Plan
+**Where its content lives now**:
+* ✅ *Phase 1 (master node bootstrap)* — captured as-built in link:../architecture/cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] (with the shipping commits).
+* 📋 *Phase 2+ (seed-peers, Flow A/B, Tekton-reactive)* — superseded/reorganized by link:vcluster-implementation-plan.adoc[vCluster Implementation Plan]; the detailed seed-peers design remains in the memory record for when that module is built.
 
 == Document Relationships
 
@@ -80,15 +75,15 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
                                    │
                     ┌──────────────┴──────────────┐
                     ↓                             ↓
-┌──────────────────────────────────┐  ┌──────────────────────────┐
-│ vCluster GitOps Architecture     │  │ GitOps + CAPI Plan       │
-│ (ARCHITECTURE)                   │  │ (HISTORICAL)             │
-│                                  │  │                          │
-│ - Why Option D was chosen       │  │ ✅ Phase 1 (complete)    │
-│ - C4 diagrams                   │  │ ❌ Phase 2-4 (superseded) │
-│ - Design trade-offs             │  │                          │
-│ - Migration path                │  └──────────────────────────┘
-└──────────────────────────────────┘
+┌──────────────────────────────────┐  ┌──────────────────────────────┐
+│ vCluster GitOps Architecture     │  │ GitOps + CAPI Plan           │
+│ (ARCHITECTURE)                   │  │ (memory record, not a doc)   │
+│                                  │  │                              │
+│ - Why Option D was chosen       │  │ ✅ Phase 1 → as-built in     │
+│ - C4 diagrams                   │  │    cluster-api-bootstrap-req  │
+│ - Design trade-offs             │  │ 📋 Phase 2+ → seed-peers      │
+│ - Migration path                │  │    design, status unresolved  │
+└──────────────────────────────────┘  └──────────────────────────────┘
 ```
 
 == How to Use These Documents
@@ -108,7 +103,7 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
 === Scenario 3: I want to implement peer provisioning
 
 1. **Read**: link:vcluster-implementation-plan.adoc#phase-4-peer-provisioning-via-flux[vCluster Implementation Plan - Phase 4]
-2. **Reference**: link:gitops-cluster-api-transition-plan.md#phase-2-seed-peers-module-operator-driven-peer1[Original Plan - Phase 2] for CAPI patterns (still valid)
+2. **Reference**: the `gitops-cluster-api-transition-plan` memory record (Phase 2 — seed-peers module) for the CAPI synthesis patterns; the current synthesis patterns also live in link:../architecture/cluster-api/staged-post-cluster-resources.adoc[Staged Post-Cluster Resources]
 3. **Check**: link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] for identity flow
 
 === Scenario 4: I'm confused about which Flux to install where
@@ -145,7 +140,7 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
 
 **Need architecture diagrams?** → link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture]
 
-**Need Phase 1 details?** → link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] (Phase 1 only)
+**Need Phase 1 details?** → link:../architecture/cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] (Phase 1 as-built)
 
 **Confused about phase numbers?** → See "Phase Mapping" section above
 
@@ -155,7 +150,7 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
 
 === Q: Why are there multiple planning documents?
 
-**A**: The project evolved. Initial plan (gitops-cluster-api-transition-plan.md) was written before vCluster architecture was fully designed. After architectural analysis, we decided to skip "Flux in core" and go directly to gitops-mgmt vCluster, requiring a revised implementation plan.
+**A**: The project evolved. The initial plan (the `gitops-cluster-api-transition-plan` memory record) was written before vCluster architecture was fully designed. After architectural analysis, we decided to skip "Flux in core" and go directly to gitops-mgmt vCluster, requiring a revised implementation plan.
 
 === Q: Should I read all the plans?
 
@@ -179,7 +174,7 @@ The work is preserved, just reorganized for better architecture.
 * After completing a phase: Update implementation plan with "✅ Complete" status
 * After discovering architectural issues: Update architecture doc with lessons learned
 * After making implementation changes: Update implementation plan steps
-* Keep original plan as historical record (don't delete it)
+* The superseded original plan lives as a memory record, not a doc — docs/ holds only current `.adoc` specs
 
 == Next Steps
 

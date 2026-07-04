@@ -447,7 +447,7 @@ Phase 1A complete when:
 
 == Related Documentation
 
-* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1 complete, Phase 2 roadmap
+* link:vcluster-implementation-plan.adoc[vCluster Implementation Plan — the Phase 2+ roadmap (supersedes the original transition plan, now a memory record)]
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity pattern, age key setup
 * link:manifests-architecture.adoc[Manifests Architecture] - How manifest units work
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A outputs and handoff

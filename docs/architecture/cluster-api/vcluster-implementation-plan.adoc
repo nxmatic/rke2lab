@@ -6,7 +6,7 @@
 **Status**: This document supersedes the previous phasing in `gitops-cluster-api-transition-plan.md` for Phase 2 onwards. It consolidates the vCluster architecture decisions with the concrete implementation roadmap.
 
 **Supersedes**:
-* Phase 2-4 sections in link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan]
+* Phase 2-4 sections in `gitops-cluster-api-transition-plan` (the re-homed memory record)
 * Implementation Plan section in link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture]
 
 **Context**: Phase 1 complete (master node + CAPI/Flux operators installed). This plan details how to transition to the gitops-mgmt vCluster pattern while maintaining operational infrastructure.
@@ -1295,7 +1295,7 @@ Throughout implementation, these decisions may require adjustment:
 
 === Architecture & Design
 * link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] - Full architecture with C4 diagrams and decision analysis
-* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Original Phase 1-3 plan (Phase 1 complete)
+* `gitops-cluster-api-transition-plan` (the re-homed memory record) - Original Phase 1-3 plan (Phase 1 complete)
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap contracts
 
 === Implementation Patterns

@@ -120,6 +120,7 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 - [Package-private sweep](package-private-sweep.md) — remove non-essential private; exemplar = DefaultManifestSynthesisService.
 - [Domain registry abstraction](domain-registry-abstraction.md) — DEFERRED; unify Manifest+Infra registry pairs at rule-of-three.
 - [seed-vcluster](seed-vcluster.md) — next chantier: bootstrap vCluster gitops-mgmt + Flux; needs vcluster operator unit + pulumi-command.
+- [GitOps + Cluster API transition plan (re-homed design record)](gitops-cluster-api-transition-plan.md) — peer1+ provisioning design (seed-peers + GitOps + CAPI + Tekton-reactive); Phase 1 done (as-built in cluster-api-bootstrap-requirements.adoc), Phase 2+ status unresolved; re-homed from docs/, awaits the future seed-peers module + a memory-cleanup verdict.
 
 ## Rules / patterns / gotchas
 

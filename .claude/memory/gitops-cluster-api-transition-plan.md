@@ -1,3 +1,11 @@
+---
+name: gitops-cluster-api-transition-plan
+description: "Design record (2026-06, status NOT yet decided — future memory-cleanup settles it): the peer1-and-beyond provisioning plan via a seed-peers module + GitOps + CAPI/CAPN/CAPRKE2 + Tekton-reactive drift-correction. Phase 1 (master node, declarative CAPI install) is COMPLETE and lives as-built in cluster-api-bootstrap-requirements.adoc. Phase 2+ (seed-peers synth, Flow A/B, Tekton) is superseded-or-reorganized by vcluster-implementation-plan.adoc — the contradiction ('still valid' vs 'superseded') is unresolved on purpose. Re-homed from docs/ (docs holds only .adoc); the seed-peers module it describes does not exist yet, so no co-located home exists."
+metadata:
+  node_type: memory
+  type: project
+---
+
 # Plan: peer1 (and beyond) via seed-peers + GitOps + CAPI/CAPN/CAPRKE2 + Tekton-reactive
 
 ## Context

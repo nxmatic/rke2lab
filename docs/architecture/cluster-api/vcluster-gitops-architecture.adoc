@@ -1224,7 +1224,7 @@ spec:
 
 === Prerequisites (Phase 1-3)
 
-* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1-3 foundation (master + peer provisioning). This document describes Phase 4, which builds on Phase 1-3 completion.
+* link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements — Phase 1 foundation (as-built); the original Phase 1-3 transition plan is now a memory record]. This document describes Phase 4, which builds on Phase 1-3 completion.
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition; gitops-mgmt continues this pattern
 * link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap; vClusters extend ownership model
 
