@@ -14,33 +14,34 @@ serves both a real test and a live seed run, differing only by scope, never by b
 
 *Why this exists:* the BDD-as-engine turn makes the seeding a tree of jGiven scenarios played by an
 embedded JUnit launcher inside Felix. That launcher, that framework, and that runbook each have a
-lifecycle — and today all three are held *lexically / per-scenario* (a fresh `newFramework()` per
-`launch()`, a throwaway `LauncherFactory.create()` per run, a `new ReportModel()` per scenario). That
-is fine for a test that may fall after each case; it is WRONG for a live seed, where the world must
-survive across the scenarios that compose the run. This spec fixes the ownership and the scoping.
+lifecycle — and today all three are held *lexically / per-scenario* (a fresh framework per launch, a
+throwaway launcher per run, a new runbook per scenario). That is fine for a test that may fall after
+each case; it is WRONG for a live seed, where the world must survive across the scenarios that
+compose the run. This spec fixes the ownership and the scoping.
 ====
 
 [TIP]
-.TL;DR — read this, skim the rest
+.TL;DR — read the figures, this confirms them
 ====
-* *Substrate:* JUnit is the single lifecycle substrate. It already discovers and creates the OSGi
-  framework; it also carries scope demarcation (`LauncherSession` root > class > method) via
-  `ExtensionContext.Store` + callbacks. Nothing home-grown doubles it.
-* *Framework lifecycle:* held by a JUnit scope's `Store`; undone when THAT scope closes. Test vs
-  runtime = *where the root lives* (test run / seed run), same code. Connection = `OsgiConnection`:
-  `embedded()` realised (`close()` stops Felix), `remote()` a named extension point (`close()`
-  detaches — the world survives).
-* *The lever:* the OSGi *start level*, a SINGLE global cursor, driven by the depth of the JUnit
-  scope. Descent stops bundles `STOP_TRANSIENT` (async → wait for `STARTLEVEL_CHANGED`); re-ascent
-  re-lights them from the persistent autostart. The `BootPlanner` stays the sole role→level source.
+* *Substrate (Figure 2):* JUnit is the single lifecycle substrate. It already discovers and creates
+  the OSGi framework; it also carries scope demarcation (session root > class > method) via nested
+  `Store`s + callbacks. Nothing home-grown doubles it.
+* *Framework lifecycle (Figure 3):* held by a JUnit scope's `Store`; undone when THAT scope closes.
+  Test vs runtime = *where the root lives* (test run / seed run), same code. The connection is an
+  abstraction: embedded is realised (owns the close, stops the world), remote is a named extension
+  point (detaches — the world survives).
+* *The lever (Figure 4):* the OSGi *start level*, a SINGLE global cursor, driven by the depth of the
+  JUnit scope. Descent stops bundles transiently (async → wait for the level-changed event);
+  re-ascent re-lights them from the persistent autostart. The `BootPlanner` stays the sole
+  role→level source.
 * *Two composable dimensions* a scope declares: *depth* (start level) × *domain* (`DiscoveryPolicy`
   — which bundles are installed).
-* *Discipline by role, declared by an rke2lab annotation* (meta-`@ExtendWith` → extension → shared
-  base + teardown strategy): *isolation* (a real test — the method scope descends/re-ascends, each
-  case starts clean) vs *stationary* (a runtime pipeline — climbs once, NEVER descends between
-  pipelines, the world survives). Extensible: a 3rd discipline = a 3rd annotation.
-* *The runbook is the DELIVERABLE.* It is owned by the launcher / the seed OPERATION (bounded by
-  `pulumi up`), NOT by the framework — the framework only CONTRIBUTES `ScenarioModel`s to it.
+* *Discipline by role (Figures 5 & 6), declared by an rke2lab annotation:* *isolation* (a real test —
+  the method scope descends/re-ascends, each case starts clean) vs *stationary* (a runtime pipeline —
+  climbs once, NEVER descends between pipelines, the world survives). Extensible: a 3rd discipline =
+  a 3rd annotation.
+* *The runbook is the DELIVERABLE (Figure 7).* Owned by the launcher / the seed OPERATION (bounded by
+  `pulumi up`), NOT by the framework — the framework only CONTRIBUTES scenario models to it.
 * *YAGNI:* no per-bundle activation model (the test case does that in plain JUnit), no scenario-level
   start-level (a scenario activates no bundle of its own — fixtures are fragments), no transaction
   engine (the "lease" is a lifetime analogy, not ACID), no framework-serves-N-operations (there is
@@ -50,30 +51,47 @@ survive across the scenarios that compose the run. This spec fixes the ownership
 == The subject — three stacked lifecycles, held lexically today
 
 The BDD-as-engine model (link:pipeline-spec.adoc[pipeline-spec]) plays the seeding as jGiven
-scenarios on an embedded JUnit launcher, inside Felix. Three engines stack, each with a lifecycle:
+scenarios on an embedded JUnit launcher, inside Felix. Three engines stack, each with a lifecycle,
+and each is held TODAY at the grain of the *scenario / test case* — which is acceptable when a test
+may fall after each case, and WRONG at runtime where the world must survive the whole seed run.
 
-[cols="1,2,2",options="header"]
-|===
-| Engine | Held TODAY (lexical / per-scenario) | Problem at runtime
-| OSGi framework | `FrameworkLauncher.launch()` does `factory.newFramework()` — a FRESH framework per
-  call; `BootedFramework.close()` = full `framework.stop()`, all-or-nothing | a live seed is ONE long
-  run whose scenarios must share ONE surviving world, not a framework per scenario
-| JUnit launcher | `LauncherFactory.create()` per run, thrown away; no `LauncherSession` | no root
-  scope survives the individual scenario
-| jGiven runbook | `new ReportModel()` per scenario (`ClusterReadinessTopic`: `runbook.orElseGet(new)`) |
-  the operator needs ONE runbook for the whole seed, not a throwaway per scenario
-|===
+*Read Figure 1 as three columns, one per stacked engine. The top (blue) cell of each is HOW it is
+held today — lexically, per-scenario. The bottom (red) cell is WHERE that grip breaks at runtime.
+The three red cells are the same defect three times: a lifetime scoped to the scenario, when the
+seed is one long run of many scenarios.*
 
-The common defect: all three are scoped to the *scenario / test case*, which is acceptable when a
-test may fall after each case, and WRONG at runtime where the world must survive the run. This spec
-re-homes each lifecycle to the scope that matches its true lifetime.
+.Figure 1 — the three engines, each held lexically today, each breaking at runtime
+[mermaid]
+....
+flowchart LR
+  subgraph fw["OSGi framework"]
+    fw1["held TODAY<br/>newFramework() per launch();<br/>close() = full stop, all-or-nothing"]
+    fw2["BREAKS at runtime<br/>one seed = many scenarios<br/>that must share ONE surviving world"]
+    fw1 --> fw2
+  end
+  subgraph la["JUnit launcher"]
+    la1["held TODAY<br/>LauncherFactory.create() per run,<br/>thrown away — no session root"]
+    la2["BREAKS at runtime<br/>no root scope survives<br/>the individual scenario"]
+    la1 --> la2
+  end
+  subgraph rb["jGiven runbook"]
+    rb1["held TODAY<br/>a new report per scenario"]
+    rb2["BREAKS at runtime<br/>the operator needs ONE runbook<br/>for the whole seed"]
+    rb1 --> rb2
+  end
+  classDef lexical fill:#0b7285,color:#fff;
+  classDef breaks fill:#c92a2a,color:#fff;
+  class fw1,la1,rb1 lexical
+  class fw2,la2,rb2 breaks
+....
+
+This spec re-homes each lifecycle to the scope that matches its true lifetime.
 
 == The substrate — JUnit carries the lifecycles, nothing home-grown doubles it
 
-*Lead: JUnit already discovers and creates the OSGi framework (`InContainerJUnitRunner` /
-`JGivenTestkit.felix()`); it also owns nested scope demarcation. So it carries the framework, launcher
-and runbook lifecycles too. A new policy is a contributed JUnit extension — never a home-grown
-registry.*
+*Lead: JUnit already discovers and creates the OSGi framework; it also owns nested scope demarcation.
+So it carries the framework, launcher and runbook lifecycles too. A new policy is a contributed JUnit
+extension — never a home-grown registry.*
 
 The realisation (2026-07-04): we already make JUnit carry the two hard parts — discovering the
 framework's install set and creating the framework in-container. Making it also carry *when* the
@@ -81,21 +99,34 @@ framework, launcher and runbook live and die is not new surface — it is the sa
 further. This is the dogfooding rule (link:pipeline-spec.adoc[pipeline-spec] § "Why embed JUnit +
 jGiven at runtime") applied to lifecycle: we extend JUnit, we do not reinvent it beside itself.
 
-The native mechanism, used as-is:
+*Read Figure 2 as three boxes NESTED one inside the other — session ⊃ class ⊃ method. That nesting IS
+the coupling: a resource placed in a scope's `Store` lives exactly as long as that scope and is
+closed when it ends, not before. Each scope has an entry hook (`BeforeXxx` — capture / raise) and an
+exit hook (`AfterXxx` / `CloseableResource.close()` — release / lower). The socle only fills these
+native slots; it adds no registry of its own.*
 
-* *`ExtensionContext.Store`, nested by scope* — `LauncherSession` (root) > Engine > Class
-  (`@BeforeAll`/`@AfterAll`) > Method (`@BeforeEach`/`@AfterEach`). A `CloseableResource` in a Store
-  is closed when THAT scope ends — not before.
-* *Lifecycle callbacks* — `BeforeXxxCallback` (the entry hook a discipline needs to capture / raise)
-  + `AfterXxxCallback` / `close()` (the exit hook to release / lower).
-* *The launcher* — the extracted `JUnitLauncherCore` (see § <<the-launcher>>), driven from a
-  `main()` at runtime and from surefire/IDE in test.
+.Figure 2 — the native scope tree: nested `Store`s, entry/exit hooks
+[mermaid]
+....
+flowchart TB
+  subgraph S["LauncherSession — ROOT scope"]
+    Snote["Store (root): the longest-lived resources<br/>closed only when the session ends"]
+    subgraph C["Class scope"]
+      Cnote["Store: @BeforeAll captures / raises<br/>@AfterAll releases"]
+      subgraph M["Method scope"]
+        Mnote["Store: @BeforeEach captures / raises<br/>@AfterEach + CloseableResource.close() releases"]
+      end
+    end
+  end
+  classDef scope fill:#eef2ff,stroke:#4c6ef5,color:#000;
+  class Snote,Cnote,Mnote scope
+....
 
 [NOTE]
 .Anti-pattern — a home-grown FrameworkRegistry
 ====
 ❌ A process/run-global registry that we write (first-connect bootstraps, caches, later ones attach),
-independent of the JUnit `Store`. It re-invents a scope JUnit already gives, and it *re-decouples*
+independent of the JUnit scope tree. It re-invents a scope JUnit already gives, and it *re-decouples*
 what we want coupled (the framework's life and the scenario's scope tree). ✅ The framework lives in
 the `Store` of the scope whose lifetime it should share; the SCOPE is the coupling.
 ====
@@ -103,61 +134,45 @@ the `Store` of the scope whose lifetime it should share; the SCOPE is the coupli
 == The framework lifecycle — held by the connection's scope
 
 *Lead: the framework lives in a JUnit scope's `Store` and is undone when that scope closes. Test vs
-runtime is only WHERE the root scope lives; the code is identical. Connecting is an abstraction:
-embedded bootstraps and owns the close; remote attaches and closes nothing.*
+runtime is only WHERE the root scope lives; the code is identical. Connecting is an abstraction —
+embedded bootstraps and owns the close, remote attaches and closes nothing.*
 
-The framework is not a JVM singleton and not a lexical `try` — it is a `CloseableResource` in the
+The framework is not a JVM singleton and not a lexical `try` — it is a closeable resource in the
 `Store` of a chosen scope. The same teardown mechanism ("close at the end of the scope") serves both
-worlds; only the *location of the root* differs:
+worlds; only the *location of the root* differs.
 
-[cols="1,2,2",options="header"]
-|===
-| | Real test | Live seed (runtime)
-| Root scope | the test run (the class / the surefire session) | the seed run (bounded by `pulumi up`)
-| Framework falls | at the end of the test — acceptable | at the end of the seed run
-| Same code? | yes — only the root's lifetime differs | yes
-|===
+*Read Figure 3 top-to-bottom. The top box is the CONNECTION abstraction with its two faces:
+`embedded()` (teal, realised — it bootstraps Felix, owns the lifecycle, and its `close()` stops the
+world) and `remote()` (green, named-not-built — it attaches to a running world, owns nothing, and its
+`close()` merely detaches so the world survives). The two boxes below show the ONLY difference between
+a test and a live seed: which scope is the root that holds the embedded connection — the test run, or
+the seed run bounded by `pulumi up`. Same `embedded()`, same close-at-scope-end; only the root's
+lifetime changes.*
 
-*Connecting is `OsgiConnection`* — an abstraction over "how do I reach the OSGi world", with explicit
-ownership of lifecycle:
-
-[source,java]
-----
-interface OsgiConnection extends AutoCloseable {
-  BootedFramework world();
-  boolean ownsLifecycle();          // true iff THIS connection bootstrapped the world
-  @Override void close();           // owns → stop; attached → detach (world survives)
-
-  static OsgiConnection embedded();       // bootstraps Felix in-process; owns the close — REALISED
-  static OsgiConnection remote(String endpoint);  // attaches; closes = detach — NAMED, not built
-}
-----
-
-*Embedded* (`FrameworkLaunchPipeline.embedded()`, the only realisation today) bootstraps Felix and
-owns its `close()`. *Remote* is the named extension point: the world runs detached, `close()` detaches
-without stopping it. Only `embedded()` is built in this increment; `remote()` throws
-`UnsupportedOperationException` until a real client-framework case arrives (see § <<yagni>>). This is
-the same detached-by-design frame the pipeline-spec already grave — here applied to the *first step*
-of the seed scenario ("the OSGi world is connected").
-
-.Figure 1 — the framework held by scope; test root vs runtime root, same mechanism
+.Figure 3 — the connection abstraction; test root vs runtime root, one mechanism
 [mermaid]
 ....
 flowchart TB
-  subgraph test["REAL TEST — root = the test run"]
-    tr["LauncherSession Store<br/>OsgiConnection.embedded()<br/>close() at run end"]
+  subgraph abs["OsgiConnection — reach the OSGi world, own the lifecycle"]
+    emb["embedded() — REALISED<br/>bootstraps Felix in-process<br/>ownsLifecycle = true<br/>close() → stop the world"]
+    rem["remote(endpoint) — NAMED, not built<br/>attaches to a running world<br/>ownsLifecycle = false<br/>close() → detach, world survives"]
   end
-  subgraph run["LIVE SEED — root = the seed run (pulumi up)"]
-    rr["LauncherSession Store<br/>OsgiConnection.embedded()<br/>close() at pulumi-up end"]
-  end
-  subgraph rem["REMOTE (named, not built)"]
-    rmr["OsgiConnection.remote(endpoint)<br/>close() = DETACH, world survives"]
-  end
+  test["REAL TEST — root scope = the test run<br/>embedded() in the session Store<br/>close() at run end → framework falls (acceptable)"]
+  run["LIVE SEED — root scope = the seed run (pulumi up)<br/>embedded() in the session Store<br/>close() at pulumi-up end → framework falls"]
+  future["a future client-framework case"]
+  emb --> test
+  emb --> run
+  rem -.-> future
   classDef built fill:#0b7285,color:#fff;
-  classDef future fill:#d4f4dd,stroke:#2e7d32,color:#000;
-  class tr,rr built
-  class rmr future
+  classDef named fill:#d4f4dd,stroke:#2e7d32,color:#000;
+  class emb,test,run built
+  class rem,future named
 ....
+
+Only `embedded()` is built in this increment; `remote()` throws `UnsupportedOperationException` until
+a real client-framework case arrives (see § <<yagni>>). This is the same detached-by-design frame the
+pipeline-spec already grave — here applied to the *first step* of the seed scenario ("the OSGi world
+is connected").
 
 [[the-lever]]
 == The lever — the start level, driven by the depth of the JUnit scope
@@ -179,37 +194,47 @@ The `BootPlanner` already assigns each bundle a start level by its ROLE, in name
 |===
 
 `beginningStartLevel()` is the highest a bundle sits at (4) — the framework climbs to it, so all
-installed bundles are active when the boot hands over.
+installed bundles are active when the boot hands over. The cursor is single and global: the framework
+is AT level N, never "at 4 for this scope and 3 for that one". So there is no parallel stack of
+levels — what nests is the JUnit scope tree, and it maps to *ordered moves of the one cursor in time*.
 
-*The cursor is single and global.* The framework is AT level N — never "at 4 for this scope and 3 for
-that one". So there is no parallel stack of levels. What DOES nest is the JUnit scope tree, and it
-maps to *ordered moves of the one cursor in time*:
+*Read Figure 4 as a timeline with three lifelines: the JUnit scopes (who calls), the single global
+start-level cursor (what moves), and the domain bundles (what lights up). Follow it down: entering
+each scope raises the cursor; `@AfterEach` LOWERS it, and that arrow is the important one — the stop
+is transient (autostart untouched) AND asynchronous, so the teardown must WAIT for the level-changed
+event before the next scope runs. The final dashed note is why re-ascent needs no explicit restart:
+the next `@BeforeEach` re-lights the bundles from their unchanged autostart.*
 
-[source]
-----
-openSession    → setStartLevel(0)   nothing active
-  @BeforeAll   → setStartLevel(3)   framework-runtime (felix.scr, resolver)
-    @BeforeEach → setStartLevel(4)  domain bundles active for THIS method
-    @AfterEach  → setStartLevel(3)  descend: STOP_TRANSIENT on the domain bundles
-  @AfterAll    → setStartLevel(0)
-closeSession
-----
+.Figure 4 — the staircase: scopes move the one cursor, bundles follow; descent is transient + async
+[mermaid]
+....
+sequenceDiagram
+  participant J as JUnit scopes
+  participant C as start-level cursor (single, global)
+  participant B as domain bundles (level 4)
+  J->>C: openSession — setStartLevel(0)
+  Note over C: 0 · nothing active
+  J->>C: @BeforeAll — setStartLevel(3)
+  Note over C: 3 · felix.scr, resolver
+  J->>C: @BeforeEach — setStartLevel(4)
+  C->>B: start (from persistent autostart)
+  Note over C,B: 4 · domain bundles active for THIS method
+  J->>C: @AfterEach — setStartLevel(3)
+  C-->>B: STOP_TRANSIENT (autostart intact)
+  Note over C,B: async — WAIT for STARTLEVEL_CHANGED before the next scope
+  Note over J,B: the next @BeforeEach re-lights B from autostart (no explicit restart)
+  J->>C: @AfterAll — setStartLevel(0)
+  J->>C: closeSession
+....
 
-*Descent and re-ascent, per the OSGi R8 spec* (`osgi.core` 8.0.0, verified against
-`FrameworkStartLevel.setStartLevel`):
-
-* Lowering the active start level *stops* bundles above the new level using `Bundle.STOP_TRANSIENT` —
-  which arrests them WITHOUT touching their persistent autostart setting.
-* The call is *asynchronous*: it returns immediately, the work runs on another thread, a
-  `FrameworkEvent.STARTLEVEL_CHANGED` fires on completion. **Therefore a scope's teardown that lowers
-  the level MUST wait for that event** (with a timeout, as `BootedFramework.close()` already waits on
-  `waitForStop`) — otherwise the next scope sees a half-torn-down world.
-* Because the descent was `STOP_TRANSIENT`, re-ascending the level *re-lights* those bundles
-  automatically from their unchanged autostart setting.
-
-NOTE: R8 guarantees per-level ordering (higher levels stop before lower) but does not explicitly
-mandate an order *within* a level; the layer design already separates roles across levels, so this
-does not bite. The dependency-safe order is the level order.
+NOTE: per the OSGi R8 spec (`osgi.core` 8.0.0, `FrameworkStartLevel.setStartLevel`): lowering the
+active level stops bundles above it with `STOP_TRANSIENT` (arrests them without touching persistent
+autostart); the call is asynchronous and fires `FrameworkEvent.STARTLEVEL_CHANGED` on completion (so
+a teardown that lowers MUST wait, as `BootedFramework.close()` already waits on `waitForStop`);
+re-ascending re-lights the transiently-stopped bundles from their unchanged autostart. R8 guarantees
+per-level ordering (higher stop before lower) — the dependency-safe order is the level order; it does
+not mandate an order *within* a level, which does not bite since the layers separate roles across
+levels.
 
 == The two dimensions — depth × domain
 
@@ -239,74 +264,86 @@ wants isolation (the method scope descends/re-ascends, each case clean); a runti
 stationary (climb once, never descend between pipelines, the world survives). Opposite mappings, one
 mechanism.*
 
-The asymmetry is the same test-vs-runtime divergence, seen through the level lever:
+*Read Figure 5 as two lanes, each a left-to-right trajectory of the start-level cursor over the run.
+The top lane (isolation) SAWTOOTHS: it climbs to 4 for a case, drops back to 3 at `@AfterEach`, climbs
+again for the next case — every case re-starts the domain bundles, so every case is clean. The bottom
+lane (stationary) is FLAT at 4: it climbs once and holds across every pipeline, the world never torn
+down between them. Seeing the two shapes side by side is the argument: a single fixed mapping would
+break whichever lane it does not match.*
 
-[cols="1,2,2",options="header"]
-|===
-| | *isolation* (a real test) | *stationary* (a runtime pipeline)
-| level mapping | method scope descends at teardown, re-ascends for the next | climbs to 4 once, NEVER
-  descends between pipelines
-| effect | each test case re-starts the domain bundles → starts clean | the live world survives across
-  the scenarios of the run
-| why | isolate each case, repartir propre | the seed is one long run; do not rebuild the world
-|===
+.Figure 5 — two trajectories of the one cursor: isolation sawtooths, stationary holds
+[mermaid]
+....
+flowchart TB
+  subgraph iso["ISOLATION — a real test (each case clean)"]
+    direction LR
+    i0["session<br/>level 0"] --> i3["@BeforeAll<br/>level 3"] --> i4a["@BeforeEach<br/>level 4"] --> i3b["@AfterEach<br/>↓ level 3"] --> i4b["next @BeforeEach<br/>↑ level 4"] --> i0b["@AfterAll<br/>level 0"]
+  end
+  subgraph sta["STATIONARY — a runtime pipeline (world survives)"]
+    direction LR
+    s0["seed start<br/>level 0"] --> s4["climb once<br/>↑ level 4"] --> s4a["pipeline 1<br/>level 4 held"] --> s4b["pipeline 2<br/>level 4 held"] --> s0b["seed end<br/>level 0"]
+  end
+  classDef clean fill:#fff3bf,stroke:#f08c00,color:#000;
+  classDef hold fill:#d4f4dd,stroke:#2e7d32,color:#000;
+  class i0,i3,i4a,i3b,i4b,i0b clean
+  class s0,s4,s4a,s4b,s0b hold
+....
 
-A fixed mapping would break one side: `session=0/class=3/method=4` breaks pipelines (they must not
-descend); `always 4` breaks test isolation. So *the role of the scope selects its discipline* — the
-concrete form of "each level chooses its discipline by its role" that runs through the whole design.
+*The role is DECLARED, not detected — by an rke2lab annotation, meta-annotated `@ExtendWith`. Read
+Figure 6 top-down: two annotations (`@IsolatedWorld`, `@SeedRuntime`) both pull, via meta-`@ExtendWith`,
+ONE shared base extension that does the common work (connect + pilot the start level). The base then
+forks into the ONLY thing that differs — the teardown strategy: isolation lowers the level at method
+scope, stationary climbs once and tears down only at the root. Choosing the annotation IS choosing the
+role. A 3rd discipline is a 3rd annotation pulling its own strategy — no change to the base.*
 
-*The role is DECLARED, not detected — by an rke2lab annotation, meta-annotated `@ExtendWith`.* The
-annotation is the readable intent; the extension is the mechanism it pulls; the extensions share a
-common base (connect + start-level piloting) and differ only in their teardown strategy (the
-discipline):
+.Figure 6 — annotation → shared base extension → divergent teardown strategy
+[mermaid]
+....
+flowchart TB
+  ann1["@IsolatedWorld<br/>(rke2lab annotation)"]
+  ann2["@SeedRuntime<br/>(rke2lab annotation)"]
+  base["BaseWorldExtension — SHARED<br/>connect + start-level piloting"]
+  iso["isolation strategy<br/>method-scope teardown LOWERS the level"]
+  sta["stationary strategy<br/>climb once; teardown at ROOT only"]
+  ann1 -.->|"meta-@ExtendWith"| base
+  ann2 -.->|"meta-@ExtendWith"| base
+  base --> iso
+  base --> sta
+  ann1 --> iso
+  ann2 --> sta
+  classDef ann fill:#eef2ff,stroke:#4c6ef5,color:#000;
+  classDef shared fill:#8250df,color:#fff;
+  classDef strat fill:#0b7285,color:#fff;
+  class ann1,ann2 ann
+  class base shared
+  class iso,sta strat
+....
 
-[source,java]
-----
-@Target(TYPE) @Retention(RUNTIME)
-@ExtendWith(/* the extension incarnating the discipline */)
-public @interface /* SeedRuntime | IsolatedWorld — exact form decided at spec authoring */ {}
-----
-
-* An *isolation* annotation → an extension whose method-scope teardown lowers the level.
-* A *stationary* annotation → an extension that climbs once and holds; teardown at the ROOT only.
-
-Choosing the annotation IS choosing the role. Extensible: a 3rd discipline = a 3rd annotation pulling
-its strategy, no change to the core — the JUnit extension model, "comme jGiven". This honours the
-single-source-of-truth-for-identifiers discipline (CLAUDE.md): the role is a named rke2lab type, not a
-hand-wired extension repeated at each call site.
+This honours the single-source-of-truth-for-identifiers discipline (CLAUDE.md): the role is a named
+rke2lab type, not a hand-wired extension repeated at each call site. Extensible, "comme jGiven" — the
+JUnit extension model absorbs a new discipline the way jGiven absorbed our steps.
 
 NOTE: whether it is one annotation per discipline (`@SeedRuntime`, `@IsolatedWorld`) or one
 parameterised annotation (`@SeedWorld(mode=…)`) — and the exact verbs of the lease — is decided at
-authoring time, where the reading is judged. The PRINCIPLE (annotation → extension → shared base +
-strategy) is fixed here.
+authoring time, where the reading is judged. The PRINCIPLE (annotation → base extension → divergent
+strategy) is fixed here and in Figure 6.
 
 == The runbook — the deliverable, owned by the operation, contributed by the framework
 
 *Lead: the runbook is the whole POINT (the operator's read-AND-act view). It is owned by the launcher
 / the seed OPERATION, bounded by `pulumi up`. The framework does NOT hold a runbook — it CONTRIBUTES
-`ScenarioModel`s to the one the operation owns.*
+scenario models to the one the operation owns.*
 
 The runbook (`ReportModel`) is the benefit of all this machinery — miss it and we would have specced
-the plumbing without its purpose. Ownership, decided:
+the plumbing without its purpose.
 
-* *The launcher / the operation owns it.* `SeedLauncher` opens ONE `ReportModel` at the start of the
-  seed, the scenarios graft their trees into it (E5 nested-step, E10 cross-world graft), and it is
-  rendered at the end of `pulumi up`. One runbook for the whole seed run.
-* *The framework does not hold it — it contributes.* An OSGi world consulted across the gateway
-  returns a serialized `ScenarioModel` (the `Document` seam); it stores no report. The calling world
-  (host / launcher) aggregates. Consistent with the two-spaces invariant: no live report object
-  crosses the gateway.
-* *Scenarios stay distinguishable within one runbook.* `ReportModel.scenarios` is a
-  `List<ScenarioModel>` where each keeps its `className` + description; `RunbookRenderer` already
-  selects a scenario by identity (`scenarioFor(model, checkpoint)`). So the seed-cluster scenario is
-  identifiable among the others. (E4 caveat: the list is FLAT + sorted by description — the *tree*
-  lives only in `nestedSteps`; "distinguish by identity" yes, "hierarchy between scenarios" only via
-  nesting.)
+*Read Figure 7 left-to-right around the OWNER (purple): the operation opens ONE report, the scenarios
+play and graft their trees into it, and it is rendered at the end of `pulumi up`. The framework (teal)
+sits OFF the ownership line: it is consulted across the gateway and returns a serialized scenario
+model (the `Document` seam) — a dashed contribution arrow, never a report it holds. That off-line
+placement is the whole claim: the framework participates, it is not the repository.*
 
-The runbook's scope is the OPERATION, not the framework's life. In embedded they coincide (the
-framework falls with the operation). The framework is a participant consulted, never a repository.
-
-.Figure 2 — the runbook owned by the operation; the framework contributes
+.Figure 7 — the runbook owned by the operation; the framework only contributes
 [mermaid]
 ....
 flowchart LR
@@ -323,6 +360,14 @@ flowchart LR
   class op,render own
   class fw contrib
 ....
+
+Scenarios stay distinguishable within one runbook: `ReportModel.scenarios` is a `List<ScenarioModel>`
+where each keeps its `className` + description; `RunbookRenderer` already selects a scenario by
+identity (`scenarioFor(model, checkpoint)`). So the seed-cluster scenario is identifiable among the
+others. (E4 caveat: the list is FLAT + sorted by description — the *tree* lives only in `nestedSteps`;
+"distinguish by identity" yes, "hierarchy between scenarios" only via nesting.) The runbook's scope is
+the OPERATION, not the framework's life; in embedded they coincide (the framework falls with the
+operation), but the ownership is the operation's.
 
 [[yagni]]
 == What the socle deliberately does NOT do (YAGNI, confirmed by the code)
@@ -353,13 +398,36 @@ Each exclusion was checked against the codebase, not assumed:
 *Lead: only the scope that INITIATED a mutation of the framework (posed the lease) holds — or
 delegates — the authority to keep or undo it. No ambient authority.*
 
-The lease that raises the start level for a scope confers its authority on that scope's initiator.
-The initiator may delegate it, but no other scope may keep or undo a mutation it did not initiate (or
-receive by delegation). This is why the discipline is a *choice of the scope*, not a global rule: the
-role is defined by who holds the authority at that level. Practically, in this socle the authority is
-carried by the extension the annotation pulls — the extension that raised the level at its scope's
-entry is the one that lowers it at teardown; a nested scope that wants a different depth declares its
-own annotation (its own extension, its own authority, undone at its own teardown).
+*Read Figure 8 following the solid arrows: the initiating scope holds the authority, and only it (or a
+scope it explicitly delegates to) reaches the "keep / undo" outcome. The dashed FORBIDDEN arrow from a
+non-initiating scope is barred — that is what "no ambient authority" means: presence in the tree does
+not grant the right to undo a mutation you did not pose.*
+
+.Figure 8 — the lease authority flows only from the initiator (or its delegate)
+[mermaid]
+....
+flowchart LR
+  init["the scope that INITIATED the mutation<br/>(raised the level = posed the lease)"]
+  hold["HOLDS the authority"]
+  del["may DELEGATE it"]
+  undo["keep / undo the mutation"]
+  other["another scope<br/>(did not initiate, no delegation)"]
+  init --> hold
+  hold --> undo
+  hold --> del
+  del --> undo
+  other -.->|"FORBIDDEN — no ambient authority"| undo
+  classDef ok fill:#0b7285,color:#fff;
+  classDef bad fill:#c92a2a,color:#fff;
+  class init,hold,del,undo ok
+  class other bad
+....
+
+This is why the discipline is a *choice of the scope*, not a global rule: the role is defined by who
+holds the authority at that level. Practically, in this socle the authority is carried by the
+extension the annotation pulls — the extension that raised the level at its scope's entry is the one
+that lowers it at teardown; a nested scope that wants a different depth declares its own annotation
+(its own extension, its own authority, undone at its own teardown).
 
 == Increment boundary — this socle is increment 1
 
