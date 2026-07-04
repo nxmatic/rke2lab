@@ -92,7 +92,6 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 === Incus
 
 * link:architecture/patterns/incus-distribution-contract.adoc[Incus Distribution Contract] - How Incus images are built and distributed (⚠️ Reverse-Engineered v1)
-* link:incus-resource-bootstrap-refactoring-plan.md[Incus Resource Bootstrap Refactoring Plan] - Bootstrap refactoring decisions (✅ Complete)
 
 === Host Assets
 
@@ -113,12 +112,12 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 == Implementation Plans
 
 * link:architecture/cluster-api/cluster-workload-completion-plan.adoc[Cluster Workload Completion Plan] - Completing cluster workload features (📋 Status Unknown)
-* link:script-layer-owners.md[Script Layer Owners] - Ownership mapping for bootstrap scripts (⚠️ Historical Reference)
+* link:script-layer-owners.adoc[Script Layer Owners] - Ownership mapping for bootstrap scripts (⚠️ Historical Reference)
 * link:guides/rke2lab-authored-notes-import.adoc[RKE2Lab Authored Notes Import] - Migration notes (⚠️ Historical Reference)
 
 == Architecture Diagrams
 
-* link:architecture/nri-plugin-c4-diagrams.md[NRI Plugin C4 Diagrams] - Container Runtime Interface plugin architecture
+* link:architecture/nri-plugin-c4-diagrams.adoc[NRI Plugin C4 Diagrams] - Container Runtime Interface plugin architecture
 
 == Navigation Tips
 

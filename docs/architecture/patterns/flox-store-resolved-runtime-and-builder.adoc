@@ -409,7 +409,7 @@ enough to land alongside if reachability is confirmed early.
   the execution contract and host-asset materialization path these scripts use.
 * link:controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] —
   how host assets are materialized on nodes.
-* link:architecture/nri-plugin-c4-diagrams.md[NRI Plugin C4 Diagrams] —
+* link:architecture/nri-plugin-c4-diagrams.adoc[NRI Plugin C4 Diagrams] —
   the plugin that mounts envs (and will mount `builder.conf`) into containers.
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
   the synth-time secret-access pattern the builder key delivery follows.

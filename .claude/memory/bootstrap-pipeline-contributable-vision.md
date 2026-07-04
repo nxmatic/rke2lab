@@ -86,12 +86,6 @@ code; much imperative logic should migrate into the fluent grammar for readabili
 Orthogonal to the other two — about *how much* logic the grammar expresses, not *where* it runs or
 *whether* it is duplicated; holds in EITHER world; presupposes the shared engine L1–L3 builds.
 
-★ DO NOT re-document the candidates here — they already live in `docs/incus-resource-bootstrap-refactoring-plan.md`
-(a 5-phase plan naming the problematic sites, e.g. `prepareHostState()` "80+ lines hidden"). That doc is
-STALE (talks of a 171-method `IncusResourceBootstrap`, "week 1-4", and `../seed-master/` from the
-pre-`exec/` layout) — REFRESH it against the current tree before acting on this horizon, don't trust it
-verbatim. This note is the pointer; the doc is the source of truth once refreshed.
-
 ## RESOLUTION — the contributable refactor is CLOSED, it dissolves into the OSGi move (2026-07-02)
 
 Revisited from the pipeline side during the OSGi-ownership chantier (spec
