@@ -31,6 +31,18 @@ Neither gate is a new orchestrator. `LiveGate` is the preview/up STATE; `PulumiO
 guaranteed ASSEMBLER. The pipeline holds both and actions them — it consults the living gate per
 action (`through(live, deferred)`) and drives the write once (`registry.add(...).assemble()`).
 
+[NOTE]
+.The living gate half is re-posed by the BDD-as-engine turn
+====
+The *living gate* framing below (`LiveGate` as a preview/up state) is *avant*: the BDD-as-engine turn
+(§ <<the-bdd-as-engine-turn>>) erases `LiveGate` and re-poses preview as an `ExecutionCondition`
+selecting a `PreviewExecutor` (rendering decoupled from execution, E9). What survives from Diagram P is
+the *named erasure of the seven scattered `isDryRun()` reads* and the whole *output gate* half
+(`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) — the output axis is
+orthogonal to the turn and stays exactly as drawn. Read Diagram P for those; read the turn section for
+the preview mechanism.
+====
+
 === Diagram P — the two gates: BEFORE vs AFTER (named erasure)
 
 Blue = shipped, untouched. Green = added. Red-dashed = deliberately erased.
@@ -88,15 +100,24 @@ Conclusion: *additive-with-named-erasure; the pipeline gains one clear responsib
 and loses four scattered anti-patterns.* Status: DESIGN (2026-07-01), the living gate slated first
 (it fixes the hang), then the systemd report, then the output registry.
 
-=== The role map — every pipeline role, where it lives, who touches it
+=== The role map — every pipeline role, where it lives, who touches it (the AVANT)
+
+[IMPORTANT]
+.This role map is the AVANT — superseded by the BDD-as-engine turn below
+====
+The Topic / `State<I,B>` / fluent-grammar role map in this section is the model *as shipped* (the
+212-commit pipeline-port arc). It is kept here as the *avant* of the evolution figure — read it to
+understand where Diagram Q (below) starts from. The *current* model is the BDD-as-engine turn (§
+<<the-bdd-as-engine-turn>>) and its spec is link:../osgi/pipeline-spec.adoc[pipeline-spec]. The former
+grammar convention doc was folded into pipeline-spec's avant section and deleted.
+====
 
 The pattern behind every fluent pipeline (`ClusterSeedPipeline`, `IncusResourceBootstrap`,
 `ApplicationPipeline`, the manifest/systemd synthesizers…) is one set of named roles. The realization
 (2026-07-03) was that the codebase already HAD each role — locally, unnamed, non-uniform (one pipeline
 used a `Sink`, another a registry, a third `Supplier`s, a fourth direct field writes). The refactor
-does not invent; it NAMES the roles and makes them uniform. This map is the transversal view (the
-grammar doc link:../patterns/fluent-pipeline-grammar.adoc[fluent-pipeline-grammar] holds the pattern
-detail; this is where it integrates into the host pipeline).
+does not invent; it NAMES the roles and makes them uniform. This map is the transversal view of the
+avant; the BDD-turn section below maps each role to its après.
 
 [mermaid]
 ....
@@ -143,6 +164,144 @@ frozen `I` and its `Sink` — never `B`, never the context — so it is determin
 isolation. Writing an output by directly assigning an accumulator field (topic holding a state
 reference) is a DERIVATION the `PIPELINE_PATTERN` governance gate is meant to catch.
 
+[[the-bdd-as-engine-turn]]
+== The BDD-as-engine turn — the seeding as jGiven scenarios (the APRÈS, GO 2026-07-04)
+
+The role map above is the *avant*. This section is the *après* — the current model: express the whole
+seeding as *jGiven scenarios orchestrated by the JUnit Platform launcher*, the fluent grammar
+dissolved, the missing dynamics contributed as Jupiter extensions. Its spec is
+link:../osgi/pipeline-spec.adoc[pipeline-spec]; the discovery record is
+link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC] (ten measured learnings E1–E10). *GO
+was reached 2026-07-04*: the turn is proven viable (a bench transposed the entire ClusterSeed pipeline
+and rendered a real runbook) AND proven to hold on the atlas (below). The reference implementation is
+pinned at tag `spike/bdd-pipeline-poc`. This view is where the *additivity proof* — the evolution
+figure — lives.
+
+=== The concept correspondence — avant → après (anchored on the bench `SeedPhases`)
+
+Every role of the former model maps to a jGiven concept the bench actually wrote. Nothing is erased
+silently: the *Sort* column names each move.
+
+[cols="2,2,2,1",options="header"]
+|===
+| Avant (Topic/State, superseded) | Après (bench cluster-seed) | Proof in `SeedPhases.java` | Sort
+| `Topic` (identification iface) | a jGiven `Stage<T>` (one phase) | `EnvironmentPhase extends Stage<>` ×7 | replaced
+| nature `Topic.Execution` | a flat-step `Stage` | `PreflightPhase`, `IncusPhase` | replaced
+| nature `Topic.Checkpoint` | a `Stage` opening a nested G/W/T | `ClusterReadinessPhase` → `ReadinessCheckpoint` (`.given().when().then()`) | replaced
+| `Topic.Sink` (write-face) | `@ProvidedScenarioState` (out-edge) | `@ProvidedScenarioState Environment environment` | replaced
+| flux input `I` | `@ExpectedScenarioState` (in-edge) | `@ExpectedScenarioState BboxReservations bbox` (IncusPhase) | replaced
+| `State<I,B>` (compile-time type-state) | scenario-state runtime **+ a build-time DAG gate** | `DagGateSpikeTest` | transformed
+| fluent `during`/`then` | intro-words + `@NestedSteps` | `WhenTheSeedRuns` (`@Hidden @NestedSteps`) | replaced
+| topic label | `@As("…")` (the runbook node) | `@As("the incus instance $ is provisioned")` | replaced
+| `FluentTopicRunner` | the embedded JUnit Platform launcher | `SeedLauncherMain` | replaced
+| `PipelineContext` (Class→record) | `ExtensionContext.Store` | (JUnit-native) | replaced
+| gate `PIPELINE_PATTERN` (ASM) | the **DAG gate** (`provided`/`required` topological) | `DagGateSpikeTest` | re-tooled
+| `LiveGate` | — | — | erased
+| `RunMode` (tag `wip/runmode-absorbs-livegate`, abandoned) | an `ExecutionCondition` + `PreviewExecutor` | `fake/PreviewExecutor` (E9) | re-posed
+| runbook (`ReportModel`, host) | same + cross-world graft | E10 (`addNestedStep`) | kept+extended
+|===
+
+The one true change of *guarantee* is `State<I,B>`: the DAG moves from compile-time (type-state) to
+runtime (scenario-state) *plus* a new build-time gate that reads the `@Provided/ExpectedScenarioState`
+annotations and checks every `required` has a `guaranteed` upstream — the compile-time safety kept, as
+a `StagingGate` sibling of the retired `PIPELINE_PATTERN`. Everything else is a 1:1 vocabulary
+replacement.
+
+=== Diagram Q — the seeding orchestration: BEFORE vs AFTER (named erasure)
+
+Blue = shipped/unchanged (the atlas invariants it rests on). Green = added. Red-dashed = erased,
+each named in the table above.
+
+[mermaid]
+....
+flowchart LR
+  subgraph B["before — fluent grammar + jGiven tangled in 2 topics"]
+    b_gram["during/then fluent grammar<br/>Topic / Topic.Sink / State&lt;I,B&gt;"]
+    b_run["FluentTopicRunner"]
+    b_ctx["PipelineContext (Class→record)"]
+    b_gate["PIPELINE_PATTERN gate (ASM)"]
+    b_tangle["2 topics drive Scenario by hand<br/>(ClusterReadinessTopic.launch)"]
+  end
+  subgraph A["after — one scenario tree, launcher-orchestrated"]
+    a_launch["JUnit Platform launcher<br/>(embedded via InContainerJUnitRunner)"]:::new
+    a_scn["phases = jGiven Stages<br/>@NestedSteps compose the tree"]:::new
+    a_state["scenario-state = the value DAG<br/>@Provided/ExpectedScenarioState"]:::new
+    a_dag["DAG gate (build-time, ASM)<br/>required ⇒ guaranteed upstream"]:::new
+    a_prev["RunMode = ExecutionCondition<br/>+ PreviewExecutor (E9)"]:::new
+    a_launch --> a_scn
+    a_scn --> a_state
+    a_state -.enforced by.- a_dag
+    a_prev -.selects.- a_launch
+  end
+  subgraph INV["atlas invariants — unchanged (the turn rests on these)"]
+    i_r4["R4 boot seam<br/>Felix in Pulumi.run"]:::inv
+    i_gw["world-gateway<br/>Document(String) at the port"]:::inv
+    i_jg["jGiven bundle-only per world<br/>never system-exported"]:::inv
+  end
+  a_launch -->|runs in| i_r4
+  a_scn -->|cross-world edge grafts ScenarioModel via| i_gw
+  a_scn -->|each world its own copy| i_jg
+  classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+  classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+  classDef inv fill:#eef,stroke:#88a,stroke-width:1px;
+  class b_gram,b_run,b_ctx,b_gate,b_tangle gone;
+....
+
+=== Verdict — does the turn hold on the atlas?
+
+Tested against the four structural invariants; each holds, three with in-container proof already on
+the bench or in the doctor testkit.
+
+[cols="2,1,3",options="header"]
+|===
+| Invariant | Holds? | Why
+| Two spaces (`grep -ri pulumi osgi/` == 0) | ✓ | jGiven stays internal to each world; `RunMode` (the `isDryRun` fact) stays host, projected as an `ExecutionCondition`. No box changes space.
+| R4 boot seam (Felix in `Pulumi.run`) | ✓ reused | the launcher is one more consumer of the seam; `InContainerJUnitRunner` already drives a JUnit launcher *inside* Felix, and `JGivenTestkit.felix()` proves the jGiven runtime (byte-buddy proxy, `ScenarioExecutor`, `ValueInjector`) boots in-container — the coupling that gives the state-DAG + the execution nesting.
+| Two vocabularies (`Document` at the port) | ✓ + E10 | the cross-world edge grafts the remote `ScenarioModel` *serialized as String* (`addNestedStep`); the live class never crosses.
+| `DUPLICATE_REALM_CLASS` == 0 | ✓ | the rule fires only if a class transpires *through a port* — jGiven is never in a `type=seam`/`system.packages.extra`, so each world loading its own copy is legal by construction (the LOCAL claim in `pipeline-jgiven`'s bnd).
+|===
+
+*Conclusion: additive-with-named-erasure.* The turn adds the launcher-substrate, the three Jupiter
+extensions, the DAG gate and the `PreviewExecutor`; it erases the fluent grammar, `Topic`/`Sink`/
+`State<I,B>`, `PipelineContext`, `LiveGate`, `FluentTopicRunner`, and re-tools `PIPELINE_PATTERN`
+into the DAG gate. It rests on four unchanged invariants. The residue is the code migration: the
+orchestration substrate is proven *in principle* on the bench (the launcher runs jGiven in Felix under
+the testkit) — wiring it as seed-master's own live pipeline is the *ClusterSeed-vertical-first*
+increment; the six other pipelines stay on the former model meanwhile (assumed coexistence, not a
+legacy variant to hide).
+
+=== The go/no-go gate — closed: the seven mechanisms, proven
+
+An adversarial pass (2026-07-04) hunted for migration-killers *before* graving the go. Two candidate
+blockers *dissolved* under the stacked-scenario model; five remained as integration concerns. The
+*enrich-proofs spike* then closed all seven with a green artifact each — the whole bench module green
+at *26 `@Test` methods across 14 classes plus one `@PollUntilReady` `@TestTemplate` (17 poll
+invocations)*. This table is now a *registry of proven mechanisms* + where to find each (all pinned at
+tag `spike/bdd-pipeline-poc`; retrieve via `git show spike/bdd-pipeline-poc:<path>`).
+
+Two honesty caveats on the proofs, neither a wall: (1) concern E and the cross-world graft are proven
+*in isolation* — the OSGi realm is a `URLClassLoader` stand-in, the cross-world hand-off an in-JVM JSON
+round-trip; the *mechanism* holds, *integration with the real embedded Felix is the migration
+increment*. (2) `FailFastPreviewExecutor` (row F) is a spike-discovered bonus seam — loquacity polish,
+not on the critical path.
+
+[cols="1,3,2",options="header"]
+|===
+| # | What it is | Proven by (tag `spike/bdd-pipeline-poc`)
+| D | jGiven state is per-scenario — would break fan-in (Resources reads two upstream outputs) if each phase were its own scenario. | *DISSOLVED + PROVEN.* `FanInStatusSpikeTest`: a `ResourcesPhase` reading BOTH `@ExpectedScenarioState NetworkPlan` AND `StoragePlan`, each from an independent upstream phase, all in ONE composing scenario; the runbook renders both fanned-in values on one node. State scopes by the stage/step hierarchy.
+| F | the launcher records pass/fail but does not throw — risk of continuing past a failed phase. | *DISSOLVED + PROVEN.* `FanInStatusSpikeTest`: the failing path reads the halt off `ScenarioModel.getExecutionStatus()` (FAILED) + the failed producer node. Under a `@Hidden @NestedSteps` relay a fail-fast-skipped node does NOT materialize — so the signal MUST be the model-level `executionStatus`, not a per-node marker. Optional polish (rendering the skipped downstream plan): `FailFastPreviewExecutor` (`FailFastPreviewSpikeTest`) or the E10 graft (`SkippedPlanGraftSpikeTest`).
+| A | the launcher driven BY seed-master inside `Pulumi.run` (not by surefire) — the "engine" premise. | *PROVEN.* `SeedLauncherMainSpikeTest` spawns `SeedLauncherMain` as a bare `java -cp … main()` subprocess — zero surefire on its stack — which drives a real `LauncherFactory` launcher, runs a jGiven scenario green, exits 0. The live boot seam already exists: `ClusterSeedTopic.seedCluster()` boots embedded Felix on the lambda thread today.
+| E | `context.export` is synchronous on the `Pulumi.run` lambda thread; the harness runs the launcher on a dedicated TCCL thread. | *PROVEN — the frontier IS the gateway.* Host-world scenarios run on the lambda thread (no OSGi realm → launcher inline, export synchronous, `SeedLauncherMain`). OSGi-world scenarios run inside Felix on ITS thread; the host consults via `consult(Document) → Document`, the remote `ScenarioModel` crosses back as JSON and is grafted (E10, `CrossWorldGraftSpikeTest`, `ExportFromModelSpikeTest`). *Isolation caveat:* `URLClassLoader` realm stand-in; real-Felix wiring is the increment.
+| G | the real temporal loops are adaptive (15s→8s→3s→2s by elapsed) with nested deadlines + 30s progress cadence — a flat repeat-count cannot express them. | *PROVEN.* `@PollUntilReady` + `PollUntilReadyExtension` — a real `TestTemplateInvocationContextProvider` re-invoking on the exact `SeedSystemdAdapterEndpointGate` schedule (15/8/3/2s bucketed at 90/150/210s, virtual clock, 30s cadence), STOPPING the instant the probe is ready (17 attempts, ready at 160s). Each attempt renders its own runbook line.
+| B | a poll loop (TestTemplate) composed with `@NestedSteps` sub-trees AND the `PreviewExecutor` is untested. | *PROVEN.* `PollCompositionSpikeTest`: (B.1) an executing poll opens the readiness G/W/T sub-tree under EACH attempt; (B.2) the *preview of a poll* is ONE representative attempt through `PreviewExecutor` — full nested plan, every step `(pending)`, zero iteration.
+| C | the build-time DAG gate must prove topological order (guaranteed BEFORE required), not just presence. | *PROVEN.* `DagGateSpikeTest` recovers phase call ORDER via asm-tree `MethodInsnNode` iteration, walks it maintaining a produced-so-far set, and REJECTS a consumer-before-producers pipeline the presence-only check accepts. The compile-time guarantee survives the turn.
+|===
+
+*Status: the turn is DESIGN adopted (GO), the mechanisms PROVEN in isolation; what remains is the real
+code increment* — wiring these into `seed-master` as the ClusterSeed-vertical-first migration, not
+further proof of viability. The bench's role (decide viability, close the blockers) is done; its code
+survives at the tag, the module itself is disposable and out of the default build.
+
 [NOTE]
 .Governance note — the build-time laws (staging extension) + the null-safety javac gate
 ====
@@ -177,11 +336,12 @@ source.
 . *The pipeline refuses to touch the live system in preview* — `[narrated]` green +
 .. GIVEN seven scattered `Deployment.getInstance().isDryRun()` reads, one consulted too late so the
    readiness probe waits a full minute for a kubeconfig a dry-run never publishes
-.. WHEN `LiveGate` becomes an instance the pipeline holds and consults per action via
-   `through(live, deferred)`, the deferred probe injected in preview
-.. THEN no live probe or wait fires in preview (the one-minute hang is gone), the runbook shell still
-   renders — AND the change is additive: the up path is unchanged, only the scattered reads collapse to
-   one passed gate (named erasure of the seven reads + the false `JGIVEN_DRY_RUN`).
+.. WHEN the injected `RunMode` fact becomes an `ExecutionCondition` selecting a `PreviewExecutor`
+   (après — the `LiveGate` of the avant is erased): the executor decouples rendering from execution,
+   the tree builds against inert probes and the reaching mode is rewritten NORMAL→PENDING (E9)
+.. THEN no live probe or wait fires in preview (the one-minute hang is gone), and the runbook renders a
+   RICH plan — every phase PENDING, the nested G/W/T present — not the empty shell a naive dry-run
+   would give (named erasure of the seven reads + the false `JGIVEN_DRY_RUN` + `LiveGate` itself).
 
 . *The pipeline decides the stack outputs through one guarded assembler* — `[narrated]` green +
 .. GIVEN an omniscient `OutputBuilder` pulling each summary by name over raw maps, systemd flattening
@@ -194,5 +354,7 @@ source.
    same outputs cross, the hub + the re-parse helpers are the named erasure.
 
 *Coverage of this view:* 2 capabilities, 2 scenarios — complete per <<scenario-completeness>>. Both
-narrated-green (the two-gates design, not yet built); they flip playable when the living gate and the
-output registry ship.
+narrated-green. Scenario 1 is the *après* — its preview mechanism (`ExecutionCondition` +
+`PreviewExecutor`) is proven on the bench (§ <<the-bdd-as-engine-turn>>) and flips playable when the
+ClusterSeed-vertical increment ships. Scenario 2 (the output registry) is orthogonal to the turn and
+flips playable when the registry ships.

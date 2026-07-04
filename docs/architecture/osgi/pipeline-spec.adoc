@@ -1,60 +1,185 @@
-= The pipeline — OSGi-owned, host-consumed; topics on jgiven, and the gates at the edge
+= The pipeline — the seeding as jGiven scenarios on the JUnit launcher
 :toc: left
 :toclevels: 3
 
 [NOTE]
 ====
-*Status:* DESIGN, not built (2026-07-01, extended 2026-07-02). One spec for one subject: what the
-pipeline *is*, who owns it, how it rests on jgiven, and the two boundaries it decides to cross.
+*Status:* the BDD-as-engine model is the *source of truth* for how rke2lab seeds. *GO reached
+2026-07-04* — the model is proven viable AND proven to hold on the atlas (four invariants), the seven
+go/no-go concerns closed on a bench. What remains is the *code migration*, not the decision.
 
-*Ownership (DECIDED 2026-07-02):* the pipeline — grammar, engine, AND the bootstrap *reasoning* — is
-owned by the *OSGi world*. The grammar primitives already live there
-(`osgi/foundation/pipeline/pipeline-port`: `FluentTopicRunner`/`OnFailure`/`TopicFailure`, pure,
-*dual-consumable*), and jgiven is already an OSGi bundle (`jgiven-wrap`). The *host* (`exec/seed-master`
-+ `pulumi-edge`) is a *consumer*: it boots the framework, injects the launch context (`RunMode`, the
-Pulumi output sink), and renders/writes what the OSGi world produces. The reasoning that is *today*
-stranded in `exec/seed-master/.../controlplane/pipeline` is *target-state OSGi*. This spec describes
-that target; the "today" notes mark what still lives host-side and must migrate.
+*This spec describes the seeding as it IS being built:* the whole seeding is expressed as *jGiven
+scenarios orchestrated by the JUnit Platform launcher* (embedded at runtime), a phase is a nested
+jGiven `Stage`, the value-DAG is carried by `@Provided/ExpectedScenarioState` (+ a build-time DAG
+gate), the missing dynamics are contributed as Jupiter extensions. The reference implementation is
+pinned at tag `spike/bdd-pipeline-poc`; the discovery record (the four operator paths, the ten
+learnings E1–E10) is link:bdd-pipeline-poc-design.adoc[the bdd-pipeline POC].
 
-This document folds in — and *replaces* — the earlier parked exploration
-`dsl-unification-exploration.adoc` ("JGiven as Shared Engine", 2026-06-07). That exploration framed
-"one engine, two layers" and left two questions open (the state model; the narration depth). This
-session closed both, so the exploration is deleted, not linked: its living content lives here.
+*The former model — the fluent `during`/`then` grammar, `Topic` / `State<I,B>` / `PipelineContext` /
+`FluentTopicRunner` (shipped in the 212-commit pipeline-port arc) — is superseded.* It survives only
+as the *avant* of the evolution figure (§ <<the-avant>>): the graved before/after lives in
+link:../atlas/host-pipeline.adoc#the-bdd-as-engine-turn[host-pipeline L1, Diagram Q],
+and the full former text lives in git (`pipeline-spec.adoc` at commit `39fe4d8a`). It is not
+maintained in parallel — this is code hygiene applied to specs: one living model, the old one in
+history.
 
-It also subsumes the original "two gates" design (living gate + output gate). The gates are two
-*mechanisms* derived from a single named launch concept (`RunMode`) — and, being intrinsically Pulumi,
-they sit at the *host edge*, fed by / feeding the OSGi reasoning across the seam. The authoring surface
-is the shared link:../patterns/fluent-pipeline-grammar.adoc[fluent pipeline grammar]; this spec is the
-substrate + reasoning underneath it.
+*Ownership (unchanged by the turn):* the pipeline — scenarios, engine, AND the bootstrap *reasoning*
+— is owned by the *OSGi world*. jGiven is already an OSGi bundle (`pipeline-jgiven`), the JUnit launcher
+already runs inside embedded Felix (`InContainerJUnitRunner`). The *host* (`exec/seed-master` +
+`pulumi-edge`) is a *consumer*: it boots the framework, injects the launch context (the `RunMode`
+fact, the Pulumi output sink), and renders/writes what the OSGi world produces.
 ====
 
 [TIP]
 .TL;DR — read this, skim the rest
 ====
-* *Owner:* the OSGi world owns the pipeline (grammar + engine + reasoning). The host (`seed-master` +
-  `pulumi-edge`) is a *consumer*: boots the framework, injects `RunMode` + Pulumi context, renders/writes.
-* *Detached by design:* the OSGi world is meant to run detached (remote); *embedded exec is the special
-  case* (seed-master, bootstrap). Only the embedded/bootstrap host has Pulumi + `RunMode`.
-* *Three levels* (Figure 2b): *L-boot* = `FrameworkLaunchPipeline` (was `BootPipeline`, lights Felix,
-  no jgiven); *L-shape* = `ClusterSeedPipeline` (was `BootstrapPipeline`, reasons + owns the runbook);
-  *L-altitude* = move the decision logic INTO OSGi. `*Stage`→`*Topic` (jgiven owns "Stage").
-* *Two gates, from `RunMode {STANDALONE,PREVIEW,APPLY}`:* the *living gate* (may an action touch the
-  real system) + the *output gate* (what is written to the stack). Both at the host edge.
-* *Two work threads (do NOT braid):* *R* = reliability (non-null→outputs→jgiven→pipeline, fixed in
-  reverse); *S* = structure (S0 rename → S1 untangle → S3 decision-in-OSGi → S4 boot-executor → S5
-  transverse). Each S# = own chantier.
-* *Status:* DESIGN, mostly not built. The design HOLDS (Figure 2c before/after is monotone).
+* *The model:* the seeding IS a tree of jGiven scenarios. A phase = a jGiven `Stage`; the tree =
+  `@NestedSteps` composition; the value-DAG = `@Provided/ExpectedScenarioState`; orchestration = the
+  embedded JUnit Platform launcher; the missing temporal/gate/ambient dynamics = Jupiter extensions.
+* *Two survivors carry the whole rationale:* the *compass* (the runbook is the operator's view of the
+  whole system, read AND act) and the *founding constraint* (a probe IS a jGiven step, or there is no
+  runbook). The turn does not weaken them — it makes the founding constraint the model itself.
+* *Owner:* the OSGi world owns the pipeline (scenarios + engine + reasoning). The host boots the
+  framework, injects the `RunMode` fact + Pulumi context, renders/writes. jGiven bundle-per-world.
+* *Preview:* `RunMode` is re-posed as an `ExecutionCondition` + a `PreviewExecutor` that decouples
+  *rendering* from *execution* (E9) — a rich PENDING plan, no dry-run blindness. `LiveGate` is erased.
+* *Compile-time safety kept:* the value-DAG moves from type-state (`State<I,B>`) to scenario-state
+  *plus* a build-time ASM DAG gate (topological: every `required` has a `guaranteed` upstream) — a
+  `StagingGate` sibling of the retired `PIPELINE_PATTERN`.
+* *Migration:* legibility cleanup of the spec network FIRST (this pass), then ClusterSeed-vertical —
+  one pipeline at a time into `seed-master`, the other six coexisting on the former model meanwhile.
 ====
+
+== Where the pipeline sits in rke2lab — set the scene before the model
+
+*Lead: before HOW we model the seeding, situate WHAT it is inside rke2lab. The pipeline is the
+orchestration SPINE of the cluster bootstrap — the one flow the operator drives, that reaches across
+the system's two boundaries into the external worlds it seeds.*
+
+=== Figure C1 — System Context: rke2lab among the operator and the worlds it seeds
+
+rke2lab is a cluster-bootstrap system. An operator drives it (through the runbook — read AND act); it
+*acts on* four external worlds it does not own. The pipeline is the flow that decides what crosses into
+each.
+
+[mermaid]
+....
+flowchart TB
+  op(["Operator<br/>drives the seed, reads + acts through the runbook"]):::person
+  subgraph sys["rke2lab — seeds an RKE2 cluster (this system)"]
+    pipe["the pipeline<br/>the orchestration spine of the bootstrap"]:::focus
+  end
+  incus["Incus<br/>containers/VMs — the substrate"]:::ext
+  kube["kube-apiserver<br/>the cluster being seeded"]:::ext
+  sysd["systemd / dbus<br/>host units + adapter"]:::ext
+  stack["Pulumi stack<br/>desired-state + outputs"]:::ext
+  op -->|"launches (STANDALONE / preview / apply)"| pipe
+  pipe -->|"provisions"| incus
+  pipe -->|"waits for readiness, applies manifests"| kube
+  pipe -->|"probes + reconciles"| sysd
+  pipe <-->|"reads RunMode / writes outputs"| stack
+  classDef person fill:#eee,stroke:#999,color:#000;
+  classDef focus fill:#0b7285,color:#fff,stroke-width:2px;
+  classDef ext fill:#efe6fb,stroke:#8250df,color:#000;
+....
+
+=== Figure C2 — Container: the pipeline among rke2lab's subsystems, across the two spaces
+
+Zoom inside rke2lab. It is split into *two spaces* (the invariant `grep -ri pulumi osgi/` == 0): the
+*OSGi world* — pure, it *describes* and *reasons*, no `com.pulumi`/`io.grpc` — and the *host* — it
+*actualises* over Pulumi. The pipeline is the spine of the OSGi world; the other subsystems are the
+capabilities it orchestrates (doctor, manifests, netplan, systemd-port…); the host boots the world and
+carries the Pulumi edge. This spec is about the OSGi-world spine; the host edge is
+link:../atlas/host-pipeline.adoc[host-pipeline L1].
+
+[mermaid]
+....
+flowchart TB
+  op(["Operator"]):::person
+  subgraph host["host space — actualises over Pulumi (exec/)"]
+    seed["seed-master<br/>boots the framework, injects RunMode + Pulumi ctx, renders/writes"]:::hostc
+    edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]:::hostc
+  end
+  subgraph osgi["OSGi world — describes + reasons (pure, no Pulumi/gRPC)"]
+    pipe["PIPELINE — the orchestration spine<br/>jGiven scenarios on the JUnit launcher<br/>(pipeline-jgiven embeds jGiven in its bundle)"]:::focus
+    doctor["doctor<br/>consult → remediation"]:::sub
+    manifests["manifests<br/>CDK8s synthesis"]:::sub
+    netplan["netplan<br/>network synthesis"]:::sub
+    systemd["systemd-port<br/>unit contracts + adapter"]:::sub
+  end
+  op -->|launches| seed
+  seed -->|amorces, injects ctx| pipe
+  edge <-->|SEAM: RunMode / outputs| pipe
+  pipe -->|orchestrates as scenarios| doctor
+  pipe -->|orchestrates as scenarios| manifests
+  pipe -->|orchestrates as scenarios| netplan
+  pipe -->|orchestrates as scenarios| systemd
+  classDef person fill:#eee,stroke:#999,color:#000;
+  classDef focus fill:#0b7285,color:#fff,stroke-width:2px;
+  classDef sub fill:#d4f4dd,stroke:#2e7d32,color:#000;
+  classDef hostc fill:#8250df,color:#fff;
+....
+
+With the pipeline located — the OSGi-world spine, driven by the host, orchestrating the other
+subsystems as scenarios — the rest of this spec is HOW that spine is modelled: why these frameworks
+(next), why it must narrate (the compass), and the model itself.
+
+== Why embed JUnit + jGiven at runtime — the dogfooding rationale
+
+*Lead: we embed the JUnit Platform launcher and jGiven into our RUNTIME scope — not just our test
+scope — because no alternative offers as rich a MODEL, and because re-entering proven tools we already
+depend on beats reinventing an engine. This is our re-entrance / dogfooding rule applied.*
+
+The seeding needs three things at once: an *orchestration substrate* (order phases, express temporal
+loops and gates, compose sub-scenarios), a *narration + report model* (the runbook the operator reads
+and acts through), and a *value-DAG* between phases. Two frameworks already give all three, richly:
+
+* *The JUnit Platform launcher* — an engine-agnostic orchestration substrate with a mature extension
+  SPI (`TestTemplateInvocationContextProvider`, `ExecutionCondition`, `ExtensionContext.Store`). Those
+  hooks are exactly the missing dynamics (temporal poll, live/preview gate, ambient + fan-in), and an
+  extension IS a contribution — the same paradigm as DS `@Component`.
+* *jGiven* — a narration + report engine (`ReportModel` → living-doc), with a state model
+  (`@Provided/ExpectedScenarioState`) that carries the value-DAG, nested-step composition, and a clean
+  separation of *model / execution / rendering* that let every adaptation we needed (E5, E8, E9) be a
+  *public-API extension* — no fork, no dirty reflection.
+
+Both are *battle-proven*: each has shown, over years and across ecosystems, robustness and the
+flexibility to adapt to real use cases — precisely the properties a runtime engine for the bootstrap
+must have. Building a bespoke orchestrator + BDD engine of comparable richness would be a large,
+under-tested reinvention of exactly what these two already do (the "home-grown BDD engine" and "Spock"
+alternatives were rejected for this reason — see link:bdd-pipeline-poc-design.adoc[the POC record]).
+
+*The re-entrance / dogfooding rule.* We already run both frameworks — jGiven as an OSGi bundle
+(`pipeline-jgiven`), the JUnit launcher in-container (`InContainerJUnitRunner`) — to *test* rke2lab.
+Promoting them from the test scope into the runtime scope is a *re-entrant* use of tools we already
+trust and maintain: the seeding engine is the same machinery that verifies the seeding. We eat our own
+dog food — the runtime consumes the very frameworks our testing depends on. That closes the loop
+(a bug in the engine surfaces in both test and runtime, one toolchain to master) and it means the
+runtime engine inherits, for free, the maturity these frameworks earned. Given no richer alternative
+exists at the model level, this choice is fully justified.
+
+*The honest objection — and why it turns into a strength.* One could object: *you should not test with
+the very framework you want to test* — the circularity worry, that a self-validating loop (engine and
+test harness being one framework) could mask the framework's own faults. It is a fair objection. But
+using the same framework at *two different levels* — as the runtime engine AND as the test harness that
+exercises it — pushes it across a far wider span of use cases, including the edge cases a
+normal-test-scope usage never reaches. That is precisely how you *discover* the real problems a
+framework can pose, rather than hide them. The POC is the evidence: pushing jGiven beyond its ordinary
+test usage is exactly what surfaced E1 (dry-run is incompatible with state-DAG enforcement), E9 (jGiven
+couples rendering to execution, so a naive dry-run renders blind), and the nested-scope-swallow gotcha
+— real limitations we now design around, found *because* we ran the framework at the limit, not
+despite it. The circularity is not a blind spot here; it is a stress test.
 
 == The compass — the runbook is the operator's view, read AND act
 
 *Lead: the runbook renders what the OPERATOR needs to understand and act on the whole system — not what
-the pipeline does. Inclusion is judged by operator-need, not by "is it a topic".*
+the pipeline does. Inclusion is judged by operator-need, not by "is it a phase". This survives the
+turn unchanged — it is why the seeding must narrate at all.*
 
 The reason any of this matters. The runbook does not exist to *narrate the pipeline*. seed-master is
 only one piece — the cluster bootstrap — of a larger system the operator runs. The runbook is the
 projection of *the operator's mental model of the whole system*, and the inclusion criterion for what
-it renders is not "is it a pipeline topic?" but *"does the operator need it to understand and act on
+it renders is not "is it a pipeline phase?" but *"does the operator need it to understand and act on
 the system?"*
 
 Scope is *read AND act*: the runbook is the medium through which the operator both understands (state,
@@ -62,33 +187,187 @@ health, why — the doctor, symptoms, drift) and acts (replay a checkpoint, appl
 phase). The doctor / symptoms / drift / remedies are not isolated features; they are pieces of this
 actionable operator-view.
 
-This compass judges the "depth" question the parked exploration left open (see
-<<closed-questions>>): a topic narrates through the runbook *iff the operator needs it*, not because
-it happens to be a pipeline step. bbox reconciliation is the first verdict — IN, because the operator
-needs the reservation state — even though it is an action topic that narrates nothing today.
+This compass judges the "depth" question: a phase narrates through the runbook *iff the operator needs
+it*, not because it happens to be an execution step. bbox reconciliation is the first verdict — IN,
+because the operator needs the reservation state — even though it is an action phase that narrates
+nothing visible today. In the BDD-as-engine model this is native: every phase IS a scenario, so every
+phase already produces its runbook node; the compass decides only what to `@Hidden`.
 
-The mechanics below (two pipelines, the vocabulary, `RunMode`, the two gates, probe⟺step) are the
-*means*; this operator-view is the *end*.
+[[founding-constraint]]
+== The founding constraint — a probe IS a jGiven scenario step
+
+*Lead: every probe must be a jGiven scenario step, or there is no runbook. In the former model this was
+a discipline bolted onto a fluent grammar; in the BDD-as-engine model it IS the model — which is the
+deepest reason the turn is not a rewrite but a realization.*
+
+The runbook exists only because each probe is played as a step (it records into the `ReportModel`). A
+probe that is not a step produces no runbook entry. So probe ⟺ scenario-step is the *raison d'être* of
+the seeding↔jGiven coupling, not an incidental detail. The former spec already recognized this — two
+topics (`ClusterReadinessTopic`, `SystemdAdapterTopic`) drove jGiven scenarios by hand, and the
+"provider" pattern generalized it. The turn removes the "by hand": *every* phase is a scenario, so the
+coupling is total and uniform, not confined to two topics.
+
+This constraint disqualifies a tempting-but-wrong preview fix. Injecting a canned "deferred" probe that
+*returns a value* makes the step *execute* and render *PASSED (fake green)* — the exact dishonesty to
+avoid. The honest preview rendering is a step marked *PENDING* ("to do") whose body never ran, so it
+never touched the real system, and the runbook shell renders honestly. The POC proved this is
+achievable *richly* (a full nested plan, every step PENDING, zero traversal) by decoupling rendering
+from execution — see § <<runmode-preview>> (E9). What one bouchons is the *probe* (the runtime seam),
+never the *edge* (the produced state) — E2: a faked probe injected in the step body makes the body run
+and produce the edge honestly from a stubbed output, so the runbook never lies.
+
+[[the-model]]
+== The model — scenarios ARE the execution engine
+
+*Lead: the seeding is not "described by" scenarios; it IS a tree of jGiven scenarios, run by the
+embedded JUnit Platform launcher. jGiven is the engine, the launcher is the orchestration substrate,
+Jupiter extensions contribute the dynamics JUnit does not ship. Every piece already exists in the
+codebase — the turn composes them, it does not invent an engine.*
+
+Five decisions, taken together (2026-07-04), fix the model:
+
+. *jGiven scenarios are the EXECUTION ENGINE of the seeding*, not a description layer. Each phase = a
+  scenario. This is the founding constraint (above) promoted to the model: probes ARE steps because
+  the whole seeding IS scenarios.
+. *Engine = jGiven* — already an OSGi bundle (`pipeline-jgiven`); its programmatic API is already used
+  outside JUnit in `ClusterReadinessTopic`.
+. *Orchestration substrate = the JUnit Platform launcher, embedded at runtime.* Not a gamble:
+  `InContainerJUnitRunner` (osgi/runtime/junit-testkit) *already* drives `LauncherFactory.create(...)`
+  with an explicit engine, a listener and a discovery request, *inside* OSGi. The launcher is engine-
+  agnostic (Jupiter carries jgiven-junit5, already used: `DoctorScenarioTest extends ScenarioTest`).
+. *The fluent `during`/`then` grammar dissolves* — jGiven composes everything. Order and dependencies
+  are expressed by nested steps (`@NestedSteps` — already in production: `ClusterReadinessScenario`
+  replays `SystemdAdapterScenario`). No mince scheduler survives (the POC confirmed the launcher +
+  `@NestedSteps` carry all the ordering; there was nothing left for a grammar to do).
+. *The value-DAG is carried by the jGiven state annotations*, not lost:
++
+--
+** `@ProvidedScenarioState(guaranteed=true)` = the outgoing edge (this stage produces this value);
+** `@ExpectedScenarioState(required=true)` = the incoming edge (this stage requires this value);
+** a `required` with no upstream `guaranteed` = a mis-wired DAG, detectable *at build time* by a new
+   ASM gate (§ <<dag-gate>>).
+** *The trade accepted:* the compile-time safety of the former type-state `State<I,B>` becomes a
+   *declared runtime state + a build-time gate*. Not a flat bag — a typed, annotated model with a
+   topological gate. The POC judged this cran acceptable (E1 named the one incompatibility: DAG
+   enforcement XOR dry-run — resolved by the `PreviewExecutor`, § <<runmode-preview>>).
+--
+
+*The missing dynamics = contributed Jupiter extensions.* JUnit does not ship the temporal/DAG/gate
+primitives, but it exposes the SPI to *build* them — and an extension IS a contribution (same paradigm
+as DS `@Component`: a node registered, discovered, composed). Three carrying hooks, each proven on the
+bench:
+
+[cols="1,2,2",options="header"]
+|===
+| Jupiter hook | Carries | Proof (tag `spike/bdd-pipeline-poc`)
+| `TestTemplateInvocationContextProvider` | the *temporal* — poll-until-ready with the real adaptive
+  cadence (15/8/3/2s bucketed, virtual clock, 30s progress), STOPPING the instant the probe is ready
+  (what `@RepeatedTest(n)` cannot do) | `@PollUntilReady` + `PollUntilReadyExtension`
+| `ExecutionCondition` | the *gate* live/preview — *`RunMode` becomes an execution condition* (§
+  <<runmode-preview>>) | the preview selection path
+| `ExtensionContext.Store` | the *ambient + fan-in enforcement* — this is the former `PipelineContext`,
+  now JUnit-native | fan-in composition (`FanInStatusSpikeTest`)
+|===
+
+.Figure 1 — the model: launcher orchestrates, scenarios ARE the phases, extensions contribute the dynamics
+[mermaid]
+....
+flowchart TB
+  operator(["Operator<br/>reads the runbook AND acts through it"])
+  subgraph osgi["OSGi world — OWNER (jGiven lives here, launcher runs here)"]
+    launch["JUnit Platform launcher<br/>embedded (InContainerJUnitRunner)<br/>orchestrates — engine-agnostic"]
+    scn["phases = jGiven Stages<br/>@NestedSteps compose ONE scenario tree"]
+    state["scenario-state = the value DAG<br/>@Provided/ExpectedScenarioState"]
+    ext["Jupiter extensions<br/>@PollUntilReady · ExecutionCondition · Store"]
+    jg["pipeline-jgiven<br/>ReportModel = runbook"]
+    doctor["doctor<br/>consult-on-failure → remediation"]
+  end
+  subgraph host["host — CONSUMER (seed-master + pulumi-edge)"]
+    boot["boot pipeline<br/>BootPlanner→BootPlan→FrameworkLauncher"]
+    edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]
+  end
+  operator -->|understands + acts, via the runbook| scn
+  launch --> scn
+  scn --> state
+  scn -->|dynamics from| ext
+  scn -->|narrates into| jg
+  scn -->|consults on failure| doctor
+  boot -->|amorces the world it runs in embedded| launch
+  edge <==>|"SEAM: inject RunMode + Pulumi ctx / return runbook + contributions"| scn
+  classDef world fill:#0b7285,color:#fff;
+  classDef hostc fill:#8250df,color:#fff;
+  classDef person fill:#eee,stroke:#999,color:#000;
+  class launch,scn,state,ext,jg,doctor world
+  class boot,edge hostc
+  class operator person
+  linkStyle 7 stroke:#d1242f,stroke-width:3px;
+....
+
+=== The scenario tree — a phase opens a nested scenario (the pièce maîtresse)
+
+The mechanism that makes "phase = scenario" compose into ONE runbook tree is E5: a step CAN open onto a
+nested scenario. "A step is a nested scenario" does not exist in the jGiven model (`StepModel` does not
+point to a `ScenarioModel`) — but a scenario is just a `Given/When/Then` of steps, and the intro-words
+`given()/when()/then()` *render inside a `@NestedSteps` block*. So a phase, as it establishes, grafts
+its G/W/T under the step of its parent phase → one arborescent runbook where each phase is a real
+scenario at its place:
+
+[listing]
+----
+   Given the pipeline starts
+    When the cluster-readiness checkpoint runs          ← parent step (a phase)
+           Given a reachable systemd adapter "..."      ← child scenario, nested
+           When the kubeconfig is published
+           And the api is ready
+           Then the cluster is ready
+    Then the seed is ready
+----
+
+The orchestration relays that sequence the phases are `@Hidden @NestedSteps` (E8): `@Hidden` removes
+the relay from the render (no double title), `@NestedSteps` promotes the phase's content one level — so
+each phase is a single visible node carrying its rich `@As` (`the incus instance "bioskop-master" is
+provisioned`), not the relay's bare method name. Rule: the orchestrator is transparent, the phase is
+the visible node.
+
+=== Fan-in — several upstream outputs into one phase, in one scenario
+
+A late phase reads several upstream outputs (Resources reads both a network plan and a storage plan).
+The candidate blocker was "jGiven state is per-scenario, would break fan-in if each phase were its own
+scenario". It dissolved under the stacked model: because all phases compose into ONE scenario, the
+scenario-state scopes by the stage/step hierarchy, so a phase reads every `@ExpectedScenarioState` its
+upstream siblings `@ProvidedScenarioState`-produced. `FanInStatusSpikeTest` runs a real two-input
+fan-in and renders both fanned-in values on the one node.
+
+=== Fail-fast — the halt is read off the model, not a thrown exception
+
+jGiven defers a failing step's propagation to `scenario.finished()`: it records the step `failed`,
+marks the chained downstream steps SKIPPED (the fail-fast), and only propagates at `finished()` (E7).
+Two consequences the model relies on: the diagnostic runbook is naturally targeted (the operator sees
+the broken step and everything not reached), and the halt signal MUST be read off
+`ScenarioModel.getExecutionStatus()` (FAILED) — not off a per-node SKIPPED marker, because under a
+`@Hidden @NestedSteps` relay a fail-fast-skipped consumer node does not even materialize
+(`FanInStatusSpikeTest`, refinement 1).
 
 == Ownership and the seam — OSGi reasons, the host feeds and renders
 
-*Lead: OSGi owns grammar + engine + reasoning (they already live there); the host injects `RunMode` +
-Pulumi context and renders/writes back. A domain never reads the global flag — the seam carries it.*
+*Lead: OSGi owns the scenarios + engine + reasoning (they already live there); the host injects the
+`RunMode` fact + Pulumi context and renders/writes back. The cross-world edge crosses as a serialized
+`ScenarioModel`, grafted into the host runbook — the live jGiven object never crosses.*
 
-The pipeline is *owned by the OSGi world*; the host is a consumer. Two facts of the code already put
-it there: the grammar primitives live in `osgi/foundation/pipeline/pipeline-port` (pure, dual-consumable
-— a real bundle at build time, exported from the system bundle for the flat host classloader at
-runtime), and jgiven is already an OSGi bundle (`jgiven-wrap`, with an in-container testkit). The
-bootstrap reasoning — the topics, the scenarios, the doctor consult, the readiness verification, the
-runbook — is *target-state OSGi*; it is only *stranded* in `exec/seed-master` today.
+The pipeline is *owned by the OSGi world*; the host is a consumer. Two facts of the code already put it
+there: jGiven is already an OSGi bundle (`pipeline-jgiven`, with an in-container testkit), and the JUnit
+launcher already runs inside embedded Felix (`InContainerJUnitRunner` drives `LauncherFactory` under
+the testkit). The bootstrap reasoning — the scenarios, the doctor consult, the readiness verification,
+the runbook — is *target-state OSGi*; it is only *stranded* in `exec/seed-master` today.
 
 [cols="1,2,2",options="header"]
 |===
 | | *OSGi world* (owner) | *host* (`exec/seed-master` + `pulumi-edge`, consumer)
 | role | the brain — reasons about the bootstrap | thin launcher + the Pulumi edge
-| holds | the topics, the jgiven session + engine, the doctor, readiness, the `ReportModel` runbook |
-  framework boot (already OSGi via `BootPipeline`), the *source* of `RunMode`, the stack *sink*
-| jgiven engine | *here* (`jgiven-wrap`) | —
+| holds | the scenarios, the jGiven session + engine, the launcher, the doctor, readiness, the
+  `ReportModel` runbook | framework boot (already OSGi via `BootPipeline`), the *source* of `RunMode`,
+  the stack *sink*
+| jGiven engine + launcher | *here* (`pipeline-jgiven` + `junit-testkit`) | —
 | the seam | *produces* the runbook + the output contributions | *injects* `RunMode` + Pulumi context,
   *renders* the runbook, *assembles + writes* the stack
 |===
@@ -97,62 +376,42 @@ The seam keeps the discipline this spec is built on: *a domain never reaches for
 `RunMode` (which only the host can know — it derives from `Deployment.isDryRun()`) is *injected* into
 the OSGi world as a value; the OSGi world reasons; the host renders and writes. The founding constraint
 travels intact: probes-as-steps and the runbook are produced OSGi-side; the host only renders/exports.
-The seam is *remote-first* (the OSGi world is detached by design; embedded exec merely folds it
-in-process — see the next section); the output gate probably splits *contributors OSGi-side* (each
-domain contributes a pure `Map`, no Pulumi dependency crosses the seam) from *assembly + write
-host-side* (`pulumi-edge`). Not yet decided — that seam is the next brainstorm.
 
-.Figure 1 — C4 Container (flowchart-style, repo convention): OSGi owns the pipeline; the host feeds and renders across the seam
-[mermaid]
-....
-flowchart TB
-  operator(["Operator<br/>reads the runbook AND acts through it"])
-  subgraph osgi["OSGi world — OWNER (detached by design)"]
-    grammar["pipeline-port<br/>shared grammar: during/then · type-state<br/><i>zero jgiven</i>"]
-    reasoning["reasoning pipeline<br/>topics: preflight·bbox·incus·systemd·readiness·outputs"]
-    jgiven["jgiven-wrap<br/>session → ReportModel = runbook"]
-    doctor["doctor<br/>consult-on-failure → remediation"]
-  end
-  subgraph host["host — CONSUMER (seed-master + pulumi-edge)"]
-    boot["boot pipeline<br/>BootPlanner→BootPlan→FrameworkLauncher<br/>amorce (embedded case)"]
-    edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]
-  end
-  operator -->|understands + acts, via the runbook| reasoning
-  reasoning -->|authored with| grammar
-  reasoning -->|narrates through provider-owned session| jgiven
-  reasoning -->|consults on failure| doctor
-  boot -->|authored with — NO jgiven| grammar
-  boot -->|amorces the world it runs in embedded| reasoning
-  edge <==>|"SEAM: inject RunMode + Pulumi ctx / return runbook + contributions"| reasoning
-  classDef world fill:#0b7285,color:#fff;
-  classDef hostc fill:#8250df,color:#fff;
-  classDef person fill:#eee,stroke:#999,color:#000;
-  class grammar,reasoning,jgiven,doctor world
-  class boot,edge hostc
-  class operator person
-  linkStyle 6 stroke:#d1242f,stroke-width:3px;
-....
+*The cross-world edge = a grafted `ScenarioModel` (E10).* A `@NestedSteps` composes within ONE world
+(one jGiven engine, one `ReportModel`). A dependency that crosses the world-gateway cannot be a nested
+step — two engines, two `ReportModel`s. It becomes a *gateway step*: the caller world sends a
+`Document`, the remote world plays its scenario in ITS `ReportModel`, and returns the *serialized
+`ScenarioModel`* (JSON String — the seam carries no live jackson type). The caller *grafts* the remote
+steps as the gateway step's `nestedSteps` (`StepModel.addNestedStep`) → the operator reads ONE
+continuous tree, from the seed down to the OSGi root. And the verdict travels IN the model:
+`remoteScenario.getExecutionStatus()` — if the remote is FAILED, the graft marks the gateway step
+FAILED and the host's downstream steps SKIPPED (the local fail-fast, reproduced across the frontier).
+*One Document suffices* — the `ScenarioModel` carries both the narration (steps → the sub-tree) and the
+verdict (`executionStatus` → the propagation). This is proven *in isolation* on the bench (a
+`URLClassLoader` realm stand-in, an in-JVM JSON round-trip); wiring it to the real embedded Felix
+(`ClusterSeedTopic.seedCluster()`) is the migration increment, not re-proof.
 
 == The OSGi world is detached by design — embedded exec is a special case
 
 *Lead: the general case is a detached OSGi world (remote); seed-master's embedded exec merely folds the
-seam in-process. The amorce paradox + Pulumi belong to the embedded/bootstrap host only, not the world.*
+seam in-process. The launcher is one more consumer of the R4 boot seam. Pulumi belongs to the
+embedded/bootstrap host only, not the world.*
 
-The correcting frame (user, 2026-07-02): *the OSGi world is designed to live detached from the
-embedded executable and be accessed remotely.* The general case is a standalone OSGi world running as
-a service — it *amorces itself* (no external actor needs to bring it into being), and the host is a
-*remote client* that connects, injects `RunMode` + the Pulumi context, and pulls back the runbook and
-the output contributions across the remote frontier.
+The general case is a standalone OSGi world running as a service — it *amorces itself*, and the host is
+a *remote client* that connects, injects `RunMode` + the Pulumi context, and pulls back the runbook and
+the output contributions across the remote frontier. The embedded exec (`FrameworkLaunchPipeline.
+embedded()`) is *one particular case* — the degenerate one where the host co-locates and boots OSGi
+in-process. The chicken-and-egg amorce ("what starts OSGi cannot run inside OSGi") is *real only in the
+embedded case*; detached, the OSGi world has its own internal amorce.
 
-The embedded exec (`BootPipeline.embedded()`) is therefore *one particular case* — the degenerate one
-where the host co-locates and boots OSGi in-process. The `embedded` in the preset's name already said
-so: it is a preset, not the pipeline. The chicken-and-egg amorce ("what starts OSGi cannot run inside
-OSGi") is *real only in the embedded case*; detached, the OSGi world has its own internal amorce and
-there is no paradox. The amorce is the hardest part — but it is a property of *co-location*, not of the
-architecture.
+The launcher does not change this — it is one more consumer of the R4 boot seam (Felix in `Pulumi.run`).
+`InContainerJUnitRunner` already drives a JUnit launcher *inside* Felix; `JGivenTestkit.felix()` proves
+the jGiven runtime (byte-buddy proxy, `ScenarioExecutor`, `ValueInjector`) boots in-container — the
+coupling that gives the state-DAG + the execution nesting. The live boot seam already exists:
+`ClusterSeedTopic.seedCluster()` boots embedded Felix synchronously on the `Pulumi.run` lambda thread
+today.
 
-*Which use case is which* (user, 2026-07-02): the two modes are not a theoretical symmetry — they are
-two real seed use cases:
+*Which use case is which* (two real seed use cases, not a theoretical symmetry):
 
 [cols="1,2,2",options="header"]
 |===
@@ -168,711 +427,175 @@ two real seed use cases:
 
 This lands the Pulumi coupling precisely: it is *not* a property of the OSGi world — it is a property
 of the *bootstrap's embedded host*. The detached OSGi world knows nothing of Pulumi. Which confirms, by
-a second route, that the two gates live at the *host edge* (`pulumi-edge`), never in the OSGi
-reasoning.
+a second route, that the preview trigger and the stack sink live at the *host edge* (`pulumi-edge`),
+never in the OSGi reasoning.
 
-So the hierarchy is not "host → amorce → OSGi". It is *one OSGi world, one seam, two ways the seam is
-realised*:
-
-.Figure 2 — the same seam, two realisations: detached (general) vs embedded (bootstrap special case)
+.Figure 2 — the thread/TCCL frontier IS the gateway (concern E, resolved)
 [mermaid]
 ....
 flowchart TB
-  subgraph gen["GENERAL CASE — seed in-cluster (detached workload)"]
-    direction LR
-    W1["OSGi world<br/>self-amorcing · exposes a service"]
-    C1["host-client<br/>(NO Pulumi — runs in the cluster)"]
-    C1 -. "remote seam:<br/>inject ctx → ← runbook" .-> W1
+  subgraph host["host world — flat classpath, Pulumi.run lambda thread"]
+    hs["host-world seeding scenarios<br/>launcher runs INLINE · export synchronous"]
+    gw["gateway step<br/>consult(Document) → Document"]
   end
-  subgraph emb["SPECIAL CASE — seed-master (bootstrap, embedded exec)"]
-    direction LR
-    C2["host (Pulumi edge)<br/>RunMode source · stack sink"]
-    subgraph proc["one process — frontier FOLDED in"]
-      B2["boot pipeline<br/>BootPlanner→launch"]
-      W2["OSGi world<br/>(same reasoning)"]
-      B2 -->|amorces| W2
-    end
-    C2 -->|"awaitService(...)<br/>folded seam"| W2
+  subgraph osgi["OSGi world — embedded Felix, its OWN thread"]
+    os["OSGi-world scenarios<br/>ClusterSeedTopic.seedCluster()"]
   end
-  gen ~~~ emb
-  classDef world fill:#0b7285,color:#fff;
-  classDef host fill:#8250df,color:#fff;
-  class W1,W2 world
-  class C1,C2 host
+  hs --> gw
+  gw -.->|"Document (JSON)"| os
+  os -.->|"ScenarioModel (JSON String)"| gw
+  gw -->|grafts sub-tree, exports on lambda thread| hs
+  classDef h fill:#8250df,color:#fff;
+  classDef o fill:#0b7285,color:#fff;
+  class hs,gw h
+  class os o
 ....
 
-`exec embedded` = the point where that frontier is *folded* into a local
-`BootedFramework.awaitService(...)` — the decision/act decomposition
-(link:osgi-boot-decomposition-spec.adoc[OSGi boot decomposition]) is how the embedded case amorces.
-The reasoning world (`W1`/`W2`) is *the same*; only the seam realisation and the presence of the Pulumi
-edge differ.
+The concern was that `context.export` is synchronous on the `Pulumi.run` lambda thread while the test
+harness runs the launcher on a dedicated TCCL thread. It conflated the harness with the production
+path: host-world scenarios run on the lambda thread (no OSGi realm → launcher inline, export
+synchronous); OSGi-world scenarios run inside Felix on ITS own thread — the host never drives that
+thread, it consults via `consult(Document) → Document` and grafts the returned model. *The thread/TCCL
+frontier IS the gateway* — no live jGiven object ever sits on the export thread.
 
-=== Three levels of "pipeline", not two — and the visions already mapped for each
+[[runmode-preview]]
+== RunMode re-posed — an ExecutionCondition + a PreviewExecutor (LiveGate erased)
 
-"Boot" and "bootstrap" name *different altitudes* and the near-synonymy hid it. The naming is settled
-(2026-07-02): *`FrameworkLaunch`* (launch the OSGi framework) vs *`ClusterSeed`* (seed-master seeds the
-cluster) — two verbs, two objects, no homonym. And `Stage` is a jgiven word: our unit of work is a
-*`Topic`* (so `BootstrapStage` → `ClusterSeedTopic`). But the reverse-audit against the late-June
-memories (the atlas-first reflex applied) shows there are *three* levels of pipeline, each already
-carrying a mapped vision — this section unifies them so they are not re-derived a sixth time.
+*Lead: preview is NOT a Pulumi-only capability, and it is NOT jGiven's naive dry-run (which renders
+blind). It is the launcher-native `ExecutionCondition` selecting a `PreviewExecutor` that decouples
+RENDERING from EXECUTION — a rich PENDING plan. `RunMode` produces the condition; `LiveGate` is erased.*
 
-.Figure 2b — the three levels of "pipeline" + the two transverse visions (blue = shipped, green = vision)
-[mermaid]
-....
-flowchart TB
-  G["pipeline-port — shared grammar (during/then, type-state)"]
-  subgraph LB["L-boot — framework launch"]
-    lb["FrameworkLaunchPipeline (was BootPipeline)<br/>BootPlanner→BootPlan + FrameworkLauncher<br/>grammar yes · jgiven NO"]
-    lb_v["vision: unify prod OsgiRuntime + test extension<br/>→ boot-pipeline-unification-backlog"]
-  end
-  subgraph LS["L-shape — cluster-seed reasoning"]
-    ls["ClusterSeedPipeline (was BootstrapPipeline)<br/>grammar yes · jgiven YES · owns runbook"]
-    ls_v["vision: decision logic → OSGi capability<br/>(this level folds into L-altitude)"]
-  end
-  subgraph LA["L-altitude — decision in OSGi"]
-    la["ClusterSeedTopic = pure decision (candidate)<br/>4/~10 topics still import Pulumi/gRPC"]
-    la_v["vision: DSL becomes OSGi capability,<br/>actualisation stays host as ports (DIP)<br/>→ pipeline-orchestration-osgi-vision"]
-  end
-  subgraph TV["transverse visions"]
-    tv1["pure jgiven MODEL vs host rendering ENGINE<br/>→ orchestration-purity-benefit"]
-    tv2["osgi/jgiven → dissolves into pipeline<br/>→ jgiven-domain-into-pipeline-debt"]
-  end
-  G --> lb
-  G --> ls
-  ls --> la
-  LA -.-> TV
-  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
-  classDef vision fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
-  class G,lb,ls,la built;
-  class lb_v,ls_v,la_v,tv1,tv2 vision;
-....
+The former model had two gates (a `LiveGate` state + an output gate) derived from a `RunMode` enum. The
+turn dissolves the living gate into the launcher's own vocabulary:
 
-*The dissociation this section resolves* (user: "dissocier le pipeline de bootstrap du monde OSGi de
-celui de master"): `FrameworkLaunch` (L-boot) is *not* seed-master's — it is the shared boot prefix of
-all three seeds; `ClusterSeed` (L-shape) is only seed-master's tail. `ClusterSeedTopic` is their single
-seam today (the embedded fold), and it is exactly the pure-decision unit L-altitude moves into OSGi.
-The homonym "bootstrap" was the tangle; the three levels are the untangling.
-
-*Monotone check:* naming + levelling adds no box and rewires no arrow — `FrameworkLaunchPipeline`,
-`ClusterSeedPipeline`, `ClusterSeedTopic` are renames of `BootPipeline`, `BootstrapPipeline`,
-`BootstrapStage`; the three visions are additive futures, each in its own memory. Additive.
-
-=== Before/after — the existing pipelines, and whether the design holds
-
-Cartography of *every* `during/then` pipeline in the code today (factual, 2026-07-02), on the two axes
-that matter: *where it is defined* (host vs OSGi) and — the axis the user surfaced — *who initiates it*
-(host vs OSGi-internal). The "after" column is the target once the three levels land. The design HOLDS
-iff the transformation is monotone (renames + additions, nothing erased) and the initiation axis moves
-in the right direction (host→OSGi, never the reverse).
-
-.Figure 2c — before/after: the ~8 pipelines, coloured by who INITIATES them (purple = host-initiated, teal = OSGi-initiated)
-[mermaid]
-....
-flowchart LR
-  subgraph B["before — host initiates almost everything"]
-    direction TB
-    b_boot["BootPipeline<br/>(osgi, host-init via main)"]
-    b_app["ApplicationPipeline<br/>(host)"]
-    b_bp["BootstrapPipeline<br/>(host, via BootstrapStage)"]
-    b_bs["BootstrapStage<br/>(host)"]
-    b_rc["ResourceCreationPipeline<br/>(host)"]
-    b_tc["TargetChecksumPipeline<br/>(host)"]
-    b_ms["DefaultManifestSynthesisService<br/>(osgi @Component, host awaitService)"]
-    b_bis["BootstrapInfrastructureSynthesizer<br/>(osgi, OSGi-INITIATED — the only one)"]
-  end
-  subgraph A["after — initiation migrates host→OSGi"]
-    direction TB
-    a_fl["FrameworkLaunchPipeline<br/>shared boot PREFIX of 3 seeds"]
-    a_cs["ClusterSeedPipeline<br/>seed-master's reasoning TAIL"]
-    a_ct["ClusterSeedTopic<br/>pure decision → into OSGi"]
-    a_ms["manifests tail<br/>(contributed)"]
-    a_bis["OSGi-internal init<br/>(the shape all migrate toward)"]
-  end
-  b_boot --> a_fl
-  b_bp --> a_cs
-  b_bs --> a_ct
-  b_ms --> a_ms
-  b_bis --> a_bis
-  b_app -.candidate.-> a_ct
-  b_rc -.nested.-> a_cs
-  b_tc -.nested.-> a_cs
-  classDef host fill:#efe6fb,stroke:#8250df,stroke-width:1px;
-  classDef osgi fill:#d4f4dd,stroke:#0b7285,stroke-width:2px;
-  class b_boot,b_app,b_bp,b_bs,b_rc,b_tc,b_ms host;
-  class b_bis,a_fl,a_cs,a_ct,a_ms,a_bis osgi;
-....
-
-*Reading the initiation axis (the user's question):* of ~8 pipelines, exactly ONE
-(`BootstrapInfrastructureSynthesizer`) is initiated *inside* the OSGi world today; all the others are
-initiated by the host — directly, or via one of the ~15 `awaitService(...)` calls that form the current
-host→OSGi surface (`ManifestSynthesisService`, `NetplanSynthesisService`, `HealthSystem`,
-`SystemdRuntimeProbe`, `ClusterReadinessContact`, `ReadinessAuthority`, …). No `@Activate` runs a
-`during/then` pipeline — nothing self-initiates on SCR activation. So the *measure* of the L-altitude
-vision is precisely this column: it moves rows from "initiated by host" to "initiated in OSGi". Today
-that column has one entry; the vision fills it.
-
-*Verdict — does it hold?* YES, with one caveat the cartography surfaced:
-
-* *Renames are a partition, not a rewrite* — `BootPipeline`→`FrameworkLaunch` (the prefix) and
-  `BootstrapPipeline`→`ClusterSeed` (the tail) split the existing chain along a line already implicit in
-  the code (the 3 seeds already share `BootPipeline.embedded().during(...)`, only the tail differs).
-  Nothing erased.
-* *The initiation axis moves the right way* — every arrow the visions add points host→OSGi; none moves
-  OSGi→host. `BootstrapInfrastructureSynthesizer` is the existing proof that OSGi-internal initiation
-  already works.
-* *CAVEAT — `Stage` is overloaded across domains.* `BootstrapStage` exists TWICE (seed-master AND
-  manifests-core's systemd synthesizer), and there are 14 `*Stage` classes over 4 modules
-  (seed-master 8, manifests-core 4 — `BootstrapStage`/`NetworkStage`/`StorageStage`/`ToolsStage` — plus
-  `VaultStage` in probe-test). So `Stage`→`Topic` is *transverse to several domains*, not local to the
-  pipeline. This is a scoping decision the rename chantier must take explicitly (all `*Stage`, or
-  seed-master only), NOT discover mid-rename. It does not break the design — it sizes the chantier.
-
-.Figure 3 — one grammar (`pipeline-port`), two consumers at two altitudes; only one touches jgiven
-[mermaid]
-....
-flowchart TB
-  G["pipeline-port (shared grammar)<br/>during/then · type-state · TopicFailure<br/><i>zero jgiven</i>"]
-  G --> BP["BOOT pipeline<br/>topics: discovery · plan · launch<br/><b>no jgiven → no runbook</b><br/>amorces the embedded case"]
-  G --> RP["REASONING pipeline<br/>topics: preflight·bbox·incus·systemd·readiness·outputs<br/><b>+ jgiven → produces the runbook</b>"]
-  RP -.->|narrates through| J["jgiven-wrap<br/>ReportModel = runbook"]
-  classDef grammar fill:#1f6feb,color:#fff;
-  classDef nojg fill:#57606a,color:#fff;
-  classDef jg fill:#0b7285,color:#fff;
-  class G grammar
-  class BP nojg
-  class RP,J jg
-....
-
-[IMPORTANT]
-====
-*Open design (reflect before building — NOT decided 2026-07-02):* the seam is *remote-first* — a
-service frontier the OSGi world exposes and the host consumes; the embedded case merely *folds* it into
-an in-process `awaitService(...)`, it does not *define* it. Left open: *what triggers the reasoning
-pipeline in the detached case* — the remote host-client commanding it (reasoning passive until called,
-embedded = same call folded in-process), or the OSGi world reasoning on its own lifecycle and exposing
-the result (more autonomous, but then where does `RunMode` — a host-only fact from
-`Deployment.isDryRun()` — enter?). This `RunMode → OSGi → runbook` joint is the hardest seam and the
-next brainstorm.
-====
-
-== Two engines, not one — the grammar rests on jgiven, does not merge with it
-
-*Lead: `FluentTopicRunner` (type-state, our grammar) and jgiven (narration+report) are orthogonal, not
-redundant. One engine (jgiven) as substrate, two layers; `during/then` stays the authoring surface.*
-
-Within the reasoning pipeline, the root defect this spec addresses is that *two independent engines are
-tangled* (in the topics still stranded host-side) and mistaken for one. They are orthogonal, not
-redundant:
-
-[cols="1,2,1",options="header"]
-|===
-| Engine | What it does | Size
-| `FluentTopicRunner` (`osgi/foundation/pipeline/pipeline-port`, shared) | type-state ordering
-  (compile-time) + enter/leave logging + wrap a throwable as `TopicFailure(label, cause)` |
-  ~33 LOC, *zero jgiven import*
-| JGiven (`jgiven-wrap`, OSGi bundle) | `ReportModel` (→ living-doc AsciiDoc), given/when/then
-  narration, thread-local scenario state | a library
-|===
-
-`FluentTopicRunner` does not do narration; jgiven does not do type-state ordering. Neither duplicates
-the other. Note the runner *already speaks the target vocabulary* — `FluentTopicRunner`, `TopicFailure`,
-`runDuring(topic, …)` — so the `*Stage → *Topic` rename below merely *aligns the stranded host classes
-onto the shared word*; it invents nothing. The landing direction — settled in the June exploration and
-unchanged — is:
-
-> *One engine (JGiven), two layers. The fluent `during/then` grammar stays the authoring surface;
-> JGiven is the runtime substrate underneath it.*
-
-Not "one merged language" (rejected: forces every action topic into a `When`), and not "re-code the
-BDD layer on a hand-rolled engine" (rejected: jgiven already *is* a narration+report engine). The
-type-state worry dissolves: `during/then` stays the authoring surface (compile-time), jgiven is only
-the runtime substrate (narration + report); they sit at different altitudes and never compete.
-
-The three layers (structure unchanged, re-labelled to the vocabulary below):
-
-[source]
-----
-Layer 1: ApplicationPipeline   during("environment").then().during("bootstrap").then().during("outputs")
-Layer 2: BootstrapPipeline     during("preflight").then()…during("bootstrap resources")   (topics)
-Layer 3: verification topics   a topic plays a JGiven scenario (given/when/then + doctor consult)
-----
-
-The shared-report seam already exists in germ: the pipeline carries a caller-owned `ReportModel`, and
-the two checkpoint topics `setModel(reportModel)` so both scenarios write into *one* report. "Shared
-engine" is already real for two topics; generalising it — to the topics the operator needs — is the
-work.
-
-== The vocabulary — separate our words from jgiven's
-
-`Stage` and `State` are jgiven words (`Given/When/Then extends Stage`, `@ScenarioState`); our classes
-borrowed them and *caused the tangle*. The reset:
-
-[cols="1,1,2",options="header"]
-|===
-| concept | jgiven (theirs) | ours (DECIDED)
-| unit of work | `Stage` | *`*Topic`* (`BootstrapStage`→`BootstrapTopic`,
-  `ClusterReadinessStage`→`ClusterReadinessTopic`, `SystemdAdapterStage`→`SystemdAdapterTopic`)
-| executor | `ScenarioExecutor` | `FluentTopicRunner` (already ours)
-| the whole | `Scenario` | the pipeline (`during`.`then`)
-| per-topic input | `@ScenarioState` | *the input record `I`* — only what THAT topic consumes (flux from
-  an upstream topic + ambient, fused at the transition). `@NonNull` by construction, deterministic.
-| ambient context | `@ScenarioState` (shared) | *`PipelineContext`* — the `Class→record` registry for
-  transverse data known before the first topic: config, policy, `RunMode`, doctor, resolved ports.
-  Read/written ONLY when a transition builds an input.
-| accumulated outputs | — | *the accumulator `B` / `StateBuilder`* — set-once: bbox, bootstrap,
-  systemdAdapterLaunch, resources (outputs, no `Result`/`Summary` suffix).
-| living doc | `ReportModel` | produced VIA the jgiven session, held by the provider
-|===
-
-`PipelineState` (today, flat) becomes `State<I,B>` per topic: the shared read-bag splits into a narrow
-input record `I` (per-topic flux + ambient, fused by the transition) and the `PipelineContext` (ambient
-only). A topic today recopies ~7 identical params (config/policy/runbook/consultations/doctor/recordedAt/gate);
-after, a topic is a fluent multi-verb builder constructed with `(input I, Topic.Sink)` — it reads only its
-input `I` and pushes its output through its sink; it implements the `Topic` identification interface
-(`role()` + one nested nature type `Topic.Execution`/`Checkpoint`/`Pipeline`), NOT a mono-shot `O run(I)`. `RunMode` is an *ambient record in `PipelineContext`*, read by the transition when it builds
-an input — never threaded as a per-topic param (the "gate mal placée" realization). Genuinely-optional
-per-topic data (runbook, consultations) are `Optional<>` fields on `I`. See
-`docs/architecture/patterns/fluent-pipeline-grammar.adoc` for the full State-shape + determinism rule;
-the migration census is in the `pipeline-state-per-topic-io-refactor-backlog` memory.
-
-== The jgiven provider — one topic furnishes the session, the rest consume it
-
-`BootstrapStage` (→ `BootstrapTopic`) is *already* the de-facto jgiven provider: it `new ReportModel()`
-and renders it (`RunbookRenderer`) in a `finally`. Make it the full provider: it owns the jgiven
-session lifecycle (create the model, render it). The other topics *consume* the session — they write
-their scenario into the shared report — and never configure jgiven. In port/edge terms: the provider
-*furnishes* the BDD session; topics consume it.
-
-== `RunMode` — the named launch concept the two gates derive from
-
-*Lead: separate the preview CAPABILITY (dry-run the reasoning → jgiven PENDING, living gate closed —
-OSGi-native) from its TRIGGER (`Deployment.isDryRun()` in bootstrap; an operator command / CRD field
-detached). `RunMode` is INJECTED, not read. Only the stack axis is Pulumi-bound; the preview axis
-survives detached.*
-
-[IMPORTANT]
-.The trap I nearly wrote: preview is NOT Pulumi-only (user, 2026-07-02)
-====
-Preview would seem lost in-cluster ("no Pulumi → no dry-run"). It is not — that conflates two things:
-
-* *The preview CAPABILITY* — play the reasoning WITHOUT touching the real system: the jgiven session in
-  dry-run (steps render PENDING, bodies don't run) + the living gate closed. jgiven is an OSGi bundle,
-  so *this capability is OSGi-native* and works detached, remote, anywhere.
+* *The preview CAPABILITY* — play the reasoning WITHOUT touching the real system — is OSGi-native
+  (jGiven is a bundle) and works detached, remote, anywhere.
 * *The TRIGGER* — what puts the world in preview. In the embedded/bootstrap host it is
-  `Deployment.isDryRun()` (a Pulumi fact). Detached in-cluster it is something else — an operator
-  command, a CRD field, a flag (OPEN — the detached trigger is not yet designed; ties to the
-  `RunMode → OSGi → runbook` seam and the doctor what-if, `preview-whatif-replay-exploration`).
+  `Deployment.isDryRun()` (a Pulumi fact). Detached in-cluster it is an operator command / CRD field
+  (OPEN — the detached trigger ties to the doctor what-if, `preview-whatif-replay-exploration`).
 
-So `RunMode` is *injected* into the OSGi world as a value, never read from `Deployment`. This fits the
-compass (the runbook is read AND ACT — an operator asking for a preview in-cluster is an action they
-drive). What IS Pulumi-only is the *output/stack axis* (write the stack) — it vanishes detached; the
-*probe/preview axis* does not. The three-mode table below is the bootstrap host's incarnation; detached
-keeps the preview axis under a different trigger, loses the stack axis.
+So `RunMode` becomes an `ExecutionCondition`: the launcher reads the injected `RunMode` fact and selects
+the execution mode. It is *injected*, never read from `Deployment` inside a phase (E3 confirmed the mode
+is piloted from OUTSIDE the scenario — a context decision, never a scenario property).
 
-*Consequence (design, not built): promote the AXES, not the enum.* `RunMode {STANDALONE, PREVIEW,
-APPLY}` is *host launch vocabulary* — STANDALONE already means "the host runs the exec without Pulumi",
-a host fact. None of the three means anything if the pipeline is not launched in the host world — and
-*that is correct*: the OSGi world must never see "STANDALONE". What it reads is the abstract *probe
-axis* (live / deferred). So:
+*The trap the POC avoided — naive dry-run renders BLIND (E1 + E9).* jGiven couples rendering to
+execution: `doIntercept` returns early WITHOUT `proceed()` as soon as the invocation mode is SKIPPED or
+PENDING. So any mechanism that skips step bodies (the `jgiven.report.dry-run` property, a
+`disableMethodExecution()`, a `setDefaultInvocationMode(PENDING)`) also skips *building the tree* — a
+`@NestedSteps` whose body does not run never builds its sub-tree, the plan comes out EMPTY (and with the
+E8 `@Hidden` relays, entirely empty). Worse, E1: dry-run skips the step bodies, so a `guaranteed` state
+stays `null` → the DAG enforcement throws. *DAG enforcement XOR dry-run — not both.*
 
-* the OSGi-native PORT speaks in *axes* (probe: live/deferred), not in `RunMode`;
-* `RunMode` is the host's *projection* — it maps a launch mode to axis values
-  (`STANDALONE`→probe-live+no-stack, `PREVIEW`→probe-deferred+stack-ro, `APPLY`→probe-live+stack-rw);
-* detached in-cluster, a *different edge* (operator command / CRD field) feeds the SAME probe axis
-  without ever saying "standalone"; the stack axis simply has no in-cluster edge.
+*The resolution, proven (E9):* a `PreviewExecutor` decorates the `ScenarioListener` the executor
+installs. The interceptor keeps its local mode NORMAL — so it `proceed()`s, the entire tree builds
+against inert (bouchonné) probes — but the mode that REACHES the model is rewritten `NORMAL → PENDING`.
+Result: the full plan (all phases, the nested G/W/T, every reservation), each step `(pending)`, zero
+traversal. Preview is not the weak point it seemed — a rich preview is reachable by rebranching the
+render without touching execution. Bonus seam `FailFastPreviewExecutor` (overrides
+`ScenarioExecutor.failed` to re-enable execution so a fail-fast-skipped downstream plan still renders)
+is loquacity polish, not on the critical path.
 
-So we ACCEPT that STANDALONE/PREVIEW/APPLY are host-only words with no detached meaning — that is the
-proof the port is the axis, not the enum. (This corrects an earlier framing that spoke of "promoting
-`RunMode` into OSGi": it is the axes that are OSGi-native; the enum stays host.) NOT built; recorded so
-it is not re-derived.
-====
+*The output/stack axis* (write the stack) is the genuinely Pulumi-only part — it vanishes detached. It
+stays at the host edge as a `PulumiOutputContributor` (SPI) + `PulumiOutputRegistry` (guaranteed
+assembly): each domain contributes a pure `Map` (no Pulumi dependency crosses the seam), the registry
+assembles them with unique-key + deterministic-order guarantees, host-side. This is orthogonal to the
+scenario model and unchanged by the turn — see link:../atlas/host-pipeline.adoc[host-pipeline L1] for
+the contributor/registry design and the `SystemdRuntimeStatusReport` typed record.
 
-*The mode is RESOLVED; the context is INJECTED — complementary, not competing (user, 2026-07-02).* An
-OSGi capability is found by an LDAP filter, so the preview axis becomes a *resolution* axis: resolve the
-pipeline/topic service under `(probe=deferred)` and Felix wires the variant that never touches the real
-system — the living gate stops being an `if`, it becomes a `Require` the resolver satisfies (this is the
-"gates become resolution edges" of `orchestration-purity-benefit`, applied to the mode). Changing mode
-is then a *re-resolution* event — natural in bootstrap (each launch resolves its mode once) and
-in-cluster (the operator commanding preview re-resolves, read+ACT).
+[[dag-gate]]
+== The DAG gate — build-time topological safety (replaces PIPELINE_PATTERN)
 
-But resolution chooses only the *form* — it carries no run data. The *matter* of a run (the patient, the
-resolved config, the outputs sink, the recorded instant) still enters through the *`PipelineContext`*
-(ambient) and the per-topic input, injected as instances (instance-passing discipline). So:
+*Lead: the compile-time DAG safety of the former type-state survives the turn as a build-time ASM gate.
+It reads the `@Provided/ExpectedScenarioState` annotations and proves TOPOLOGICAL order (guaranteed
+BEFORE required), not mere presence — a `StagingGate` sibling of the retired `PIPELINE_PATTERN`.*
 
-* *resolution (LDAP)* answers *which variant* — `(probe=deferred)` → the preview variant;
-* *`PipelineContext` (injected)* answers *with what data this run* — patient, config, sink.
+Moving the value-DAG from type-state to runtime scenario-state would lose the compile-time guarantee if
+nothing replaced it. The gate replaces it at build time: it recovers the phase call ORDER from the
+composing method body via asm-tree `MethodInsnNode` iteration (mirroring `ReferencedTypes` /
+`PipelinePattern`), then walks it maintaining a produced-so-far set, and REJECTS a pipeline whose
+consumer precedes its producers — a fault a presence-only check accepts. `DagGateSpikeTest` proves the
+difference is genuinely topological, on test-classpath bytecode; confirming it on real staged bytecode
+is part of the migration.
 
-The host `RunMode` then projects to *both*: it supplies the resolution filter (probe live/deferred) AND
-feeds the ambient data in `PipelineContext` (e.g. the stack sink). One host axis, two destinations by nature —
-structural facts resolve, data is passed. *Rule: the mode resolves, the context injects.* NOT built.
+This is one more `StagingGate` (ASM over staged bytecode, reached from `ResolvedBundle`, governable per
+package via `@GovernedBy`) — see link:staging-gates-governance-spec.adoc[staging-gates governance]. It
+supersedes `PIPELINE_PATTERN` (which policed the former Topic/Sink shape).
 
-*How the host gets this — transpose the ROLE, not the MECHANISM (user, 2026-07-02).* Resolution is an
-OSGi-native mechanism (the Felix resolver, `getServiceReferences(type, filter)`); the host has no
-resolver, and re-coding one would be the "re-code OSGi host-side" trap. The host does not need to
-*resolve* — it needs to *ask for the right variant*. Today the host looks up services by TYPE only
-(`awaitService(Class)`), not by filter. So the transposition is a *port that carries the mode INTENTION*,
-and OSGi resolves it:
+[[the-avant]]
+== The avant — the fluent grammar / Topic / State model (reference only)
 
-* *port-factory (chosen):* the host calls e.g. `PipelineProvider.forMode(probe=deferred)`; the OSGi
-  world resolves the variant internally (LDAP filter stays OSGi-side) and returns it. The host knows
-  only the INTENTION, never the capability vocabulary.
-* *why not `awaitService(Class, filter)`:* it would teach the host the LDAP vocabulary AND it breaks
-  detached — a remote host has no local registry to filter. The port-factory carries an intention, so
-  it works embedded (folds onto `awaitService`) and detached (remote call) alike — the remote-first
-  seam.
+*This is the model the BDD-as-engine turn supersedes. It is kept here only as the "avant" of the
+evolution figure — enough to read link:../atlas/host-pipeline.adoc#the-bdd-as-engine-turn[Diagram Q].
+The full former text is in git: `pipeline-spec.adoc` at commit `39fe4d8a` (and the fluent grammar
+convention doc it folded in). It is NOT maintained.*
 
-So: the host TRANSPOSES the role (ask the intention), OSGi keeps the mechanism (resolve). `RunMode`
-becomes the host's producer of that intention (`STANDALONE/PREVIEW/APPLY` → a `(probe=…)` intention it
-sends), never a resolver itself. The port-factory's exact shape is decided at chantier S3. NOT built.
+The former seeding was a *fluent type-state pipeline*: a `during(label, lambda).then().during(...)`
+chain, ordered by the compiler. Its vocabulary, and where each concept goes in the après:
 
-There are three launch modes *in the embedded/bootstrap host*, three coordinates in a *two-axis* space
-(probe × stack), not one binary. A single `RunMode` enum names the input; both gates are projections of
-it. The transition reads `RunMode` off `PipelineContext` when it builds a topic's input; no topic reaches for `Deployment.getInstance()`.
-
-[cols="1,1,1",options="header"]
+[cols="1,2,2",options="header"]
 |===
-| `RunMode` | probe axis (living gate) | stack axis (output gate)
-| `STANDALONE` | live | none (print — `pulumiContext == null`)
-| `PREVIEW` (`pulumi preview`) | *dry-run (deferred)* | read-only (Pulumi engine)
-| `APPLY` (`pulumi up`) | live | read-write (Pulumi engine)
-|===
-
-KEY: `PREVIEW` is the *only* mode with a dry-run probe — `STANDALONE` and `APPLY` both probe live. The
-trap to avoid is *fusing* the two axes: "standalone = dry-run" is wrong — standalone probes the live
-system, it merely writes no stack. The axes are orthogonal, each binary in our code:
-
-* *probe axis*: live vs deferred → deferred *only* in `PREVIEW` (`pulumiMode && isDryRun()`).
-* *stack axis*: our code sees only `pulumiContext != null` (export) vs null (print) — the
-  read-only/read-write split is *internal to Pulumi* (`OutputsStage.exportOrPrint` makes the same
-  `context.export` call; the engine simply does not apply in preview). We do not pilot ro/rw.
-
-`RunMode` is resolved once at launch (the one place the dry-run flag is read) and lives as an ambient
-record in `PipelineContext`. The `LiveGate` type built today (`LiveGate.forRun(pulumiMode)`, `isOpen()`,
-`through(live, deferred)`) is the *transitional projection* of the probe axis — on implement it
-becomes `runMode.probesLive()` and the combinator stays.
-
-== The living gate — what may touch the real system
-
-=== Problem — the pipeline crosses the living boundary without checking it
-
-In `pulumi preview` the pipeline must not touch the live system: no systemd probe, no kubeconfig wait.
-Today domains gate themselves inline, and one reads it wrong:
-
-* *systemd* — `ResourceCreationPipeline.withSystemdRuntimeStatus` branches on `isDryRun()` and calls
-  `deferredPreview(config)` in preview. Correct, but inline and global.
-* *k8s / cluster readiness* — `ClusterReadinessStage` computes `preview` but uses it only AFTER
-  playing the scenario. The scenario's step bodies (`ClusterReadinessScenario.checking`) call
-  `phaseProbe.probe(...)` unconditionally, so the live probe still runs:
-  `waitForBootstrapPreconditions` then `waitForKubeconfigPublished` — a wait that times out after one
-  minute in every preview. The stage sets `System.setProperty(JGIVEN_DRY_RUN)` believing it skips the
-  step bodies — but that property does nothing on our execution path (see <<dead-dry-run>>).
-
-The living boundary was crossed before the gate was consulted. The output said "deferred"; the side
-effect had already happened.
-
-.The scattered reads of the living-gate state (the smell)
-[cols="1,2",options="header"]
-|===
-| Site | What it reads globally
-| `SystemdAdapterStage:124` | `pulumiMode && Deployment.getInstance().isDryRun()`
-| `ClusterReadinessStage:95` | `pulumiMode && Deployment.getInstance().isDryRun()`
-| `ResourceCreationPipeline:207` | `Deployment.getInstance().isDryRun()`
-| `IncusResourceBootstrap` (×3) | `Deployment.getInstance().isDryRun()`
-| `PulumiIncusImageProvider:144` | `Deployment.getInstance().isDryRun()`
-| `BboxReconcilerComponent:27` | `Deployment.getInstance().isDryRun()`
+| Avant concept | What it was | Après (this spec)
+| `during`/`then` (fluent grammar) | the authoring surface — scoped topic lambdas, explicit conjunctions,
+  type-state ordering | dissolved → intro-words + `@NestedSteps` (§ <<the-model>>)
+| `Topic` (identification iface, `role()` + nested natures) | the unit of work | a jGiven `Stage` (one
+  phase)
+| `Topic.Execution` / `Topic.Checkpoint` / `Topic.Pipeline` (nature = nested type) | the three phase
+  bodies | a flat-step `Stage` / a `Stage` opening a nested G/W/T / a `Stage` composing sub-phases
+| `Topic.Sink` (the write-face, `Consumer<O>`) | how a phase pushed its output | `@ProvidedScenarioState`
+  (the out-edge)
+| the input record `I` (flux + ambient, fused) | what a phase read | `@ExpectedScenarioState` (the in-edge)
+| `State<I,B>` (compile-time type-state) | the ordering guarantee | scenario-state runtime + the
+  build-time DAG gate (§ <<dag-gate>>)
+| `PipelineContext` (`Class→record` ambient registry) | transverse ambient | `ExtensionContext.Store`
+  (JUnit-native)
+| `FluentTopicRunner` | the topic-execution loop | the embedded JUnit Platform launcher
+| `PIPELINE_PATTERN` (ASM gate) | policed the Topic/Sink shape | re-tooled into the DAG gate
+| `LiveGate` / `RunMode {STANDALONE,PREVIEW,APPLY}` | the living gate + its enum | erased / re-posed as an
+  `ExecutionCondition` + the `PreviewExecutor`
 |===
 
-[[founding-constraint]]
-=== The founding constraint — probes ARE jgiven scenario steps
+The one true change of *guarantee* is `State<I,B>`: the DAG moves from compile-time (type-state) to
+runtime (scenario-state) *plus* the build-time gate. Everything else is a 1:1 vocabulary replacement.
+The `wip/runmode-absorbs-livegate` tag is *abandoned* — it presupposed a `LiveGate` to absorb, which
+this turn erases.
 
-*Every probe must be a jgiven scenario step, or there is no runbook.* The runbook exists only because
-each probe is played as a step (it records into the `ReportModel`). A probe that is not a step produces
-no runbook entry. So probe ⟺ scenario-step is the *raison d'être* of the pipeline↔jgiven coupling, not
-an incidental detail — and it is the deepest justification for making jgiven the substrate: the
-operator-model deserves to be rendered and acted upon.
+== Migration — legibility first, then ClusterSeed-vertical
 
-This constraint *disqualifies a tempting-but-wrong fix.* Injecting a canned "deferred" probe that
-*returns a value* makes the step *execute* and render *PASSED (fake green)* — the exact dishonesty to
-avoid. The honest `PREVIEW` rendering is jgiven's native dry-run: `disableMethodExecution()` +
-`setDefaultInvocationMode(PENDING)` → step bodies do not run, steps render *PENDING* ("to do"). The
-body never executes, so it never touches the real system, and the runbook shell renders honestly. So
-the probe axis in `PREVIEW` is not "inject another probe" — it is "put the jgiven session in dry-run",
-and because probes *are* steps, they all become PENDING at once. The living gate acts *through* the
-jgiven session, not beside it — which fits the provider decision (`BootstrapTopic` owns the session, so
-it flips the session to dry-run in `PREVIEW`, derived from `RunMode`).
+*The method: the spec runs ahead (avant/après) with the atlas up to date; only then the plan and the
+worktree scheduling — integration obliges the worktrees, the spec does not.*
 
-[[dead-dry-run]]
-=== The blocker — jgiven's dry-run is dead on our execution path
+. *Legibility cleanup of the spec network — FIRST, this pass.* Make the BDD-as-engine model the primary
+  readable content across the network (this spec, host-pipeline, the atlas satellites); demote the
+  former model to the avant reference above. Do not build the migration on docs nobody can read. (This
+  is the pass you are reading the result of.)
+. *ClusterSeed-vertical migration — one pipeline at a time.* Migrate ONLY `ClusterSeedPipeline` first
+  (the POC transposed it) end-to-end into `seed-master` (real Felix, not the `URLClassLoader` stand-in):
+  the seven proven mechanisms wired live. The other six pipelines STAY on the former model meanwhile —
+  assumed coexistence, NOT a legacy variant to hide. Each subsequent pipeline is its own increment.
 
-Verified in jgiven-core 2.0.3 sources: `Config.dryRun()` reads
-`System.getProperty("jgiven.report.dry-run")`, *but* `disableMethodExecution()` is triggered only in
-`ScenarioExecutor.startScenario(Class, Method, List<NamedArgument>)` — the JUnit path. Our topics call
-`startScenario(String)` (the 1-arg overload), which never consults `Config.dryRun()`. So the
-`System.setProperty(JGIVEN_DRY_RUN, "true")` in both `SystemdAdapterStage` and `ClusterReadinessStage`
-is *dead code* — dry-run never activates on our path. There is no public Java API to enable it (only
-the system property + the JUnit entry we do not use).
-
-Consequence: the honest PENDING rendering requires making our scenario execution *honor* jgiven's
-dry-run without the JUnit entry — the open design work below. Until then the dead `System.setProperty`
-lines must be *deleted* from both topics (they encode a false belief), and the transitional mechanism
-is the living gate deferring the probe.
-
-[IMPORTANT]
-====
-*Open design question (resume):* how to trigger `disableMethodExecution` without the JUnit
-`startScenario(Class, Method, args)` entry. Candidates: drive `ScenarioExecutor`/its interceptor
-directly, or add a jgiven-wrap helper in the `pipeline-jgiven` module. The currently-built
-`SimulatedClusterReadinessProbe.deferred()` + the `checking()` symptom tweak are a *wrong direction to
-unwind* (they render fake-green), kept only until the honest PENDING path exists.
-====
-
-=== Resolution — the living gate as a projection of `RunMode`
-
-The pipeline holds the gate and calls `through(...)` at each gated action; the domain provides both
-branches and reads `isDryRun()` nowhere.
-
-[source,java]
-----
-interface LiveGate {                                       // transitional; becomes runMode.probesLive()
-  boolean isOpen();                                        // APPLY/STANDALONE → true, PREVIEW → false
-  <T> T through(Supplier<T> live, Supplier<T> deferred);   // open → live.get(), closed → deferred.get()
-}
-----
-
-.Figure 4 — the living gate: `RunMode` projects to per-action live/deferred crossings
-[mermaid]
-....
-flowchart LR
-  P["pipeline<br/>holds RunMode (in PipelineContext)"] --> G["living gate<br/>= runMode.probesLive()"]
-  G -->|through live/deferred| S["systemd edge<br/>snapshot() | deferredPreview()"]
-  G -->|through live/deferred| K["k8s readiness<br/>live probe | jgiven session in dry-run (PENDING)"]
-  S --> world1["EXTERNAL — systemd-adapter (dbus)"]
-  K --> world2["EXTERNAL — kube-apiserver (kubectl)"]
-  classDef hub fill:#0b7285,color:#fff;
-  classDef dom fill:#1f6feb,color:#fff;
-  classDef w fill:#eee,stroke:#999;
-  class G hub
-  class S,K dom
-  class world1,world2 w
-....
-
-== The output gate — what is written to the stack
-
-=== Problem — an omniscient builder pulls each output by name, over raw maps
-
-`OutputBuilder` knows every output by name and pulls each (`resourceResult.registrySummary()`,
-`.systemdRuntimeStatusSummary()`, …). Every new output edits this class; nothing prevents a duplicate
-key (silent overwrite) or a value that flattened too early. The systemd case is the last one: its
-producer flattens `SystemdStatusSnapshot` to a `Map` at production time, and the map then travels
-internally to `SeedNodeBootstrapWatcher`, which re-parses it (the null lived here). The three sibling
-summaries (`registrySummary`/`imageBuildSummary`/`manifestSynthSummary`) already stay structured until
-the edge. The convention exists (`policy.toOutputMap()`, `bbox.summaryMap()` are named projections); it
-is simply not enforced.
-
-=== Resolution — `PulumiOutputContributor` (SPI) + `PulumiOutputRegistry` (guaranteed assembly)
-
-The pipeline collects contributors and the registry assembles them, guaranteeing what the omniscient
-hub could not: no key collision (a duplicate is a named failure, not a silent overwrite) and a
-deterministic order. `contribute()` is the single flatten point — called once, by the registry, never
-by an internal consumer.
-
-[source,java]
-----
-interface PulumiOutputContributor {
-  String namespace();                 // identity for diagnostics (names the offender on collision)
-  Map<String,Object> contribute();    // the flat projection — computed here and nowhere else
-}
-
-final class PulumiOutputRegistry {
-  PulumiOutputRegistry add(PulumiOutputContributor c);   // fluent
-  Map<String,Object> assemble();                          // unique keys, deterministic order
-}
-----
-
-Both types live in `host/pulumi/pulumi-edge` (pure: `String` + `Map`, zero seed-master type), beside
-`StackHandle` — an output projection is a Pulumi-edge concept. `pulumi-edge` is already `@NullMarked`
-and depends on `com.pulumi:pulumi`, so the living gate lives there too. The stateful implementations
-(`SystemdRuntimeStatusReport`, and the registry/image/manifest contributors, which hold
-`bootstrapResult`) stay in `controlplane` and depend on the edge SPI — the dependency direction
-`seed-master → pulumi-edge` already holds, no cycle.
-
-=== The structured type behind the systemd contribution — `SystemdRuntimeStatusReport`
-
-The systemd runtime status stays a domain-pure record all the way in, and projects to the K8s envelope
-only at the edge. The `deferred-preview` case is NOT a runtime status — it is the living gate being
-closed — so it is not a value of the report's `Status`; the report models the two outcomes of a *real*
-probe, and the deferred envelope is produced by the contributor when the living gate is closed.
-
-[source,java]
-----
-record SystemdRuntimeStatusReport(
-    Status status,                              // OK | EXECUTION_ERROR (a real probe's two outcomes)
-    Optional<SystemdStatusSnapshot> snapshot,   // present on OK, empty on error
-    String summary) {
-  enum Status { OK, EXECUTION_ERROR }
-}
-----
-
-`SeedSystemdAdapterRuntimeStatusSnapshot.snapshot()` returns the report (no map). The watcher reads
-`report.snapshot()` typed — the three converter helpers and the `@Nullable Object` params are deleted
-at the source. The K8s envelope (`apiVersion`/`kind`/`status`/`source`/`probeMode`) and the deferred
-case live in the systemd contributor's `contribute()`, gated by the living gate.
-
-== The unifying picture — the pipeline owns both gates
-
-.Figure 5 — both gates derive from `RunMode`; the pipeline crosses IN (per action) and OUT (once)
-[mermaid]
-....
-flowchart TB
-  subgraph pipeline [the pipeline — the only orchestrator]
-    IN["living gate: gate.through(live, deferred)<br/>per gated action (systemd, k8s)"]
-    OUT["output gate: registry.add(...).assemble()<br/>once, at the end"]
-  end
-  IN --> real["EXTERNAL systems (dbus, kubectl)"]
-  OUT --> stack["Pulumi stack outputs"]
-  RM["RunMode (in PipelineContext)"]:::mech -.derives.- IN
-  RM -.derives.- OUT
-  REG["PulumiOutputRegistry (assembly)"]:::mech -.held by.- pipeline
-  classDef mech fill:#6f42c1,color:#fff;
-....
-
-Neither the living gate nor `PulumiOutputRegistry` orchestrates. Both derive from `RunMode`; the
-pipeline consults the living gate upstream (per action) and drives the write downstream (once).
-
-[IMPORTANT]
-====
-*Crossing a boundary — touching the live system, or writing the stack — is the pipeline's decision,
-never the domain's.* The domain offers the branches (`live`/`deferred`) or a structured contribution;
-the pipeline holds the gate and chooses.
-====
-
-[[closed-questions]]
-== The two questions the June exploration left open — now closed
-
-The parked "JGiven as Shared Engine" exploration deferred two decisions to "a prototype". This session
-answered both from the design work above — no prototype needed:
-
-[cols="1,2",options="header"]
-|===
-| Open question (June) | Answer (this session)
-| *State model* — jgiven thread-local (`@ProvidedScenarioState`) as the threading mechanism (Role 2),
-  or narration+report only with inter-topic state passed as an instance (Role 1)?
-| *Role 1.* the input record `I` (per-topic, read) + the accumulator `B`/`PipelineContext` (ambient) are
-  passed as instances — honoring the CLAUDE.md instance-passing discipline. jgiven's thread-local stays
-  confined *within* a single verification scenario (local, short-lived). Role 2 is rejected: it would
-  frontally contradict the discipline.
-| *Depth* — do all topics narrate (full Mapping B), or only verification topics keep jgiven?
-| Judged by *the compass*, not by a blanket rule: a topic narrates *iff the operator needs it to
-  understand or act*. Not "all 8 by default", not "verification only" — operator-need decides
-  per-topic. bbox → IN is the first verdict.
-|===
-
-== What moves where — the inventory
-
-[cols="1,3"]
-|===
-| Destination | Content
-
-| *pulumi-edge* (host, `@NullMarked`)
-| `PulumiOutputContributor` (SPI), `PulumiOutputRegistry` (assembly + guarantees), the living gate
-  (`RunMode`/`LiveGate`). Pure — `String`/`Map`/`Supplier`, no seed-master type.
-
-| *controlplane.pipeline* (seed-master)
-| flat `PipelineState` becomes `State<I,B>` per topic (input record `I` + accumulator `B` +
-  `PipelineContext` ambient); `*Stage` classes rename to `*Topic`; `BootstrapTopic` becomes the jgiven
-  provider (owns session create + render). `RunMode` resolved once, held as an ambient record in
-  `PipelineContext`.
-
-| *controlplane.systemd* (seed-master)
-| `SystemdRuntimeStatusReport` (record + `Status`); `SeedSystemdAdapterRuntimeStatusSnapshot.snapshot()`
-  returns it; a systemd `PulumiOutputContributor` whose `contribute()` builds the K8s envelope, gated.
-
-| *controlplane.resources* (seed-master)
-| `SeedNodeBootstrapWatcher` reads the typed report (helpers + `@Nullable Object` deleted).
-  `ResourceCreationResult` stops carrying raw `Map`/`Object` summaries. `OutputBuilder` melts into
-  `registry.add(...).assemble()`. `playClusterReadiness` uses the gate; delete the dead
-  `System.setProperty(JGIVEN_DRY_RUN)` and the `isDryRun()` recompute in both topics.
-
-| *the seven `isDryRun()` sites*
-| Refactored to read `RunMode` off `PipelineContext` instead of `Deployment.getInstance()` (incremental —
-  the two readiness/systemd sites first; Incus/image/bbox as they are touched).
-|===
-
-== Work plan (high level) — two orthogonal threads
-
-The spec describes a target; this is the map of what it takes to get there. There are *two orthogonal
-threads*, and they must not be braided into one chantier:
-
-* *Thread R — reliability* (tactical, the arc that started this): non-null → pulumi-outputs → jgiven →
-  pipeline, fixed in reverse. Detailed in "Build order" below. Independent of the restructuring.
-* *Thread S — structure* (strategic, the three levels): the pipeline moves toward OSGi ownership. Each
-  step is its own chantier + worktree; none is started here.
-
-.Thread S — the structure chantiers, in dependency order
-[cols="1,3,1,1",options="header"]
-|===
-| # | Chantier | Level | Depends on
-| S0 | *Lexical rename* — `BootPipeline`→`FrameworkLaunchPipeline`, `BootstrapPipeline`→`ClusterSeedPipeline`,
-  `BootstrapStage`→`ClusterSeedTopic`; then `*Stage`→`*Topic`. FIRST decide the `Stage` scope (all 4
-  modules vs seed-master only — the overload caveat). Mechanical, but transverse. | socle | —
-| S1 | *Untangle the fold* — in `ClusterSeedTopic`, name the two altitudes apart: the framework-launch
-  crossing (`FrameworkLaunchPipeline.embedded()`) vs the cluster-seed reasoning body. No behaviour
-  change; make the seam explicit. | L-boot/shape | S0
-| S3 | *Decision into OSGi* — re-seam the 4 topics that import Pulumi/gRPC (`ClusterReadinessStage`,
-  `EnvironmentStage`, `OutputsStage`, `SystemdAdapterStage`) behind ports; the orchestrator becomes an
-  OSGi capability, actualisation bodies stay host. Moves initiation rows host→OSGi. | L-altitude | S1 + P2
-| S4 | *Boot-executor unification* — one `boot-pipeline` for prod (`OsgiRuntime`) + test
-  (`FelixFrameworkExtension`), beside `boot-discovery`. Parallelisable (own concern). | L-boot | S0
-| S5 | *Transverse* — pure jgiven scenario MODEL vs host rendering ENGINE (runbook becomes a pure bundle,
-  scenario becomes a resolvable `UnitResource`); `osgi/jgiven/` dissolves into `pipeline`. | transverse | S3
-|===
-
-Sequencing note: S0 is the only prerequisite everything else reads (the vocabulary). The open seam
-(`RunMode → OSGi → runbook`, the detached trigger) is decided inside S3. Thread R can proceed at any
-time — it touches the topics' bodies, not their structure.
-
-[TIP]
-.Rejected alternative — a "contributable seed" step before S3
-====
-Making `ClusterSeedPipeline` a shared boot prefix + a per-seed contributed tail was considered and
-rejected: the prefix already exists (all three seeds already share `FrameworkLaunchPipeline.embedded()`),
-the tails are incommensurable (one resolved service for the CLIs vs seed-master's 6-topic type-state
-chain), and it moves nothing on the initiation axis. The composition only earns its keep once the
-decision logic is inverted behind ports — which is S3 itself. Full rationale (both the pipeline and the
-module side): the `bootstrap-pipeline-contributable-vision` memory.
-====
-
-== Build order — thread R (reliability), fixed in reverse
-
-The defects were discovered symptom-to-root along the thread *non-null → pulumi-outputs → jgiven →
-pipeline*; they are fixed in reverse (pipeline first), each link green before the next:
-
-1. *pipeline* — flat `PipelineState`→`State<I,B>` per topic (input record `I` + accumulator `B` +
-   `PipelineContext` ambient); rename `*Stage`→`*Topic`; `RunMode` as an ambient record in
-   `PipelineContext`; `BootstrapTopic` as the jgiven provider.
-2. *jgiven* — resolve the honest-PENDING question (drive dry-run without the JUnit entry), or keep the
-   gate-deferred probe transitionally; delete the dead `System.setProperty(JGIVEN_DRY_RUN)`; unwind the
-   fake-green `SimulatedClusterReadinessProbe.deferred()` + `checking()` tweak. `pulumi preview` proves
-   the kubeconfig hang is gone and the shell renders honestly.
-3. *pulumi-outputs* — `SystemdRuntimeStatusReport`; producer returns it; watcher reads it typed
-   (helpers/`@Nullable` deleted); `PulumiOutputContributor`/`PulumiOutputRegistry`; migrate the four
-   summaries to contributors; `ResourceCreationResult` drops raw maps; `OutputBuilder` melts.
-4. *non-null* — the watcher's converter helpers and `@Nullable Object` params fall out; sweep the
-   remaining `isDryRun()` sites onto `RunMode` (Incus/image/bbox).
-
-Build `-Pall-worlds` (never `,nxmatic`); measure NullAway with `clean package -DskipTests=true`.
+The reference implementation for every mechanism is pinned at tag `spike/bdd-pipeline-poc`
+(`git show spike/bdd-pipeline-poc:<path>`): `SeedLauncherMain` (the launcher from a bare `main()`),
+`PollUntilReadyExtension` (the adaptive poll), `DagGateSpikeTest` (the topological gate),
+`CrossWorldGraftSpikeTest` (the E10 graft), `FanInStatusSpikeTest` (fan-in + fail-fast off
+`executionStatus`), `FailFastPreviewExecutor` (the rich-preview bonus).
 
 == Related documentation
 
-* link:../patterns/fluent-pipeline-grammar.adoc[Fluent pipeline grammar] - the *authoring surface*
-  (`during`/`then`, type-state) that survives unchanged; this spec is the *substrate* underneath it.
-* link:osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] - the *other* consumer of the shared
-  grammar (`BootPipeline`, `BootPlanner`/`FrameworkLauncher`); how the host boots the OSGi world the
-  pipeline reasoning will live in.
-* link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] - jgiven already runs as an OSGi bundle
-  (`jgiven-wrap`); the substrate this spec puts the engine on.
-* link:pulumi-edge-handoff.adoc[pulumi-edge] - the host edge where the SPI, registry and gate live.
-* link:../patterns/frontier-playability-model.adoc[frontier-playability model] - the edge/port/playability axes; the living gate is the preview state of an edge crossing.
-* link:../patterns/port-edge-domain-ownership.adoc[port-edge-domain ownership] - domain calls, port declares, edge provides; the pipeline decides when the crossing happens.
-* link:../bdd/bdd-diagnostic-pattern.adoc[BDD diagnostic pattern] - the checkpoint scenarios + doctor consult seam this spec generalises.
-* link:staging-gates-governance-spec.adoc[staging-gates governance] - the SPEC_COVERAGE gate this document answers for the new types.
+* link:bdd-pipeline-poc-design.adoc[bdd-pipeline POC] — the discovery record: the four operator paths
+  (P1–P4), the ten measured learnings (E1–E10) that back this model.
+* link:../atlas/host-pipeline.adoc[host-pipeline L1] — the graved avant/après (Diagram Q), the concept
+  correspondence table anchored on the bench `SeedPhases`, the four-invariant additivity verdict, and
+  the go/no-go table (the seven proven mechanisms + the tag pointer). The output-gate design
+  (`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) lives here too.
+* link:osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] — the boot seam
+  (`BootPlanner`/`FrameworkLauncher`) the launcher rests on; how the host boots the OSGi world the
+  reasoning lives in.
+* link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — jGiven already runs as an OSGi bundle
+  (`pipeline-jgiven`) and the JUnit launcher already runs in-container (`InContainerJUnitRunner`); the
+  substrate this spec puts the engine on.
+* link:world-gateway-2a-document-foundation-spec.adoc[World-gateway 2A] — the `Document` +
+  `consult(Document)` seam the cross-world scenario graft (E10) reuses.
+* link:pulumi-edge-handoff.adoc[pulumi-edge] — the host edge where the output SPI, registry, and the
+  Pulumi-bound preview trigger live.
+* link:staging-gates-governance-spec.adoc[staging-gates governance] — the DAG gate is a new
+  `StagingGate` sibling; the SPEC_COVERAGE gate this document answers for the new types.
