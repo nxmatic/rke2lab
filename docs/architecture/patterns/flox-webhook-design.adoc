@@ -553,38 +553,6 @@ Client Version: v1.28.0
 /nix/store/def456-helm-3.12.0/bin/helm
 ----
 
-== Implementation Plan
-
-=== Phase 1: Core Webhook (2-3 days)
-
-1. ✅ **Design document** (this document)
-2. 🔲 **Project setup** - Go module, directory structure
-3. 🔲 **Core handler** - admission webhook handler with basic injection
-4. 🔲 **Environment reader** - read ConfigMap, parse JSON
-5. 🔲 **Injector logic** - generate patches for volumes + env vars
-6. 🔲 **Unit tests** - test injection logic
-7. 🔲 **Dockerfile** - build container image
-8. 🔲 **Deployment manifests** - k8s resources
-
-=== Phase 2: Integration & Testing (1-2 days)
-
-9. 🔲 **Deploy webhook** - to flox-system namespace
-10. 🔲 **Create test ConfigMap** - with fleet/k8s and fleet/keyhole
-11. 🔲 **Integration tests** - test pods with annotations
-12. 🔲 **Manual verification** - exec into pods, verify tools
-13. 🔲 **Edge case testing** - missing env, invalid annotation, etc.
-
-=== Phase 3: Production Readiness (1-2 days)
-
-14. 🔲 **Observability** - metrics, logging, tracing
-15. 🔲 **Error handling** - failure modes, retry logic
-16. 🔲 **Documentation** - usage guide, troubleshooting
-17. 🔲 **CI/CD** - build/test/deploy pipeline
-18. 🔲 **HA testing** - verify 2-replica behavior
-19. 🔲 **Performance testing** - load test webhook
-
-**Total estimated**: 4-7 days
-
 == Security Considerations
 
 === Threat Model

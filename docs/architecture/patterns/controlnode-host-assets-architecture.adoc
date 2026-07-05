@@ -128,30 +128,6 @@ Create one materializer that:
 - Build fails on unresolved alias or conflicting contributions.
 - External source inputs, such as the projected macOS-backed worktree, are not treated as writable runtime asset targets.
 
-== Suggested incremental rollout
-
-=== Phase 1 (safe, low-risk)
-
-- Introduce Runtime Filesystem Contract class and switch:
-  - `controlplane` mount destinations,
-  - runtime `paths.env` generation
-  to contract-backed values.
-
-=== Phase 2
-
-- Introduce contribution API and adapt runtime domain layers first (`runtime/*`).
-- Keep existing manifest units intact while delegating asset collection.
-
-=== Phase 3
-
-- Add Script Interface Layer and migrate direct script orchestration there.
-- Deprecate direct path literals from layer implementations.
-
-=== Phase 4
-
-- Extend contribution API to other domains (networking/mesh/gitops/etc.).
-- Add CI checks for forbidden raw `/srv/host/*` literals outside contract package.
-
 == Validation strategy
 
 - Unit tests: alias map, collision detection, deterministic inventory hash.
