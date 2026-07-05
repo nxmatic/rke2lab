@@ -553,8 +553,8 @@ contract is enforced at build. Only the *mechanism* changed (readers + schema-pe
 a mux/demux of mapper components), and the change dropped a whole class of live components (no
 `@Reference List<DomainDagMapper>` boot bind was ever needed — the LOW-rated open proof above is moot).
 Diagrams N/N2/O are kept as the design-time reasoning that led here; the shipped shape is specified in
-link:../osgi/world-gateway-2d-schema-contract-spec.adoc[the 2D schema-contract spec] and its 2A/2B/2C
-siblings. The verdict stands — three leaks closed, atomic, preview green — reached by the lighter path.
+link:../osgi/world-gateway-spec.adoc[the world-gateway spec]. The verdict stands — the boundary leaks
+closed, reached by the lighter path.
 ====
 
 === Design scenarios — the doctor capabilities as DSL sentences

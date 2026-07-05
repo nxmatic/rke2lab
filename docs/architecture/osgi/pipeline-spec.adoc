@@ -589,7 +589,7 @@ The reference implementation for every mechanism is pinned at tag `spike/bdd-pip
 * link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — jGiven already runs as an OSGi bundle
   (`pipeline-jgiven`) and the JUnit launcher already runs in-container (`InContainerJUnitRunner`); the
   substrate this spec puts the engine on.
-* link:world-gateway-2a-document-foundation-spec.adoc[World-gateway 2A] — the `Document` +
+* link:world-gateway-spec.adoc[World gateway] — the `Document` +
   `consult(Document)` seam the cross-world scenario graft (E10) reuses.
 * link:pulumi-edge-handoff.adoc[pulumi-edge] — the host edge where the output SPI, registry, and the
   Pulumi-bound preview trigger live.

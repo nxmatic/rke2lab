@@ -4,15 +4,12 @@
 
 [NOTE]
 ====
-*Status:* DESIGN (converged 2026-06-27, NOT yet built). This spec is the design-of-record for the
-host↔OSGi data/behaviour gateway. It REPLACES two earlier specs (`multiplexor-spec`,
-`world-boundary-spec`, deleted 2026-06-27, recoverable from git history): a five-angle code review
-found they covered only one of three real boundary leaks and that their "single door" / "records
-never cross" claims had drifted from the code. The sound parts (the egress mechanism: `Document`,
-`DomainDagMapper`, `DomainDagMultiplexor`, `DomainDagAdapter`) are carried forward as step 2 below.
-
-Written from the code, not imposed on it: every claim below was checked against the real pipeline and
-bundle manifests on 2026-06-27.
+The design-of-record for the host↔OSGi data/behaviour boundary. The *contract layer* is BUILT — the
+seam types, the per-realm codec, and the two build-time gates that enforce the boundary
+(`REALM_BOUNDARY`, `SCHEMA_CONCORD`, both at `ERROR`). The *host-side migration* it governs is
+PARTIAL: the last leaks (the JSON Schema files, the residual `Severity`/`toOutputMap` sites on the
+host) are still open — see § <<remaining-migration>>. Written from the code: every claim below was
+checked against the real modules and bundle manifests.
 ====
 
 == The mental model: REST, in our embedded model
@@ -26,7 +23,7 @@ forward-compatible with a future remote split (same contract, a different transp
 | REST (distributed) | this embedded model
 
 | the API exposes resources/verbs, not the server's internal types | the *ports are services* (verbs), not the records
-| the payload is neutral JSON/YAML | the `Document` (a `JsonNode` tree)
+| the payload is neutral JSON/YAML | the `Document` (a serialized `String` payload)
 | the contract is a schema (OpenAPI / JSON Schema), versioned | a *JSON Schema per document type*, semver'd
 | the client validates at its edge, blind to server logic | the host validates *structure, not meaning*
 | the server is authority over the resource | *OSGi holds the authority*
@@ -41,46 +38,9 @@ runs remote, it is the same contract with an HTTP transport instead of a method 
 
 The host world (flat JCL, Pulumi-aware orchestrator) and the OSGi world (bundle classloaders, the
 domain models + reasoning) gateway **no data type at all**. They gateway **services** — a port is a
-set of verbs — and the data those verbs carry crosses as a **`Document`** (a neutral YAML/`JsonNode`
-tree), validated by a **JSON Schema keyed on the document type**. OSGi holds the authority and owns
-all rich typing; the host transports. One rule, uniformly applied, closes the three leaks the review
-found.
-
-== Why this spec exists — the three leaks
-
-A `pulumi preview` crashes at boot with `NoClassDefFoundError doctor.records.Severity` once
-`doctor-records` became a `type=record` bundle (bundle-only, excluded from the flat uber-jar). The
-review found the boundary leaks in three distinct ways; the prior multiplexor design addressed only
-the third.
-
-[cols="1,4,1",options="header"]
-|===
-| # | leak | prior spec?
-
-| 1
-| *The seam SPEAKS records.* `doctor-port` and `cluster-port` (both `type=seam`, system-exported)
-  carry `Import-Package: io.nxmatic.rke2lab.doctor.records` + `uses:=`. 19 record types appear in
-  seam method signatures — `consult(Symptom, Observation)`, `admit(Patient)`,
-  `recordFor(Patient)`. A `type=seam` package whose verbs name `type=record` classes is a
-  contradiction: the host gets the interface but cannot load its argument types.
-| not covered
-
-| 2
-| *The host REASONS on records.* `ControlplanePolicy.from()` calls `Severity.parse()` AT BOOT (the
-  crash, before Felix exists); `SystemdAdapterStage` branches `if (effective == Severity.CRITICAL)`;
-  probes build `Observation.failed(Symptom.X, …)`. This is parse / branch / produce — not the
-  "address a DAG node by path" the prior keystone assumed.
-| not covered
-
-| 3
-| *Egress self-serialization.* ~14 files in `osgi/` carry `toOutputMap` / `OUTPUT_KEY` /
-  `fromOutputMap` (the doctor records serialize themselves to Pulumi outputs; four `*Reader` classes
-  parse them back).
-| covered (the multiplexor)
-|===
-
-Closing only #3 (the multiplexor) leaves the boot crash (#2) and the seam contradiction (#1) open.
-This spec closes all three with one principle.
+set of verbs — and the data those verbs carry crosses as a **`Document`**, validated by a **JSON
+Schema keyed on the document type**. OSGi holds the authority and owns all rich typing; the host
+transports. One rule, uniformly applied, closes every boundary leak.
 
 == The principle: ports are services, Documents are data
 
@@ -102,11 +62,16 @@ flowchart LR
 ....
 
 * A `-port` (`type=seam`) exposes *verbs*. Its method signatures take and return `Document`, never a
-  data type. `consult(Symptom, Observation) -> RemediationPlan` becomes `consult(Document) ->
-  Document`. The seam stops being 61 exported types and becomes a handful of service interfaces.
-* The only shared class is the service interface plus the neutral `Document`. No domain data type
-  (no `Severity`, no `Observation`, no `MedicalRecord`) ever crosses. Leak #1 is closed by
-  construction: a seam cannot name a record because its signatures speak `Document`.
+  data type: `consult(Symptom, Observation) -> RemediationPlan` becomes `consult(Document) ->
+  Document`. The seam stops being dozens of exported record types and becomes a handful of service
+  interfaces.
+* The only shared classes are the service interfaces plus the seam types (`Document`, the coordinate
+  vocabulary, the wire-records). No domain data type (no `Severity`, no `Observation`, no
+  `MedicalRecord`) ever crosses. A seam cannot name a record because its signatures speak `Document`.
+
+`consult(Document) -> Document` is realised today on the doctor seams (`ConsultingService`,
+`ReadinessAuthority`); the record-typed reasoning moved bundle-internal (`ClinicalReasoning` +
+`adapt(Class)` face-by-capability).
 
 == OSGi holds the authority; the host transports (the asymmetry)
 
@@ -135,151 +100,108 @@ flowchart TB
 
 * *Ingress* — the host serializes its host-native facts (Pulumi config, raw probe output) into a
   `Document` and hands it to OSGi. OSGi interprets it into its own records.
-* *Verdict* — OSGi answers with a `Document`; the host reads ONE control field (e.g. continue/stop),
-  never a typed record. This is what removes leak #2: the host can no longer `== Severity.CRITICAL`,
-  because it holds a string verdict, not a `Severity`.
+* *Verdict* — OSGi answers with a `Document`; the host reads ONE control field, never a typed record.
+  The host cannot `== Severity.CRITICAL`, because it holds a string verdict, not a `Severity`.
 * *Egress* — OSGi emits its DAG as a `Document`; the host forwards it opaquely to `pulumi.export`.
 
-Rejected alternative (map-A, symmetric): a rich host-side mapper rebuilding doctor types host-side —
-it re-creates a doctor vocabulary on the host, the very leak we are closing.
+The asymmetry reaches into the codec too: OSGi owns the `DocumentCodec` as a DS `@Component` (the twin
+of `YamlMapper`), the host holds a plain instance (no DS); each realm carries its own jackson and maps
+`String` payload ↔ record independently. The rejected symmetric alternative — a rich host-side mapper
+rebuilding doctor types — re-creates a doctor vocabulary on the host, the very leak this closes.
 
-== The contract: a wire-record per coordinate, the schema generated from it
+== The seam types — what actually crosses
 
-A `Document` is untyped; without a contract we would trade a type leak for a silent schema drift. The
-contract is a **wire-record per `Coordinate`** — a flat seam record (scalars, `List`, nested
-wire-records, seam enums; no jackson) that carries `@DocumentContract(Coordinate)`. Its
+The seam module `osgi/foundation/world-gateway` (`type=seam`, system-exported, one shared copy) holds
+the entire crossing vocabulary in package `io.nxmatic.rke2lab.world.gateway.port`:
+
+* *The envelope* — `Document(String domain, String coordinate, String payload)`. The payload is a
+  serialized `String`, NOT a `JsonNode` — so jackson never crosses the seam; each realm parses the
+  string with its own mapper. `WorldGatewayCatalog` is the single-source-of-truth for the shared field
+  names (the `FIELD_*` constants a producer and its reconstruction both key on).
+* *The closed vocabularies* — seam enums, not loose strings, so the compiler catches drift:
+  `Coordinate` (the six document types: `readiness-checkpoint`, `readiness-verdict`, `consultation`,
+  `intervention-request`, `intervention`, `visit`), `Domain`, `Action` (the provisioning control
+  vocabulary the host may name), `SymptomKind` (the routing key, `slug()` ↔ the doctor's `Symptom.id()`
+  in shared kebab-case). Each implements the `WireEnum` marker (wire form = a kebab-case `slug()`).
+* *The identity types* — `Checkpoint` (enum: `SYSTEMD_ADAPTER`, `CLUSTER_READINESS`, each carrying its
+  slug, derived `resourceName`, and `scenarioTitle`) and `Patient(org, project, stack)` (a stack
+  coordinate, not a medical one — `qualifiedName()`). Both worlds hold their own; the checkpoint
+  identity is the join key, so the peer verbs pass identity, not payload
+  (`reviewDrift(Checkpoint) : void`).
+* *The wire-records* — one flat seam record per `Coordinate`, carrying `@DocumentContract(Coordinate)`;
+  its `RecordComponents` ARE the contract (see the next section). The seven:
++
+[cols="1,2",options="header"]
+|===
+| wire-record | shape / role
+| `ReadinessVerdict(Action, reason)` | the verdict; `Action` typed, not a loose slug
+| `ReadinessCheckpoint(scenarioId, failed?, override?, recordedAt?, observations)` | the nesting exemplar — holds a `List<ObservationWire>`; two producers (VERDICT + CONSULT) union into it, so every field beyond `scenarioId` is `Optional`/`List`
+| `ObservationWire(status, summary, symptom?, details)` | `SymptomKind` typed + an open `details` bag
+| `InterventionRequest(problem, what, provenance?, prescriptionRef?, when)` | the operator's raw CLI facts (ingress); refs raw strings, parsed OSGi-side only
+| `InterventionWire(provenance, when, what, problem, prescriptionRef?, details)` | ONE intervention (the read-path list framing was Pulumi's `outputsNamed` transport leaking in — the host now unwraps to one Document per intervention)
+| `Consultation(scenarioId, narration, diagnosisAdoc, consultationReport, expectations)` | doctor output; host reads the three flat strings, `consultationReport`(`Map`)/`expectations`(`List`) cross OPAQUE (doctor→doctor, host copies verbatim). `diagnosisAdoc` is AsciiDoc TEXT, not rendered
+| `VisitWire(version, when, consultationReport, expectations)` | the read-path mirror; the host READ journal harvests the two opaque blobs, OSGi's `MedicalRecordReader` folds them into a typed `Visit`
+|===
+
+An opaque sub-tree a producer copies verbatim (a blob it does not re-describe) is modelled as an open
+slot (`Map`/`List`), for which the projection emits an open `object`/`array` — the contract is "this
+slot is a structure", its inner shape owned where it is produced. The reader classes that reconstruct
+those inner graphs (`ConsultationReportReader`, `ExpectationReader`, `InterventionReader`,
+`MedicalRecordReader`) are bundle-internal, OSGi-side.
+
+== The contract: a wire-record per coordinate, the schema projected from it
+
+A `Document` payload is untyped text; without a contract we would trade a type leak for silent schema
+drift. The contract is the **wire-record per `Coordinate`** — a flat seam record (scalars, `List`,
+nested wire-records, seam enums; no jackson annotations) carrying `@DocumentContract(Coordinate)`. Its
 `RecordComponents` ARE the contract: the JSON Schema is a **build-time projection** of them, never
-hand-written. There is no `FIELD_*` string catalog to keep in step and no shared schema file — the
-record's components are the properties.
+hand-written — no `FIELD_*` string catalog to keep in step. The wire-record *type* never crosses (it
+is a seam type); only the serialized `String` payload does, mapped record↔`String` by each realm's own
+`DocumentCodec`.
 
-The wire-record is a **seam type** (system-exported, one shared copy, like `Document` and
-`Coordinate` themselves): the *type* never crosses the boundary, only the serialized `String`
-payload, which each realm maps record↔`String` with its own jackson in the per-realm
-`DocumentCodec`. This is stricter than a shared Java data class (which would re-introduce a shared
-mutable domain type and violate "ports are services") and stricter than the host hand-rolling a map
-independently: both realms now build the same coordinate through the same record shape.
-
-The first migrated coordinate is `readiness-verdict`, whose wire-record `ReadinessVerdict(Action,
-reason)` holds the provisioning `Action` **typed** rather than as a loose slug string — the typing
-the `FIELD_*` strings lacked. A closed-vocabulary seam enum a wire-record holds implements the
-`WireEnum` marker (its wire form is a kebab-case `slug()`); the codec maps every `WireEnum` ↔ slug
-generically with one jackson module, so the seam enum carries no jackson annotation and the seam
-stays flat. Deserializing a verdict into `ReadinessVerdict` leaks nothing the 2C boundary forbade:
-`Action` is the seam's own control vocabulary the host already names, never a doctor `Severity`.
-
-The `intervention-request` wire-record `InterventionRequest(problem, what, provenance?,
-prescriptionRef?, when)` shows two more shapes the projection needs: an `Optional<String>` field
-(the `provenance`/`prescriptionRef` the operator may omit — jackson's `Jdk8Module` maps it to an
-absent key, and the generated schema drops it from `required`) and an `Instant` (`when`, rendered
-ISO-8601 by the codec's home-made `InstantModule`). The references stay RAW strings on the wire — the
-doctor vocabulary (`ProblemRef`, `Provenance`, `RemediationProgramRef`) is parsed only OSGi-side, so
-the host holds no doctor type. The codec registers its modules EXPLICITLY (never
-`findAndRegisterModules`), so it stays clear of the `ServiceLoader<Module>` discovery surface even
-while using jackson's own `Jdk8Module`.
-
-The canonical `intervention` wire-record `InterventionWire(provenance, when, what, problem,
-prescriptionRef?, details)` carries ONE intervention — who changed the world and what problem it
-addresses, refs raw as strings, with an open `details` bag (a `Map` the projection emits as an open
-`object`). It is the record's-are-contract fix for a modelling bug: the coordinate previously carried
-TWO shapes under one slug — the write path a flat intervention, the read path a `{interventions:[…]}`
-list. That list was not a contract but Pulumi's array-valued `outputsNamed` transport framing leaking
-into the payload (one ledger history entry records exactly one intervention). The host journal now
-UNWRAPS that framing — one `intervention` Document per intervention — so one coordinate has one wire
-shape, and `InterventionReader.fromWire(InterventionWire)` replaced a permissive
-`fromOutputMap(Object)` (a typed door, not an open one).
-
-The `readiness-checkpoint` wire-record `ReadinessCheckpoint(scenarioId, failed?, override?,
-recordedAt?, observations)` is the nesting exemplar: it holds a `List<ObservationWire>`, and the
-projection recurses into that nested wire-record to emit an `array` of `object`. Two producer
-concerns union into this one shape — the VERDICT checkpoint (`ReadinessAuthority.assess` reads
-`scenarioId`/`override`) and the CONSULT checkpoint (the doctor's `consult` reads `recordedAt` +
-`observations`) — so every field beyond `scenarioId` is `Optional`/`List`, each producer filling only
-its concern (legitimately one coordinate, one schema: both are the same checkpoint object, unlike the
-`intervention` bug above). The nested `ObservationWire(status, summary, symptom?, details)` holds the
-`SymptomKind` **typed** (the routing key the loose slug string lacked) and an open `details` bag; the
-host maps its `ObservationView` to it, and OSGi maps `ObservationWire` back to the doctor's own
-`Observation` (`SymptomKind.slug()` → `Symptom.id()`, the shared kebab-case vocabulary) — no doctor
-type crosses the seam.
-
-The `consultation` and `visit` coordinates close the arc and exercise the OPAQUE-slot rule at scale.
-`Consultation(scenarioId, narration, diagnosisAdoc, consultationReport, expectations)` is what the
-doctor produces from a consult: the host reads only the three flat strings (`scenarioId` to join the
-runbook scenario, `narration` to log, `diagnosisAdoc` to inject), while `consultationReport` (a `Map`)
-and `expectations` (a `List`) cross OPAQUELY — a doctor→doctor payload the host copies verbatim into
-its Pulumi outputs, never interpreting. `VisitWire(version, when, consultationReport, expectations)`
-is the mirror on the read path: the host READ journal harvests those same two output blobs from a
-stack-history entry (carrying the `outputsNamed` per-resource framing) into one visit; OSGi's
-`MedicalRecordReader` unwraps and folds them into a typed `Visit`. Both records model the two
-sub-trees as open slots (`Map`/`List` → open `object`/`array`); their inner shape — the
-`ConsultationReport`/`Expectation` record graph — is owned OSGi-side, where `ConsultationReportReader`
-/ `ExpectationReader` reconstruct it. That inner graph is the next hardening pass (typed wire-records
-for the doctor sub-trees), tracked separately; the coordinate contract here is "these slots are nested
-structures".
-
-An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
-forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for
-which the projection emits an open `object` — the contract is "this slot is an object", its inner
-shape owned where it is produced.
+The codec (`osgi/foundation/gateway-document-codec`, package
+`io.nxmatic.rke2lab.world.gateway.codec`) registers its jackson modules EXPLICITLY (never
+`findAndRegisterModules`, so it stays clear of the `ServiceLoader<Module>` surface): a custom
+`WireEnumModule` (maps every `WireEnum` ↔ slug generically, so seam enums carry no jackson
+annotation), a `JavaTimeModule` (ISO-8601 `Instant`), and `Jdk8Module` (`Optional<T>` → an absent key,
+dropped from `required`). It carries a `withValidation(boolean)` switch, OFF in the embedded build
+(see § <<remaining-migration>>).
 
 === Build-time is the load-bearing contract check (we build on one codebase)
 
-We are *embedded*: the host and the OSGi exec-jar build from the same codebase, in one reactor. So
-the contract is enforced where that fact lives — at build time, by the `SCHEMA_CONCORD` staging gate
-(the fourth, alongside record-purity / spec-coverage / instance-discipline): it asserts every
-`Coordinate` has a wire-record and that the schema projected from that record validates against the
-*meta-schema* (the JSON Schema draft standard, supplied by the validation library). Deleting the old
-`FIELD_*` catalog makes the record the only way to name a coordinate's keys — construction-by-record
-is then enforced by compilation, not by fragile string reconciliation.
+We are *embedded*: the host and the OSGi exec-jar build from the same codebase, in one reactor. So the
+contract is enforced where that fact lives — at build time, by the `SCHEMA_CONCORD` staging gate
+(alongside record-purity / spec-coverage / instance-discipline / realm-boundary / duplicate-realm).
+It asserts every `Coordinate` has a wire-record, that each `<slug>.schema.json` validates against the
+JSON-Schema meta-schema, and that the schema's properties concord with the record's components. The
+gate lives in both `StagingGate` enums (the annotation module `osgi/foundation/domain-annotations` and
+the ASM mirror in `maven-embed-staging-ext/staging-extension`) and is at the locked `ERROR` default.
+Because the two worlds ship together, their contract cannot drift in version — the reactor guarantees
+the pairing.
 
-Because the two worlds are built and shipped together, their contract cannot drift apart in version —
-the reactor guarantees the pairing. The build check is sufficient for the embedded deployment.
+=== Runtime validation is designed, but YAGNI until remote
 
-=== Runtime validation is designed, but YAGNI until remote (graduated)
+Runtime `Document` validation is *designed* but *deferred (YAGNI)* — it earns its keep only when the
+host and the OSGi exec-jar are deployed or versioned **separately** (a remote split), when a semver
+mismatch becomes possible. The `DocumentCodec.withValidation(boolean)` switch reserves its shape:
 
-A runtime `Document` validation is *designed* but its *implementation is deferred (YAGNI)* — it earns
-its keep only when the embedded assumption breaks, i.e. when the host and the OSGi exec-jar are
-deployed or versioned **separately** (a remote split, or an old host loading a newer
-`META-INF/bundles`). Then a semver mismatch becomes possible and runtime validation is what surfaces
-it ("you are talking to the wrong version", seen at runtime). The design reserves its shape so the
-day it is needed it slots in without a redesign:
+* *OSGi side* — validation carried by a **fragment** that attaches to a domain's bundle and validates
+  that domain's `Document`s (the proven fragment-contribution pattern). Absent in the embedded build;
+  present when wanted.
+* *Host side* — **off by default, on only when OSGi is configured remote**. In the embedded build the
+  OSGi mapper that reads the `Document` is the implicit validator (a missing field breaks there). When
+  remote, the host validates *structure, not meaning* at its edge — checks fields and types against the
+  schema (which travels as data over the wire), never interprets what a value *means*. Validating shape
+  is not holding a type; the host stays blind to the vocabulary, exactly as a REST client validates
+  JSON without owning the server's logic.
 
-* *OSGi side* — validation is carried by a **fragment** that attaches to a domain's bundle and
-  validates that domain's `Document`s against its schema. Optional and attachable — the proven
-  fragment-contribution pattern (`systemd-cdk8s-manifests`, the `-test` fragments). Absent in the
-  embedded build; present when wanted.
-* *Host side* — validation is **off by default and switched on only when OSGi is configured remote**.
-  In the embedded same-codebase deployment it is inert: the host transports, the OSGi mapper that
-  reads the `Document` is the implicit validator (a missing field breaks there). When remote, the
-  host validates *structure, not meaning* at its edge before sending — it checks fields and types
-  against the schema, never interprets what a value *means* (`"critical"` stopping provisioning stays
-  OSGi's authority). Validating shape is not holding a type — the host stays blind to the vocabulary,
-  exactly as a REST client validates JSON without owning the server's logic. The schema then travels
-  as data over the wire (no shared classpath in a remote split).
-
-[mermaid]
-....
-flowchart TB
-  subgraph "embedded today one codebase"
-    bt["build gate plus mapper unit tests"]
-    impl["OSGi mapper reads Document implicit validator"]
-  end
-  subgraph "remote later YAGNI"
-    frag["OSGi validation fragment optional"]
-    hostval["host validation on when configured remote"]
-  end
-  bt -.sufficient now.-> impl
-  frag -.slots in when separable.-> hostval
-....
-
-Rejected: contrat-A (opaque Document, no schema at all — silent drift, no build check);
-contrat-B (a shared `wire` DTO bundle — re-introduces a shared data type). Introspection /
-schema-crossing at boot is also deferred: the host knows the offered services at build time (same
-codebase), so an OpenAPI-style catalog is YAGNI until remote.
+Rejected: contrat-A (opaque Document, no schema — silent drift); contrat-B (a shared `wire` DTO bundle
+— re-introduces a shared data type).
 
 == The two units: domain owns the mapper, document type owns the schema
 
 Two instincts ("schema per domain" vs "schema per document type") were each right about a *different*
-unit. They form a hierarchy, matching `Document(domain, coordinate, payload)`.
+unit. They form a hierarchy matching `Document(domain, coordinate, payload)`.
 
 [cols="1,2,2",options="header"]
 |===
@@ -288,24 +210,24 @@ unit. They form a hierarchy, matching `Document(domain, coordinate, payload)`.
 | ownership / code
 | the DOMAIN
 | one `DomainDagMapper` `@Component` per domain, collected by `@Reference(cardinality=MULTIPLE)
-  List<DomainDagMapper>` (the proven DS mechanism — same shape as the `List<Specialist>` roster). The
-  domain owns its translation.
+  List<DomainDagMapper>` (the same DS mechanism as the `List<Specialist>` roster). The domain owns its
+  translation.
 
 | contract / validation
 | the DOCUMENT TYPE (the `coordinate`)
-| one JSON Schema per type — the unit the validator sees at build and runtime. A domain owns N
-  document types, hence N schemas.
+| one JSON Schema per type, anchored by coordinate (not per-domain), at
+  `doctor-core/src/main/resources/schema/<slug>.schema.json`. A domain owns N document types, hence N
+  schemas.
 |===
 
 So `domain` = ownership, `coordinate` = type = schema key. A new domain plugs in additively: one more
 `@Component`, its own schemas, no gateway change.
 
-== The boot pipeline, re-decomposed by capability — GROUND / GATEWAY / APPLY
+== The boot pipeline — GROUND / GATEWAY / APPLY
 
-The decomposition follows the system's real capabilities, not a functional view: we do not mix the
-two worlds at every level. But the framework lifecycle constrains the shape — verified on the code,
-`BootPipeline.embedded()` owns a *boot-run-close* (it closes Felix on return, always). So GATEWAY is
-not a flat sibling topic; it is *framed by* the boot-run-close.
+The decomposition follows the system's real capabilities. The framework lifecycle constrains the
+shape: the embedded boot owns a *boot-run-close* (it closes Felix on return, always), so GATEWAY is not
+a flat sibling topic — it is *framed by* the boot-run-close.
 
 [mermaid]
 ....
@@ -332,18 +254,17 @@ flowchart TB
   rb --> p1
 ....
 
-* *GROUND* (host only) — read Pulumi config, boot the embedded framework, publish the host infra
-  (the EHR + ledger services the OSGi `HealthSystem` `@References`). No doctor type.
-* *GATEWAY* (framed by boot-run-close) — the one place the worlds talk. Verified: only **2 of 5**
-  stages cross the seam — `systemd adapter` and `bootstrap resources` (they `consult(Document)`). The
-  other three (`preflight`, `bbox`, `incus provisioning`) are host-pure; they run in the same
-  boot-run-close because the framework must be open for the two seam stages, but they say nothing to
-  OSGi. The crossings are: the `open` (ingress config + the register/await burst), the 2 seam stages,
-  and the egress. Nothing else.
-* *APPLY* (host only) — transport the verdict / DAG Document to `pulumi.export`. Pure host; the one
-  legitimate `com.pulumi.Context` straddle point.
-* *Runbook* — owned by the bootstrap stage, rendered by `RunbookRenderer` in the `finally` of the
-  boot-run-close tail, BEFORE Felix closes, so a CRITICAL stop still produces a runbook. Unchanged.
+* *GROUND* (host only) — read Pulumi config, boot the embedded framework, publish the host infra (the
+  EHR + ledger services the OSGi `HealthSystem` `@References`). No doctor type.
+* *GATEWAY* (framed by boot-run-close) — the one place the worlds talk. Only **2 of 5** stages cross
+  the seam — `systemd adapter` and `bootstrap resources` (they `consult(Document)`). The other three
+  (`preflight`, `bbox`, `incus provisioning`) are host-pure; they run in the same boot-run-close
+  because the framework must be open for the two seam stages, but they say nothing to OSGi. The
+  crossings are: the `open` (ingress config + the register/await burst), the 2 seam stages, the egress.
+* *APPLY* (host only) — transport the verdict / DAG Document to `pulumi.export`. The one legitimate
+  `com.pulumi.Context` straddle point.
+* *Runbook* — owned by the bootstrap stage, rendered in the `finally` of the boot-run-close, BEFORE
+  Felix closes, so a CRITICAL stop still produces a runbook.
 
 == The invariant
 
@@ -353,61 +274,42 @@ flowchart TB
 `REALM_BOUNDARY` staging gate (see link:staging-gates-governance-spec.adoc[staging-gates governance]):
 a class may reference only types reachable in its own classloader realm, so no flat-realm class (host
 exec, flat tail, or `type=seam` port) may reference a bundle-only `isDomain()` type. That single gate
-mechanizes all three leaks — the seam importing records (#1), the host reasoning on records (#2), the
-egress (#3) — and is what would have caught the `doctor.records`-into-the-host drift the greps below
-missed. It runs `WARN` during the migration (a shrinking, auto-attributed worklist: flat-realm lines =
-host/seam leaks, bundle-realm lines = OSGi-internal leaks) and returns to the locked `ERROR` default
-once the surface is clean.
+mechanizes every leak — a seam importing records, the host reasoning on records, the egress
+self-serialization. It is at the locked `ERROR` default.
 
-Two coarser greps remain useful as quick eyeballs (the gate is the real check):
+Two coarse greps remain useful as quick eyeballs (the gate is the real check):
 
-* `grep -rl "import com.pulumi" osgi/` == 0 (holds today at the type level).
-* `grep -rl "toOutputMap\|OUTPUT_KEY\|fromOutputMap" osgi/` == 0 (14 today — the egress leak the
-  migration closes).
+* `grep -rl "import com.pulumi" osgi/` == 0 (holds at the type level).
+* `grep -rl "toOutputMap\|OUTPUT_KEY\|fromOutputMap" osgi/` — the egress-serialization sites the
+  remaining host migration still closes (see below).
 ====
 
-== Sequencing (incremental, each step green + commit)
+[[remaining-migration]]
+== Remaining migration (the host-side worklist — future)
 
-The order is *gate-first, flip-last*: the drift exists because `doctor-records` became bundle-only
-BEFORE the host surface was migrated. Rather than reverse that (re-exposing records, re-opening the
-leak), we make the boundary VISIBLE first, migrate against it, and let the gate lock once clean. The
-build keeps compiling throughout — `doctor-records` stays on the compile classpath; it is only
-shade-excluded at runtime — so a `WARN` gate lists the worklist without breaking the build.
+The contract layer above is built and locked; the *host-side surface* that must speak it is not fully
+migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces:
 
-. *Lay the guard first* — the `REALM_BOUNDARY` staging gate, governed `WARN`. It prints the exact
-  worklist: every flat-realm class that references a bundle-only `isDomain()` type (the host files +
-  the two `-port` seams importing `doctor.records`). `doctor-records` stays bundle-only; nothing is
-  re-exposed. (A vocabulary clean-up rides along here: the gate enum is renamed `Gate` →
-  `StagingGate`; the `production`-vs-test naming becomes `live`.)
-. *Migrate the surface to Documents, worklist-driven* — group by group, each commit shrinking the
-  `WARN` list:
-.. the `open`/ingress — `environment` config crosses as a `Document` interpreted OSGi-side; the host
-   stops calling `Severity.parse()`;
-.. the 2 seam stages become `consult(Document)`; doctor-port/cluster-port drop their `doctor.records`
-   import; the egress DAG crosses as a `Document` (the multiplexor: per-domain `DomainDagMapper`
-   `@Component` + the `DomainDagMultiplexor` published as a `DomainDagSource` seam + the host
-   `DomainDagAdapter`); the four `*Reader` + all `toOutputMap` are deleted;
-.. *APPLY* — the host-side transport tail consumes the Document stream and exports to Pulumi.
-. *Flip the gate to `ERROR`* — once the worklist is empty, drop the `@GovernedBy(REALM_BOUNDARY, WARN)`
-  so the package returns to the locked `ERROR` default. The boundary is now enforced by the build, not
-  just by runtime class-loading.
-. *The schema, build-time* — one JSON Schema per document type, beside its domain's mapper; the
-  mapper unit tests round-trip against it and a staging check confirms mapper↔schema concord +
-  schema-vs-meta-schema. This is the contract enforcement for the embedded deployment.
-. *(YAGNI, deferred) runtime validation* — the OSGi validation fragment + the host-side
-  remote-only switch. NOT built in the embedded increment; its shape is reserved (see "Runtime
-  validation is designed, but YAGNI until remote"). Implement when host and OSGi become separately
-  deployable.
+* *The six `<slug>.schema.json` files* are not yet authored. `SCHEMA_CONCORD` is active and will bind
+  each coordinate to its schema as the files land, one coordinate at a time.
+* *Residual host reasoning on records* — sites still calling `Severity.parse()` / branching
+  `== Severity.X` / carrying `toOutputMap`/`OUTPUT_KEY`/`fromOutputMap` remain on the host and in the
+  egress path. Each is a `REALM_BOUNDARY` worklist line to convert to a `Document` crossing, closing
+  the leak.
+* *Host-side journals + intake* — the `DocumentJournal.historyOf(Checkpoint)` /
+  `InterventionLedgerWriter.append(Document)` host impls and the `InterventionIntake.canonicalize`
+  OSGi `@Component` (the CLI ingress path) are named in the design but not yet realised.
 
-The plans implement this in two passes: *Plan 1* = step 1 (the gate + the two renames); *Plan 2* =
-steps 2–4, written from the worklist the gate prints (so the host edits are exact, not guessed).
+The order is worklist-driven: the gate lists the exact flat-realm classes referencing bundle-only
+types; each commit shrinks the list; the coordinate schemas land beside their domain's mapper with a
+round-trip unit test. This is the same "finish the surface" pass paused alongside the seed-master
+provisioning rework.
 
 == Related documentation
 
-* link:../patterns/port-edge-domain-ownership.adoc[port/edge/domain ownership] — the seam law this
-  spec specializes (a `-port` is `type=seam`; its verbs now speak `Document`).
-* link:pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] — the former
-  model the GROUND/GATEWAY/APPLY decomposition was expressed in, kept as the avant reference; the
-  current model is BDD-as-engine (jGiven scenarios on the JUnit launcher).
-* link:staging-gates-governance-spec.adoc[staging-gates governance] — the `REALM_BOUNDARY` gate that
-  mechanizes this spec's invariant at build time (`WARN` during migration, `ERROR` once clean).
+* link:../patterns/port-edge-domain-ownership.adoc[port/edge/domain ownership] — the seam law this spec
+  specializes (a `-port` is `type=seam`; its verbs speak `Document`).
+* link:staging-gates-governance-spec.adoc[staging-gates governance] — the `REALM_BOUNDARY` +
+  `SCHEMA_CONCORD` gates that mechanize this spec's invariant and contract at build time.
+* link:pipeline-spec.adoc[The pipeline — BDD-as-engine] — the model the GROUND/GATEWAY/APPLY host flow
+  feeds.

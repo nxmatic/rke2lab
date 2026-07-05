@@ -469,7 +469,7 @@ breakdown in the increment-1 plan.
   named start levels, the `DiscoveryPolicy`; the role→level authority this spec's lever rests on.
 * link:bdd-pipeline-poc-design.adoc[bdd-pipeline POC] — E4 (the flat scenario list + the tree in
   nestedSteps), E5 (a step opens a nested scenario), E10 (cross-world graft) — the runbook mechanics.
-* link:world-gateway-2a-document-foundation-spec.adoc[World-gateway 2A] — the `Document` seam a remote
+* link:world-gateway-spec.adoc[World gateway] — the `Document` seam a remote
   world uses to contribute a `ScenarioModel` without holding a report.
 * link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — `InContainerJUnitRunner` /
   `JGivenTestkit.felix()`, the current in-container launcher the core is extracted from.
