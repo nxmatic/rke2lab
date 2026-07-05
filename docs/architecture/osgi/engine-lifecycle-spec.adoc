@@ -435,22 +435,27 @@ This spec is the foundation the ClusterSeed-vertical migration rests on. It ship
 (the launcher-core extraction + the connection/lifecycle model), integrated BEFORE the ClusterSeed
 migration (*increment 2*) consumes it:
 
-* *Increment 1 (this socle):* extract `JUnitLauncherCore` into `osgi/runtime/launcher` (the launcher
-  the runtime OWNS, the test CONSUMES); the `OsgiConnection` abstraction (embedded realised, remote
-  named); the discipline annotations (isolation / stationary) and the start-level piloting. Its plan:
-  `docs/superpowers/plans/2026-07-04-launcher-core-extraction.md`.
+* *Increment 1 (this socle):* carve a new runtime module `osgi/runtime/engine` that OWNS the
+  JUnit/jGiven machinery playable at runtime — the two framework envelopes (`InContainerJUnitRunner`
+  AND `OutOfContainerFrameworkExtension`, moved out of `junit-testkit`, which is left an attachable
+  test bundle holding only the test-only tags) plus the SCR diagnostic; extract the neutral
+  `JUnitLauncherCore`; add the `OsgiConnection` abstraction (embedded realised, remote named), the
+  start-level lever, and the discipline annotations (isolation / stationary). A committed
+  `BulletproofPipeline` played end-to-end proves the socle before ClusterSeed consumes it. Its plan:
+  `docs/superpowers/plans/2026-07-05-engine-lifecycle-socle.md`.
 * *Increment 2 (ClusterSeed):* the seed as a jGiven scenario whose first step connects to the OSGi
   world, consuming this socle. Its plan: `docs/superpowers/plans/2026-07-04-clusterseed-bdd-migration.md`.
 
 [[the-launcher]]
 == Related — the launcher core it rests on
 
-The launcher is `JUnitLauncherCore`, extracted from `InContainerJUnitRunner` (the runtime owns it,
-the test consumes it — the sound dependency direction, and the dogfooding promotion of JUnit to
-runtime scope). It runs a JUnit Platform `Launcher` inside Felix on a dedicated host-bound thread,
-engine registered explicitly, the three OSGi crossings handled; discovery + harvest are injected
-strategies so both the test envelope (`*Test` + PASS/FAIL) and the seed (a named scenario +
-`ReportModel`) reuse one core. Full task breakdown in the increment-1 plan.
+The launcher is `JUnitLauncherCore`, extracted from `InContainerJUnitRunner` into the new
+`osgi/runtime/engine` module (the runtime owns it, the test consumes it — the sound dependency
+direction, and the dogfooding promotion of JUnit to runtime scope). It runs a JUnit Platform
+`Launcher` inside Felix on a dedicated host-bound thread, engine registered explicitly, the three
+OSGi crossings handled; discovery + harvest are injected strategies so both the test envelope
+(`*Test` + PASS/FAIL) and the seed (a named scenario + `ReportModel`) reuse one core. Full task
+breakdown in the increment-1 plan.
 
 == Related documentation
 
