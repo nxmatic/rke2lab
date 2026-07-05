@@ -2,11 +2,17 @@ package io.nxmatic.rke2lab.world.gateway.codec.internal;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializationConfig;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.nxmatic.rke2lab.world.gateway.port.WireEnum;
 import java.io.IOException;
 import java.util.Arrays;
@@ -22,12 +28,10 @@ public final class WireEnumModule extends SimpleModule {
 
   public WireEnumModule() {
     setSerializerModifier(
-        new com.fasterxml.jackson.databind.ser.BeanSerializerModifier() {
+        new BeanSerializerModifier() {
           @Override
           public JsonSerializer<?> modifySerializer(
-              com.fasterxml.jackson.databind.SerializationConfig config,
-              com.fasterxml.jackson.databind.BeanDescription beanDesc,
-              JsonSerializer<?> serializer) {
+              SerializationConfig config, BeanDescription beanDesc, JsonSerializer<?> serializer) {
             if (WireEnum.class.isAssignableFrom(beanDesc.getBeanClass())) {
               return new SlugSerializer();
             }
@@ -35,12 +39,12 @@ public final class WireEnumModule extends SimpleModule {
           }
         });
     setDeserializerModifier(
-        new com.fasterxml.jackson.databind.deser.BeanDeserializerModifier() {
+        new BeanDeserializerModifier() {
           @Override
           public JsonDeserializer<?> modifyEnumDeserializer(
-              com.fasterxml.jackson.databind.DeserializationConfig config,
-              com.fasterxml.jackson.databind.JavaType type,
-              com.fasterxml.jackson.databind.BeanDescription beanDesc,
+              DeserializationConfig config,
+              JavaType type,
+              BeanDescription beanDesc,
               JsonDeserializer<?> deserializer) {
             final Class<?> raw = type.getRawClass();
             if (WireEnum.class.isAssignableFrom(raw)) {

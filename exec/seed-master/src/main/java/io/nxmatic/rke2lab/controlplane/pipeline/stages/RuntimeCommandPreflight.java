@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -102,7 +103,7 @@ public final class RuntimeCommandPreflight {
       return false;
     }
 
-    for (String pathEntry : pathEnv.split(java.io.File.pathSeparator)) {
+    for (String pathEntry : pathEnv.split(File.pathSeparator)) {
       if (pathEntry == null || pathEntry.isBlank()) {
         continue;
       }

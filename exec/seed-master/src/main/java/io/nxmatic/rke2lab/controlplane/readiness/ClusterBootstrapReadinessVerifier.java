@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Deterministic bootstrap readiness verification contract.
@@ -114,8 +115,7 @@ public final class ClusterBootstrapReadinessVerifier {
         });
   }
 
-  private static PhaseOutcome runPhase(
-      Consumer<String> logger, java.util.function.Supplier<PhaseOutcome> phase) {
+  private static PhaseOutcome runPhase(Consumer<String> logger, Supplier<PhaseOutcome> phase) {
     final Consumer<String> previous = ACTIVE_LOGGER.get();
     ACTIVE_LOGGER.set(logger == null ? DEFAULT_LOGGER : logger);
     try {

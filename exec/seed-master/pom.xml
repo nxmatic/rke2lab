@@ -16,10 +16,6 @@
   <description>Main bootstrap orchestration and Pulumi control plane: the shaded entry point
     (controlplane.Main) that drives provisioning and hosts the level-0 node wiring.</description>
 
-  <properties>
-    <rke2lab.manifests.unpack.skip>false</rke2lab.manifests.unpack.skip>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>com.pulumi</groupId>
@@ -83,7 +79,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>launcher</artifactId>
+      <artifactId>framework-launcher</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The passive fluent-pipeline grammar engine, consumed FLAT on the host classpath (JCL) —
@@ -313,22 +309,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <!-- JGiven generates stage subclasses with byte-buddy, whose reflective
-               class injector needs java.lang opened under JDK module encapsulation. -->
-          <argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
-          <!-- JGiven's text report writes Given/When/Then straight to the fork's native
-               stream. By default surefire's fork channel rides that same stdout pipe, so the
-               writes corrupt it ("Corrupted channel by directly writing to native stream").
-               Move the channel onto TCP (the surefire FAQ remedy for tests that legitimately
-               print to the console): the encoded protocol no longer shares stdout, so the
-               human-facing text report can stay ON. -->
-          <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
-          <systemPropertyVariables>
-            <jgiven.report.dir>${project.build.directory}/jgiven-reports/json</jgiven.report.dir>
-            <jgiven.report.text>true</jgiven.report.text>
-          </systemPropertyVariables>
-        </configuration>
+        <!-- The jGiven test closure (byte-buddy add-opens, TCP fork-node, per-module
+             jgiven.report.dir) is inherited from build-parent's managed surefire — shared by every
+             module that plays a scenario. The exec-runtime Add-Opens for `java -jar` lives in the
+             shade manifest below (a distinct, exec-only concern). -->
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -434,7 +418,7 @@
               <!-- Same m2e gate as unpack-manifests-bundle: the IDE incremental builder runs this
                    mojo without a full reactor package, so the reactor jar isn't built yet (MDEP-187).
                    The CLI reactor packages manifests-core before seed-master, so it stages fine. -->
-              <skip>${rke2lab.manifests.unpack.skip}</skip>
+              <skip>${rke2lab.staging.skip}</skip>
               <outputDirectory>${project.build.directory}/generated-resources/META-INF/bundles</outputDirectory>
               <overWriteReleases>true</overWriteReleases>
               <overWriteSnapshots>true</overWriteSnapshots>
@@ -448,7 +432,7 @@
             </goals>
             <phase>generate-resources</phase>
             <configuration>
-              <skip>${rke2lab.manifests.unpack.skip}</skip>
+              <skip>${rke2lab.staging.skip}</skip>
               <artifactItems>
                 <artifactItem>
                   <groupId>io.nxmatic.rke2lab</groupId>
@@ -476,7 +460,7 @@
         </property>
       </activation>
       <properties>
-        <rke2lab.manifests.unpack.skip>true</rke2lab.manifests.unpack.skip>
+        <rke2lab.staging.skip>true</rke2lab.staging.skip>
       </properties>
     </profile>
   </profiles>

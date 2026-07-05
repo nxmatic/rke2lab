@@ -355,4 +355,3 @@ AND its additivity.
 
 *Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. Eight
 playable-and-blue today; one narrated-green (the orchestration-OSGi inversion, a shared leverage gate).
-

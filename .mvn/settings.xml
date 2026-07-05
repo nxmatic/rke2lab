@@ -24,6 +24,12 @@
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
                               https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <pluginGroups>
+    <pluginGroup>org.apache.maven.plugins</pluginGroup>
+    <pluginGroup>org.codehaus.mojo</pluginGroup>
+    <pluginGroup>org.eclipse.jetty</pluginGroup>
+    <pluginGroup>org.openrewrite.maven</pluginGroup>
+  </pluginGroups>
   <servers>
     <server>
       <id>github-nxmatic-java-systemd</id>

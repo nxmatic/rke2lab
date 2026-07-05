@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -30,7 +31,7 @@ public record ProvisioningMetadata(Targets targets, Paths paths) {
 
     /** All target checksums regardless of policy. */
     public Map<String, String> all() {
-      final var combined = new java.util.LinkedHashMap<String, String>();
+      final var combined = new LinkedHashMap<String, String>();
       combined.putAll(staticTargets);
       combined.putAll(dynamicTargets);
       return Map.copyOf(combined);

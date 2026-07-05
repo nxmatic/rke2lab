@@ -7,6 +7,7 @@ import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -80,7 +81,7 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
           networkConfig.replace("10:66:6a:4c:00:00", lanMac).replace("52:54:00:00:00:00", wanMac);
 
       // Create new map with updated network config
-      java.util.Map<String, String> mutableData = new java.util.HashMap<>(configMapData);
+      Map<String, String> mutableData = new HashMap<>(configMapData);
       mutableData.put("networkData", networkConfig);
       configMapData = Map.copyOf(mutableData);
     }

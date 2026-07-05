@@ -4,7 +4,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap.BootstrapResult;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.Topic;
 
 /** Incus-provisioning topic. Pushes the bootstrap result through its {@link Sink}. */

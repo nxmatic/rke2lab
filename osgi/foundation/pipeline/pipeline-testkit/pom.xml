@@ -28,6 +28,14 @@
       <artifactId>junit-testkit</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- JGivenTestkit (src/main) builds on the out-of-container envelope, moved to the runtime engine
+         module (JUnit/jGiven are runtime-scope now); the @Osgi tag the guard test wears stays in
+         junit-testkit above. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+      <version>${project.version}</version>
+    </dependency>
 
     <!--
       The non-regression guard (src/test) boots a real Felix via JGivenTestkit.felix() and walks

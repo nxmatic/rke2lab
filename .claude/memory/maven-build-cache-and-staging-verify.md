@@ -30,4 +30,13 @@ disk**. Therefore:
 - Verify with a **full reactor `package`** from the repo root (every upstream module packaged before
   the exec module), scoping the test with `-Dtest=...`.
 
+**Cache input-tracking gap fixed (2026-07-05).** The cache config `.mvn/maven-build-cache-config.xml`
+did NOT track `bnd.bnd` as a build input: its `<glob>` listed `*.java,*.yaml,…` but not `*.bnd`, and
+`bnd.bnd` lives at the **module root**, outside the `src/` `<include>`. Consequence: a **bnd-only edit**
+(changing `Export-Package`/`Import-Package` — the OSGi manifest) did not invalidate the cache, so the
+build replayed a **stale bundle manifest**. Symptom seen: an added `!org.checkerframework…` import
+exclusion was ignored, the in-container bundle kept a mandatory checkerframework import and failed to
+resolve. Fix: added `*.bnd` to the glob AND an explicit `<include>bnd.bnd</include>`. If a bnd-only
+change seems to have no effect, suspect the cache first (or build with `skipCache=true` to confirm).
+
 Related: [[cdk8s-carrier-flat-jar-pattern]] (the staging closure this extension computes).

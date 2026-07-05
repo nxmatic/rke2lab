@@ -27,9 +27,11 @@ import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,8 +51,7 @@ class NestedRunbookTest {
   /**
    * A fixed run instant for the consult checkpoint (deterministic — no wall-clock in the state).
    */
-  private static final java.time.Instant RECORDED_AT =
-      java.time.Instant.parse("2026-06-29T00:00:00Z");
+  private static final Instant RECORDED_AT = Instant.parse("2026-06-29T00:00:00Z");
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final DocumentCodec CODEC = new DocumentCodec();
@@ -247,7 +248,7 @@ class NestedRunbookTest {
       ClusterReadinessProbe probe,
       LiveGate gate,
       ConsultingService doctor,
-      java.util.function.Consumer<String> logger) {
+      Consumer<String> logger) {
     return play(runbook, new ConsultationLog(), probe, gate, doctor, logger);
   }
 
@@ -272,7 +273,7 @@ class NestedRunbookTest {
       ClusterReadinessProbe probe,
       LiveGate gate,
       ConsultingService doctor,
-      java.util.function.Consumer<String> logger) {
+      Consumer<String> logger) {
     final VerificationResult[] holder = new VerificationResult[1];
     new ClusterReadinessTopic(
             config(),

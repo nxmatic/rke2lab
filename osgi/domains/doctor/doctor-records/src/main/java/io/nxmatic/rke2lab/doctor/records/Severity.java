@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import java.util.Optional;
+
 /**
  * How a failed readiness scenario affects provisioning. A scenario declares its intrinsic severity
  * from domain knowledge; the operator can override it per scenario (see {@code
@@ -12,14 +14,14 @@ public enum Severity {
   WARNING;
 
   /** Parses an operator override value ("critical"/"warning"); blank/unknown yields empty. */
-  public static java.util.Optional<Severity> parse(String value) {
+  public static Optional<Severity> parse(String value) {
     if (value == null || value.isBlank()) {
-      return java.util.Optional.empty();
+      return Optional.empty();
     }
     return switch (value.trim().toLowerCase()) {
-      case "critical", "crit", "stop" -> java.util.Optional.of(CRITICAL);
-      case "warning", "warn", "degraded" -> java.util.Optional.of(WARNING);
-      default -> java.util.Optional.empty();
+      case "critical", "crit", "stop" -> Optional.of(CRITICAL);
+      case "warning", "warn", "degraded" -> Optional.of(WARNING);
+      default -> Optional.empty();
     };
   }
 }

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
 import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,6 +13,7 @@ import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
@@ -212,7 +213,7 @@ public final class EntryGatePolicyEnforcer {
     static List<DiffEntry> diffTrees(Repository repository, ObjectId oldTreeId, ObjectId newTreeId)
         throws Exception {
       try (Git git = new Git(repository);
-          org.eclipse.jgit.lib.ObjectReader reader = repository.newObjectReader()) {
+          ObjectReader reader = repository.newObjectReader()) {
         final CanonicalTreeParser oldTree = new CanonicalTreeParser();
         oldTree.reset(reader, oldTreeId);
         final CanonicalTreeParser newTree = new CanonicalTreeParser();

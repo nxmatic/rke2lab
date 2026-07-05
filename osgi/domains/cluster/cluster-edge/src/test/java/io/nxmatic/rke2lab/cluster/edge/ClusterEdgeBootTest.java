@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * unreachable cluster deterministically returns {@code false} — no flakiness, no real cluster
  * needed. An empty controller list is vacuously effective.
  */
-@Osgi
+@OsgiWorld
 class ClusterEdgeBootTest {
 
   private static final String EDGE_FIXTURE = "(&(type=edge)(edge=cluster))";

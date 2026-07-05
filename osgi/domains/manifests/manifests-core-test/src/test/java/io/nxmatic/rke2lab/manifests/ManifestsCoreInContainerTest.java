@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.manifests;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,9 +28,11 @@ import org.osgi.framework.Bundle;
  * <p>Each in-container test comes back as an encoded {@link String} mapped to one {@link
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
-@Osgi
+@OsgiWorld
 // To debug a failed in-container resolve/activation, annotate this class with @FrameworkLog(DEBUG)
-// (io.nxmatic.rke2lab.junit.testkit.FrameworkLog) — it raises Felix's own felix.log.level so the
+// (io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog) — it raises Felix's own
+// felix.log.level so
+// the
 // resolver prints WHICH requirement could not be wired to System.out (resolve() otherwise returns a
 // bare false). Left as a comment: it is the lever to reach for, not a permanent dependency.
 //   @FrameworkLog(FrameworkLog.Level.DEBUG)

@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeService;
@@ -13,8 +13,8 @@ import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvOverlayService;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
-import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * Import-Package onto the system bundle. A split (two class copies) would surface as {@code
  * awaitService} returning null or a {@code ClassCastException}.
  */
-@Osgi
+@OsgiWorld
 class EmbeddedBundlesBootTest {
 
   private static BootedFramework framework;

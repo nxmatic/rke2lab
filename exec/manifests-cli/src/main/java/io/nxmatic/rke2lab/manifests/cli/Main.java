@@ -4,7 +4,7 @@ package io.nxmatic.rke2lab.manifests.cli;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;

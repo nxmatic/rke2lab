@@ -1,8 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
@@ -13,6 +14,7 @@ import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -83,10 +85,13 @@ public final class RecordInterventionCommand {
               intake ->
                   record(args, Instant.now(), intake, new PulumiInterventionLedgerWriter(backend)));
     } catch (InterventionRejected rejected) {
-      System.err.println(rejected.getMessage());
+      SeedLog.error(
+          "record-intervention",
+          Objects.requireNonNullElse(rejected.getMessage(), rejected.toString()));
       System.exit(2);
     } catch (IllegalArgumentException e) {
-      System.err.println(e.getMessage());
+      SeedLog.error(
+          "record-intervention", Objects.requireNonNullElse(e.getMessage(), e.toString()));
       System.exit(2);
     }
   }

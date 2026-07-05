@@ -3,9 +3,11 @@ package io.nxmatic.rke2lab.controlplane.incus;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Registry for provisioning targets — independently reconcilable downstream consumers.
@@ -88,8 +90,8 @@ public final class ProvisioningTargetRegistry {
    * @param ownerName target that owns {@code parent}; descendants owned by this same target are not
    *     returned
    */
-  public java.util.Set<Path> nestedForeignDescendants(Path parent, String ownerName) {
-    final java.util.LinkedHashSet<Path> descendants = new java.util.LinkedHashSet<>();
+  public Set<Path> nestedForeignDescendants(Path parent, String ownerName) {
+    final LinkedHashSet<Path> descendants = new LinkedHashSet<>();
     for (Map.Entry<Path, String> entry : pathOwnership.entrySet()) {
       final Path candidate = entry.getKey();
       if (candidate.equals(parent)) {

@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.osgibench;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -16,7 +16,7 @@ import org.osgi.framework.Bundle;
  * silent empty closure). The real-engine successor to the hand-rolled {@code
  * ConfigExtenderResolutionSpike}.
  */
-@Osgi
+@OsgiWorld
 class ExtenderContractTest {
 
   // Plain framework, no declared topology: each method installs its own bundle set and drives

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -33,8 +34,7 @@ final class HostLoggingBridgeTest {
   @BeforeEach
   void attachAppender() {
     context = (LoggerContext) LoggerFactory.getILoggerFactory();
-    final ch.qos.logback.classic.Logger root =
-        context.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+    final Logger root = context.getLogger(Logger.ROOT_LOGGER_NAME);
     // Capture every level so the test asserts DELIVERY, not a level policy.
     root.setLevel(Level.TRACE);
     appender = new ListAppender<>();
@@ -46,7 +46,7 @@ final class HostLoggingBridgeTest {
 
   @AfterEach
   void detach() {
-    context.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME).detachAppender(appender);
+    context.getLogger(Logger.ROOT_LOGGER_NAME).detachAppender(appender);
   }
 
   @Test

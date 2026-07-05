@@ -17,7 +17,8 @@
 
   <modules>
     <module>boot</module>
-    <module>launcher</module>
+    <module>framework-launcher</module>
+    <module>scenario-engine</module>
     <module>junit-testkit</module>
     <module>bench</module>
   </modules>

@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Request contract for canonical manifest synthesis. */
@@ -48,7 +49,7 @@ public record ManifestSynthesisRequest(
     // config
     // on top. Required by construction, so a version-less request cannot exist.
     componentVersions =
-        java.util.Objects.requireNonNull(
+        Objects.requireNonNull(
             componentVersions, "componentVersions is required (no blank-version default)");
     imageState = imageState == null ? ImageState.unknown() : imageState;
     incusIdentity = incusIdentity == null ? IncusIdentityMaterial.unknown() : incusIdentity;

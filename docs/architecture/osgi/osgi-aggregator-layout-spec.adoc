@@ -14,12 +14,15 @@ confirmed.
 ====
 **What actually shipped (2026-06-30)** — two deliberate divergences from this spec:
 
-1. **The runtime leaf is named `launcher`, NOT `runtime-host`** (§5.2 prescribed
+1. **The runtime leaf is named `framework-launcher`, NOT `runtime-host`** (§5.2 prescribed
    `runtime-host`). During execution, the user rejected `runtime-host` as a
-   collision-patch and chose `launcher` — the ACT of launching (FrameworkLauncher +
-   BootPipeline.embedded), pairing with `boot/` (the decision). Short like boot/bench.
-   The directory is `osgi/runtime/launcher/`, artifactId `launcher`, and the 3 exec
-   consumers (seed-master, manifests-cli, netplan-cli) depend on `launcher`.
+   collision-patch and chose the ACT of launching (FrameworkLauncher +
+   BootPipeline.embedded), pairing with `boot/` (the decision). First shipped as bare
+   `launcher`; renamed to `framework-launcher` (2026-07-05) when the sibling `engine` →
+   `scenario-engine` rename made both leaf names domain-specific rather than generic — the
+   directory is `osgi/runtime/framework-launcher/`, artifactId `framework-launcher`, package
+   `io.nxmatic.rke2lab.osgi.runtime.framework`, and the 3 exec consumers (seed-master,
+   manifests-cli, netplan-cli) depend on `framework-launcher`.
 
 2. **The jgiven→pipeline regroup WAS done (the SAFE half), export-fusion is STILL deferred**.
    §5.4 prescribed "dissolve jgiven into pipeline"; §8 said "no fusion" (a contradiction).

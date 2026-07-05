@@ -22,7 +22,7 @@ import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;

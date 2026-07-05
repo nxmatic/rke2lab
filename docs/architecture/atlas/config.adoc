@@ -128,4 +128,3 @@ halves are playable on the OSGi bench; the value channel is narrated.
 *Coverage of this view:* 4 capabilities, 4 scenarios — complete per <<scenario-completeness>>. Two
 playable-green (proven on the bench, not yet in production), two narrated-amber (the value/activation
 half, gated).
-

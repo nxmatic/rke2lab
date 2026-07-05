@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -209,7 +210,7 @@ public final class TargetChecksumPipeline {
    * ownerName} and {@code registry} are only ever used together, so they travel as one scope.
    */
   private record ChecksumScope(String ownerName, ProvisioningTargetRegistry registry) {
-    java.util.Set<Path> foreignDescendants(Path root) {
+    Set<Path> foreignDescendants(Path root) {
       return registry.nestedForeignDescendants(root, ownerName);
     }
   }
@@ -222,8 +223,7 @@ public final class TargetChecksumPipeline {
     try {
       final MessageDigest digest = MessageDigest.getInstance("SHA-256");
       for (Path root : roots) {
-        final java.util.Set<Path> foreign =
-            scope.map(s -> s.foreignDescendants(root)).orElseGet(java.util.Set::of);
+        final Set<Path> foreign = scope.map(s -> s.foreignDescendants(root)).orElseGet(Set::of);
         updateDigestForPath(digest, root, foreign);
       }
       return HexFormat.of().formatHex(digest.digest());
@@ -233,7 +233,7 @@ public final class TargetChecksumPipeline {
   }
 
   private static void updateDigestForPath(
-      MessageDigest digest, Path root, java.util.Set<Path> foreignDescendants) {
+      MessageDigest digest, Path root, Set<Path> foreignDescendants) {
     // NOTE: Do not include absolute path in digest — it contains ephemeral PID+timestamp from
     // the Maven build directory (host.12345.1779123456789). Hash only file contents and the
     // relative paths within the target's roots so checksums are deterministic.
@@ -259,7 +259,7 @@ public final class TargetChecksumPipeline {
     }
   }
 
-  private static boolean isUnderForeign(Path file, java.util.Set<Path> foreignDescendants) {
+  private static boolean isUnderForeign(Path file, Set<Path> foreignDescendants) {
     for (Path foreign : foreignDescendants) {
       if (file.startsWith(foreign)) {
         return true;

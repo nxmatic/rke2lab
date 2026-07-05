@@ -36,29 +36,40 @@ import io.nxmatic.rke2lab.manifests.port.profiles.ComponentVersions;
 import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pipeline.PipelineContext;
 import io.nxmatic.rke2lab.pipeline.Topic;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -832,11 +843,9 @@ public final class IncusResourceBootstrap {
               unitFile -> {
                 try {
                   Path targetFile = target.resolve(unitFile.getFileName());
-                  Files.copy(
-                      unitFile, targetFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                  Files.copy(unitFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
                 } catch (IOException e) {
-                  throw new java.io.UncheckedIOException(
-                      "Failed to copy systemd unit: " + unitFile, e);
+                  throw new UncheckedIOException("Failed to copy systemd unit: " + unitFile, e);
                 }
               });
     }
@@ -967,7 +976,7 @@ public final class IncusResourceBootstrap {
         return;
       }
       try (Stream<Path> stream = Files.walk(root)) {
-        final List<Path> entries = stream.sorted(java.util.Comparator.reverseOrder()).toList();
+        final List<Path> entries = stream.sorted(Comparator.reverseOrder()).toList();
         for (Path entry : entries) {
           Files.deleteIfExists(entry);
         }
@@ -977,7 +986,7 @@ public final class IncusResourceBootstrap {
     void deleteSynthScratchSilently(Path scratch) {
       try (Stream<Path> stream = Files.walk(scratch)) {
         stream
-            .sorted(java.util.Comparator.reverseOrder())
+            .sorted(Comparator.reverseOrder())
             .forEach(
                 entry -> {
                   try {
@@ -2479,15 +2488,15 @@ public final class IncusResourceBootstrap {
         SystemdTarget systemdTarget)
         throws IOException {
 
-      final java.time.Instant timestamp = java.time.Instant.now();
-      final Path repoRoot = java.nio.file.Paths.get(System.getProperty("user.dir"));
+      final Instant timestamp = Instant.now();
+      final Path repoRoot = Paths.get(System.getProperty("user.dir"));
       final Optional<HostSlotManifest.GitInfo> gitInfo =
           GitMetadataExtractor.extract(repoRoot, policy.provisioning().gitDirtyCheck());
       final String buildId = GitMetadataExtractor.generateBuildId(gitInfo);
 
       // Build manifest using CDK8s
-      final org.cdk8s.App app = org.cdk8s.App.Builder.create().outdir(slotPath.toString()).build();
-      final org.cdk8s.Chart chart = org.cdk8s.Chart.Builder.create(app, "manifest").build();
+      final App app = App.Builder.create().outdir(slotPath.toString()).build();
+      final Chart chart = Chart.Builder.create(app, "manifest").build();
 
       final HostSlotManifest.Builder manifestBuilder =
           HostSlotManifest.builder()
@@ -2530,7 +2539,7 @@ public final class IncusResourceBootstrap {
       final Path synthesized = slotPath.resolve("manifest.k8s.yaml");
       final Path target = slotPath.resolve(".rke2lab-manifest.yaml");
       if (Files.exists(synthesized)) {
-        Files.move(synthesized, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Files.move(synthesized, target, StandardCopyOption.REPLACE_EXISTING);
       }
     }
 
@@ -2557,8 +2566,8 @@ public final class IncusResourceBootstrap {
     }
 
     private boolean directoriesAreIdentical(Path left, Path right) throws IOException {
-      final java.util.Set<Path> leftRelativePaths = collectRelativePaths(left);
-      final java.util.Set<Path> rightRelativePaths = collectRelativePaths(right);
+      final Set<Path> leftRelativePaths = collectRelativePaths(left);
+      final Set<Path> rightRelativePaths = collectRelativePaths(right);
       if (!leftRelativePaths.equals(rightRelativePaths)) {
         return false;
       }
@@ -2581,8 +2590,8 @@ public final class IncusResourceBootstrap {
       return true;
     }
 
-    private java.util.Set<Path> collectRelativePaths(Path root) throws IOException {
-      final java.util.Set<Path> entries = new java.util.HashSet<>();
+    private Set<Path> collectRelativePaths(Path root) throws IOException {
+      final Set<Path> entries = new HashSet<>();
       Files.walkFileTree(
           root,
           new SimpleFileVisitor<>() {
@@ -2620,13 +2629,13 @@ public final class IncusResourceBootstrap {
       }
 
       int oldestSlot = 0;
-      java.nio.file.attribute.FileTime oldestMtime = null;
+      FileTime oldestMtime = null;
       for (int seq = 0; seq < retentionCount; seq++) {
         final Path stagingPath = stagingPathFor(hostAssetRoot, seq);
         if (!Files.exists(stagingPath)) {
           return seq;
         }
-        final java.nio.file.attribute.FileTime mtime = Files.getLastModifiedTime(stagingPath);
+        final FileTime mtime = Files.getLastModifiedTime(stagingPath);
         if (oldestMtime == null || mtime.compareTo(oldestMtime) < 0) {
           oldestMtime = mtime;
           oldestSlot = seq;
@@ -2645,8 +2654,7 @@ public final class IncusResourceBootstrap {
           hostAssetRoot.getFileName().toString() + ".backup." + seq);
     }
 
-    private static final java.util.Set<String> FLOX_VOLATILE_SUBTREES =
-        java.util.Set.of("run", "cache", "lib", "log");
+    private static final Set<String> FLOX_VOLATILE_SUBTREES = Set.of("run", "cache", "lib", "log");
 
     /**
      * Returns true if {@code dir} is flox-managed state that must not be backed up or synced.
@@ -2714,7 +2722,7 @@ public final class IncusResourceBootstrap {
     private void syncDirectories(Path source, Path target) throws IOException {
       // Collect all paths in source (for copying/updating). .flox/ subtrees are skipped on both
       // sides so flox runtime state stays untouched: we don't copy it, and we don't delete it.
-      final java.util.Set<Path> sourcePaths = new java.util.HashSet<>();
+      final Set<Path> sourcePaths = new HashSet<>();
       Files.walkFileTree(
           source,
           new SimpleFileVisitor<>() {
@@ -2740,14 +2748,14 @@ public final class IncusResourceBootstrap {
               Files.copy(
                   file,
                   targetFile,
-                  java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                  java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
+                  StandardCopyOption.REPLACE_EXISTING,
+                  StandardCopyOption.COPY_ATTRIBUTES);
               return FileVisitResult.CONTINUE;
             }
           });
 
       // Collect all paths in target (for deletion of stale entries)
-      final java.util.Set<Path> targetPaths = new java.util.HashSet<>();
+      final Set<Path> targetPaths = new HashSet<>();
       if (Files.exists(target)) {
         Files.walkFileTree(
             target,
@@ -2774,11 +2782,11 @@ public final class IncusResourceBootstrap {
       }
 
       // Delete paths in target that don't exist in source (rsync --delete behavior)
-      final java.util.List<Path> toDelete =
+      final List<Path> toDelete =
           targetPaths.stream()
               .filter(p -> !sourcePaths.contains(p))
               .map(target::resolve)
-              .sorted(java.util.Comparator.reverseOrder()) // Delete files before dirs
+              .sorted(Comparator.reverseOrder()) // Delete files before dirs
               .toList();
 
       for (Path path : toDelete) {
@@ -3182,7 +3190,7 @@ public final class IncusResourceBootstrap {
       if (summary == null) {
         return false;
       }
-      final String lower = summary.toLowerCase(java.util.Locale.ROOT);
+      final String lower = summary.toLowerCase(Locale.ROOT);
       return lower.contains("not found");
     }
 
@@ -3193,8 +3201,7 @@ public final class IncusResourceBootstrap {
 
       Throwable root = ex;
       while (root.getCause() != null
-          && (root instanceof java.util.concurrent.CompletionException
-              || root instanceof java.util.concurrent.ExecutionException)) {
+          && (root instanceof CompletionException || root instanceof ExecutionException)) {
         root = root.getCause();
       }
 
@@ -3626,8 +3633,8 @@ public final class IncusResourceBootstrap {
               .collectChecksums();
 
       // Partition by reload policy.
-      final Map<String, String> staticTargets = new java.util.LinkedHashMap<>();
-      final Map<String, String> dynamicTargets = new java.util.LinkedHashMap<>();
+      final Map<String, String> staticTargets = new LinkedHashMap<>();
+      final Map<String, String> dynamicTargets = new LinkedHashMap<>();
 
       for (Map.Entry<String, String> entry : allChecksums.entrySet()) {
         final String targetName = entry.getKey();

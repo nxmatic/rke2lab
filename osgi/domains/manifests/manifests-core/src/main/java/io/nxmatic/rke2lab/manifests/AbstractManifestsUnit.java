@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
+import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
 /**
@@ -111,7 +112,7 @@ public abstract class AbstractManifestsUnit implements ManifestsUnit {
                         .build())
                 .build());
 
-    marker.addJsonPatch(org.cdk8s.JsonPatch.add("/data", Map.of("members", inventory)));
+    marker.addJsonPatch(JsonPatch.add("/data", Map.of("members", inventory)));
   }
 
   private Map<String, String> groupMarkerAnnotations(final String domainId) {

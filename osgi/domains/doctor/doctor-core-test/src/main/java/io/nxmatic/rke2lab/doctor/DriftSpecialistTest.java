@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class DriftSpecialistTest {
@@ -146,8 +147,7 @@ class DriftSpecialistTest {
     @Override
     public void append(Document intervention) {
       // Only the canonical intervention Document crosses the seam now.
-      org.junit.jupiter.api.Assertions.assertEquals(
-          Coordinate.INTERVENTION.slug(), intervention.coordinate());
+      Assertions.assertEquals(Coordinate.INTERVENTION.slug(), intervention.coordinate());
       captured.add(intervention);
     }
 

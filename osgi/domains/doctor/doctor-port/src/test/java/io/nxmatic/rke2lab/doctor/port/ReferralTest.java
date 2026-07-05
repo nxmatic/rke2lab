@@ -9,6 +9,8 @@ import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class ReferralTest {
@@ -18,10 +20,8 @@ class ReferralTest {
     final Patient patient = new Patient("organization", "rke2lab", "standalone");
     final Observation observation =
         Observation.failed(
-            Symptom.CONNECTION_REFUSED,
-            "dbus refused",
-            java.util.Map.of("source", "endpoint-gate"));
-    final MedicalRecord record = new MedicalRecord(patient, java.util.List.of());
+            Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
+    final MedicalRecord record = new MedicalRecord(patient, List.of());
 
     final Referral referral = Referral.of(patient, Symptom.CONNECTION_REFUSED, observation, record);
 
@@ -35,12 +35,9 @@ class ReferralTest {
   void null_patient_is_rejected() {
     final Observation observation =
         Observation.failed(
-            Symptom.CONNECTION_REFUSED,
-            "dbus refused",
-            java.util.Map.of("source", "endpoint-gate"));
+            Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
     final MedicalRecord record =
-        new MedicalRecord(
-            new Patient("organization", "rke2lab", "standalone"), java.util.List.of());
+        new MedicalRecord(new Patient("organization", "rke2lab", "standalone"), List.of());
 
     assertThrows(
         NullPointerException.class,
@@ -52,10 +49,8 @@ class ReferralTest {
     final Patient patient = new Patient("organization", "rke2lab", "standalone");
     final Observation observation =
         Observation.failed(
-            Symptom.CONNECTION_REFUSED,
-            "dbus refused",
-            java.util.Map.of("source", "endpoint-gate"));
-    final MedicalRecord record = new MedicalRecord(patient, java.util.List.of());
+            Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
+    final MedicalRecord record = new MedicalRecord(patient, List.of());
 
     assertThrows(NullPointerException.class, () -> Referral.of(patient, null, observation, record));
   }
@@ -63,7 +58,7 @@ class ReferralTest {
   @Test
   void null_observation_is_rejected() {
     final Patient patient = new Patient("organization", "rke2lab", "standalone");
-    final MedicalRecord record = new MedicalRecord(patient, java.util.List.of());
+    final MedicalRecord record = new MedicalRecord(patient, List.of());
 
     assertThrows(
         NullPointerException.class,
@@ -75,9 +70,7 @@ class ReferralTest {
     final Patient patient = new Patient("organization", "rke2lab", "standalone");
     final Observation observation =
         Observation.failed(
-            Symptom.CONNECTION_REFUSED,
-            "dbus refused",
-            java.util.Map.of("source", "endpoint-gate"));
+            Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
 
     assertThrows(
         NullPointerException.class,

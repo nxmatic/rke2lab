@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.osgi.boot.logging;
 
 import java.util.logging.Level;
+import org.apache.felix.framework.Logger;
 
 /**
  * Routes Felix's OWN internal log output ({@code felix.log.level} trace, the resolver diagnostics)
@@ -19,7 +20,7 @@ import java.util.logging.Level;
  * source converges on the one logback context (pax-logging carries the OSGi LogService side, this
  * carries Felix's own).
  */
-public final class FelixJulLogger extends org.apache.felix.framework.Logger {
+public final class FelixJulLogger extends Logger {
 
   private static final java.util.logging.Logger JUL =
       java.util.logging.Logger.getLogger("org.apache.felix.framework");

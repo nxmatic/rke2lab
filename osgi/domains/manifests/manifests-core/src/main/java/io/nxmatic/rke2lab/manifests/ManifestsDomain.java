@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,7 @@ public class ManifestsDomain {
     final Map<InstallPhase, List<String>> subpathsByPhase = new LinkedHashMap<>();
     for (ManifestsUnit unit : units) {
       subpathsByPhase
-          .computeIfAbsent(unit.installPhase(), p -> new java.util.ArrayList<>())
+          .computeIfAbsent(unit.installPhase(), p -> new ArrayList<>())
           .add(domainId + "/" + unit.outputDir());
     }
 

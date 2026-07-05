@@ -39,12 +39,16 @@
         <global>
             <!-- If not defined, default glob is "*" -->
             <glob>
-                {*.java,*.groovy,*.yaml,*.svcd,*.proto,*assembly.xml,assembly*.xml,*logback.xml,*.vm,*.ini,*.jks,*.properties,*.sh,*.bat}
+                {*.java,*.groovy,*.yaml,*.svcd,*.proto,*assembly.xml,assembly*.xml,*logback.xml,*.vm,*.ini,*.jks,*.properties,*.sh,*.bat,*.bnd}
             </glob>
             <includes>
                 <!-- By default, project sources and resources directories are included (src/main/java and src/main/resources) -->
                 <!-- In this example, the goal is to include a wider range of src directories (like src/main/assembly or src/main/groovy) -->
                 <include>src/</include>
+                <!-- bnd.bnd lives at the module ROOT (not under src/) and drives the OSGi manifest
+                     (Export-/Import-Package). It MUST be a cache input, else a bnd-only edit serves a
+                     stale bundle manifest — the checkerframework-import staleness that hid here. -->
+                <include>bnd.bnd</include>
             </includes>
             <excludes>
                 <!-- We don't want a static "hash" pom resolution (it would conflict the will to adjust the version in the manifest), -->

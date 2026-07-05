@@ -9,6 +9,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -110,8 +112,7 @@ public final class FloxRuntimeAssets {
       return;
     }
     try {
-      Files.setPosixFilePermissions(
-          target, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+      Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("rwxr-xr-x"));
     } catch (UnsupportedOperationException ignored) {
       // Non-POSIX filesystem (shouldn't happen on the host paths we target).
     }
@@ -152,7 +153,7 @@ public final class FloxRuntimeAssets {
       final Path dst = targetDir.resolve(rel);
       Files.createDirectories(dst.getParent());
       try (InputStream in = entry.openStream()) {
-        Files.copy(in, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(in, dst, StandardCopyOption.REPLACE_EXISTING);
       }
       applyExecutableBitIfNeeded(dst);
     }

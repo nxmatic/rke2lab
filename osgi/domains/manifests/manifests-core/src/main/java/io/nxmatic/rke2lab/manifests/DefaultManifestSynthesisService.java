@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
@@ -186,8 +187,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           this.state = state;
         }
 
-        Cdk8sSetupDone during(
-            String topic, java.util.function.Function<Cdk8sSetupStage, Cdk8sSetupStage> body) {
+        Cdk8sSetupDone during(String topic, Function<Cdk8sSetupStage, Cdk8sSetupStage> body) {
           final Cdk8sSetupStage stage =
               new Cdk8sSetupStage(state, scaffold -> state.scaffold = scaffold);
           runner.runDuring(topic, stage, body, state.onFailure);
@@ -252,8 +252,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         DomainRegistryDone during(
-            String topic,
-            java.util.function.Function<DomainRegistryStage, DomainRegistryStage> body) {
+            String topic, Function<DomainRegistryStage, DomainRegistryStage> body) {
           final DomainRegistryStage stage =
               new DomainRegistryStage(state, registry -> state.registry = registry);
           runner.runDuring(topic, stage, body, state.onFailure);
@@ -342,8 +341,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         SystemdTargetsDone during(
-            String topic,
-            java.util.function.Function<SystemdTargetsStage, SystemdTargetsStage> body) {
+            String topic, Function<SystemdTargetsStage, SystemdTargetsStage> body) {
           final SystemdTargetsStage stage =
               new SystemdTargetsStage(state, targets -> state.targets = targets);
           runner.runDuring(topic, stage, body, state.onFailure);
@@ -493,8 +491,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           this.state = state;
         }
 
-        SystemdUnitsDone during(
-            String topic, java.util.function.Function<SystemdUnitsStage, SystemdUnitsStage> body) {
+        SystemdUnitsDone during(String topic, Function<SystemdUnitsStage, SystemdUnitsStage> body) {
           final SystemdUnitsStage stage = new SystemdUnitsStage(state);
           runner.runDuring(topic, stage, body, state.onFailure);
           return new SystemdUnitsDone(state);
@@ -549,8 +546,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         TargetFinalizationDone during(
-            String topic,
-            java.util.function.Function<TargetFinalizationStage, TargetFinalizationStage> body) {
+            String topic, Function<TargetFinalizationStage, TargetFinalizationStage> body) {
           final TargetFinalizationStage stage = new TargetFinalizationStage(state);
           runner.runDuring(topic, stage, body, state.onFailure);
           return new TargetFinalizationDone(state);
@@ -623,8 +619,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           this.state = state;
         }
 
-        SynthesisDone during(
-            String topic, java.util.function.Function<SynthesisStage, SynthesisStage> body) {
+        SynthesisDone during(String topic, Function<SynthesisStage, SynthesisStage> body) {
           final SynthesisStage stage = new SynthesisStage(state);
           runner.runDuring(topic, stage, body, state.onFailure);
           return new SynthesisDone(state);

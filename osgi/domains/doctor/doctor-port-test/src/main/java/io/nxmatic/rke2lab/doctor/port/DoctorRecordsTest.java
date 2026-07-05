@@ -18,6 +18,7 @@ import io.nxmatic.rke2lab.doctor.records.TreatmentEfficacy;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,7 +30,7 @@ class DoctorRecordsTest {
   private static ConsultationReport report(
       String checkpointId, Symptom symptom, RemediationProgramRef... programs) {
     final List<ReferralReply> replies =
-        java.util.Arrays.stream(programs)
+        Arrays.stream(programs)
             .map(p -> Prescription.of(p, Map.of(), "hint"))
             .map(ReferralReplies::treating)
             .toList();

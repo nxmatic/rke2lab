@@ -26,6 +26,10 @@ iff ≥2 modules (singletons reduced — world-gateway, ssh-to-age-edge stay lea
    `runtime-host` as collision-patch; chose `launcher` (the act-of-launching, pairs with boot/,
    short). Dir is `osgi/runtime/launcher/`, artifactId `launcher`; 3 exec consumers (seed-master,
    manifests-cli, netplan-cli) depend on `launcher`.
+   **RENAMED 2026-07-05 → `framework-launcher`** (dir + artifactId + package
+   `io.nxmatic.rke2lab.osgi.runtime` → `io.nxmatic.rke2lab.osgi.runtime.framework`), when the sibling
+   `engine` → `scenario-engine` rename made both runtime leaves domain-specific rather than generic.
+   Bare `launcher`/`engine` no longer exist. See [[engine-lifecycle-socle-state]].
 
 2. **The jgiven→pipeline regroup WAS done (SAFE half), export-fusion STILL deferred**. §5.4 spec said
    "dissolve jgiven into pipeline"; §8 said "no fusion" (contradiction). What shipped: jgiven REGROUPED

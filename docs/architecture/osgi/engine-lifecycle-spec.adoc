@@ -4,9 +4,13 @@
 
 [NOTE]
 ====
-*Status:* DESIGN (converged 2026-07-04), not built. This is the SOCLE (foundation) of the
-BDD-as-engine migration — increment 1, which must land before the ClusterSeed vertical
-(link:pipeline-spec.adoc[pipeline-spec]) consumes it.
+*Status:* BUILT (increment 1 landed 2026-07-05, `feature/engine-lifecycle-socle`, all tests +
+6 staging gates green). This is the SOCLE (foundation) of the BDD-as-engine migration — it lands
+before the ClusterSeed vertical (link:pipeline-spec.adoc[pipeline-spec]) consumes it. The realised
+module is `osgi/runtime/scenario-engine` (the boot module was renamed `osgi/runtime/framework-launcher`
+alongside); `OsgiConnection` shipped as a `context()`-based contract (not `world()`), and the machinery
+sits behind a realm/seam package split (in-realm exported, seam unexported). See the
+`engine-lifecycle-socle-state` memory for the as-built decisions.
 
 One spec for one subject: *how the stacked engine lifecycles are held at runtime* — the OSGi
 framework, the embedded JUnit Platform launcher, and the jGiven runbook — and how the SAME model
@@ -435,7 +439,7 @@ This spec is the foundation the ClusterSeed-vertical migration rests on. It ship
 (the launcher-core extraction + the connection/lifecycle model), integrated BEFORE the ClusterSeed
 migration (*increment 2*) consumes it:
 
-* *Increment 1 (this socle):* carve a new runtime module `osgi/runtime/engine` that OWNS the
+* *Increment 1 (this socle):* carve a new runtime module `osgi/runtime/scenario-engine` that OWNS the
   JUnit/jGiven machinery playable at runtime — the two framework envelopes (`InContainerJUnitRunner`
   AND `OutOfContainerFrameworkExtension`, moved out of `junit-testkit`, which is left an attachable
   test bundle holding only the test-only tags) plus the SCR diagnostic; extract the neutral
@@ -450,7 +454,7 @@ migration (*increment 2*) consumes it:
 == Related — the launcher core it rests on
 
 The launcher is `JUnitLauncherCore`, extracted from `InContainerJUnitRunner` into the new
-`osgi/runtime/engine` module (the runtime owns it, the test consumes it — the sound dependency
+`osgi/runtime/scenario-engine` module (the runtime owns it, the test consumes it — the sound dependency
 direction, and the dogfooding promotion of JUnit to runtime scope). It runs a JUnit Platform
 `Launcher` inside Felix on a dedicated host-bound thread, engine registered explicitly, the three
 OSGi crossings handled; discovery + harvest are injected strategies so both the test envelope

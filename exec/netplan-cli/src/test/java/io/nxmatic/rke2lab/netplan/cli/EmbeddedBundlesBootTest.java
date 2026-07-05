@@ -3,10 +3,10 @@ package io.nxmatic.rke2lab.netplan.cli;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
-import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * resolve against the CLI's flat classpath, and the typed resolve below would fail loudly on any
  * split.
  */
-@Osgi
+@OsgiWorld
 class EmbeddedBundlesBootTest {
 
   private static BootedFramework framework;

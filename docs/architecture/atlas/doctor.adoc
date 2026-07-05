@@ -730,4 +730,3 @@ stray the other. The designer's runbook closes the bottom seam (code ⇄ spec) b
 closes the top seam (design ⇄ spec) by the scenario map; the plan seam (spec ⇄ plan) is closed by
 each increment naming the scenario it lands. The whole chain is one re-entrance discipline applied at
 four heights.
-

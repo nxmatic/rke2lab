@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.netplan.cli;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisResult;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

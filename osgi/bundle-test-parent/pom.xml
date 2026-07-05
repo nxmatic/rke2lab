@@ -23,8 +23,17 @@
     platform-engine/commons + opentest4j/apiguardian transitively.</description>
 
   <dependencies>
-    <!-- The JUnit-in-OSGi testkit: OutOfContainerFrameworkExtension (src/test harness) +
-         InContainerJUnitRunner (src/main, runs the @Tests in-framework). -->
+    <!-- The runtime-playable machinery, now in the engine module (JUnit/jGiven are runtime-scope):
+         OutOfContainerFrameworkExtension (src/test harness), InContainerJUnitRunner (src/main, runs
+         the @Tests in-framework), ScrDiagnostics (src/main). provided keeps the in-container half out
+         of the fragment jar — it resolves as its own bundle at runtime. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- The JUnit-in-OSGi testkit: now only the test-only tags (@Osgi/@Pipeline) a fragment wears. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>

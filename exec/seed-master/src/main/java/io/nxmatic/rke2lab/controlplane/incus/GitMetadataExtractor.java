@@ -1,9 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
+import io.nxmatic.rke2lab.controlplane.SeedLog;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.Optional;
 import org.eclipse.jgit.api.Git;
@@ -44,7 +46,7 @@ public final class GitMetadataExtractor {
           .map(head -> gitInfoOf(repo, head, dirtyCheckEnabled));
     } catch (IOException | UncheckedIOException ex) {
       // Log but don't fail bootstrap if git metadata extraction fails
-      System.err.println("Warning: Failed to extract git metadata: " + ex.getMessage());
+      SeedLog.warn("git", "failed to extract git metadata: " + ex.getMessage());
       return Optional.empty();
     }
   }
@@ -88,7 +90,7 @@ public final class GitMetadataExtractor {
       return !git.status().call().isClean();
     } catch (GitAPIException ex) {
       // Treat an unreadable status as clean rather than failing bootstrap.
-      System.err.println("Warning: Failed to compute git dirty status: " + ex.getMessage());
+      SeedLog.warn("git", "failed to compute git dirty status: " + ex.getMessage());
       return false;
     }
   }
@@ -105,12 +107,12 @@ public final class GitMetadataExtractor {
     final String timestamp =
         String.format(
             "%04d%02d%02d-%02d%02d%02d",
-            now.atZone(java.time.ZoneOffset.UTC).getYear(),
-            now.atZone(java.time.ZoneOffset.UTC).getMonthValue(),
-            now.atZone(java.time.ZoneOffset.UTC).getDayOfMonth(),
-            now.atZone(java.time.ZoneOffset.UTC).getHour(),
-            now.atZone(java.time.ZoneOffset.UTC).getMinute(),
-            now.atZone(java.time.ZoneOffset.UTC).getSecond());
+            now.atZone(ZoneOffset.UTC).getYear(),
+            now.atZone(ZoneOffset.UTC).getMonthValue(),
+            now.atZone(ZoneOffset.UTC).getDayOfMonth(),
+            now.atZone(ZoneOffset.UTC).getHour(),
+            now.atZone(ZoneOffset.UTC).getMinute(),
+            now.atZone(ZoneOffset.UTC).getSecond());
 
     final String commitSuffix = gitInfo.map(HostSlotManifest.GitInfo::commit).orElse("unknown");
     return timestamp + "-" + commitSuffix;

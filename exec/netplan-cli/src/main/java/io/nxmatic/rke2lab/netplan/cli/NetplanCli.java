@@ -1,5 +1,8 @@
 package io.nxmatic.rke2lab.netplan.cli;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Command-line interface for netplan operations.
  *
@@ -27,6 +30,8 @@ package io.nxmatic.rke2lab.netplan.cli;
  */
 public final class NetplanCli {
 
+  private static final Logger LOG = LoggerFactory.getLogger(NetplanCli.class);
+
   /** Command contract for netplan CLI operations. */
   public interface Command {
     void execute(String[] args) throws Exception;
@@ -42,14 +47,14 @@ public final class NetplanCli {
           case "synthesis" -> new SynthesisCommand();
           case "yamlExport" -> new BlueprintExportCommand();
           case "jsonSchemaExport" -> {
-            System.err.println("jsonSchemaExport not yet implemented");
+            LOG.error("jsonSchemaExport not yet implemented");
             System.exit(1);
             yield null;
           }
           default -> {
-            System.err.println("Unknown command: " + commandName);
-            System.err.println(
-                "Supported commands: synthesis (default), yamlExport, jsonSchemaExport");
+            LOG.error(
+                "unknown command: {} — supported: synthesis (default), yamlExport, jsonSchemaExport",
+                commandName);
             System.exit(1);
             yield null;
           }

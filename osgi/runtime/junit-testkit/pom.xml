@@ -11,72 +11,18 @@
 
   <artifactId>junit-testkit</artifactId>
   <name>osgi/runtime/junit-testkit</name>
-  <description>The JUnit-in-OSGi testkit: the shared fixtures for running JUnit IN AND AROUND a real
-    embedded framework. Two halves, by world. JVM-side (loaded by surefire, BEFORE the framework):
-    OutOfContainerFrameworkExtension boots a real Felix and the @Osgi/@OsgiSpike tags. In-container (loaded by
-    a host bundle): InContainerJUnitRunner drives a JUnit Platform Launcher INSIDE the framework
-    against a host package, so a host -test fragment runs its tests white-box. A bundle, not a plain
-    jar — being a bundle is a superset (it degrades to a plain jar on the flat classpath), and the
-    in-container half must be importable by fragments as a real bundle export.</description>
+  <description>The test-only tag annotations a test wears out-of-container to classify itself for
+    surefire selection: @Osgi/@OsgiWorld (the OSGi-world marker) and @Pipeline (marks a *Test that
+    exercises a runtime pipeline). The runtime-playable machinery (the two framework envelopes, the
+    SCR diagnostic, the neutral launcher core) moved to osgi/runtime/scenario-engine when JUnit/jGiven became
+    runtime-scope. Kept an attachable test bundle (a bundle is a superset of a plain jar) so a -test
+    fixture can attach to it; the shared logback-test.xml still ships in this jar.</description>
 
   <dependencies>
-    <!-- JVM-side half: the Jupiter extension implements the callbacks (compile dep, not test), and
-         boots a real Felix via its launch API. -->
+    <!-- The tags compose org.junit.jupiter.api.Tag — the only dependency they need. -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.felix</groupId>
-      <artifactId>org.apache.felix.framework</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
-    </dependency>
-    <!-- slf4j-api for the resolution-failure diagnostic (resolve() logs the unsatisfied
-         requirements rather than returning a blind false). API façade only — the backend is the
-         consuming test module's. -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <!-- The shared boot MODEL — NOT the executor osgi/runtime. OutOfContainerFrameworkExtension reuses the
-         ClasspathBundleIndex (locate / embeddableBundles / exportsForImportsOf) so test and prod agree
-         on boot discovery from one source. Depending on boot-discovery (which pulls only the JDK
-         jar/manifest API) rather than runtime keeps the boot EXECUTOR's closure — notably pax-logging-api,
-         a second org.slf4j provider — off the consuming test modules' classpath, where it broke jGiven
-         in-container resolution. Compile scope (not provided): the extension is loaded JVM-side by
-         surefire BEFORE any framework boots, and so are the downstream test modules that use it — they
-         need boot-discovery on their flat test classpath, which only a transitive dependency gives. The
-         package is only touched JVM-side, never wired in-container, so its bnd Import-Package is harmless. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>boot-discovery</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-
-    <!-- The SCR runtime API (ServiceComponentRuntime + the *.dto types): the ScrDiagnostics helper
-         reads component states / unsatisfied references to explain why a @Component is or isn't
-         published. provided — felix.scr provides these packages at runtime; the helper only needs
-         them to compile (and the bnd import below is optional, JVM-side only). -->
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.service.component</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
-    <!-- In-container half: the runner compiles against the JUnit Platform launcher + engine;
-         provided keeps them out of this bundle — each resolves as its own bundle at runtime. -->
-    <dependency>
-      <groupId>org.junit.platform</groupId>
-      <artifactId>junit-platform-launcher</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.platform</groupId>
-      <artifactId>junit-platform-engine</artifactId>
-      <scope>provided</scope>
     </dependency>
   </dependencies>
 

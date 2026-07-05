@@ -10,7 +10,7 @@ import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
-import io.nxmatic.rke2lab.junit.testkit.diagnostic.ScrDiagnostics;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class HealthSystemContributionTest {
             + " EHR + ledger references satisfied by the fragment-contributed @Components."
             // when this fails, the SCR report names which @Reference is still unbound (and on which
             // target filter), so the failure explains itself instead of just "service was null".
-            + ScrDiagnostics.of(context).report());
+            + ScrDiagnostics.of(context).map(ScrDiagnostics::report).orElse(""));
     final HealthSystem healthSystem = context.getService(reference);
     assertNotNull(healthSystem, "the HealthSystem service reference must resolve to an instance");
 

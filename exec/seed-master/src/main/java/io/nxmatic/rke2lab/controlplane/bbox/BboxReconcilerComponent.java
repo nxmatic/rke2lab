@@ -7,6 +7,7 @@ import io.nxmatic.bbox.reconcile.ReservationReconciler;
 import io.nxmatic.bbox.reconcile.ReservationReconciler.Mode;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,7 @@ public final class BboxReconcilerComponent {
     }
 
     final List<DesiredRow> rows = new BlueprintRowEnumerator().rows();
-    final java.util.EnumMap<Action, Integer> counts = new java.util.EnumMap<>(Action.class);
+    final EnumMap<Action, Integer> counts = new EnumMap<>(Action.class);
     for (Action action : Action.values()) {
       counts.put(action, 0);
     }

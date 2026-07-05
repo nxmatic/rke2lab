@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.doctor.port;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.osgi.framework.Bundle;
  * value-type tests run white-box against doctor-port's own world — the coherence the flat classpath
  * could not give (it is what produced the {@code ReferralReplies} Maven cycle).
  */
-@Osgi
+@OsgiWorld
 class DoctorPortInContainerTest {
 
   private static final String FIXTURE_FILTER = "(&(type=fixture)(suite=doctor)(role=port))";

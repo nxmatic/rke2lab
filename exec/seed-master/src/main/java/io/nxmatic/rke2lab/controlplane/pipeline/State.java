@@ -10,7 +10,7 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;

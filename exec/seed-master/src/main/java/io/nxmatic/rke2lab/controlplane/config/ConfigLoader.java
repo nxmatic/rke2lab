@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -105,7 +106,7 @@ public final class ConfigLoader {
     if (!(value instanceof Map)) {
       return Map.of();
     }
-    final java.util.LinkedHashMap<String, String> result = new java.util.LinkedHashMap<>();
+    final LinkedHashMap<String, String> result = new LinkedHashMap<>();
     ((Map<String, Object>) value)
         .forEach((entryKey, entryValue) -> result.put(entryKey, String.valueOf(entryValue)));
     return result;

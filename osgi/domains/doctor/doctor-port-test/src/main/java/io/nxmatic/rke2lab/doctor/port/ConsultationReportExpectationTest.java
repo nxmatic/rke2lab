@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -69,8 +70,7 @@ class ConsultationReportExpectationTest {
             SchemaRef.of("network/reachability/v1"),
             Map.of(),
             "endpoint unreachable; no remediation");
-    final ReferralReply declined =
-        ReferralReply.reconstructed(assessment, java.util.Optional.empty());
+    final ReferralReply declined = ReferralReply.reconstructed(assessment, Optional.empty());
     final RemediationPlan plan =
         new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(declined), "adapter unreachable");
     final ConsultationReport report =

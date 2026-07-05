@@ -61,6 +61,14 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- The out-of-container framework envelope moved to the runtime engine module (JUnit/jGiven are
+         runtime-scope now); the @Osgi tag stays in junit-testkit above. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <!-- junit-jupiter (test) is inherited from build-parent. -->
     <dependency>
       <groupId>org.osgi</groupId>

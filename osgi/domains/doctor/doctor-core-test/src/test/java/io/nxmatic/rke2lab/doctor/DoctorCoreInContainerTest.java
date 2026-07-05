@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.osgi.framework.Bundle;
  * <p>Each in-container test comes back as an encoded {@link String} mapped to one {@link
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
-@Osgi
+@OsgiWorld
 class DoctorCoreInContainerTest {
 
   // The doctor suite's two fixtures, selected by what they declare. role=core is the host under

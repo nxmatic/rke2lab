@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.sshtoage.edge;
 
 import io.nxmatic.rke2lab.manifests.port.SshToAgeConversionException;
 import io.nxmatic.rke2lab.manifests.port.SshToAgeConverter;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
@@ -31,7 +32,7 @@ public final class ProcessBuilderSshToAgeConverter implements SshToAgeConverter 
     final Process process;
     try {
       process = pb.start();
-    } catch (java.io.IOException ex) {
+    } catch (IOException ex) {
       throw new SshToAgeConversionException(
           "ssh-to-age could not be started — is it on PATH? (flox activate -- ...)", ex);
     }
@@ -54,7 +55,7 @@ public final class ProcessBuilderSshToAgeConverter implements SshToAgeConverter 
       }
       LOG.debug("ssh-to-age converted an SSH key to an age key");
       return output.trim();
-    } catch (java.io.IOException ex) {
+    } catch (IOException ex) {
       throw new SshToAgeConversionException("ssh-to-age I/O failed", ex);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();

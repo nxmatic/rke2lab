@@ -18,6 +18,7 @@ import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -61,7 +62,7 @@ class HealthSystemTest {
   void the_employed_doctor_still_consults_normally() {
     final ConsultingService doctor = admit(DEV, singlePatientRegistry());
     final Observation observation =
-        Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", java.util.Map.of());
+        Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", Map.of());
     final RemediationPlan plan =
         doctor
             .adapt(ClinicalReasoning.class)

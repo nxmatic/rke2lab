@@ -2,9 +2,11 @@ package io.nxmatic.rke2lab.controlplane.incus;
 
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -88,13 +90,13 @@ public final class SystemdTarget implements ProvisioningTarget {
       return;
     }
     try (var walk = Files.walk(root)) {
-      walk.sorted(java.util.Comparator.reverseOrder())
+      walk.sorted(Comparator.reverseOrder())
           .forEach(
               p -> {
                 try {
                   Files.delete(p);
                 } catch (IOException e) {
-                  throw new java.io.UncheckedIOException(e);
+                  throw new UncheckedIOException(e);
                 }
               });
     }

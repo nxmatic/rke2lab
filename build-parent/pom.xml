@@ -41,6 +41,18 @@
     <surefire.groups/>
     <surefire.excludedGroups>live | spike</surefire.excludedGroups>
     <spotless.version>3.7.0</spotless.version>
+    <!-- OpenRewrite: the ShortenFullyQualifiedTypeReferences recipe both FIXES (rewrite:run —
+         strips an inline JDK FQN to a simple name AND adds the import, which spotless cannot do) and
+         GATES (rewrite:dryRun on verify — fails if any inline FQN remains). One tool, no duplicate
+         spotless check. Generated code (the Pulumi SDKs) is excluded — not ours to govern. -->
+    <rewrite.maven.plugin.version>6.43.0</rewrite.maven.plugin.version>
+    <!-- Gates the exec modules' generate-resources staging (stage-embedded-bundles copy +
+         unpack-manifests-bundle): false normally, true to run a reactor pass that must NOT trigger
+         staging — the m2e IDE build (no full reactor package) and the fix-fqn profile (OpenRewrite
+         re-parses the model and would erase the injected <artifactItems>). Declared here as the
+         single default so no exec module needs a local =false (a child plain property would shadow a
+         parent profile, defeating -Pfix-fqn); the m2e/fix-fqn profiles override it. -->
+    <rke2lab.staging.skip>false</rke2lab.staging.skip>
     <!-- NullAway static null-analysis via error-prone (the -Pnullaway opt-in profile below reads the
          @NullMarked packages). Confirmed to run on the JDK 25 toolchain with the full javac module
          export/open set the profile passes. -->
@@ -320,6 +332,22 @@
                  Default: groups empty (all), excludedGroups 'live | spike'. -->
             <groups>${surefire.groups}</groups>
             <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+            <!-- The jGiven test closure, shared by every module (any module may play a jGiven
+                 scenario — the seeding is BDD-as-engine): jGiven generates its Stage subclasses
+                 with byte-buddy, whose reflective class injector needs java.lang opened under JDK
+                 module encapsulation. -->
+            <argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+            <!-- jGiven's text report writes Given/When/Then straight to the fork's native stream;
+                 surefire's fork channel rides that same stdout by default, so the writes corrupt it
+                 ("Corrupted channel by directly writing to native stream"). Move the channel onto
+                 TCP (the surefire FAQ remedy) so the human-facing text report can stay on. -->
+            <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
+            <systemPropertyVariables>
+              <!-- Per-module: ${project.build.directory} resolves to each module's own target/, so
+                   the runbook lands beside the module that played it, never in a shared root. -->
+              <jgiven.report.dir>${project.build.directory}/jgiven-reports/json</jgiven.report.dir>
+              <jgiven.report.text>true</jgiven.report.text>
+            </systemPropertyVariables>
           </configuration>
         </plugin>
         <plugin>
@@ -331,6 +359,49 @@
           <groupId>dev.dimlight</groupId>
           <artifactId>shellcheck-maven-plugin</artifactId>
           <version>${shellcheck.maven.plugin.version}</version>
+        </plugin>
+        <!--
+          OpenRewrite FQN-shortener. The ShortenFullyQualifiedTypeReferences recipe turns an inline
+          JDK FQN (java.util.Objects.x) into a simple name AND adds the import — the one thing spotless
+          cannot do (it removes unused imports, never adds one). The version + recipe + exclusions live
+          HERE (single source); the `fix-fqn` profile below activates the plugin (bare, inheriting this
+          config) and sets rke2lab.staging.skip=true, so the whole thing is one gesture:
+          `./mvnw -Pfix-fqn rewrite:run`.
+
+          It is deliberately NOT bound to a lifecycle phase: rewrite:run re-resolves and re-parses the
+          Maven project to build its AST model, and that reconstruction ERASES the <artifactItems> the
+          maven-embed-staging-ext StagingExecutionStrategy injects in place (a MojosExecutionStrategy
+          reconfiguring the stage-embedded-bundles dependency:copy just before the mojo is configured).
+          Two build-time model rewriters collide → dependency:copy then sees an empty <artifactItems>
+          ("Either artifact or artifactItems is required"). Verified at verify, process-sources AND
+          generate-sources — structural, not phase-specific. So invoke the GOAL alone (never with
+          package/verify): `-Pfix-fqn rewrite:run`, review the diff, commit.
+        -->
+        <plugin>
+          <groupId>org.openrewrite.maven</groupId>
+          <artifactId>rewrite-maven-plugin</artifactId>
+          <version>${rewrite.maven.plugin.version}</version>
+          <configuration>
+            <activeRecipes>
+              <recipe>org.openrewrite.java.ShortenFullyQualifiedTypeReferences</recipe>
+            </activeRecipes>
+            <!-- The Pulumi SDKs are generated code — not ours to govern (their java.lang.String FQNs
+                 are the generator's, not a style slip). package-info.java is excluded too: its
+                 @org.jspecify.annotations.NullMarked / @org.osgi…Version FQNs are the DELIBERATE
+                 idiom (fully-qualified precisely to avoid an import in an otherwise-empty file), and
+                 shortening them would insert an import AFTER the package statement — invalid Java. -->
+            <exclusions>
+              <exclusion>**/pulumi-generated-sdks/**</exclusion>
+              <exclusion>**/package-info.java</exclusion>
+              <!-- These two hold a DELIBERATE FQN: `implements Topic.Checkpoint` shadows the simple
+                   name Checkpoint, so the domain enum io.nxmatic.rke2lab.world.gateway.port.Checkpoint
+                   is named fully-qualified. The recipe misses this inner-type shadow and would
+                   re-shorten it into an ambiguous reference (compile error). Their only other FQNs are
+                   already proper imports, so excluding them loses no coverage. -->
+              <exclusion>**/pipeline/stages/SystemdAdapterTopic.java</exclusion>
+              <exclusion>**/pipeline/stages/ClusterReadinessTopic.java</exclusion>
+            </exclusions>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -572,6 +643,33 @@
                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
               </compilerArgs>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- Activates the OpenRewrite plugin (bare — it inherits version/recipe/exclusions from the
+         pluginManagement block above) so the short goal resolves, in one self-contained gesture:
+
+           ./mvnw -Pfix-fqn rewrite:run
+
+         then review the diff and commit. Off by default, so a normal build never triggers anything.
+
+         It also sets rke2lab.staging.skip=true → the exec modules' generate-resources staging
+         (stage-embedded-bundles copy + unpack-manifests-bundle) is skipped. rewrite:run walks the
+         reactor and re-parses the project model, which would otherwise erase the <artifactItems> the
+         staging extension injects, breaking the copy ("Either artifact or artifactItems is
+         required"). The override holds because the default lives in build-parent's properties (no
+         exec module pins it locally, so nothing shadows this profile). -->
+    <profile>
+      <id>fix-fqn</id>
+      <properties>
+        <rke2lab.staging.skip>true</rke2lab.staging.skip>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.openrewrite.maven</groupId>
+            <artifactId>rewrite-maven-plugin</artifactId>
           </plugin>
         </plugins>
       </build>

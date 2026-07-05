@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
@@ -15,8 +16,7 @@ final class SystemdAdapterTopicFixture {
   private SystemdAdapterTopicFixture() {}
 
   static SystemdAdapterTopic failing(ReadinessAuthority authority) {
-    final BootstrapConfig config =
-        BootstrapConfig.from(io.nxmatic.rke2lab.controlplane.config.Rke2labConfig.defaults());
+    final BootstrapConfig config = BootstrapConfig.from(Rke2labConfig.defaults());
     final ControlplanePolicy policy = ControlplanePolicy.defaults();
     final SystemdAdapterProbe failingProbe =
         cfg ->

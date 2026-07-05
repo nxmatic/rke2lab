@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
 import io.nxmatic.rke2lab.pulumi.edge.StackMedicalRecordJournal;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
@@ -109,7 +110,8 @@ public final class MedicalRecordDump {
   public static void main(String[] args) {
     final Args parsed = Args.parse(args);
     final MedicalRecordJournal journal =
-        new StackMedicalRecordJournal(Optional.of(parsed.backend), msg -> System.err.println(msg));
+        new StackMedicalRecordJournal(
+            Optional.of(parsed.backend), msg -> SeedLog.warn("medical-record", msg));
     final Result result = dump(parsed.patient(), journal);
 
     if (parsed.out.isEmpty()) {
@@ -121,7 +123,7 @@ public final class MedicalRecordDump {
         throw new UncheckedIOException(e);
       }
     }
-    result.failures().forEach(line -> System.err.println("unreadable entry: " + line));
+    result.failures().forEach(line -> SeedLog.warn("medical-record", "unreadable entry: " + line));
     System.exit(result.exitCode());
   }
 

@@ -4,11 +4,13 @@ import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Predicate;
 
 /** Policy controlling which serialized host manifest layers are linked into live RKE2 manifests. */
 public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug) {
 
-  public record DebugPolicy(java.util.function.Predicate<String> domainDebug) {
+  public record DebugPolicy(Predicate<String> domainDebug) {
     public static DebugPolicy none() {
       return new DebugPolicy(domain -> false);
     }
@@ -23,7 +25,7 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
 
   public ManifestLinkPolicy {
     domains = new ManifestDomainPolicy(new LinkedHashMap<>(domains.asMap()));
-    java.util.Objects.requireNonNull(debug, "debug");
+    Objects.requireNonNull(debug, "debug");
   }
 
   public static ManifestLinkPolicy stageA(

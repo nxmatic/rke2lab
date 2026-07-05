@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.manifests.ManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.felix.resolver.Logger;
@@ -142,7 +143,7 @@ final class ManifestsVisitOrderTest {
   }
 
   private static List<UnitResource> append(List<UnitResource> base, UnitResource extra) {
-    java.util.List<UnitResource> all = new java.util.ArrayList<>(base);
+    List<UnitResource> all = new ArrayList<>(base);
     all.add(extra);
     return all;
   }

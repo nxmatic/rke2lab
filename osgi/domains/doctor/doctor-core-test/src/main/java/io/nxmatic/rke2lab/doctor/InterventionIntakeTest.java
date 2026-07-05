@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
-import io.nxmatic.rke2lab.junit.testkit.diagnostic.ScrDiagnostics;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
@@ -45,7 +45,7 @@ class InterventionIntakeTest {
         reference,
         "SCR must publish InterventionIntake — DefaultInterventionIntake activates with NO"
             + " references, so no EHR/ledger need be published for canonicalization."
-            + ScrDiagnostics.of(context).report());
+            + ScrDiagnostics.of(context).map(ScrDiagnostics::report).orElse(""));
     final InterventionIntake intake = context.getService(reference);
     assertNotNull(intake, "the InterventionIntake service reference must resolve to an instance");
 

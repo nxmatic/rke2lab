@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.osgibench;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import io.nxmatic.rke2lab.osgibench.scr.Greeter;
 import io.nxmatic.rke2lab.osgibench.scr.GreetingClient;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * no published consumer. Its own framework (separate class) so the provider bundle is genuinely
  * never installed.
  */
-@Osgi
+@OsgiWorld
 class ScrUnsatisfiedReferenceTest {
 
   // The consumer is installed but NOT the provider — the anti-cheat is right here in the topology.

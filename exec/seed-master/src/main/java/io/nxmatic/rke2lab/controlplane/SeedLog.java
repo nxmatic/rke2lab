@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Shared seed-master logger with Pulumi verbosity-aware level mapping. */
@@ -112,18 +113,18 @@ public final class SeedLog {
     return level.ordinal() <= THRESHOLD.ordinal();
   }
 
-  private static java.util.logging.Level toJavaLevel(LogLevel level) {
+  private static Level toJavaLevel(LogLevel level) {
     return switch (level) {
-      case ERROR -> java.util.logging.Level.SEVERE;
-      case WARN -> java.util.logging.Level.WARNING;
-      case INFO -> java.util.logging.Level.INFO;
-      case DEBUG -> java.util.logging.Level.FINE;
-      case TRACE -> java.util.logging.Level.FINER;
+      case ERROR -> Level.SEVERE;
+      case WARN -> Level.WARNING;
+      case INFO -> Level.INFO;
+      case DEBUG -> Level.FINE;
+      case TRACE -> Level.FINER;
     };
   }
 
   private static void configureJavaUtilLogging() {
-    final java.util.logging.Level javaThreshold = toJavaLevel(THRESHOLD);
+    final Level javaThreshold = toJavaLevel(THRESHOLD);
 
     LOGGER.setLevel(javaThreshold);
 

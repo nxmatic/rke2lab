@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import io.nxmatic.rke2lab.systemd.port.SystemdProbeRequest;
 import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import java.io.IOException;
@@ -41,7 +41,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * So a connection-level failure is GREEN (transport resolved); a "no transport" failure is the
  * regression this test exists to catch.
  */
-@Osgi
+@OsgiWorld
 class DbusSystemdEdgeBootTest {
 
   private static final String EDGE_FIXTURE = "(&(type=edge)(edge=dbus-systemd))";

@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashSet;
@@ -280,7 +281,7 @@ public final class BundleIndex {
     if ("jar".equals(root.getProtocol())) {
       final JarURLConnection connection = (JarURLConnection) root.openConnection();
       try (var jar = connection.getJarFile()) {
-        for (var entry : java.util.Collections.list(jar.entries())) {
+        for (var entry : Collections.list(jar.entries())) {
           final String name = entry.getName();
           if (!entry.isDirectory()
               && name.startsWith(STAGED_ROOT)

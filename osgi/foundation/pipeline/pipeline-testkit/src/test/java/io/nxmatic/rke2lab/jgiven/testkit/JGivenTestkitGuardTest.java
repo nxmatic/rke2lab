@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.jgiven.testkit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.MethodOrderer;
@@ -16,8 +16,8 @@ import org.osgi.framework.Bundle;
 
 /**
  * The testkit's own non-regression guard — the palier-2/3 proof from the jgiven-osgi-bundle spike,
- * promoted from throwaway to a lasting guard ({@code @Osgi}, default reactor). It asserts the two
- * reusable assets STILL work as shipped:
+ * promoted from throwaway to a lasting guard ({@code @OsgiWorld}, default reactor). It asserts the
+ * two reusable assets STILL work as shipped:
  *
  * <ul>
  *   <li>{@link JGivenTestkit#felix()} boots a Felix where {@code jgiven-wrap} reaches ACTIVE
@@ -32,7 +32,7 @@ import org.osgi.framework.Bundle;
  * the boot helper loses a bundle, palier 3 goes red here — the guard catches a regression in the
  * template a host like doctor relies on.
  */
-@Osgi
+@OsgiWorld
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class JGivenTestkitGuardTest {
 

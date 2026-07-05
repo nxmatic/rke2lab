@@ -244,4 +244,3 @@ the richest playable surface after the runtime view), one green design target.
 
 *Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. Eight
 playable-and-blue (the shipped synthesis layer), one narrated-green (the lifecycle cleanup target).
-

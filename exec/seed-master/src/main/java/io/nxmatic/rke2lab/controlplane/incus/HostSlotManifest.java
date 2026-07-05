@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.incus;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -275,8 +276,8 @@ public final class HostSlotManifest extends Construct {
     private @MonotonicNonNull String buildId;
     private Optional<GitInfo> git = Optional.empty();
     private Optional<PolicyInfo> policy = Optional.empty();
-    private final List<FloxEnvironment> floxEnvironments = new java.util.ArrayList<>();
-    private final List<StagedManifest> stagedManifests = new java.util.ArrayList<>();
+    private final List<FloxEnvironment> floxEnvironments = new ArrayList<>();
+    private final List<StagedManifest> stagedManifests = new ArrayList<>();
     private Optional<PromotionInfo> promotion = Optional.empty();
     private Optional<SourceInfo> source = Optional.empty();
 

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
-import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.Topic;
 import java.nio.file.Path;
 import java.util.List;

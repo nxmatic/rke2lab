@@ -5,9 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.nxmatic.rke2lab.junit.testkit.Osgi;
-import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import io.nxmatic.rke2lab.osgibench.fragment.ContributedService;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -29,7 +30,7 @@ import org.osgi.service.component.runtime.dto.ComponentConfigurationDTO;
  * <p>No existing {@code -test} fragment carries a {@code @Component}, so this mechanism was
  * unproven until here.
  */
-@Osgi
+@OsgiWorld
 class FragmentContributedComponentTest {
 
   private static final String FRAGMENT_FILTER =
@@ -86,7 +87,7 @@ class FragmentContributedComponentTest {
         ComponentConfigurationDTO.ACTIVE,
         configuration.state,
         "the fragment-contributed component must be ACTIVE (unsatisfied="
-            + java.util.Arrays.toString(configuration.unsatisfiedReferences)
+            + Arrays.toString(configuration.unsatisfiedReferences)
             + ", failure="
             + configuration.failure
             + ")");
@@ -105,12 +106,12 @@ class FragmentContributedComponentTest {
                 () -> new AssertionError("the host collector component is not known to SCR"));
     final boolean bound =
         collector.satisfiedReferences.length > 0
-            && java.util.Arrays.stream(collector.satisfiedReferences)
+            && Arrays.stream(collector.satisfiedReferences)
                 .anyMatch(ref -> ref.boundServices != null && ref.boundServices.length > 0);
     assertTrue(
         bound,
         "the host collector's MULTIPLE/DYNAMIC @Reference must have a bound service — the"
             + " fragment-contributed service was received into the host roster. satisfied="
-            + java.util.Arrays.toString(collector.satisfiedReferences));
+            + Arrays.toString(collector.satisfiedReferences));
   }
 }

@@ -49,7 +49,7 @@ owned by the **OSGi world**, NOT by seed-master. Grounded in the code (Explore p
   merely aligns the stranded host classes onto the shared word.
 - jgiven is already an OSGi bundle (`jgiven-wrap` + in-container testkit).
 - **TWO consumers of the one grammar**: (a) the **boot pipeline** (`BootPipeline.embedded()` in
-  `osgi/runtime/launcher`; `BootPlanner`→`BootPlan` pure decision, uses NO runner; `FrameworkLauncher`→
+  `osgi/runtime/framework-launcher` (was `launcher`); `BootPlanner`→`BootPlan` pure decision, uses NO runner; `FrameworkLauncher`→
   `BootedFramework` the act — only code touching `org.osgi.framework.launch`) — grammar YES, jgiven NO
   (it precedes jgiven's world; topics = discovery/plan/launch); (b) the **reasoning pipeline** (topics
   preflight/bbox/incus/systemd/readiness/outputs) — grammar YES, jgiven YES; stranded in
