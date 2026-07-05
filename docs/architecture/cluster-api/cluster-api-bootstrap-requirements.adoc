@@ -6,27 +6,13 @@ Plan for Phase 1 cleanup and flox environment architecture for cluster workloads
 
 == Overview
 
-Phase 1 implemented declarative CAPI/CAPN/CAPRKE2 installation via manifest layers. This plan covers:
+Declarative CAPI/CAPN/CAPRKE2 installation runs via manifest layers: the Cluster API Operator with
+provider CRs, the Incus identity secret, the image-state ConfigMap (Stage A → Stage B handoff), the
+Flux GitRepository + root Kustomization, and the SOPS age Secret are all in place as manifest units.
 
-1. **Cleanup** - Remove old imperative clusterctl-based installation
-2. **Environment architecture** - Define flox environments for pod-level executable injection
-3. **Validation** - Verify bootstrap without clusterctl dependency
-
-== Context
-
-**Phase 1 complete** (commits c324fa05, 8ed42994, 515157e2):
-
-- ✅ Cluster API Operator with provider CRs
-- ✅ Incus identity secret via manifest unit
-- ✅ Image-state ConfigMap for Stage A → Stage B handoff
-- ✅ Flux GitRepository + root Kustomization
-- ✅ SOPS age Secret for encrypted resource decryption
-
-**Remaining work**:
-
-- Remove imperative clusterctl installation (systemd units)
-- Define flox environment architecture for cluster workloads
-- Validate bootstrap without clusterctl
+This document covers what remains: (1) remove the old imperative clusterctl-based installation, (2)
+the flox-environment architecture for pod-level executable injection, (3) validating bootstrap with no
+clusterctl dependency.
 
 == Current State
 
@@ -263,34 +249,18 @@ env:
 
 **Future work**: Implement webhook injection based on annotations.
 
-== Deliverables
+== Remaining work
 
-=== Phase 1A: Cleanup & Environment Definition (Current)
+The near-term surface is the environment definition + removing the old imperative installation
+(include fleet/keyhole in the operator environment; delete the imperative clusterctl systemd units;
+decide the mesh/cicd domain toggles). Then two future tracks:
 
-1. ✅ **Document architecture** - this document defines webhook injection pattern
-2. ✅ **Verify tooling** - age/sops in fleet/keyhole, kubectl/helm in fleet/k8s
-3. 🔲 **Add keyhole to main env** - include fleet/keyhole in operator environment
-4. 🔲 **Remove imperative installation** - delete 4 systemd files
-5. 🔲 **Test build** - verify manifests module compiles
-6. 🔲 **Review domain policy** - decide on mesh/cicd toggles
-7. 🔲 **Update cross-references** - link from transition plan and README
-8. 🔲 **Validation** - full bootstrap test without clusterctl
-
-=== Phase 1B: Environment Availability (Future)
-
-9. 🔮 **Materialize environments** - ensure fleet/k8s and fleet/keyhole on nodes via DaemonSet
-10. 🔮 **ConfigMap metadata** - publish nix store paths for environments
-11. 🔮 **Verify mounts** - test volume mount pattern from existing flox NRI plugin
-
-=== Phase 2: Mutating Webhook (Future Track)
-
-12. 🔮 **Design webhook API** - annotation format, injection rules
-13. 🔮 **Implement webhook** - read annotations, inject volumes + env vars
-14. 🔮 **Certificate management** - integrate with cert-manager
-15. 🔮 **Deploy webhook** - flox-system namespace, cluster-wide scope
-16. 🔮 **Test injection** - pod with `flox.dev/environment: "fleet/k8s"`, verify kubectl
-
-**Current focus**: Phase 1A
+* *Environment availability* — materialize `fleet/k8s` + `fleet/keyhole` on nodes via the DaemonSet
+  trampoline, publish their nix store paths in a ConfigMap, mount them by the existing flox-NRI-plugin
+  volume pattern.
+* *Mutating webhook* (the Tier-3 dynamic injection above) — an admission webhook reading the
+  `flox.dev/environment` annotation and injecting the volumes + env vars, cert-managed, deployed in
+  `flox-system`. Its design is in link:../patterns/flox-webhook-design.adoc[the flox webhook design].
 
 == Manifest Domain Review
 
@@ -301,16 +271,16 @@ From `DefaultManifestSynthesisService`:
 [cols="1,2,1",options="header"]
 |===
 |Domain |Description |Status
-|cluster |kube-vip, namespaces |✅ Required
-|storage |OpenEBS ZFS |✅ Required
-|replication |kubernetes-replicator |✅ Required
-|gitops |Flux, Porch |✅ Required
-|runtime |flox NRI plugin |✅ Required
-|networking |Cilium, Multus |✅ Required
+|cluster |kube-vip, namespaces |Required
+|storage |OpenEBS ZFS |Required
+|replication |kubernetes-replicator |Required
+|gitops |Flux, Porch |Required
+|runtime |flox NRI plugin |Required
+|networking |Cilium, Multus |Required
 |mesh |Istio, Tailscale, Headscale |⚠️ Review
-|ha |High availability |✅ Required
+|ha |High availability |Required
 |cicd |Tekton |⚠️ Review
-|cluster-api |CAPI, CAPN, CAPRKE2 |✅ Required
+|cluster-api |CAPI, CAPN, CAPRKE2 |Required
 |===
 
 === Review Questions
@@ -434,16 +404,10 @@ kubectl get controlplaneprovider rke2 -n caprke2-system
 
 == Success Criteria
 
-Phase 1A complete when:
-
-- ✅ No clusterctl in any flox environment
-- ✅ No imperative cluster-api systemd units
-- ✅ fleet/keyhole included in operator environment
-- ✅ Manifests module builds successfully
-- ✅ Cluster API operator installs declaratively
-- ✅ All provider CRs created (Core, Infrastructure, ControlPlane)
-- ✅ Bootstrap completes without clusterctl dependency
-- ✅ Documentation cross-referenced
+The cleanup is done when no clusterctl remains in any flox environment and no imperative
+cluster-api systemd units remain; fleet/keyhole is included in the operator environment; the manifests
+module builds; the Cluster API operator installs declaratively with all provider CRs (Core,
+Infrastructure, ControlPlane); and bootstrap completes with no clusterctl dependency.
 
 == Related Documentation
 
@@ -452,19 +416,3 @@ Phase 1A complete when:
 * link:manifests-architecture.adoc[Manifests Architecture] - How manifest units work
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A outputs and handoff
 * link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - Existing trampoline pattern
-
-== Timeline
-
-**Phase 1A Estimated**: 2-3 hours
-
-- Environment verification: 30 min
-- Add keyhole to includes: 15 min
-- File removal: 15 min
-- Build/test: 30 min
-- Domain policy review: 30 min
-- Documentation cross-references: 30 min
-- Full validation: 30 min
-
-**Phase 1B Estimated**: 4-6 hours (future)
-
-**Phase 2 Estimated**: 1-2 days (future)

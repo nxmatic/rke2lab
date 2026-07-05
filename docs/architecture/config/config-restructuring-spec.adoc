@@ -847,15 +847,13 @@ variation axes.
 * link:../manifests/manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog
   pattern] - the single-source-of-truth catalog `InfraDomainCatalog` mirrors
 
-== Appendix: files
+== Appendix: the shipped shape
 
-*Create* (under `seed-master/.../controlplane/config/`): `Rke2labConfig`, `ConfigLoader`,
-`MissingRequiredConfiguration`, `InfraDomainCatalog`, `InfraConfigFragment` (sealed),
-`InfraDomainRegistrar`, `InfraConfigRegistryBuilder`, `InfraConfigRegistry`, and one registrar per
-infra domain (`Incus`, `Image`, `Network`, `Worktree`, `Systemd`, `Host`).
-
-*Modify*: `BootstrapConfig` (delete `Builder`/`Defaults`/`EnvironmentValues`; add
-`from(Rke2labConfig)`); `ControlplanePolicy` (delete `Config` constructor + `EnvironmentValues`;
-add `from(Rke2labConfig)`, catalog-keyed `isLinkEnabled`); `Pulumi.dev.yaml` (flat → nested).
-
-*Delete*: `ConfigResolver`.
+Under `seed-master/.../controlplane/config/`: `Rke2labConfig` (the immutable DTO), `ConfigLoader`,
+`MissingRequiredConfiguration`, `InfraDomainCatalog`, `InfraConfigFragment` (sealed), and `InfraDomain`
+— the polymorphic enum whose six values (`INCUS`, `IMAGE`, `NETWORK`, `WORKTREE`, `SYSTEMD`, `HOST`)
+each self-load their fragment via `contribute(ConfigLoader)`; the DTO is assembled by iterating
+`InfraDomain.values()`. (The open `InfraDomainRegistrar`/`InfraConfigRegistry` form this spec's
+diagrams draw is the future p2p evolution — see § <<open-registrar-p2p>>.) `BootstrapConfig` and
+`ControlplanePolicy` expose `from(Rke2labConfig)` (their old `Builder`/`Config`/`EnvironmentValues`
+readers gone); `ConfigResolver` is gone; `Pulumi.dev.yaml` is nested.

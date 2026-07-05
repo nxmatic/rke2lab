@@ -2,39 +2,27 @@
 :toc: left
 :toclevels: 3
 
-This note is the running plan for finishing the master cluster's workload bring-up after the Pulumi/cdk8s migration. It captures the failure backlog observed on master, the order in which we intend to address it, and the build-side work (nix-built binaries, upstream pinning) that pairs with the runtime fixes.
+The remaining work to finish the master cluster's workload bring-up. seed-master's validation was
+paused mid-way to rework its provisioning logic (the BDD-as-engine pipelines), so this is a live
+FUTURE worklist, not a closed plan — it resumes with that rework. It captures what is still to do to
+call the master fully operational, in a recommended (but reorderable) sequence.
 
-It is meant to evolve. Cross out items as they land; add items as new failures surface. The order below is the recommended sequence, but each section is self-contained enough to take out of order if a constraint changes.
+== What still blocks a fully-operational master
 
-== Snapshot — current master state
+* *Porch CRD absent* — `Repository`/`PackageVariant` resources (`gitops/porch-resources/*`) fail apply.
+* *Flux Operator CRD absent* — `FluxInstance` (`gitops/flux-instance/*`) fails apply.
+* *CAPN provider not configured* — `rke2lab-cluster-api-install.service` /
+  `rke2lab-capn-provider-install.service` stay `inactive` (a systemd ordering bug: their prerequisite
+  activates after `rke2lab.target` has settled; and `clusterctl.yaml` lacks the `incus` provider). The
+  seed-master output shows them as `pendingDependencies`.
 
-Reference snapshot taken 2026-05-26 after the seed-master pipeline-grammar / Maven-coords / on-failure-fix / topic-runner batch landed end-to-end successfully (commits `c8e4c385`..`6585cb55`). The earlier 2026-05-26 snapshot from the busybox-carrier batch (`c727b597`..`d9db75aa`) is preserved in git history.
-
-Healthy:
-
-* RKE2 server running, CNI (Cilium) up, kubelet ready
-* `kdns` deploys (busybox + `flox activate` on PATH) and resolves its env
-* `clustermesh-apiserver` runs (3/3) once the empty `clustermesh-remote-users` ConfigMap ships
-* Tekton operator deployment lands and reconciles `TektonConfig`
-* `kube-vip-ds` Running (1/1) — VIP active on vmnet0
-* `openebs-zfs-localpv-controller` Running (5/5) and `openebs-zfs-localpv-node` Running (2/2)
-* `envoy-gateway` Running (1/1); installer Completed
-* `flox-runtime-installer` DaemonSet Running on master
-
-Still broken (or pending validation):
-
-* `Repository`/`PackageVariant` resources fail apply because the Porch CRD is absent
-* `FluxInstance` fails apply because the Flux Operator CRD is absent
-* `rke2lab-cluster-api-install.service` and `rke2lab-capn-provider-install.service` are stuck `inactive`: systemd ordering bug (their prerequisite activates after `rke2lab.target` has settled) and `clusterctl.yaml` lacks the `incus` provider entry. Visible in the seed-master output as `pendingDependencies`.
-
-Hygiene:
-
-* Every pod logs `DNSConfigForming` because `/etc/resolv.conf` lists more than three nameservers and kubelet trims silently
-* Several `rke2lab-*-manifests.service` units run after `rke2.target` has already settled; revisit unit ordering once the workload set is stable
+Known hygiene items to revisit once the workload set is stable: pods log `DNSConfigForming` (>3
+nameservers in `/etc/resolv.conf`, kubelet trims silently); several `rke2lab-*-manifests.service` units
+run after `rke2.target` has settled — unit ordering to revisit.
 
 == Phase 1 — finish the operator install backlog
 
-Pattern: every remaining apply-time failure is "operand shipped before operator's CRDs exist." The fix is the same shape as Tekton (commit `d9db75aa`): inline the upstream operator release as a classpath YAML, project it through `UpstreamYamlInclusion`.
+Pattern: every remaining apply-time failure is "operand shipped before operator's CRDs exist." The fix is the same shape as Tekton: inline the upstream operator release as a classpath YAML, project it through `UpstreamYamlInclusion`.
 
 The component pattern is in place — what's left is bumping each operator into its layer.
 
@@ -49,16 +37,6 @@ The component pattern is in place — what's left is bumping each operator into 
 | 2 | Flux Operator (`fluxcd.controlplane.io`)
 | `gitops/flux-instance/02-fluxinstance-flux.yml`
 | `controlplane/flux-operator` releases on GitHub. Latest stable. Ships its own namespace. Operator owns the `Flux*` reconcilers; the existing `FluxInstance` CR will reconcile once the CRD lands.
-
-| ~~3~~
-| ~~kube-vip (workload-side, not the daemonset)~~
-| ~~`kube-vip-ds-*` CrashLoopBackOff~~
-| *Done.* `kube-vip-ds` is Running 1/1 since the VIP-on-vmnet0 fix (commit `cc01b7fe`).
-
-| ~~4~~
-| ~~OpenEBS snapshot CRDs (or RKE2's bundled set)~~
-| ~~`openebs-zfs-localpv-controller` snapshot-controller container CrashLoopBackOff~~
-| *Done.* `rke2-snapshot-controller-crd` was re-enabled (commit `0730fb6b`); openebs-zfs controller now Running 5/5 and node 2/2.
 |===
 
 For each remaining line (Porch, Flux Operator): drop the upstream release.yaml under `manifests/src/main/resources/upstream/<layer>/<name>/release-<version>.yaml`, instantiate `UpstreamYamlInclusion` from the matching `*Layer` class. Same shape as Tekton.
@@ -76,7 +54,7 @@ Two prerequisite work items before any `Machine` reconciles:
 
 Validation: `pulumi up` with these fixes should land the seed-master output's `pendingDependencies` empty (currently shows the two services as `inactive`).
 
-=== 2.B — Bring control-plane peers under CAPN (current focus)
+=== 2.B — Bring control-plane peers under CAPN
 
 Once 2.A lands, the *first* CAPN-managed nodes are the missing bioskop control-plane peers (peer1, peer2, peer3) — not workers. They round out HA on the management cluster itself before any worker scale-out. Worker provisioning (worker1, worker2, nikopol) is a later phase.
 
@@ -122,11 +100,9 @@ Open question for each candidate: do we replace the **operator container image**
 
 == Order of operations summary
 
-Recommended execution order — respects what unblocks what, leaves room to skip. Crossed-out items have landed:
+Recommended execution order — respects what unblocks what, leaves room to skip:
 
-. ~~*Phase 1.3 kube-vip* — workload triage, may not need an operator at all.~~ *Done* (commit `cc01b7fe`).
-. ~~*Phase 1.4 OpenEBS snapshot CRDs* — drop the rke2 disables; revisit if `RuntimeRke2ConfigLayer` truly meant to ship project-owned CRDs.~~ *Done* (commit `0730fb6b`).
-. *Phase 2.A CAPN materialization + systemd ordering fix* — unblocks Stage B. *Current focus.*
+. *Phase 2.A CAPN materialization + systemd ordering fix* — unblocks Stage B; the resume point.
 . *Phase 2.B CAPN-managed control-plane peers (peer1/2/3)* — HA on the management cluster, follows immediately after 2.A.
 . *Phase 1.1 Porch* — biggest single workload unblock (7 manifests). Same shape as Tekton. Independent of Phase 2; can run in parallel or after.
 . *Phase 1.2 Flux Operator* — small follow-up; once Porch is in we have the core gitops surface.
