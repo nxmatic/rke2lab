@@ -2,15 +2,18 @@
 :toc: left
 :toclevels: 3
 
-*Status:* Design (brainstorm complete, awaiting review) +
-*Branch:* `refactor/config` +
-*Workshop:* lives in `wip/` while in progress; durable substance migrates to
-`docs/architecture/` just before merge.
-
 This specification restructures rke2lab's configuration from a fragmented multi-reader model
 into a single-source-of-truth architecture: all configuration flows through Pulumi config into
-one immutable DTO, assembled from fragments that infra domains contribute, with missing-input
-remediation expressed through the doctor pattern.
+one immutable DTO (`Rke2labConfig`), assembled from fragments that infra domains contribute, with
+missing-input remediation expressed through the doctor pattern.
+
+[NOTE]
+====
+The core is BUILT: `ConfigLoader`, the immutable `Rke2labConfig` DTO, and `InfraDomain` (the six
+domains, each self-loading its `InfraConfigFragment` via a polymorphic `contribute(loader)`) exist in
+`exec/seed-master/.../config/`. What shipped is the CLOSED form (an enum), not the open registrar
+interface this spec's diagrams still draw — see § <<open-registrar-p2p>> for why, and when that opens.
+====
 
 The design output is *C4 / UML diagrams*, not code. The implementation follows the project's
 documented patterns (fluent pipeline grammar, builder/record discipline, single-source-of-truth
@@ -779,6 +782,27 @@ Review questions.)*
 |===
 
 == Future work
+
+[[open-registrar-p2p]]
+=== Open the domain set: the registrar, required by the distributed peer-to-peer mode
+
+This spec's diagrams draw an open `InfraDomainRegistrar` `<<interface>>` — "a new provisioning concern
+= one new registrar, no edit to a central monolith". What SHIPPED is the closed form: `InfraDomain`, a
+polymorphic enum whose six values each self-load their fragment via `contribute(loader)`. The enum
+KEEPS most of the design's value — per-domain self-load, decoupled assembly (`values()` iterates, no
+hand-list), logic encapsulated per value — and loses ONLY the OPEN axis: adding a domain edits the
+central enum rather than dropping in a new file/bundle.
+
+For the current CENTRALIZED bootstrap (seed-master orchestrates six fixed structural infra domains)
+the enum is the sound, idiomatic choice — the open registrar would be speculative. The registrar
+becomes REQUIRED in the DISTRIBUTED peer-to-peer mode: when the system is a mesh of unitrepo peers that
+extend their capabilities dynamically — contributing a domain as a bundle to answer a new need — a
+closed compiled enum cannot be extended by a peer, but a DS-collected roster of registrars
+(`@Reference(cardinality=MULTIPLE) List<InfraDomainRegistrar>`) can. This is the SAME open-vs-closed
+tension, with the same p2p driver, as the world-gateway egress roster (the "multiplexor") — see the
+link:../osgi/world-gateway-spec.adoc#open-extensibility-chantier[world-gateway planned evolution]. Both
+open the contributor set; both are scheduled with the unitrepo peer-to-peer work, not before. The open
+registrar design in this spec is PRESERVED as that future direction.
 
 === GitHub clone fallback
 

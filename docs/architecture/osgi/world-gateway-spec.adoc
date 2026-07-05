@@ -310,16 +310,19 @@ round-trip unit test. This is the same "finish the surface" pass paused alongsid
 provisioning rework.
 
 [[open-extensibility-chantier]]
-== Planned evolution — the per-domain roster (a critical architecture element, deferred)
+== Planned evolution — the per-domain roster (required by the distributed peer-to-peer mode)
 
 [NOTE]
 ====
-This is FUTURE, not dead. The per-domain roster ("multiplexor") was judged a *critical element of the
-system architecture* when it first appeared; it was set aside during the records-as-contract landing
-and is now a PRIORITY chantier, scheduled right after the behavior-driven pipelines land (cluster, the
-second contributing domain, arrives with that migration — the N=2 trigger and the slot coincide). The
-design below is PRESERVED as the starting point and the DIRECTION; the exact new shape is the
-chantier's own design work, done when we get to it — not invented here.
+This is FUTURE, not dead. The per-domain roster ("multiplexor") is an OPEN-extensibility design the
+*distributed peer-to-peer mode requires*: while the system is centralized bootstrap (seed-master
+orchestrates) the closed form below is fine, but the moment the system becomes a mesh of unitrepo peers
+that contribute domains dynamically (as bundles, per new need — the unitrepo thesis), the roster becomes
+necessary. It is a PRIORITY chantier right after the behavior-driven pipelines land (cluster, the second
+contributing domain, arrives with that migration — the trigger and the slot coincide). The design below
+is PRESERVED as the starting point and the DIRECTION; the exact new shape is the chantier's own design
+work, done when we get to it — not invented here. (The config `InfraDomain` enum carries the same
+closed-vs-open tension, same p2p driver — see the config-restructuring spec.)
 ====
 
 The shipped records-as-contract won a typed contract-of-form, but it does NOT yet have OPEN per-domain

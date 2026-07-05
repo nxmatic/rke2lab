@@ -1,59 +1,54 @@
 ---
 name: world-gateway-lost-open-extensibility-debt
-description: "Architecture debt: records-as-contract (shipped world-gateway) dropped the multiplexor's OPEN per-domain extensibility — a new domain now edits the central Coordinate enum + host-side OutputBuilder instead of just publishing a @Component. Revisit when a 2nd domain contributes."
+description: "Open per-domain extensibility (a DS roster of contributors, not a central enum) is a FUTURE evolution the distributed peer-to-peer mode requires — surfaces in two places: the world-gateway egress (multiplexor) and the config InfraDomain enum. Not a defect; a p2p-driven need."
 metadata:
   node_type: memory
   type: project
 ---
 
-**The debt (surfaced 2026-07-05 during the atlas doc cleanup, by the user's question "what did we lose
-in the model by dropping the multiplexor functionality?").**
+**Framing (user, 2026-07-05): this is a FUTURE evolution required by the distributed peer-to-peer mode
+— NOT a defect to repair.** While the system is centralized bootstrap (seed-master orchestrates), the
+closed forms below are fine. The moment the system becomes a mesh of unitrepo PEERS that extend their
+capabilities dynamically (contribute a domain as a bundle, per new need — the unitrepo thesis, see
+[[federated-unitrepo-p2p-design]] [[fragment-contribution-mediation-model]]), OPEN per-domain
+extensibility becomes REQUIRED. It is the p2p mode that makes it necessary, not a present-day lack.
+Surfaced during the 2026-07-05 atlas doc cleanup (user: "what did we lose by dropping the multiplexor?"
+then "in a dynamic unitrepo context we extend the system to new domains per new needs, no?").
 
-The world-gateway shipped as *records-as-contract* (wire-records + per-coordinate readers/codec +
-SCHEMA_CONCORD gate). The earlier *DomainDagMultiplexor* design (never coded — no commit's `.java` ever
-held it) was abandoned. Records-as-contract GAINED something the multiplexor lacked (a typed
-contract-of-form: `@DocumentContract` → generated JSON Schema → build gate). But it LOST a real
-architectural property the multiplexor had, and this loss was not consciously decided — it fell out of
-the pivot:
+**The recurring shape (one pattern, two instances).** Both are the SAME move: an OPEN
+contributor-roster collected by DS (`@Reference(cardinality=MULTIPLE) List<…>`, like `List<Specialist>`)
+was, under delivery pressure, shrunk to a CLOSED central point. Extending then means editing a compiled
+center instead of publishing a bundle — which a p2p peer cannot do dynamically.
 
-* **Multiplexor (design): OPEN per-domain extensibility.** Each domain publishes its own
-  `DomainDagMapper` `@Component`; a `@Reference(cardinality=MULTIPLE) List<DomainDagMapper>` aggregates
-  them (the roster pattern, like `List<Specialist>`). A new domain = one `@Component`, ZERO touch to the
-  center. Egress unified OSGi-side (one mux DAG→Document→Pulumi).
-* **Records-as-contract (built): CLOSED central extensibility.** Verified in code 2026-07-05:
-  - No `@Reference List<...>` egress roster exists (0 occurrences) — there is no open collection point.
-  - `Coordinate` is a CENTRAL closed enum (`osgi/foundation/world-gateway/.../port/Coordinate.java`):
-    adding a document type edits the central enum + its wire-record + its schema.
-  - Egress still runs through host-side `OutputBuilder` + `toOutputMap` (part of the ~51 unmigrated
-    host sites) — the very host-side hand-assembly the mux was meant to dissolve.
+1. *World-gateway egress — the "multiplexor" / per-domain roster.* The design: each domain publishes a
+   `DomainDagMapper` `@Component`; a roster aggregates them and assembles the egress DAG. Shipped
+   instead: records-as-contract with a CLOSED central `Coordinate` enum
+   (`osgi/foundation/world-gateway/.../port/Coordinate.java`) + host-side `OutputBuilder`/`toOutputMap`
+   egress; no `@Reference List<…>` roster exists (verified 0 occurrences; the multiplexor never had
+   `.java` in any commit). Records-as-contract GAINED a typed contract-of-form (`@DocumentContract` →
+   JSON Schema → SCHEMA_CONCORD gate) the multiplexor lacked. The end state wants BOTH axes.
+   *Frontier correction:* inside OSGi, records are natural; `Document` is the currency of the FRONTIER
+   only. So the roster + mappers assemble the DAG ON RECORDS OSGi-side; the record→`Document`
+   transposition sits at ONE place — the seam edge. The multiplexor is NOT dead, its frontier just
+   recedes to the edge. Design preserved in world-gateway-spec §"Planned evolution — the per-domain
+   roster"; its own memory is [[multiplexor-two-models-design]].
 
-**Net:** a new domain now touches the CENTER (the `Coordinate` enum, the host egress builder) instead
-of just contributing a `@Component` at the edge. That is a loss of the open/closed-principle property
-the roster gave.
+2. *Config — the `InfraDomain` enum.* config-restructuring-spec designs an `InfraDomainRegistrar`
+   `<<interface>>` ("a new provisioning concern = one new registrar, no edit to a central monolith").
+   Shipped instead: `InfraDomain` (a CLOSED enum, `exec/seed-master/.../config/InfraDomain.java`, 6
+   values). Nuance (verified 2026-07-05): the polymorphic enum KEEPS the per-domain self-load
+   (`abstract InfraConfigFragment contribute(ConfigLoader)`, one body per value) and the decoupled
+   assembly (`values()` iterates, no hand-list) — it loses ONLY the OPEN axis (a new domain edits the
+   central enum, cannot be contributed as a bundle). For 6 fixed structural infra domains that is a sound
+   idiomatic choice TODAY; it becomes the friction point exactly when a peer must contribute an infra
+   domain dynamically (the p2p mode).
 
-**Criticality + priority + timing (user, 2026-07-05):** when the multiplexor/roster first appeared the
-user judged it a CRITICAL element of the system architecture — not a nice-to-have. It was set aside
-during the records-as-contract landing; now that it is back in mind it is a PRIORITY chantier
-scheduled *right after the behavior-driven pipelines are in place* (BDD-as-engine migration: socle
-done, ClusterSeed / increment 2 next). Not a vague "someday": the next major chantier after the
-pipelines. It lines up naturally — cluster is the 2nd contributing domain, arriving with the pipeline
-migration, so the N=2 trigger and the scheduled slot coincide. The NEW design is done WHEN we get to
-it (do not invent its exact shape now); preserve the existing design + direction + this criticality.
+**Timing:** the world-gateway roster is the nearer one — a PRIORITY chantier right after the
+behavior-driven pipelines land (cluster, the 2nd contributing domain, arrives with that migration, so
+N=2 and the slot coincide). The config registrar rides the same p2p wave; both are "open the
+contributor set" evolutions, done WHEN we get there (do NOT invent the exact new shape now — preserve
+the existing designs + the direction). Both docs keep their open design as FUTURE, framed "required by
+the distributed p2p mode".
 
-**Why it's held as debt, not fixed now:** only ONE domain (doctor) contributes today, so N=1 hides the
-cost. The repay: reintroduce a DS roster (a `List<DomainDagMapper>`-style open collection) so domains
-extend at the edge again. The multiplexor was RIGHT on the extensibility axis; records-as-contract was
-right on the contract axis. The end state wants BOTH.
-
-**Key correction (user, 2026-07-05) — the multiplexor is NOT dead, only its FRONTIER moves.** Inside
-the OSGi world, working on RECORDS is natural (records are the domain model there); `Document` is the
-currency of the FRONTIER, not of OSGi-internal work. So the roster + its `DomainDagMapper`s assemble
-the egress DAG **on records, OSGi-side** (Pulumi-blind); the record→`Document` transposition happens at
-ONE place — the seam edge (the egress adapter), a single crossing where the assembled DAG becomes
-`@DocumentContract` `Document`s so `SCHEMA_CONCORD` still binds each coordinate. Earlier I wrongly had
-the mappers emitting `Document`s directly; corrected: mappers stay record-native, the seam transposes.
-The multiplexor design is preserved (do NOT delete it) as the starting point of the chantier — its
-diagrams live in the world-gateway-spec §"Planned evolution — the per-domain roster".
-
-Tracked in the world-gateway-spec §Remaining migration. See [[atlas-before-after-shift-at-merge]]
-(this debt was found because the shift/cleanup was deferred, not done at merge).
+See [[federated-unitrepo-p2p-design]] [[fragment-contribution-mediation-model]] [[multiplexor-two-models-design]]
+[[osgi-frontier-underpopulated-chantier]] [[atlas-before-after-shift-at-merge]].
