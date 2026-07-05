@@ -97,7 +97,7 @@ An honest reading:
   surface; this view keeps the host null-clean at the source rather than annotating consumers.
 
 Conclusion: *additive-with-named-erasure; the pipeline gains one clear responsibility (own both gates)
-and loses four scattered anti-patterns.* Status: DESIGN (2026-07-01), the living gate slated first
+and loses four scattered anti-patterns.* Status: DESIGN — the living gate is the first horizon
 (it fixes the hang), then the systemd report, then the output registry.
 
 === The role map — every pipeline role, where it lives, who touches it (the AVANT)

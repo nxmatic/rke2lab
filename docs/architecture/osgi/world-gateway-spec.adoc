@@ -300,10 +300,80 @@ migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces
   `InterventionLedgerWriter.append(Document)` host impls and the `InterventionIntake.canonicalize`
   OSGi `@Component` (the CLI ingress path) are named in the design but not yet realised.
 
+* *Residual host egress* — the egress DAG still assembles host-side through `OutputBuilder` /
+  `toOutputMap`, the hand-assembly the gateway is meant to dissolve. Closing it is part of the
+  open-extensibility chantier below.
+
 The order is worklist-driven: the gate lists the exact flat-realm classes referencing bundle-only
 types; each commit shrinks the list; the coordinate schemas land beside their domain's mapper with a
 round-trip unit test. This is the same "finish the surface" pass paused alongside the seed-master
 provisioning rework.
+
+[[open-extensibility-chantier]]
+== Planned evolution — the per-domain roster (a critical architecture element, deferred)
+
+[NOTE]
+====
+This is FUTURE, not dead. The per-domain roster ("multiplexor") was judged a *critical element of the
+system architecture* when it first appeared; it was set aside during the records-as-contract landing
+and is now a PRIORITY chantier, scheduled right after the behavior-driven pipelines land (cluster, the
+second contributing domain, arrives with that migration — the N=2 trigger and the slot coincide). The
+design below is PRESERVED as the starting point and the DIRECTION; the exact new shape is the
+chantier's own design work, done when we get to it — not invented here.
+====
+
+The shipped records-as-contract won a typed contract-of-form, but it does NOT yet have OPEN per-domain
+extensibility: `Coordinate` is a closed central enum and the egress assembles host-side, so a new
+contributing domain edits the CENTER (the enum, the host builder) rather than extending at the edge.
+Only one domain (doctor) contributes today, so N=1 hides the cost.
+
+The design is not new and not dead: it is the *per-domain roster* we already conceived (the
+"multiplexor"), still current — only its BOUNDARY moves. The key correction to the earlier picture:
+*inside the OSGi world, working on records is natural* — records ARE the domain model there. The
+`Document` is not OSGi's internal currency; it is the currency of the FRONTIER. So the record→`Document`
+transposition happens at ONE place, the seam (the host↔OSGi crossing), not inside each mapper. The
+multiplexor does not die; its frontier recedes to the edge.
+
+* Each domain publishes a `DomainDagMapper` `@Component` that contributes its part of the DAG **as
+  records** (OSGi-natural, Pulumi-blind). A roster collects them by
+  `@Reference(cardinality=MULTIPLE) List<DomainDagMapper>` (the same DS mechanism as the
+  `List<Specialist>` roster) and assembles the egress DAG **OSGi-side, on records**, dissolving the
+  host `OutputBuilder`. A new domain contributes by publishing one `@Component` — touching nothing
+  central.
+* The record→`Document` transposition sits at the SEAM edge (the egress adapter), a single crossing —
+  the assembled DAG becomes `@DocumentContract` `Document`s exactly as it leaves the OSGi world, so
+  `SCHEMA_CONCORD` still binds every coordinate to a schema. The typed contract lives at the frontier;
+  the roster and its mappers stay record-native behind it.
+
+[mermaid]
+....
+flowchart LR
+  subgraph osgi["OSGi world — records are natural here"]
+    dm["DomainDagMapper @Components<br/>one per domain, contribute RECORDS"]
+    roster["roster: @Reference List DomainDagMapper<br/>assembles the egress DAG on records"]
+    dm --> roster
+  end
+  subgraph seam["the SEAM — the one transposition"]
+    edge["egress adapter<br/>DAG records to @DocumentContract Documents"]
+  end
+  subgraph host["host world"]
+    apply["APPLY: forwards Documents to pulumi export"]
+  end
+  roster -->|"records"| edge
+  edge -->|"Documents (schema-bound)"| apply
+  classDef o fill:#eef,stroke:#88a;
+  classDef s fill:#d4f4dd,stroke:#2e7d32;
+  classDef h fill:#fde,stroke:#a58;
+  class dm,roster o
+  class edge s
+  class apply h
+....
+
+The multiplexor was right on the extensibility axis; records-as-contract was right on the contract
+axis. This chantier merges them — the roster reopens per-domain extensibility, the seam keeps the
+typed `Document` contract, and the frontier is the single line where records become Documents. The
+exact shape (does the roster replace the central `Coordinate` enum or feed it; where precisely the
+adapter sits) is the chantier's own design work — the DIRECTION is fixed here.
 
 == Related documentation
 

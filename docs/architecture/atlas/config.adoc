@@ -86,7 +86,7 @@ bench is disposable scaffolding that graduates these principles to the durable a
 
 [NOTE]
 ====
-*Confirmed in code (2026-06-17).* The bench shipped on `refactor/config-extender` with four modules
+*Confirmed in code.* The bench shipped on `refactor/config-extender` with four modules
 (`osgi-bench-config`, `osgi-bench-host`, `osgi-bench-testkit`, `osgi-bench-tests`), two spike tests
 (P1 and P2, both `@OsgiSpike`), runnable from VSCode Test Explorer and surefire. The production
 config island (`InfraDomain` / `InfraConfigRegistry` / `Rke2labConfig`) was never touched — the

@@ -9,14 +9,12 @@ _L0 shows how this subsystem integrates with the others and the value that emerg
 == OSGi runtime view — per-subsystem view
 
 The config view (above) proved the *schema/resolution* half of the bundle/host contract on the bench.
-This view tracks the **runtime** half: replacing `java.util.ServiceLoader` with a launched Felix
-framework + Declarative Services (SCR), up to the point where `seed-master` boots the framework inside
-its `Pulumi.run` callback and consumes the pure-model services from the registry. The migration spec is
-`wip/specs/2026-06-18-osgi-runtime-migration-design.adoc` (slices R1–R7); this view is the GRADUATION of
-that spec's §7 atlas (Diagrams G/H) into the durable atlas, as the spec itself directed — plus the two
-decisions taken AFTER the spec was frozen (named below so the two documents do not silently diverge):
-the *API-extraction* prerequisite (the osgi/ ports) and the *proof reframe* (R4 by `pulumi preview`, not
-`-Plive`).
+This view tracks the **runtime** half: `java.util.ServiceLoader` is replaced with a launched Felix
+framework + Declarative Services (SCR), and `seed-master` boots the framework inside its `Pulumi.run`
+callback and consumes the pure-model services from the registry. Two decisions shape it: the
+*API-extraction* (the boundary ports live in `osgi/<domain>/<domain>-port`, so the host compiles
+against the port and fails fast at build) and the *proof reframe* (the boot seam is proven by
+`pulumi preview`, not a live deploy).
 
 === The two worlds, as shipped at R4 (C4 — Context)
 
@@ -58,21 +56,33 @@ The packaging split (5 embedded bundles vs the flat host world), the boot sequen
 chain each have their own C4 figure in the R4 spec —
 `wip/specs/2026-06-20-osgi-runtime-r4-boot-seam-design.adoc` (§3, §4, §7) — not duplicated here.
 
-=== The model inventory
+=== The model
 
-[cols="2,1,3",options="header"]
-|===
-| Model / move | Status | Note
+The runtime is `ServiceLoader`-free for services: every entrypoint boots under Felix and reads its
+services from the SCR registry. The pieces:
 
-| R1 — felix.scr in the BOM + embedded-Felix proof | SHIPPED (blue) | `@Component` publishes, `@Reference` binds; anti-cheat = consumer unsatisfied when provider absent
-| R2 — the 5 SPIs declared `@Component` | SHIPPED (blue) | geste A only; bnd emits OSGI-INF; `ServiceLoader` stays active (coexist)
-| R3 — intra-bundle consume via `@Reference` | SHIPPED (blue) | `NodeEnvContributorRegistry` aggregates the 6 contributors via SCR; dual-path (`forServiceLoader()`) kept
-| API-extraction + port re-placement (prerequisite to R4) | SHIPPED (blue) | the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the DOMAIN, not the adapter); host compiles against the port → fail-fast at build; each port carries its own `@Version`, host imports it versioned
-| R4 — boot seam in seed-master | SHIPPED (blue) | embed Felix in the Pulumi callback; host seam reads services from the registry via `awaitService` (single path, fail-fast); self-contained exec-jar embeds 5 bundles intact (manifests-core + felix.scr/resolver + pax-logging ×2). Proven by `pulumi preview` (0 errored, full pipeline under Felix). Both R4 dominoes now cleared: the 2 CLIs boot Felix, and all three exec demoted the model `-core` to `runtime` scope
-| CLI alignment — generalise the boot seam | SHIPPED (blue) | manifests-cli + netplan-cli boot embedded Felix and read their `-port` service from the registry (same seam as seed-master); fixes the WI-C0 synthesis breakage. `netplan.api` moved into `netplan-port` so the consumed contract is single-exported (the consumed-contract corollary). Proves the boot model generalises to standalone `main()` entrypoints
-| pipeline-core (L1) + SeedRuntime (L3) — dedup the grammar + one boot seam | SHIPPED (blue) | the fluent-pipeline engine, formerly duplicated as seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, unified into the passive `pipeline-core` bundle (`FluentTopicRunner`/`OnFailure`/`TopicFailure`), dual-consumed (in-bundle by manifests-core, flat by seed-master). `SeedRuntime` collapses the three copied `bootEmbeddedOsgiRuntime()` into one host-only seam each seed parameterises with its bundle + tail. (L2 passive-stage extraction dropped: the candidate stages are host-coupled — awaits the orchestration-OSGi inversion)
-| R5 — retire `ServiceLoader` | PARTIALLY SHIPPED (CLI half blue) | the CLI half is DONE: every entrypoint now boots under Felix, and the 8 orphaned `META-INF/services` on the ports are deleted. Nothing of ours uses `ServiceLoader` for services any more (only `FrameworkFactory` discovery remains, permanent). The amber remainder is only any residual static-path cleanup the migration spec still tracks
-|===
+* *felix.scr + embedded Felix* — `@Component` publishes, `@Reference` binds; the anti-cheat is a
+  consumer left unsatisfied when its provider is absent.
+* *The 5 SPIs as `@Component`s, consumed intra-bundle via `@Reference`* — e.g.
+  `NodeEnvContributorRegistry` aggregates its 6 contributors through SCR.
+* *API-extraction* — the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the
+  DOMAIN, not the adapter); the host compiles against the port and fails fast at build; each port
+  carries its own `@Version`, imported versioned.
+* *The boot seam* — Felix is embedded in the Pulumi callback; the host seam reads services from the
+  registry via `awaitService` (single path, fail-fast); the self-contained exec-jar embeds its bundles
+  intact (the model core + felix.scr/resolver + pax-logging). Proven by `pulumi preview` (full pipeline
+  under Felix, no live deploy). Generalised across all three entrypoints — the two CLIs
+  (`manifests-cli`, `netplan-cli`) boot Felix the same way, and all three demote the model `-core` to
+  `runtime` scope. `netplan.api` moved into `netplan-port` so the consumed contract is single-exported.
+* *`pipeline-core` + `SeedRuntime`* — the fluent-pipeline engine, once duplicated as seed-master's
+  `TopicRunner` + manifests-core's `SynthesisTopicRunner`, is unified into the passive `pipeline-core`
+  bundle (`FluentTopicRunner`/`OnFailure`/`TopicFailure`), dual-consumed (in-bundle by manifests-core,
+  flat by seed-master); `SeedRuntime` collapses the three copied `bootEmbeddedOsgiRuntime()` into one
+  host-only seam each seed parameterises with its bundle + tail.
+
+`ServiceLoader` survives only for `FrameworkFactory` discovery (permanent, by design); the 8 orphaned
+`META-INF/services` on the ports are gone. The one remaining thread is any residual static-path
+cleanup.
 
 === The refinement this view makes to the two-spaces frame
 
@@ -193,19 +203,12 @@ flowchart TB
   final confirmation, the user's gesture. gRPC stays on the flat host classloader throughout (issue
   #1565); no gRPC type crosses into a bundle.
 
-. *Two evolutions of the spec's §7, named (not silent redraws).* The frozen spec §7 (Diagrams G/H) did
-  not yet carry (a) the API-extraction prerequisite — the ports were decided 2026-06-19, so this
-  view ADDS the `osgi/<domain>-port` boxes that G/H lacked; and (b) the proof reframe — §7 gated R4/R5 on
-  `-Plive`, but `pulumi preview` (a dry-run) boots Felix for real without mutating master, so R4's proof
-  is in-scope and the `-Plive up` is an optional final confirmation. Both are refinements the graduating
-  view records on top of G/H, leaving G/H intact as the design-time origin.
-
 Conclusion: the runtime migration is additive through R4, with R5 the one named, deferred erasure. The
 static `ServiceLoader` surface and the live registry coexist until every caller boots under Felix.
 
 [NOTE]
 ====
-*Confirmed in code (2026-06-19).* R1 (`bdc71678`), R2 (`1a5b3a9f`), R3 (`c471dbc8`) shipped to
+*Confirmed in code.* R1–R3 shipped to
 `design/target-module-layout`, each proven on embedded Felix (`@OsgiSpike`, `-Posgi`). R4 +
 API-extraction are cartographied in `.claude/memory/` (`osgi-runtime-r4-boot-seam-state`,
 `api-extraction-tri-carto-state`) and remain GREEN here until they ship. Flip them blue at merge.
@@ -276,12 +279,12 @@ holds.
 
 [NOTE]
 ====
-*Confirmed in code (2026-06-20).* CLI alignment shipped on `feature/cli-osgi-exec-alignment`
+*Confirmed in code.* CLI alignment shipped:
 (`a925e877..92a56cea`): both CLIs boot embedded Felix, `netplan.api`→`netplan-port`, all three exec demoted
 `-core` to `runtime`, the 8 SPI files deleted, both CLIs run for real (EXIT 0). pipeline-core (L1) +
 SeedRuntime (L3) shipped on the same branch (`cc48c18a`, `319cc4f5`, `d065ce2f`, `06a60a48`, `95fcb82e`):
 one `FluentTopicRunner` dual-consumed, the three `bootEmbeddedOsgiRuntime()` collapsed to one seam, 4
-embedded-Felix tests green. SHIPPED to `design/target-module-layout` (squash merge 2026-06-20); the
+embedded-Felix tests green. The
 `pc`/`sr` boxes are now blue (their world colour), no green remaining in Diagram K.
 ====
 

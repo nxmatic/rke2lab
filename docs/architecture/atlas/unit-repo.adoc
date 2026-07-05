@@ -325,7 +325,7 @@ Folding the unitrepo docs in reconciles their vocabulary with the atlas's reserv
 
 [NOTE]
 ====
-*Design, not yet built (2026-06-20).* The resolution core is shipped (blue); everything else is design.
+*Design horizon.* The resolution core is shipped; everything else is a design horizon.
 The figures above are the design-time proof; the inventory carries the live status. The first buildable
 increment is the handler edge plus load-from-store. Flip green→blue as each ships.
 ====

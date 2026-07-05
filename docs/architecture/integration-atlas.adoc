@@ -111,7 +111,7 @@ These words are used precisely throughout the atlas and specs; this is the gloss
   is NOT a synonym for "system". Kept distinct on purpose.
 ====
 
-=== The two vocabularies — one thing, named in each world (DESIGN 2026-06-24)
+=== The two vocabularies — one thing, named in each world
 
 The two-spaces seam is also a *vocabulary* seam. The same real-world thing is named differently in
 each world, on purpose: the OSGi world speaks the *diagnostic* model, the host world speaks the
