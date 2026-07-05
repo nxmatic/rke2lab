@@ -399,8 +399,7 @@ Acting on the record is step 2 (remediation).
 
 == Related documentation
 
-* link:vocabulary-and-live-record-plan.adoc[the implementation plan] — the executed task breakdown.
-* link:glossary.adoc[Doctor Glossary] — the term source of truth produced by chantier 1.
+* link:glossary.adoc[Doctor Glossary] — the term source of truth for the clinical vocabulary.
 * link:medical-record-query-api-design.adoc[Medical-record Query API] — the reconstruction query
   API this wiring consumes.
 * link:healthsystem-access-control-design.adoc[HealthSystem access-control] — the step-2/3 layer

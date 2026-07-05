@@ -4,11 +4,10 @@
 
 [NOTE]
 ====
-*Status:* SHIPPED (2026-06-21), integrable directly on `main`. Test-scope infrastructure only — no
-production bundle imports jGiven. This is the durable promotion of the `spike/jgiven-osgi-bundle`
-proof (see link:jgiven-osgi-wrap-spike-report.adoc[the wrap spike report] for the measured verdict).
-The non-regression guard (`JGivenTestkitGuardTest`, palier 2 + palier 3) runs GREEN on a real
-embedded Felix 7.0.5: `Tests run: 2, Failures: 0`.
+Test-scope infrastructure only — no production bundle imports jGiven. jGiven wraps clean as an OSGi
+bundle at a LOCAL cost — one `bootdelegation=sun.misc`, one forced fragment import, no
+`DynamicImport-Package: *` — not viral. A non-regression guard (`JGivenTestkitGuardTest`, palier 2 +
+palier 3) runs on a real embedded Felix 7.0.5.
 ====
 
 == What this is
@@ -248,9 +247,6 @@ regression guard, not a throwaway. The default build excludes `spike` and `live`
 
 == Related documentation
 
-* link:jgiven-osgi-wrap-spike-report.adoc[jGiven wrap spike report] — the measured verdict
-  (wrap-propre, LOCAL not viral) this kit promotes; the three paliers and the byte-buddy
-  classloading evidence.
 * link:../patterns/frontier-playability-model.adoc[Frontier playability model] — classifies jGiven
   `com.tngtech.*` as "not playable" for production; this kit narrows that to: not-playable as a
   production dependency, cleanly wrappable as a *test-time* bundle.
