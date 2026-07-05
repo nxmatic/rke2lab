@@ -4,11 +4,11 @@
 
 [NOTE]
 ====
-*Status:* SETTLED DIRECTION, NOT BUILT (2026-06-26). The user's call: *correct the system so every
-actor declares itself as a component of the system* — rather than bending the model to today's
-limitation where only stateless actors can be DS components. This doc names the one knot that
+*Status:* SETTLED DIRECTION, NOT BUILT. Correct the system so every actor declares itself as a
+component — rather than bending the model to the limitation where only stateless actors can be DS
+components. This doc names the one knot that
 blocks it (per-run state inside the Generalist) and the correction (separate the employed
-practitioner from the per-run consultation). Instantiation mechanism CHOSEN (2026-06-26): option C,
+practitioner from the per-run consultation). Instantiation mechanism CHOSEN: option C,
 the employment registry — the practitioner is employed once as a `@Component`, the consultation is a
 per-run value. Remaining maille (the operational-mode contract, the `engage` shape) deferred to build.
 
@@ -141,7 +141,7 @@ today); the deciding question was *where the per-run `ClinicalAccess` lives*:
 | *C — employment registry (CHOSEN)* | a field of a `Consultation` VALUE | ✅ kept, simple, navigable
 |===
 
-*Decision (user, 2026-06-26): C.* It keeps DS for what it is good at (stable services), models the
+*Decision: C.* It keeps DS for what it is good at (stable services), models the
 per-run act as a plain value (no contrived component lifecycle, no host signature changes), keeps the
 access encapsulated, and makes the directory fall out for free.
 

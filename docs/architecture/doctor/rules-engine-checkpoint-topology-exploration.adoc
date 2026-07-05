@@ -10,10 +10,8 @@ This document predates the 2026-06-10 clinical-vocabulary rename (`Dossier`→`O
 the point-in-time thinking; see link:glossary.adoc[the glossary] for current names.
 ====
 
-*Date:* 2026-06-07 +
-*Status:* EXPLORATION captured cold — brainstorm only, no spec, no plan, no code. The map is
-grounded in the source read during the session; the three options are candidate directions with
-their value/cost named, not a decision. +
+*Status:* EXPLORATION — the three options are candidate directions with their value/cost named, not a
+decision; grounded in the source. +
 *Branch (when started):* TBD — likely a `refactor/` branch (it restructures the diagnosis layer,
 external behaviour unchanged) for options ①/②; option ③ would be a `feature/` branch. +
 *Workshop:* parked in `wip/` deliberately. Sibling to link:../osgi/pipeline-spec.adoc[the
@@ -151,7 +149,7 @@ for Redundancy A is therefore a pattern `Checkpoint` already began — just exte
 
 == The three options
 
-=== Option ① — Checkpoint gains topology (derive the three encodings from one declaration) [DISCARDED 2026-06-07]
+=== Option ① — Checkpoint gains topology (derive the three encodings from one declaration) [DISCARDED]
 
 *Status: DISCARDED for THIS track — but a hard PREREQUISITE for the planner track.* The user chose to
 pursue only the specialist track (② + ②′) here, setting the topology track aside. *Redundancy A is
@@ -216,7 +214,7 @@ classDiagram
   `dependsOn()` + a topo-sort helper. YAGNI says do not build a graph library; do build the single
   declaration.
 
-=== Option ② — self-declaring specialists, permissive Generalist [DECIDED 2026-06-07]
+=== Option ② — self-declaring specialists, permissive Generalist [DECIDED]
 
 *Status: ADOPTED as the direction.* The decision: the specialist **publishes the set of symptoms it
 knows how to treat** (`treats() : Set<Symptom>` — a self-declared capability), and the Generalist
@@ -256,7 +254,7 @@ classDiagram
   Generalist_DECIDED --> Specialist_DECIDED : asks treats().contains(symptom)
 ....
 
-*The competence has a single authority — the practitioner (2026-06-07 clarification).* "Who knows
+*The competence has a single authority — the practitioner.* "Who knows
 what it treats" is *always* the specialist itself: it *provides* its set of symptoms. The set never
 lives in an external table the Generalist keeps. The specialist's `domain()` gives it a *default
 repertoire* — the symptoms of its specialty — which it *inherits*; but the effective list is its own

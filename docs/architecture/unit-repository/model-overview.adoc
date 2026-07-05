@@ -4,7 +4,7 @@
 
 [NOTE]
 ====
-*Status:* DESIGN, unified into rke2lab (2026-06-20). This is the entry point of the unit-repository
+*Status:* DESIGN. This is the entry point of the unit-repository
 design — the vision formerly developed in the standalone `docrepo-dag-wip` repo, now folded into
 rke2lab because the host project matured enough to host it (the OSGi framework boots in production,
 a Felix resolver runs in production, the hand-rolled dependency walker is retired). It is a sibling

@@ -10,10 +10,8 @@ This document predates the 2026-06-10 clinical-vocabulary rename (`Dossier`→`O
 the point-in-time thinking; see link:glossary.adoc[the glossary] for current names.
 ====
 
-*Date:* 2026-06-07 (two sessions) +
-*Status:* EXPLORATION — brainstorm only, no spec, no plan, no code. The first session (parked cold)
-named a *placement blocker*; the second session (this rewrite) *dissolved that blocker* and grew the
-idea into a closed-loop diagnostic model. Captured so it can be resumed cold. +
+*Status:* EXPLORATION — a candidate direction (no spec, no plan, no code): a closed-loop diagnostic
+model built around preview-as-counterfactual-replay. +
 *Branch (when started):* likely `feature/runbook-doctor` (it renegotiates a layer-3 write-side
 decision) — to be decided when picked up. +
 *Workshop:* parked in `wip/` deliberately. A *different subject* from the doctor-model extensions
@@ -439,7 +437,7 @@ The user's inversion: the *specialist declares the symptoms it treats*; the gene
 *asking* the specialists, not by consulting a table.
 
 *Single authority — the practitioner (the user's refinement, aligned with the rules-engine doc's
-2026-06-07 clarification).* The competence has exactly *one owner*: the specialist itself *provides*
+clarification).* The competence has exactly *one owner*: the specialist itself *provides*
 its set of symptoms. The `domain()` only *seeds* a *default repertoire* — the symptoms a specialist of
 that specialty *can* treat — which the practitioner *inherits*; but the effective list is always the
 practitioner's own, *adding* (sub-specialization) or *removing* (a procedure it does not perform). The
@@ -727,7 +725,7 @@ seam the prototype leans on. No correlation forces a change on either side. The 
 === Intersection 1 — `treats()` shape: CONVERGED (domain seeds, practitioner owns)
 
 Both subjects adopt "the specialist declares what it treats" (their Option ②, this doc's <<treats>>),
-and — after the 2026-06-07 clarification — *both landed on the same shape*: the `domain()` *seeds* a
+and — after the clarification — *both landed on the same shape*: the `domain()` *seeds* a
 default repertoire the practitioner inherits, but the practitioner is the *sole authority* that
 provides its effective `treats()` (adding / removing). Not "flat" (which dropped the domain default),
 not "computed two-source" (which would re-create the synchronization the `switch` had) — one owner, the

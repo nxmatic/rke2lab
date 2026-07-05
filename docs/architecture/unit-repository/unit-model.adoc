@@ -6,7 +6,7 @@
 
 [NOTE]
 ====
-*Status:* DESIGN, folded into rke2lab (2026-06-20). This is the deepest justification of the
+*Status:* DESIGN. This is the deepest justification of the
 unit-repository thesis — the vision formerly developed in the standalone `docrepo-dag-wip` repo,
 now ported into rke2lab and reconciled against the host project's reality: rke2lab boots an
 embedded Felix framework in production and runs a real Felix resolver, so the unit model is no
