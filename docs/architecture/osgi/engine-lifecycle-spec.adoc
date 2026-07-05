@@ -447,8 +447,16 @@ migration (*increment 2*) consumes it:
   start-level lever, and the discipline annotations (isolation / stationary). A committed
   `BulletproofPipeline` played end-to-end proves the socle before ClusterSeed consumes it. Its plan:
   `docs/superpowers/plans/2026-07-05-engine-lifecycle-socle.md`.
-* *Increment 2 (ClusterSeed):* the seed as a jGiven scenario whose first step connects to the OSGi
-  world, consuming this socle. Its plan: `docs/superpowers/plans/2026-07-04-clusterseed-bdd-migration.md`.
+* *Increment 2 (ClusterSeed):* the seed as ONE jGiven scenario consuming this socle — the phases become
+  `@ScenarioStage`s composed by `@NestedSteps`, the value-DAG (`@Provided/ExpectedScenarioState`)
+  replaces `State<I,B>`/`StateBuilder`, and the two live jGiven islands (`SystemdAdapterTopic`,
+  `ClusterReadinessTopic`) fold in as phases. A design point settled while planning it: this socle's
+  `LaunchedPipelineExchange` is TEST-ONLY — `@SeedRuntime` self-boots (no connection to inject) and
+  jGiven's own `ScenarioHolder`/`JGivenExtension` hold the `ReportModel`, so the vertical needs NO
+  custom exchange; inbound host-facts ride `ExtensionContext.Store` (the `ConnectionSeeder` pattern),
+  outbound is the synchronous harvest return `SeedRun(runbook, outputs)`, and the four OSGi services
+  are resolved by the scenario from its connection. It closes with the `SCENARIO_STATE_DAG` staging
+  gate. Its design + plan land under `docs/superpowers/`.
 
 [[the-launcher]]
 == Related — the launcher core it rests on

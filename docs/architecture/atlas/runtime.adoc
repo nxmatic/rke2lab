@@ -20,9 +20,9 @@ against the port and fails fast at build) and the *proof reframe* (the boot seam
 
 One process, two classloader worlds. The HOST world is flat and holds gRPC (invariant #1565: no gRPC
 type ever crosses into a bundle); the OSGI world holds the pure-model bundles Felix resolves. The host
-`OsgiRuntime` boots Felix inside `Pulumi.run`, the host seam reads the typed services from the registry,
-and OSGi logs converge on the host's Logback via Pax with `StaticLogbackContext` (logs follow the
-bootstrap direction — outward to the host).
+`FrameworkLaunchPipeline.embedded()` boots Felix inside `Pulumi.run`, the host seam reads the typed
+services from the registry, and OSGi logs converge on the host's Logback via Pax with
+`StaticLogbackContext` (logs follow the bootstrap direction — outward to the host).
 
 [mermaid]
 ....
@@ -30,7 +30,7 @@ flowchart TB
   subgraph proc["seed-master exec-jar (one process, one binary:)"]
     subgraph host["HOST world — flat classpath"]
       seam["host seam<br/>IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
-      rt["OsgiRuntime<br/>(osgi/runtime — boots Felix)"]:::host
+      rt["FrameworkLaunchPipeline.embedded<br/>(framework-launcher — boots Felix)"]:::host
       grpc["Pulumi SDK + grpc-netty"]:::host
       lb["SLF4J + Logback"]:::host
     end
@@ -74,11 +74,16 @@ services from the SCR registry. The pieces:
   under Felix, no live deploy). Generalised across all three entrypoints — the two CLIs
   (`manifests-cli`, `netplan-cli`) boot Felix the same way, and all three demote the model `-core` to
   `runtime` scope. `netplan.api` moved into `netplan-port` so the consumed contract is single-exported.
-* *`pipeline-core` + `SeedRuntime`* — the fluent-pipeline engine, once duplicated as seed-master's
-  `TopicRunner` + manifests-core's `SynthesisTopicRunner`, is unified into the passive `pipeline-core`
-  bundle (`FluentTopicRunner`/`OnFailure`/`TopicFailure`), dual-consumed (in-bundle by manifests-core,
-  flat by seed-master); `SeedRuntime` collapses the three copied `bootEmbeddedOsgiRuntime()` into one
-  host-only seam each seed parameterises with its bundle + tail.
+* *`pipeline-port` + the boot decomposition* — the fluent-pipeline engine, once duplicated as
+  seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, is unified into the passive
+  `pipeline-port` bundle (`FluentTopicRunner`/`OnFailure`/`TopicFailure`), dual-consumed (in-bundle by
+  manifests-core, flat by seed-master). The three copied `bootEmbeddedOsgiRuntime()` were NOT collapsed
+  into a `SeedRuntime` seam (an earlier design) but DISSOLVED by the boot decomposition
+  (link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]): the pure decision `BootPlanner`
+  → `BootPlan` told apart from the effectful `FrameworkLauncher` → `BootedFramework`, entered through
+  one `FrameworkLaunchPipeline.embedded()` the three exec apps share. `OsgiRuntime` and the old
+  `SeedRuntime` class are both GONE. (Name note: the socle's later `@SeedRuntime` is an unrelated
+  homonym — a jGiven lifecycle-discipline annotation in `scenario-engine`, not this boot seam.)
 
 `ServiceLoader` survives only for `FrameworkFactory` discovery (permanent, by design); the 8 orphaned
 `META-INF/services` on the ports are gone. The one remaining thread is any residual static-path
@@ -214,11 +219,11 @@ API-extraction are cartographied in `.claude/memory/` (`osgi-runtime-r4-boot-sea
 `api-extraction-tri-carto-state`) and remain GREEN here until they ship. Flip them blue at merge.
 ====
 
-=== Diagram K — AFTER (CLI alignment + pipeline-core/SeedRuntime): the static surface erased, the grammar deduped, monotone-with-one-named-erasure
+=== Diagram K — AFTER (CLI alignment + pipeline unification + boot decomposition): the static surface erased, the grammar deduped, the boot decomposed
 
-Builds on Diagram J. Two additive moves and the one pre-named R5 erasure (CLI half) realised. GREEN =
-added this increment; the `sl` box of J is DELETED (the named R5 erasure); the `cli` box is rewired, not
-erased.
+Builds on Diagram J. The pre-named R5 erasure (CLI half) realised, the two runner copies unified, and
+the boot dissolved into a pure/effectful pair. GREEN = added across these increments; the `sl` box of J
+is DELETED (the named R5 erasure); the `cli` box is rewired, not erased.
 
 [mermaid]
 ....
@@ -228,12 +233,13 @@ flowchart TB
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component"]:::osgi
     reg2["NodeEnvContributorRegistry @Component+@Reference"]:::osgi
-    pc["pipeline-core — PASSIVE grammar<br/>FluentTopicRunner / OnFailure / TopicFailure"]:::osgi
+    pc["pipeline-port — PASSIVE grammar<br/>FluentTopicRunner / OnFailure / TopicFailure"]:::osgi
+    plan["BootPlanner → BootPlan (pure decision)"]:::osgi
   end
   subgraph HOST["host space — actualises"]
     seam0["IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
     fx["embedded Felix + felix.scr (R4)"]:::osgi
-    sr["SeedRuntime — common boot prefix"]:::host
+    flp["FrameworkLaunchPipeline.embedded<br/>(effectful: FrameworkLauncher → BootedFramework)"]:::host
   end
   cli["manifests-cli / netplan-cli — NOW boot Felix"]:::host
   reg["service registry (SCR publishes)"]:::osgi
@@ -242,10 +248,11 @@ flowchart TB
   comp -->|publish| reg
   seam0 -->|"awaitService, single path"| reg
   reg2 -->|"@Reference"| reg
-  cli -->|"awaitService via SeedRuntime (R5 CLI-half DONE)"| reg
-  cli -->|boot via| sr
-  seam0 -->|boot via| sr
-  sr -->|"wraps the outer topic via"| pc
+  cli -->|"awaitService (R5 CLI-half DONE)"| reg
+  cli -->|boot via| flp
+  seam0 -->|boot via| flp
+  flp -->|"reads the plan"| plan
+  flp -->|"wraps the outer topic via"| pc
   comp -.->|"in-bundle runner"| pc
   spi -.->|implement| bapi
   seam0 -.->|"system-exported"| bapi
@@ -259,17 +266,22 @@ flowchart TB
 . *The one named erasure is realised, not new.* Diagram J's `sl` box (`ServiceLoader + META-INF/services`)
   and its edges are DELETED — exactly the R5 CLI-half the J verdict pre-authorised ("delete the static
   path once every entrypoint boots under Felix; then drop the 8 orphaned `META-INF/services`"). The `cli`
-  box is NOT erased: it is rewired from `sl` to the registry via `SeedRuntime` — a changed collaborator,
-  named per the ritual.
+  box is NOT erased: it is rewired from `sl` to the registry via the boot pipeline — a changed
+  collaborator, named per the ritual.
 
-. *`pipeline-core` is a NEW box on an EXISTING seam.* It is passive (pure logic), so by the purity axis it
+. *`pipeline-port` is a NEW box on an EXISTING seam.* It is passive (pure logic), so by the purity axis it
   is OSGi-space, and it crosses to the host the SAME way the `-port` modules do (system-exported flat, one
   copy) — no new seam invented. It unifies the two runner copies (`TopicRunner` + `SynthesisTopicRunner`)
-  the atlas never drew, so it rewires nothing on the map; both `comp` (in-bundle) and `sr` (host) point to
+  the atlas never drew, so it rewires nothing on the map; both `comp` (in-bundle) and `flp` (host) point to
   it, proving dual-consumption.
 
-. *`SeedRuntime` is a NEW host box beside `OsgiRuntime`.* It launches Felix, so it is host-only (#1565);
-  it wraps the three boot copies into one seam. No built box rewritten.
+. *The boot is DECOMPOSED, not a `SeedRuntime` seam.* An earlier design collapsed the three
+  `bootEmbeddedOsgiRuntime()` copies into a host `SeedRuntime` prefix; the shipped shape instead
+  DISSOLVED them (link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]) into a pure
+  decision (`BootPlanner` → `BootPlan`, OSGi-space) told apart from the effectful act
+  (`FrameworkLauncher` → `BootedFramework`), entered through one `FrameworkLaunchPipeline.embedded()` the
+  three exec apps share. `OsgiRuntime` and the `SeedRuntime` class are GONE. (The socle's later
+  `@SeedRuntime` is an unrelated homonym — a jGiven discipline annotation, not this boot seam.)
 
 . *L2 not drawn.* The passive-stage module was dropped (candidate stages are host-coupled); nothing added
   for it — honest absence, not a silent omission.
@@ -279,13 +291,13 @@ holds.
 
 [NOTE]
 ====
-*Confirmed in code.* CLI alignment shipped:
-(`a925e877..92a56cea`): both CLIs boot embedded Felix, `netplan.api`→`netplan-port`, all three exec demoted
-`-core` to `runtime`, the 8 SPI files deleted, both CLIs run for real (EXIT 0). pipeline-core (L1) +
-SeedRuntime (L3) shipped on the same branch (`cc48c18a`, `319cc4f5`, `d065ce2f`, `06a60a48`, `95fcb82e`):
-one `FluentTopicRunner` dual-consumed, the three `bootEmbeddedOsgiRuntime()` collapsed to one seam, 4
-embedded-Felix tests green. The
-`pc`/`sr` boxes are now blue (their world colour), no green remaining in Diagram K.
+*Confirmed in code.* CLI alignment shipped (`a925e877..92a56cea`): both CLIs boot embedded Felix,
+`netplan.api`→`netplan-port`, all three exec demoted `-core` to `runtime`, the 8 SPI files deleted, both
+CLIs run for real (EXIT 0). The pipeline grammar was unified into one `FluentTopicRunner` (now in
+`pipeline-port`), dual-consumed. The boot was then DECOMPOSED (`BootPlanner`/`BootPlan` +
+`FrameworkLauncher`/`BootedFramework` + `FrameworkLaunchPipeline`), retiring `OsgiRuntime` and the old
+`SeedRuntime` class — see link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]. The
+`pc`/`flp`/`plan` boxes are blue (their world colour), no green remaining in Diagram K.
 ====
 
 === Design scenarios — the runtime capabilities as DSL sentences
@@ -335,8 +347,9 @@ AND its additivity.
 
 . *One fluent pipeline grammar, dual-consumed in-bundle and flat* — `[playable]` blue +
 .. GIVEN the grammar duplicated as `TopicRunner` + `SynthesisTopicRunner`
-.. WHEN pipeline-core (L1) extracts `FluentTopicRunner` and SeedRuntime (L3) collapses the three boot
-   copies
+.. WHEN `pipeline-port` unifies `FluentTopicRunner` and the boot decomposition
+   (`BootPlanner`/`FrameworkLauncher`, entered via `FrameworkLaunchPipeline.embedded()`) dissolves the
+   three boot copies
 .. THEN one pipeline grammar is consumed both in-bundle and flat, behind one boot seam — AND it
    crosses to the host the same way the ports do, no new seam (L2 dropped: host-coupled).
 

@@ -5,15 +5,20 @@
 [NOTE]
 ====
 *Status:* the BDD-as-engine model is the *source of truth* for how rke2lab seeds. *GO reached
-2026-07-04* — the model is proven viable AND proven to hold on the atlas (four invariants), the seven
-go/no-go concerns closed on a bench. What remains is the *code migration*, not the decision.
+2026-07-04*, and *increment 1 — the engine-lifecycle socle — SHIPPED 2026-07-05*
+(link:engine-lifecycle-spec.adoc[engine-lifecycle-spec], `osgi/runtime/scenario-engine`): the launcher
+(`JUnitLauncherCore`), the world connection (`OsgiConnection`), the start-level lever, the
+`@SeedRuntime`/`@IsolatedWorld` disciplines, and a green connected `BulletproofPipeline` are LIVE. What
+remains is *increment 2* — the ClusterSeed vertical that expresses the seeding on that socle — and then
+the other pipelines, one at a time.
 
 *This spec describes the seeding as it IS being built:* the whole seeding is expressed as *jGiven
 scenarios orchestrated by the JUnit Platform launcher* (embedded at runtime), a phase is a nested
-jGiven `Stage`, the value-DAG is carried by `@Provided/ExpectedScenarioState` (+ a build-time DAG
-gate), the missing dynamics are contributed as Jupiter extensions. The reference implementation is
-pinned at tag `spike/bdd-pipeline-poc`; the discovery record (the four operator paths, the ten
-learnings E1–E10) is link:bdd-pipeline-poc-design.adoc[the bdd-pipeline POC].
+jGiven `Stage`, the value-DAG is carried by `@Provided/ExpectedScenarioState` (+ a build-time
+`SCENARIO_STATE_DAG` gate, the vertical's closing task), the missing dynamics are contributed as
+Jupiter extensions. The substrate is the shipped socle above; the disposable bench that first proved
+viability survives only at tag `spike/bdd-pipeline-poc`, and the discovery record (the four operator
+paths, the ten learnings E1–E10) is link:bdd-pipeline-poc-design.adoc[the bdd-pipeline POC].
 
 *The former model — the fluent `during`/`then` grammar, `Topic` / `State<I,B>` / `PipelineContext` /
 `FluentTopicRunner` (shipped in the 212-commit pipeline-port arc) — is superseded.* It survives only
@@ -560,28 +565,36 @@ commit `39fe4d8a`). It is NOT maintained here.
 *The method: the spec runs ahead (avant/après) with the atlas up to date; only then the plan and the
 worktree scheduling — integration obliges the worktrees, the spec does not.*
 
-. *Legibility cleanup of the spec network — FIRST, this pass.* Make the BDD-as-engine model the primary
-  readable content across the network (this spec, host-pipeline, the atlas satellites); demote the
-  former model to the avant reference above. Do not build the migration on docs nobody can read. (This
-  is the pass you are reading the result of.)
-. *ClusterSeed-vertical migration — one pipeline at a time.* Migrate ONLY `ClusterSeedPipeline` first
-  (the POC transposed it) end-to-end into `seed-master` (real Felix, not the `URLClassLoader` stand-in):
-  the seven proven mechanisms wired live. The other six pipelines STAY on the former model meanwhile —
-  assumed coexistence, NOT a legacy variant to hide. Each subsequent pipeline is its own increment.
+. *Legibility cleanup of the spec network — DONE.* The BDD-as-engine model is the primary readable
+  content across the network (this spec, host-pipeline, the atlas satellites); the former model is the
+  avant reference above. (Closed before the socle landed.)
+. *Engine-lifecycle socle — increment 1, SHIPPED (2026-07-05).* The launcher, connection, lever and
+  disciplines are live in `osgi/runtime/scenario-engine`; see
+  link:engine-lifecycle-spec.adoc[engine-lifecycle-spec]. This is the substrate the vertical rests on —
+  no longer a bench stand-in.
+. *ClusterSeed-vertical migration — increment 2, one pipeline at a time.* Migrate ONLY
+  `ClusterSeedPipeline` first, end-to-end into `seed-master` on the shipped socle (real embedded Felix):
+  the phases become `@ScenarioStage`s, the two live jGiven islands (`SystemdAdapterTopic`,
+  `ClusterReadinessTopic`) fold in as phases, the value-DAG replaces `StateBuilder`, outputs return as
+  `SeedRun(runbook, outputs)`. The other six pipelines STAY on the former model meanwhile — assumed
+  coexistence, NOT a legacy variant to hide. Each subsequent pipeline is its own increment.
+. *Closing task — the `SCENARIO_STATE_DAG` gate.* Once the phases carry `@Provided/ExpectedScenarioState`,
+  add the sixth `StagingGate` (the topological check, on the existing ASM+`@GovernedBy` mould), born
+  WARN then flipped WARN→ERROR — the REALM_BOUNDARY ritual, the static safety the former type-state gave.
 
-The reference implementation for every mechanism is pinned at tag `spike/bdd-pipeline-poc`
-(`git show spike/bdd-pipeline-poc:<path>`): `SeedLauncherMain` (the launcher from a bare `main()`),
-`PollUntilReadyExtension` (the adaptive poll), `DagGateSpikeTest` (the topological gate),
-`CrossWorldGraftSpikeTest` (the E10 graft), `FanInStatusSpikeTest` (fan-in + fail-fast off
-`executionStatus`), `FailFastPreviewExecutor` (the rich-preview bonus).
+The three mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate, the
+cross-world `ScenarioModel` graft) have their reference sketch pinned at tag `spike/bdd-pipeline-poc`
+(`git show spike/bdd-pipeline-poc:<path>`): `PollUntilReadyExtension` (adaptive poll — though its live
+form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological gate), and
+`CrossWorldGraftSpikeTest` (the E10 graft). The rest shipped with the socle.
 
 == Related documentation
 
 * link:bdd-pipeline-poc-design.adoc[bdd-pipeline POC] — the discovery record: the four operator paths
   (P1–P4), the ten measured learnings (E1–E10) that back this model.
-* link:../atlas/host-pipeline.adoc[host-pipeline L1] — the graved avant/après (Diagram Q), the concept
-  correspondence table anchored on the bench `SeedPhases`, the four-invariant additivity verdict, and
-  the go/no-go table (the seven proven mechanisms + the tag pointer). The output-gate design
+* link:../atlas/host-pipeline.adoc[host-pipeline L1] — the graved avant/après (Diagram Q, socle shipped
+  = invariant blue), the concept correspondence table (anchored on the shipped socle + the vertical),
+  the four-invariant additivity verdict, and the collapsed go/no-go pointer. The output-gate design
   (`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) lives here too.
 * link:osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] — the boot seam
   (`BootPlanner`/`FrameworkLauncher`) the launcher rests on; how the host boots the OSGi world the
