@@ -285,6 +285,13 @@
       <groupId>com.tngtech.jgiven</groupId>
       <artifactId>jgiven-core</artifactId>
     </dependency>
+    <!-- The Jupiter extension API is runtime code here: HostFactsSeeder (src/main) is a
+         TestInstancePostProcessor the scenario declares, so the extension SPI is a compile dep,
+         not test-only. Mirrors scenario-engine's dogfooding promotion. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
