@@ -25,8 +25,27 @@ kept distinct (A adapt=bounded realm, B service-registry=future ServiceBroker, N
 migrate NOTHING by force (self-cast group stays native — `of` pays only where a RAW loader must decide the
 world). Full reasoning in [[classrealm-adaptable-pattern]].
 
-**NEXT — resume ClusterSeed at: rework `RunMode`** → tri-state enum at the edge + `LiveGate.forRun(RunMode)`
-projection; phases consume `LiveGate` not RunMode ([[runmode-livegate-pulumi-abstraction]]).
+**DONE — RunMode rework (`208b3e0d`):** tri-state enum in `pulumi-edge`, projections `playsLive()`/
+`materialises()`, `LiveGate.forRun(RunMode)`, `HostFacts` carries LiveGate not RunMode. Green.
+
+**IN FLIGHT — Task 3 (ClusterSeedScenario skeleton), reworked live with the user (NOT the bâclé version
+on disk).** The disk skeleton (untracked ClusterSeedScenario.java) used a `static volatile ReportModel
+lastRunbook` + dead `import Nullable` — the user rejected it: "un null ne circule jamais nu; trouve la
+source à la FRONTIÈRE, décore en Optional, remonte au traitant qui SAIT". Verified at bytecode:
+`Scenario.getModel()`→`ScenarioModelBuilder.reportModel` is NOT ctor-initialized (can be null before 1st
+setModel). jGiven stores its model in ITS ExtensionContext store (ns `com.tngtech.jgiven`, key
+`report-model`) — NOT reachable from the launcher-level harvest. So harvest CANNOT read jGiven's store.
+DECISION **P** (user: "on est solide"): add the session store as a 3rd param to `HarvestStrategy.harvest(
+launcher, request, sessionStore)`; a small `afterAll` extension of OURS pushes `getScenario().getModel()`
+(decorated `Optional.ofNullable` at capture) into OUR session store under an SSOT key `RUN_MODEL`; the
+harvest reads OUR key, `orElseThrow` (the harvest is the traitant that KNOWS a run played). Kills the
+static + the home-made null + the "removed in Task 8" debt. `@MonotonicNonNull` (checkerframework, 80
+uses in repo) is THE annotation for genuinely-deferred fields (the stages will need it) — but P avoids a
+null field here entirely so it's not needed. Touches socle (HarvestStrategy iface +
+InContainerJUnitRunner harvest + 3 scenario-engine tests add the ignored 3rd param). Whiteboard section
+"HARVEST DU REPORTMODEL". Coding P by hand (too subtle for a blind subagent).
+
+**THEN:** Tasks 4-9 (subagent-driven where clean). See [[runmode-livegate-pulumi-abstraction]].
 
 **THEN resume ClusterSeed Tasks 3-9:** 3=ClusterSeedRun+scenario skeleton; 4=attached-framework seam
 (OsgiConnection.framework() + BootedFramework.attached()) + Preflight/Bbox/Incus stages; 5=SystemdAdapterStage

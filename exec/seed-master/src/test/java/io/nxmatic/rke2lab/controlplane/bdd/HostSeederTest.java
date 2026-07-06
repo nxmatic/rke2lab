@@ -13,9 +13,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@code @ProvidedScenarioState} BEFORE jGiven's readScenarioState siphons them. The store is
  * seeded here in a BeforeAllCallback (standing in for the host driver's session-store put).
  */
-@ExtendWith(HostFactsSeederTest.FactsStoreSeeder.class) // seeds the store (stands in for the host)
-@ExtendWith(HostFactsSeeder.class) // reads it onto the instance
-class HostFactsSeederTest implements HostFactsSeeder.HostFactsAware {
+@ExtendWith(HostSeederTest.FactsStoreSeeder.class) // seeds the store (stands in for the host)
+@ExtendWith(HostSeeder.class) // reads it onto the instance
+class HostSeederTest implements HostSeeder.HostFactsAware {
 
   @ProvidedScenarioState HostFacts hostFacts;
 
@@ -35,7 +35,7 @@ class HostFactsSeederTest implements HostFactsSeeder.HostFactsAware {
 
     @Override
     public void beforeAll(org.junit.jupiter.api.extension.ExtensionContext context) {
-      context.getStore(HostFactsSeeder.NS).put(HostFactsSeeder.HOST_FACTS, FACTS);
+      context.getStore(HostSeeder.NS).put(HostSeeder.HOST_FACTS, FACTS);
     }
 
     private static HostFacts sampleFacts() {

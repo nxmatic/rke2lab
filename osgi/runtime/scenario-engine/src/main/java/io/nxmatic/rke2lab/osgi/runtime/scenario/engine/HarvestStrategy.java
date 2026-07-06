@@ -9,11 +9,13 @@ import org.junit.platform.launcher.LauncherDiscoveryRequest;
  * on the {@code launcher}, executes the {@code request}, and returns the harvested value.
  *
  * <p>The two implementations that motivate the seam: the in-container envelope harvests PASS/FAIL
- * lines from a {@code TestExecutionListener}; a runtime pipeline harvests the jGiven {@code
- * ReportModel} (the runbook).
+ * lines from a {@code TestExecutionListener}; a runtime pipeline harvests the run's outputs. The
+ * jGiven {@code ReportModel} does NOT come back through here — the driver injects its own model
+ * into the run (via the session store) and holds the reference, so it renders the runbook from that
+ * reference after the run, not from a harvested value.
  *
- * @param <R> the harvested result type — {@code List<String>} for the envelope, a {@code
- *     ReportModel} for a pipeline
+ * @param <R> the harvested result type — {@code List<String>} for the envelope, the outputs for a
+ *     pipeline
  */
 @FunctionalInterface
 public interface HarvestStrategy<R> {

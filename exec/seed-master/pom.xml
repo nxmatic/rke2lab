@@ -96,6 +96,14 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- The neutral launcher core (JUnitLauncherCore): the skeleton driver plays the scenario
+         through it. Test-scope until the host boot wires it as the runtime engine. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
          flattened into the uber-jar (excluded from the shade). runtime scope MACHINE-ENFORCES path
          2: seed-master's main + tests compile only against -port + OsgiRuntime, never against a
@@ -284,6 +292,13 @@
     <dependency>
       <groupId>com.tngtech.jgiven</groupId>
       <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <!-- jgiven-junit5 (JGivenExtension) is runtime code here: ClusterSeedScenario (src/main)
+         declares it as a class-level @ExtendWith, so the extension is a compile dep, not test-only.
+         Same dogfooding promotion as scenario-engine. -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
     </dependency>
     <!-- The Jupiter extension API is runtime code here: HostFactsSeeder (src/main) is a
          TestInstancePostProcessor the scenario declares, so the extension SPI is a compile dep,
