@@ -2,9 +2,13 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.platform.engine.TestEngine;
+import org.junit.platform.engine.support.store.Namespace;
+import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
+import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.core.LauncherConfig;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
@@ -57,6 +61,23 @@ public final class JUnitLauncherCore<R> {
       DiscoveryStrategy discovery,
       HarvestStrategy<R> harvest)
       throws InterruptedException {
+    return run(hostLoader, engineClass, discovery, harvest, store -> {});
+  }
+
+  /**
+   * As {@link #run(ClassLoader, Class, DiscoveryStrategy, HarvestStrategy)}, but the run happens
+   * within an open {@link LauncherSession}: {@code seedSessionStore} is handed the session-level
+   * store before discovery/execution, so the caller can seed values (e.g. host-facts) that a
+   * harvest — or an extension ordered before the run — reads back. This is the inbound channel's
+   * foundation: no ThreadLocal, the store crosses the launcher membrane.
+   */
+  public R run(
+      ClassLoader hostLoader,
+      Class<? extends TestEngine> engineClass,
+      DiscoveryStrategy discovery,
+      HarvestStrategy<R> harvest,
+      Consumer<NamespacedHierarchicalStore<Namespace>> seedSessionStore)
+      throws InterruptedException {
     final AtomicReference<R> out = new AtomicReference<>();
     final AtomicReference<Throwable> failure = new AtomicReference<>();
 
@@ -64,7 +85,7 @@ public final class JUnitLauncherCore<R> {
         new Thread(
             () -> {
               try {
-                out.set(execute(hostLoader, engineClass, discovery, harvest));
+                out.set(execute(hostLoader, engineClass, discovery, harvest, seedSessionStore));
               } catch (Throwable t) {
                 failure.set(t);
               }
@@ -84,20 +105,24 @@ public final class JUnitLauncherCore<R> {
       ClassLoader hostLoader,
       Class<? extends TestEngine> engineClass,
       DiscoveryStrategy discovery,
-      HarvestStrategy<R> harvest) {
-    final Launcher launcher =
-        LauncherFactory.create(
-            LauncherConfig.builder()
-                .enableTestEngineAutoRegistration(false)
-                .addTestEngines(instantiateEngine(engineClass))
-                .build());
-
-    final LauncherDiscoveryRequest request =
-        LauncherDiscoveryRequestBuilder.request()
-            .selectors(discovery.selectors(wiringOf(hostLoader)))
+      HarvestStrategy<R> harvest,
+      Consumer<NamespacedHierarchicalStore<Namespace>> seedSessionStore) {
+    final LauncherConfig config =
+        LauncherConfig.builder()
+            .enableTestEngineAutoRegistration(false)
+            .addTestEngines(instantiateEngine(engineClass))
             .build();
 
-    return harvest.harvest(launcher, request);
+    try (LauncherSession session = LauncherFactory.openSession(config)) {
+      seedSessionStore.accept(session.getStore());
+
+      final LauncherDiscoveryRequest request =
+          LauncherDiscoveryRequestBuilder.request()
+              .selectors(discovery.selectors(wiringOf(hostLoader)))
+              .build();
+
+      return harvest.harvest(session.getLauncher(), request);
+    }
   }
 
   /** The host bundle's wiring when {@code loader} is bundle-loaded, else empty (flat classpath). */
