@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.osgi.boot.discovery;
 
 import java.util.Optional;
+import org.osgi.framework.BundleReference;
 
 /**
  * A classloader-bounded world, seen as the source of the capability faces it can offer — a
@@ -21,6 +22,19 @@ import java.util.Optional;
  * this world?" lands on one contract instead of scattered {@code instanceof}/{@code adapt} reaches.
  */
 public interface ClassRealm {
+
+  /**
+   * The realm {@code loader} belongs to — the {@link BundleClassRealm} of its owning bundle when
+   * the loader is a {@link BundleReference} (the in-container, bundle-wired world), else the {@link
+   * HostClassRealm} of the flat classpath. This is the one place the two worlds are told apart: a
+   * caller asks the realm for a face and reads the same {@link #adapt(Class)} contract either way,
+   * instead of branching on {@code instanceof BundleReference} at each reach.
+   */
+  static ClassRealm of(ClassLoader loader) {
+    return loader instanceof BundleReference bundleReference
+        ? BundleClassRealm.of(bundleReference.getBundle())
+        : HostClassRealm.of(loader);
+  }
 
   /**
    * The face of this realm that implements {@code type}, or {@link Optional#empty()} if this world

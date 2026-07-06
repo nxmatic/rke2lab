@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
+import io.nxmatic.rke2lab.osgi.boot.discovery.ClassRealm;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -12,8 +13,6 @@ import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.core.LauncherConfig;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
-import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleReference;
 import org.osgi.framework.wiring.BundleWiring;
 
 /**
@@ -127,11 +126,7 @@ public final class JUnitLauncherCore<R> {
 
   /** The host bundle's wiring when {@code loader} is bundle-loaded, else empty (flat classpath). */
   private static Optional<BundleWiring> wiringOf(ClassLoader loader) {
-    if (loader instanceof BundleReference bundleReference) {
-      final Bundle host = bundleReference.getBundle();
-      return Optional.of(host.adapt(BundleWiring.class));
-    }
-    return Optional.empty();
+    return ClassRealm.of(loader).adapt(BundleWiring.class);
   }
 
   private static TestEngine instantiateEngine(Class<? extends TestEngine> engineClass) {
