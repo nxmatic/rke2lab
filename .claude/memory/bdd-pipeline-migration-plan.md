@@ -36,6 +36,23 @@ PROVEN on a disposable bench — reference impl pinned at [[spike-bdd-pipeline-r
    NOT a legacy variant to hide. Each subsequent pipeline = its own increment. Consult
    [[spike-bdd-pipeline-reference-tag]] for the proven mechanism implementations.
 
+**The call-site trajectory (2026-07-05, user's reading — how each increment attaches, and how the
+sequence ENDS).** Each nested pipeline migrates BEHIND its `Topic` call-site: the topic keeps its
+`Topic.*` skin (so the still-fluent parent keeps compiling) while its BODY is rewritten to launch the
+new BDD scenario. For ClusterSeed: `ClusterSeedTopic` (called by the fluent `ApplicationPipeline` via
+`.during("cluster seed", …)`) stays `Topic.Pipeline`, its body rewritten to `openSession +
+JUnitLauncherCore(ClusterSeedScenario) + harvest`. It is the fluent↔BDD seam BY DESIGN, not a vestige.
+The FINAL increment migrates the main pipeline (`ApplicationPipeline` → `ApplicationScenario`,
+its `environment`/`cluster seed`/`outputs` becoming `@ScenarioStage`s, `ClusterSeedScenario` nested
+under "cluster seed") — and ONLY THEN does `ClusterSeedTopic` disappear (no fluent parent left to serve).
+Naming for the ClusterSeed increment (all in `controlplane.bdd`): `ClusterSeedScenario` (replaces
+`ClusterSeedPipeline`); `*Stage` per phase (`PreflightStage`… replace `*Topic`, uniform, no wrap);
+`PendingMarkingScenarioExecutor` (replaces `DeferringScenarioExecutor` — the old one SKIPS bodies which
+empties `@NestedSteps` sub-trees, verified in `StepInterceptorImpl.doIntercept`; the new one executes
+against inert probes and rewrites NORMAL→PENDING at the listener, E9); `ClusterSeedRun(runbook, outputs)`
+local record. See [[jgiven-custom-executor-seam]] [[cluster-seed-inbound-session-store]]
+[[cluster-seed-transport-consensus]].
+
 ## Settled decisions (do NOT re-litigate)
 
 - Scenarios ARE the execution engine; engine = jGiven; JUnit Platform launcher = the orchestration
