@@ -96,13 +96,14 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
-    <!-- The neutral launcher core (JUnitLauncherCore): the skeleton driver plays the scenario
-         through it. Test-scope until the host boot wires it as the runtime engine. -->
+    <!-- The neutral launcher core + the OSGi connection contract (JUnitLauncherCore,
+         OsgiConnection): runtime code now — HostSeeder/PreflightStage/IncusStage in src/main reach
+         OsgiConnection to attach the phases to the world. The dogfooding promotion (parallel to
+         jgiven-junit5): the launcher is the runtime engine, not a test tool. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
          flattened into the uber-jar (excluded from the shade). runtime scope MACHINE-ENFORCES path

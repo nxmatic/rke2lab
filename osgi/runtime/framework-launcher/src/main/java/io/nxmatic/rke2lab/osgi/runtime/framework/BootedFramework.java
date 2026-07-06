@@ -22,9 +22,26 @@ public final class BootedFramework implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(BootedFramework.class);
 
   private final Framework framework;
+  private final boolean owns;
 
   BootedFramework(Framework framework) {
+    this(framework, true);
+  }
+
+  private BootedFramework(Framework framework, boolean owns) {
     this.framework = framework;
+    this.owns = owns;
+  }
+
+  /**
+   * A view that ATTACHES to an already-running framework (e.g. reached from an {@code
+   * OsgiConnection}) without owning its lifecycle: {@link #close()} is a no-op, because the
+   * attacher did not boot it and must not stop it. Parallel to {@code
+   * OsgiConnection.over(ownsLifecycle = false)} — a phase that needs the service-lookup shape of a
+   * {@code BootedFramework} but did not perform the boot.
+   */
+  public static BootedFramework attached(Framework framework) {
+    return new BootedFramework(framework, false);
   }
 
   /**
@@ -67,6 +84,9 @@ public final class BootedFramework implements AutoCloseable {
 
   @Override
   public void close() {
+    if (!owns) {
+      return; // attached, not owned — do not stop a framework we did not boot
+    }
     try {
       framework.stop();
       framework.waitForStop(5000);

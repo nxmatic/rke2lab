@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.launch.Framework;
 
 /**
  * A connection to the OSGi world — the first step of a seed scenario ("the OSGi world is
@@ -44,6 +45,16 @@ public interface OsgiConnection extends AutoCloseable {
   /** Release the connection: stop the world if owned, else detach — never throws checked. */
   @Override
   void close();
+
+  /**
+   * The {@link Framework} this connection is attached to — the system bundle IS the Framework
+   * ({@code getBundle(0)}). A cast, not an {@code adapt}: the system bundle's runtime identity, not
+   * a capability face. For phases that need the {@code BootedFramework}-shaped service lookup
+   * ({@link BootedFramework#attached}) without owning the boot.
+   */
+  default Framework framework() {
+    return (Framework) context().getBundle(0);
+  }
 
   /**
    * Bootstrap Felix in-process and own its lifecycle — the prod boot (spec Figure 3, REALISED).

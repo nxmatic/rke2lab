@@ -45,7 +45,45 @@ null field here entirely so it's not needed. Touches socle (HarvestStrategy ifac
 InContainerJUnitRunner harvest + 3 scenario-engine tests add the ignored 3rd param). Whiteboard section
 "HARVEST DU REPORTMODEL". Coding P by hand (too subtle for a blind subagent).
 
-**THEN:** Tasks 4-9 (subagent-driven where clean). See [[runmode-livegate-pulumi-abstraction]].
+**DONE — Task 3 (`5ac7cf0d`):** ClusterSeedRun + ClusterSeedScenario skeleton + HostSeeder (renamed from
+HostFactsSeeder — seeds the fact bag AND the ReportModel). Inject-the-model: driver creates the
+ReportModel, HostSeeder plants it in jGiven's OWN store (ns `Stage.class.getPackageName()`, key
+`report-model`) BEFORE jGiven's postProcessTestInstance (which would overwrite via its store — bytecode
+verified); jGiven writes the run into it; driver renders from its held reference. No static, no null, no
+harvest-back. HarvestStrategy stays `(launcher, request)`.
+
+**IN FLIGHT — Task 4 (attached-framework seam + 3 pure phases), design reworked live, DECIDED F1.**
+Socle done: `BootedFramework.attached(fw)` (flag `owns`, close no-op) + `OsgiConnection.framework()`
+(cast getBundle(0), NOT adapt — runtime identity). HostSeeder gained `CONNECTION` key + `ConnectionAware`.
+seed-master pom: scenario-engine promoted test→compile (HostSeeder/stages in src/main use OsgiConnection).
+KEY DESIGN (F1, user-confirmed): the plan's PureStagesTest seeds standalone and would make the 3 phases
+TOUCH THE REAL WORLD (Preflight reads real git/flake; Bbox reads real bbox secrets; Incus provisions +
+crashes on Deployment.getInstance() off-Pulumi, line 584 ungated). Two axes were conflated: LiveGate =
+PROD (live vs deferred in real preview); probes/fakes = TEST (inert without touching reality). The
+established pattern IS probes: `SystemdAdapterProbe` is a `@FunctionalInterface` (live impl + fake in
+test). So — for UNIFORMITY — extract the same for the pure phases: `PreflightProbe`/`IncusProbe` +
+make Bbox injectable, each `@FunctionalInterface` with a live impl (real collaborator) and a test fake.
+Collaborators today are static/final (EntryGatePolicyEnforcer static; IncusResourceBootstrap final;
+BboxReconciliationOrchestrator final) → must extract interfaces. IncusProbe returns
+`Optional<BootstrapResult>` (an Outcome — present iff mutation ran; BootstrapResult has NO cheap deferred
+form, 10 fields/5 composite — do NOT fabricate one). Stages take injected probes; test injects fakes;
+LiveGate keeps its PROD role. NEXT: read FakeSystemdAdapterProbes + how SystemdAdapterScenario receives
+its probe (probed_by) + NestedRunbookTest injection path, mirror it. Whiteboard §TASK 4.
+
+**jGiven config friction (2026-07-06, will recur for the 6 other pipelines).** jGiven's `Config` is a
+STATIC singleton (private ctor) whose setters (`setReportEnabled`, `setReportDir`) just write
+system-properties; the junit5 extension reads it at write-time (`afterAll` → `new CommonReportHelper()
+.finishReport(model)`), never receives a per-run config. jGiven assumes one-process = one-config (the
+surefire case). We run scenarios as a RUNTIME ENGINE (many runs, one JVM) — an unforeseen use — so a
+launcher run would dump a stray `./jgiven-reports/null.json` (null because our injected model has no
+name until we copy jGiven's identity — see below). Fix in `HostSeeder`: (1) copy name/className/
+description from jGiven's beforeAll model onto ours before planting it (kills null.json + "Test Class:
+null"); (2) `Config.config().setReportEnabled(false)` in postProcessTestInstance + RESTORE the prior
+property in `afterAll` (HostSeeder declared first → its afterAll runs LAST, after jGiven's report write).
+Save/restore leaves no leaked global state. Cannot contribute a scoped config (singleton closed); a real
+fix would be upstream. This is the dogfooding tax the CLAUDE.md's "BDD-as-engine" predicts.
+
+**THEN:** Tasks 5-9. See [[runmode-livegate-pulumi-abstraction]].
 
 **THEN resume ClusterSeed Tasks 3-9:** 3=ClusterSeedRun+scenario skeleton; 4=attached-framework seam
 (OsgiConnection.framework() + BootedFramework.attached()) + Preflight/Bbox/Incus stages; 5=SystemdAdapterStage
