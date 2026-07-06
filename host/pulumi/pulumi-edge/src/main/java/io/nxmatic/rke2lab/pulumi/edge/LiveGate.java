@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
-import com.pulumi.deployment.Deployment;
 import java.util.function.Supplier;
 
 /**
@@ -35,14 +34,13 @@ public final class LiveGate {
   }
 
   /**
-   * The gate for a run, across all three launch modes: closed ONLY for a Pulumi {@code preview}
-   * (dry-run under Pulumi management); open for a Pulumi {@code up} AND for a standalone run
-   * ({@code pulumiMode == false}) — both touch the live system. The {@code &&} short-circuit means
-   * {@code Deployment.getInstance()} is read only when actually under Pulumi, never standalone
-   * (where no deployment exists). This is the ONE place the dry-run flag is read.
+   * The gate projected from a {@link RunMode}: open when the mode {@link RunMode#playsLive() plays
+   * live} (a Pulumi {@code up} OR a standalone run — both touch the live system), closed only for a
+   * Pulumi {@code preview}. {@code LiveGate} is one of {@code RunMode}'s two projections; it names
+   * no {@code com.pulumi} type, so the domain consumes it without seeing Pulumi.
    */
-  public static LiveGate forRun(boolean pulumiMode) {
-    return new LiveGate(!(pulumiMode && Deployment.getInstance().isDryRun()));
+  public static LiveGate forRun(RunMode runMode) {
+    return new LiveGate(runMode.playsLive());
   }
 
   /** Whether the live crossing is permitted (a real run) rather than deferred (a preview). */

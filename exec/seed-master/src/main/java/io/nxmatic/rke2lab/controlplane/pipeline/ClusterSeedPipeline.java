@@ -26,6 +26,7 @@ import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
+import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.pulumi.edge.StackInterventionJournal;
 import io.nxmatic.rke2lab.pulumi.edge.StackMedicalRecordJournal;
 import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
@@ -145,7 +146,7 @@ public final class ClusterSeedPipeline {
       inputsBuilder
           .readinessLogger(readinessLogger)
           .pulumiMode(pulumiMode)
-          .gate(LiveGate.forRun(pulumiMode));
+          .gate(LiveGate.forRun(RunMode.detect(pulumiMode)));
       inputsBuilder
           .doctor(admitPatient(inputsBuilder, readinessLogger, pulumiMode))
           .systemdRuntimeStatus(resolveSystemdRuntimeStatus(inputsBuilder))

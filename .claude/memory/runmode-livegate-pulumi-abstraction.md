@@ -13,8 +13,28 @@ mutation. (Why standalone ≠ live, user's collision scenario: standalone creati
 → not in any Pulumi state → later `pulumi up` hits "already exists"; `refresh` won't import it. So
 standalone MUST be inert.)
 
-**Truth table (the only thing to memorize):**
-- STANDALONE     → probes inert, pending, no mutation, output=print
+**CORRECTED truth table (2026-07-06, verified at source — supersedes the wrong one below).** The user's
+thread "LiveGate is a STATE, not a fact — are you on it?" dissolved a contradiction I nearly asked them to
+arbitrate. Verified: `through(live,deferred)` is NEVER called in prod (0 sites); the 3 real `isOpen()` sites
+all do ONE thing (preview = deferred render vs touch reality); MUTATION (creating real resources) is gated
+by `if (pulumiMode)` (ResourceManager:49), NOT by LiveGate. So RunMode (the STATE) has TWO INDEPENDENT
+projections, today two correlated unnamed booleans scattered everywhere:
+- `LiveGate.isOpen()` → "may I touch reality?" (ssh/kubectl/inspect)
+- `pulumiMode` → "do I materialise Pulumi resources?"
+
+| state | LiveGate.isOpen (touch reality?) | pulumiMode (materialise Pulumi resources?) |
+| STANDALONE     | **YES** (reads reality: ssh/kubectl) | **NO** (standalone path, no Pulumi resource) |
+| PULUMI_PREVIEW | no (deferred render)                 | yes (but dry-run) |
+| PULUMI_RUN     | yes                                  | yes |
+
+STANDALONE stays LIVE (the shipped code AND its javadoc are right) AND does NOT provision (the design is
+right) — because those are DIFFERENT projections. The collision the user feared does NOT happen: master is
+created by the `if (pulumiMode)` path, which standalone does NOT take — NOT by LiveGate. My earlier belief
+"standalone must be inert" (below) was WRONG: it conflated the two projections. NO runtime behavior changes
+in the rework — it only NAMES the correlated state. This is source-vs-projection's 3rd recurrence.
+
+**OLD (wrong) truth table — kept for the trace, DO NOT act on it:**
+- STANDALONE     → probes inert, pending, no mutation, output=print  ← WRONG: standalone is LIVE (reads reality)
 - PULUMI_PREVIEW → probes inert, pending, no mutation, output=export (dry-run)
 - PULUMI_RUN     → probes live, normal, mutates master, output=export
 
@@ -41,6 +61,27 @@ tool. Door left open AND tooled.
 export are PROJECTIONS. Reading RunMode tells you everything; nothing re-decides in its corner. Same shape
 as [[classrealm-adaptable-pattern]] (a world → its faces) — the recurrence is why it feels right.
 
-**TODO for the rework:** move/rewrite `RunMode` → tri-state enum at the edge; `LiveGate.forRun(RunMode)`;
-phases consume `LiveGate`, never `RunMode`. See [[cluster-seed-transport-consensus]]
+**Two state TYPES, carried by the Java type (2026-07-06, user's breakthrough — "marque les états, pas les
+steps").** A `@ProvidedScenarioState` value is one of two kinds, and the code ALREADY encodes each via its
+type: (1) OBSERVATION (what the world IS) = `ObservationView`, with its guarded form
+`ObservationView.deferredPreview(config)`; (2) OUTCOME (what a mutation PRODUCED) = a resource/URN, with
+`createStandaloneResources()`. A step (When) ALWAYS writes scenario-DAG state (that's its essence, not a
+mutation of the world); what varies is whether it touches the WORLD, and how (read→LiveGate,
+mutate→materialises). So we mark STATES not STEPS — and we don't even annotate: the type already carries it
+(`ObservationView`=observation, resource/URN=outcome). Closes the loop: RunMode (source) → LiveGate/
+materialises (projections) → Observation/Outcome (the two state types the projections produce). A marker
+interface (`Observation`/`Outcome`) or a static gate is DEFERRED to the handoff from the new codebase
+(user, 2026-07-06) — door tooled, not opened (YAGNI).
+
+**Rework SCOPE settled (A, 2026-07-06) + naming.** Verified at source: `RunMode` has NO readers (only stored
+in `HostFacts`, constructed in one test); `through(live,deferred)` is NEVER called in prod; `pulumiMode`
+threading lives in the DYING pipeline (erased Task 8). So scope A = fix at the EDGE only, do NOT polish the
+dying pipeline's `pulumiMode` threading. Gestures: (1) `RunMode` → tri-state enum MOVED to `pulumi-edge`
+beside LiveGate, factory `detect(pulumiMode)` (reads ambient `isDryRun` ONLY when pulumiMode, preserving the
+short-circuit), projections `playsLive()` (this != PULUMI_PREVIEW) + `materialises()` (this != STANDALONE);
+(2) `LiveGate.forRun(boolean)` → `forRun(RunMode)` = `new LiveGate(runMode.playsLive())` — the isDryRun read
+moves into RunMode.detect; (3) `HostFacts.runMode` → `HostFacts.liveGate` (decision A: domain carries the
+abstraction LiveGate, NOT the Pulumi-vocab RunMode); (4) one call-site `ClusterSeedPipeline:148`.
+
+**TODO for the rework:** implement the 4 gestures above. See [[cluster-seed-transport-consensus]]
 [[cluster-seed-execution-state]].

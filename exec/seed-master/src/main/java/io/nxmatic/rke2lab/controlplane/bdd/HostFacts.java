@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import java.util.function.Consumer;
 
 /**
@@ -15,12 +16,15 @@ import java.util.function.Consumer;
  * the driver and read onto the scenario by {@link HostFactsSeeder}. The four OSGi services
  * (doctor/systemdProbe/clusterContact/readinessAuthority) are NOT here — the scenario resolves them
  * from its OSGi connection.
+ *
+ * <p>Carries {@link LiveGate}, not {@code RunMode}: the domain consumes the abstract live/deferred
+ * face, never the Pulumi-vocabulary state it projects from — the edge does the projection.
  */
 public record HostFacts(
     BootstrapConfig config,
     ControlplanePolicy policy,
     BootstrapOptions options,
-    RunMode runMode,
+    LiveGate liveGate,
     BboxReconciliationOrchestrator bboxOrchestrator,
     ResourceManager resourceManager,
     OutputBuilder outputBuilder,

@@ -44,7 +44,8 @@ class HostFactsSeederTest implements HostFactsSeeder.HostFactsAware {
           cfg.asBootstrapConfig(),
           cfg.asPolicy(),
           io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions.from(cfg.asDto()),
-          RunMode.live(false),
+          io.nxmatic.rke2lab.pulumi.edge.LiveGate.forRun(
+              io.nxmatic.rke2lab.pulumi.edge.RunMode.STANDALONE),
           new io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator(false),
           new io.nxmatic.rke2lab.controlplane.resources.ResourceManager(),
           new io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder(),
