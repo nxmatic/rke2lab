@@ -30,13 +30,36 @@ OSGi call: `JUnitLauncherCore.wiringOf` (the `instanceof BundleReference` select
 point) + `bundle.adapt(...)`. Do NOT twist `HostClassRealm.resolves()/stagedBundles()` into
 `adapt(Capability.class)` — those are host-world QUESTIONS, not faces. They stay named methods.
 
-**Increments.** A (now, socle): `ClassRealm` + `HostClassRealm`(renamed) + `BundleClassRealm` +
-entry-point `of(loader)` selecting via `instanceof BundleReference`; migrate the real `.adapt` call-sites;
-`OsgiConnection` adapts its domain services. Future (documented, not built): the realm as the single door
-to EVERYTHING a world offers (infra AND domain services fused) — extended via `adapt(NewFace.class)` when
-a real client appears (the `Adaptable` mechanism IS the extension tool — no door closed).
+**Per-bundle is the load-bearing truth (user, 2026-07-06) — settled the whole design.** In OSGi each
+bundle OWNS its classloader → each bundle IS a class realm (Plexus, materially). So `BundleClassRealm.of(
+bundle)` is a PER-BUNDLE entity (parameterized by the bundle), NOT a "the OSGi world" monolith — a correct
+model, not a commodity. This is what legitimized building it: I nearly reverted it as YAGNI ("wiringOf is
+test-only, no payer"), but that was wrong twice — (1) `ClassRealm.of(loader)` is the scenario-engine's
+MEMBRANE primitive (the 3rd of JUnitLauncherCore's "three OSGi crossings": the host bundle's `BundleWiring`
+in-container), and in-container = `InContainerJUnitRunner` = how rke2lab tests itself = dogfooded product,
+not throwaway; (2) the abstraction models a real OSGi truth instead of inventing one.
 
-**Progress (2026-07-06).** Commit `00c2441`: `ClassRealm` interface + `HostClassRealm` rename + test
-(ClassRealmTest 2/2 green) + `FrameworkLaunchPipeline` updated. NEXT: `BundleClassRealm`, then `of(loader)`
-selector, migrate call-sites, tests both worlds. See [[engine-lifecycle-socle-state]]
-[[cluster-seed-execution-state]] [[single-source-of-truth-before-logic]].
+**TWO OSGi mechanisms, distinct by NATURE — do NOT fuse under "realm" (settled II).** (A) `adapt(Class)` =
+classloader-BOUNDED (Plexus): `getBundle(0).adapt(FrameworkStartLevel)` = the system-bundle realm,
+`bundle.adapt(BundleWiring/...)` = an app-bundle realm — literally two realms. (B) the service registry
+(`awaitService(HealthSystem/...)`, what the RUNTIME really uses via `BootedFramework.awaitService`) crosses
+ALL bundles → NOT classloader-bounded → NOT a class realm. Kept separate: B is a future `ServiceBroker`,
+distinct type. Note: `OsgiConnection.awaitService` does NOT exist (whiteboard was wrong) — `awaitService`
+lives on `BootedFramework` + the testkit extension; `OsgiConnection` has only context()/ownsLifecycle()/
+close(). So the earlier "OsgiConnection IS the realm" idea was dropped.
+
+**Migration line = migrate NOTHING by force (settled step 5).** The self-cast group (`bundle.adapt(
+FrameworkStartLevel/BundleWiring)` where the caller ALREADY holds its bundle and the face is ALWAYS present,
+no null-check today) STAYS native — wrapping it adds an Optional/orElseThrow for a never-absent value, the
+exact "don't twist, invent nothing" the pattern forbids. `ClassRealm.of` pays only where you start from a
+RAW loader and must DECIDE the world (wiringOf). Door left tooled, not opened: resolve a realm from ANY type
+via `FrameworkUtil.getBundle(clazz)` ("which world does THIS type live in?") — `of(loader)` already takes
+any loader.
+
+**Progress (2026-07-06) — SOCLE COMPLETE, committed.** `00c2441` (interface + HostClassRealm rename) then
+`8ccc8ed` (BundleClassRealm + `ClassRealm.of(loader)` + wiringOf collapsed to `of(loader).adapt(BundleWiring)`
++ 2 tests). 6/6 green: ClassRealmTest (self-cast), BundleClassRealmTest (delegate + null→empty),
+ClassRealmOfLoaderTest (the membrane selector: flat→Host, BundleReference→Bundle). Chantier CLOSED. NEXT
+(back to ClusterSeed): rework RunMode ([[runmode-livegate-pulumi-abstraction]]). See
+[[engine-lifecycle-socle-state]] [[cluster-seed-execution-state]] [[collaborative-design-method]]
+[[single-source-of-truth-before-logic]].

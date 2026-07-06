@@ -18,13 +18,14 @@ between). Drift rule: any subagent-reported drift → joint review with the user
 - `00c2441` socle ClassRealm step 1+2 (interface + HostClassRealm rename). See
   [[classrealm-adaptable-pattern]].
 
-**IN FLIGHT — socle ClassRealm chantier (interrupted ClusterSeed on purpose, it's socle):** done = interface
-`ClassRealm` + `HostClassRealm` (renamed from HostClassLoaderView) + ClassRealmTest (2/2 green). NEXT steps:
-(3) `BundleClassRealm` (delegates to Bundle.adapt); (4) entry point `ClassRealm.of(loader)` absorbing
-`JUnitLauncherCore.wiringOf`'s `instanceof BundleReference`; (5) migrate the real `.adapt(Class)` call-sites
-+ `OsgiConnection implements ClassRealm` for domain services; (6) tests both worlds.
+**DONE — socle ClassRealm chantier CLOSED (2026-07-06).** `00c2441` (interface + HostClassRealm rename)
+then `8ccc8ed` (BundleClassRealm + `ClassRealm.of(loader)` + wiringOf collapsed + 2 tests). 6/6 green.
+Design settled with the user: per-bundle IS a realm (legitimized BundleClassRealm); TWO OSGi mechanisms
+kept distinct (A adapt=bounded realm, B service-registry=future ServiceBroker, NOT fused); step 5 =
+migrate NOTHING by force (self-cast group stays native — `of` pays only where a RAW loader must decide the
+world). Full reasoning in [[classrealm-adaptable-pattern]].
 
-**THEN, before resuming ClusterSeed:** rework `RunMode` → tri-state enum at the edge + `LiveGate.forRun(RunMode)`
+**NEXT — resume ClusterSeed at: rework `RunMode`** → tri-state enum at the edge + `LiveGate.forRun(RunMode)`
 projection; phases consume `LiveGate` not RunMode ([[runmode-livegate-pulumi-abstraction]]).
 
 **THEN resume ClusterSeed Tasks 3-9:** 3=ClusterSeedRun+scenario skeleton; 4=attached-framework seam
