@@ -4,7 +4,7 @@ import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BootPlan;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BootPlanner;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BootRequest;
-import io.nxmatic.rke2lab.osgi.boot.discovery.HostClassLoaderView;
+import io.nxmatic.rke2lab.osgi.boot.discovery.HostClassRealm;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pipeline.Topic;
@@ -139,8 +139,8 @@ public final class FrameworkLaunchPipeline {
    * staged-bundle index and the host-resolution predicate both derive from, passed into {@link
    * BootPlanner} rather than reached through static helpers.
    */
-  private static final HostClassLoaderView HOST =
-      HostClassLoaderView.of(FrameworkLaunchPipeline.class.getClassLoader());
+  private static final HostClassRealm HOST =
+      HostClassRealm.of(FrameworkLaunchPipeline.class.getClassLoader());
 
   /**
    * Whether the running process carries the embedded boot stack — true in a deployed exec-jar,
