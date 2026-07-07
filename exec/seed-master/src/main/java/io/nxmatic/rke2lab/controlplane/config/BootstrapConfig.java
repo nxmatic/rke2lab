@@ -1,20 +1,37 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 
 /**
- * Derives the flat {@link BootstrapConfig} (a config-port seam record) from the Pulumi-backed
- * {@link Rke2labConfig}. This derivation stays host-side: it reads {@code Rke2labConfig}, which
- * touches {@code com.pulumi}, so it cannot cross into a bundle. The host builds the flat config
- * here and passes it into the embedded framework via {@code HostFacts}; the OSGi world reads it
- * back typed across the type=seam boundary.
+ * Runtime configuration for provider-native Stage A bootstrap, derived from {@link Rke2labConfig}.
  */
-public final class BootstrapConfigFactory {
+public record BootstrapConfig(
+    Path worktreeDir,
+    String clusterName,
+    String nodeName,
+    String incusProject,
+    String incusDefaultRemote,
+    URI incusRemoteAddress,
+    Path incusConfigDir,
+    String imageAlias,
+    String imageBuilderHost,
+    URI imageDistrobuilderConfig,
+    Path imageSharedFolder,
+    String profileName,
+    String lanBridgeParent,
+    String vmnetNetworkName,
+    URI apiEndpoint,
+    Path kubeconfigRef,
+    boolean nfsAutomount,
+    String systemdAdapterDbusHost,
+    int systemdAdapterDbusPort,
+    int hostAssetRotationRetentionCount,
+    Duration readinessTimeout) {
 
-  // Defaults applied here, at the single derivation site — formerly on the record itself.
+  // Defaults applied here, at the single derivation site — formerly the Builder field initializers
+  // and the env/JGit/user.home detection in the deleted Defaults class.
   private static final String DEFAULT_CLUSTER_NAME = "bioskop";
   private static final String DEFAULT_NODE_NAME = "master";
   private static final String DEFAULT_INCUS_PROJECT = "rke2lab";
@@ -36,12 +53,14 @@ public final class BootstrapConfigFactory {
   private static final int DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT = 3;
   private static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofMinutes(10);
 
-  private BootstrapConfigFactory() {}
-
   /**
    * Derive the Stage A bootstrap config from the root DTO. Mandatory values ({@code worktree.dir},
    * {@code incus.configDir}, {@code image.sharedFolder}) are already validated at load, so they
    * arrive non-null. Optional values get their default here.
+   *
+   * <p>Future: if {@code worktree.dir} is not accessible (e.g. a Nix {@code nix run} with no
+   * worktree), a {@code worktree.source = github} clone fallback is planned — see the config
+   * restructuring spec. Not implemented yet.
    */
   public static BootstrapConfig from(Rke2labConfig config) {
     final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
@@ -78,5 +97,76 @@ public final class BootstrapConfigFactory {
             .rotationRetentionCount()
             .orElse(DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT),
         config.readiness().timeout().orElse(DEFAULT_READINESS_TIMEOUT));
+  }
+
+  public String imageBuilderBinary() {
+    return "distrobuilder";
+  }
+
+  public enum WorktreeHost {
+    DARWIN,
+    NIXOS
+  }
+
+  public Path worktreeDirOn(WorktreeHost host) {
+    return pathOn(host, worktreeDir);
+  }
+
+  public Path pathOn(WorktreeHost host, Path rawPath) {
+    final Path normalizedPath = normalizeAbsolutePath(rawPath);
+    if (host == WorktreeHost.DARWIN || !nfsAutomount) {
+      return normalizedPath;
+    }
+
+    final String netPrefix = netPrefix();
+    final String normalized = normalizedPath.toString();
+
+    if (normalized.startsWith("/net/")) {
+      return normalizedPath;
+    }
+    if (normalized.startsWith("/private/")) {
+      return Path.of(netPrefix + normalized).normalize();
+    }
+    if (normalized.startsWith("/")) {
+      return Path.of(netPrefix + "/private" + normalized).normalize();
+    }
+    return Path.of(netPrefix + "/private/" + normalized).normalize();
+  }
+
+  public BootstrapConfig asIncusConfig() {
+    return new BootstrapConfig(
+        worktreeDirOn(WorktreeHost.NIXOS),
+        clusterName,
+        nodeName,
+        incusProject,
+        incusDefaultRemote,
+        incusRemoteAddress,
+        incusConfigDir,
+        imageAlias,
+        imageBuilderHost,
+        imageDistrobuilderConfig,
+        imageSharedFolder,
+        profileName,
+        lanBridgeParent,
+        vmnetNetworkName,
+        apiEndpoint,
+        kubeconfigRef,
+        nfsAutomount,
+        systemdAdapterDbusHost,
+        systemdAdapterDbusPort,
+        hostAssetRotationRetentionCount,
+        readinessTimeout);
+  }
+
+  public Path localWorktreePath() {
+    return worktreeDirOn(WorktreeHost.DARWIN);
+  }
+
+  public String netPrefix() {
+    return "/net/" + clusterName + ".local";
+  }
+
+  private static Path normalizeAbsolutePath(Path rawPath) {
+    return rawPath.toAbsolutePath().normalize();
   }
 }

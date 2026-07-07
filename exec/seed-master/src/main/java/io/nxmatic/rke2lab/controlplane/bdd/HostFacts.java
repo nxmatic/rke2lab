@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;

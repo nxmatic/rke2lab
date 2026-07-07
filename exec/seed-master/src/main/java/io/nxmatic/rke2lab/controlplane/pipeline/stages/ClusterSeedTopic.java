@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedRun;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedScenario;
@@ -9,6 +8,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.HostFacts;
 import io.nxmatic.rke2lab.controlplane.bdd.HostSeeder;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.nxmatic.rke2lab.controlplane.bdd.SeedProbes;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;

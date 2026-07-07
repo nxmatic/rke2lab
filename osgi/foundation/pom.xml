@@ -20,6 +20,5 @@
     <module>world-gateway</module>
     <module>pipeline</module>
     <module>gateway-document-codec</module>
-    <module>host</module>
   </modules>
 </project>

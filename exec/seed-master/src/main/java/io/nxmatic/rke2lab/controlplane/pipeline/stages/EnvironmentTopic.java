@@ -1,9 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.pulumi.Context;
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfigFactory;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -77,7 +76,7 @@ public final class EnvironmentTopic implements Topic.Execution {
   }
 
   public EnvironmentTopic loadBootstrapConfig() {
-    sink.bootstrapConfig(BootstrapConfigFactory.from(config()));
+    sink.bootstrapConfig(BootstrapConfig.from(config()));
     return this;
   }
 

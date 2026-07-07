@@ -179,15 +179,6 @@
       <artifactId>cluster-port</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The config domain's seam: BootstrapConfig, the flat (JDK-closed DAG) bootstrap settings the
-         host derives from the Pulumi-backed Rke2labConfig and passes into the embedded framework via
-         HostFacts. COMPILE scope like the other -port membranes; type=seam so the host reads it back
-         TYPED across the boundary. The derivation (from()) stays host — it touches com.pulumi. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>config-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <!-- Governance annotations: the controlplane package-info poses REALM_BOUNDARY=WARN so the
          staging gate lists the flat-realm doctor.records references during the Plan 2 migration
          (build-time only, not runtime behaviour). -->

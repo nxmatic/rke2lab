@@ -2,9 +2,9 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import com.pulumi.Context;
 import com.pulumi.Pulumi;
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterSeedTopic;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.EnvironmentTopic;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.OutputsTopic;

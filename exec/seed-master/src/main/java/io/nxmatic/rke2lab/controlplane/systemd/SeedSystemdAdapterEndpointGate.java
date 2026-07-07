@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.io.IOException;

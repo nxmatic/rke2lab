@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.systemd.port.SystemdProbeRequest;
 import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.port.SystemdStatusSnapshot;

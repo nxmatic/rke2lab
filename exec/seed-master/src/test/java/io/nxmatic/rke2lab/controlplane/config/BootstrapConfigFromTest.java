@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.controlplane.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;

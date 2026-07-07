@@ -6,7 +6,7 @@ import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
-import io.nxmatic.rke2lab.config.port.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
