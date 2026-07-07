@@ -1,0 +1,66 @@
+= bbox-edge — the router-reconciliation contact, put in its place
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* IN PROGRESS (2026-07-07). The sixth external edge, second extraction of the
+control-plane→OSGi sweep (after link:incus-edge-spec.adoc[incus-edge]). Unlike incus (a bare
+`ProcessBuilder`), the bbox contact rides an external library, `java-bbox-api-client` — so this edge
+also proves the *library-backed* edge shape: the library is made an OSGi bundle and IMPORTED (not
+embedded), and no library type crosses the seam.
+====
+
+== The contact today — inlined, duplicated, library types on the host
+
+The bbox contact (open a session to the Bouygues Bbox router, diff+apply DHCP reservations) lived in
+`seed-master`, duplicated across two paths: `BboxReconcilerComponent.reconcileStandalone` and the
+Pulumi `BboxReservationsResource`. Both did `BboxApiClient.open` + `ReservationReconciler.apply(row,
+mode)`. Five host files imported `io.nxmatic.bbox.*` — the library's `Action`/`RowOutcome`/
+`DesiredReservation` types were spread across the host, including into the Pulumi resource graph
+(`BboxReservationResource` built its `Output`s from a library `RowOutcome`).
+
+== Resolution — a `bbox-edge` `@Component` and a home-vocabulary `bbox-port`
+
+* *java-bbox-api-client* becomes an OSGi bundle (bnd manifest, `0.2.1`): `Bundle-SymbolicName
+  io.nxmatic.bbox.api.client`, exports its two API packages, imports `com.google.gson` (itself a
+  bundle). No embedding — the edge imports it, and the staging closure stages it (and gson) as
+  carriers because an edge imports their packages.
+* *bbox-port* (`type=seam`): `BboxReconciler` — `reconcile(baseUri, password, dryRun,
+  List<BboxReservationRequest>) → List<BboxRowOutcome>` — over a HOME vocabulary
+  (`BboxReservationRequest`, `BboxRowOutcome`, `BboxAction` mirroring the library enum). No
+  `io.nxmatic.bbox.*` type crosses the seam.
+* *bbox-edge* (`type=edge`, `@Component`): `LiveBboxReconciler` opens the session, rebuilds the
+  library `DesiredReservation` from each request, applies, and maps the library `RowOutcome`/`Action`
+  back to the home records. The single door — the library resolves only in this bundle's realm.
+* *seed-master* (host): purified off `io.nxmatic.bbox.*` — it builds `BboxReservationRequest`s from
+  the blueprint, calls the reconciler resolved from the registry, and projects `BboxRowOutcome`s into
+  its counts and Pulumi resource graph. The library types no longer live host-side.
+
+[mermaid]
+....
+flowchart LR
+  world["EXTERNAL<br/>the Bbox router (HTTP API)"]
+  edge["bbox domain — EDGE<br/>bbox-edge: @Component BboxReconciler<br/>(imports java-bbox-api-client)"]
+  bport["bbox domain — PORT<br/>bbox-port: BboxReconciler, Bbox{ReservationRequest,RowOutcome,Action}"]
+  host["control-plane — HOST<br/>blueprint enumeration + Pulumi resource graph<br/>(home vocabulary only)"]
+  edge -->|BboxApiClient session| world
+  edge -.->|implements| bport
+  host -->|composes the contact| bport
+  host -->|projects outcomes into the resource graph| host
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  class edge e;
+  class bport p;
+  class host h;
+  class world w;
+....
+
+== Related documentation
+
+* link:incus-edge-spec.adoc[incus-edge] — the sibling extraction (a bare-ProcessBuilder contact).
+* link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] — the library-backed edge that EMBEDS its jars
+  (dbus-java is not OSGi); bbox imports instead because its client is made a bundle.
+* link:../patterns/port-edge-domain-ownership.adoc[port-edge-domain ownership] — domain CALLS / port DECLARES / edge PROVIDES.

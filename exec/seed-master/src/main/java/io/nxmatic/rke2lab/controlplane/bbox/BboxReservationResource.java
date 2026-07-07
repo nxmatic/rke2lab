@@ -4,8 +4,8 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.bbox.reconcile.Action;
-import io.nxmatic.bbox.reconcile.RowOutcome;
+import io.nxmatic.rke2lab.bbox.port.BboxAction;
+import io.nxmatic.rke2lab.bbox.port.BboxRowOutcome;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -14,49 +14,39 @@ import java.util.Map;
  *
  * <p>One {@link BboxReservationResource} is registered per canonical RKE2 row by the parent {@link
  * BboxReservationsResource}, so {@code pulumi preview} / {@code pulumi up} display a row for every
- * cluster/node pair (e.g. {@code bioskop-master}, {@code nikopol-peer1}). Inputs are the immutable
- * identity of the row ({@code cluster}, {@code node}, {@code mac}, {@code ip}, {@code hostname});
- * outputs surface the reconciliation outcome reported by the library's {@code
- * ReservationReconciler} ({@code action}, optional {@code bboxId}, optional previous values,
- * optional failure message).
- *
- * <p>The {@link RowOutcome} comes from {@code java-bbox-api-client}'s reconcile package and doesn't
- * carry rke2lab's {@code (cluster, node)} identity — that's why the child resource takes both a
- * {@link DesiredRow} (for naming and rke2lab-side metadata) and the {@link RowOutcome} (for the
- * bbox-side result).
+ * cluster/node pair (e.g. {@code bioskop-master}, {@code nikopol-peer1}). Its inputs and outputs
+ * come from the flat {@link BboxRowOutcome} the bbox-edge produced — the reconciliation ran before
+ * this resource is built, so the resource only mirrors the outcome into Pulumi outputs, no bbox
+ * contact.
  */
 public final class BboxReservationResource extends ComponentResource {
 
   private static final String TYPE_TOKEN = "rke2lab:controlplane:BboxReservation";
 
-  private final DesiredRow row;
-  private final RowOutcome outcome;
+  private final BboxRowOutcome outcome;
 
-  public BboxReservationResource(DesiredRow row, RowOutcome outcome, Resource parent) {
+  public BboxReservationResource(BboxRowOutcome outcome, Resource parent) {
     super(
-        TYPE_TOKEN, row.resourceName(), ComponentResourceOptions.builder().parent(parent).build());
+        TYPE_TOKEN,
+        outcome.cluster() + "-" + outcome.node(),
+        ComponentResourceOptions.builder().parent(parent).build());
 
-    this.row = row;
     this.outcome = outcome;
-    registerOutputs(asOutputs(row, outcome));
+    registerOutputs(asOutputs(outcome));
   }
 
-  public DesiredRow row() {
-    return row;
-  }
-
-  public RowOutcome outcome() {
+  public BboxRowOutcome outcome() {
     return outcome;
   }
 
-  public Action action() {
+  public BboxAction action() {
     return outcome.action();
   }
 
-  private static Map<String, Output<?>> asOutputs(DesiredRow row, RowOutcome outcome) {
+  private static Map<String, Output<?>> asOutputs(BboxRowOutcome outcome) {
     final LinkedHashMap<String, Output<?>> out = new LinkedHashMap<>();
-    out.put("cluster", Output.of(row.cluster()));
-    out.put("node", Output.of(row.node()));
+    out.put("cluster", Output.of(outcome.cluster()));
+    out.put("node", Output.of(outcome.node()));
     out.put("mac", Output.of(outcome.mac()));
     out.put("ip", Output.of(outcome.ip()));
     out.put("hostname", Output.of(outcome.hostname()));

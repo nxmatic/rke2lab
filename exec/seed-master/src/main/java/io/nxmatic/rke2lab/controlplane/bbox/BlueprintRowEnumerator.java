@@ -1,19 +1,18 @@
 package io.nxmatic.rke2lab.controlplane.bbox;
 
-import io.nxmatic.bbox.reconcile.DesiredReservation;
+import io.nxmatic.rke2lab.bbox.port.BboxReservationRequest;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Enumerates the canonical RKE2 rows from {@link ClusterNetworkBlueprint}.
+ * Enumerates the canonical RKE2 reservation requests from {@link ClusterNetworkBlueprint}.
  *
  * <p>Owns the canonical clusters/nodes lists and the MAC-prefix safety check. Knows nothing about
- * the bbox API — the bbox-side reconciliation comes from {@code java-bbox-api-client}'s {@code
- * ReservationReconciler}, which in turn knows nothing about the blueprint. The two sides meet
- * through {@link DesiredReservation}; rke2lab wraps each one in a {@link DesiredRow} so the {@code
- * (cluster, node)} pair is preserved for Pulumi resource naming.
+ * the bbox API — it produces flat {@link BboxReservationRequest}s (the bbox-port home vocabulary)
+ * carrying the {@code (cluster, node)} identity alongside the MAC/IP/hostname triple; the bbox-edge
+ * turns each into the library's reservation behind the seam.
  */
 public final class BlueprintRowEnumerator {
 
@@ -47,11 +46,11 @@ public final class BlueprintRowEnumerator {
   }
 
   /**
-   * Materialise the cartesian product of clusters × nodes as {@link DesiredRow}s, deriving each row
-   * from the blueprint and asserting the RKE2 MAC-prefix invariant.
+   * Materialise the cartesian product of clusters × nodes as {@link BboxReservationRequest}s,
+   * deriving each from the blueprint and asserting the RKE2 MAC-prefix invariant.
    */
-  public List<DesiredRow> rows() {
-    final List<DesiredRow> out = new ArrayList<>(clusters.size() * nodes.size());
+  public List<BboxReservationRequest> rows() {
+    final List<BboxReservationRequest> out = new ArrayList<>(clusters.size() * nodes.size());
     for (String cluster : clusters) {
       for (String node : nodes) {
         final ClusterNetworkBlueprint bp =
@@ -72,11 +71,12 @@ public final class BlueprintRowEnumerator {
                   + "); reconciliation aborted to avoid scope creep.");
         }
         out.add(
-            new DesiredRow(
+            new BboxReservationRequest(
                 cluster,
                 node,
-                new DesiredReservation(
-                    mac, bp.lan().hostInetaddr().getHostAddress(), cluster + "-" + node)));
+                mac,
+                bp.lan().hostInetaddr().getHostAddress(),
+                cluster + "-" + node));
       }
     }
     return List.copyOf(out);

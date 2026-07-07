@@ -169,6 +169,16 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- The bbox edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime. runtime
+         scope — seed-master never compiles against the edge impl; BboxStage resolves BboxReconciler
+         from the registry. The edge imports the (bundled) bbox client + gson, staged as carriers by
+         the closure. The edge MUST be embedded or the reconcile contact never publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bbox-edge</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-port</artifactId>
@@ -195,6 +205,14 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The bbox domain's seam: BboxReconciler + its home vocabulary. The host builds
+         BboxReservationRequests from the blueprint and reads BboxRowOutcomes back; no
+         io.nxmatic.bbox.* library type lives host-side. type=seam. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bbox-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- Governance annotations: the controlplane package-info poses REALM_BOUNDARY=WARN so the
@@ -263,7 +281,7 @@
     <dependency>
       <groupId>io.nxmatic</groupId>
       <artifactId>java-bbox-api-client</artifactId>
-      <version>0.2.0</version>
+      <version>0.2.1</version>
     </dependency>
     <dependency>
       <groupId>com.google.code.findbugs</groupId>

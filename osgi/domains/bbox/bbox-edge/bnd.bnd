@@ -1,0 +1,14 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.bbox.edge
+# Self-declares this jar as an embeddable EDGE bundle (scanned + installed under META-INF/bundles by
+# the same io.nxmatic.rke2lab.embed capability as the other carriers). See dbus-systemd-edge.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=edge; edge=bbox
+
+# Nothing embedded: the bbox client (io.nxmatic.bbox.api.client) and gson (com.google.gson) are both
+# real OSGi bundles, staged as carriers and resolved from the registry — this edge IMPORTS them, like
+# cluster-edge would import a bundled tool. No -includeresource, no realm split (the host is purified
+# off io.nxmatic.bbox.*, so the client lives only as a bundle, in one realm).
+# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
+# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
+# nothing resolves at runtime. Drop it from the computed imports.
+Import-Package: !org.jspecify.annotations, *
+-noimportjava: true

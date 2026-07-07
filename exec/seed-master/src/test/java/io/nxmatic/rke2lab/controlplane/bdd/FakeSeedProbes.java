@@ -17,7 +17,7 @@ final class FakeSeedProbes {
   static SeedProbes inert() {
     return new SeedProbes(
         (hostFacts, framework) -> {},
-        hostFacts -> new ReconciliationResult("", Map.of()),
+        (hostFacts, reconciler) -> new ReconciliationResult("", Map.of()),
         (hostFacts, framework) -> Optional.empty());
   }
 }

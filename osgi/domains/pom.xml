@@ -24,5 +24,6 @@
     <module>unitrepo</module>
     <module>ssh-to-age-edge</module>
     <module>incus</module>
+    <module>bbox</module>
   </modules>
 </project>
