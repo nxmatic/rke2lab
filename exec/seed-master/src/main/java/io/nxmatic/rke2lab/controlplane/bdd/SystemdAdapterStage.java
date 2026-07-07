@@ -24,7 +24,6 @@ import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * The systemd-adapter readiness checkpoint, as a phase: it plays the reused {@link
@@ -46,15 +45,16 @@ public class SystemdAdapterStage extends Stage<SystemdAdapterStage> {
   @ExpectedScenarioState OsgiConnection connection;
 
   /**
-   * The endpoint probe, injected when the driver supplies one (a fake in tests, later a
-   * preview-simulated incident), else {@code null} → the stage builds the live probe from the
-   * registry ({@link #liveProbe()}). Optional by nature: the live boot injects nothing and resolves
-   * the probe itself; a test injects a reachable/failing fake so the scenario plays without the
-   * host-side {@code incus exec} the live gate still runs (the un-migrated instance-reachability
-   * axis, see {@code SeedSystemdAdapterEndpointGate}). {@code @MonotonicNonNull}: set at most once
-   * by jGiven, read through {@link #resolveProbe()}.
+   * The endpoint probe override — {@link Optional#empty()} in the live boot (the stage resolves the
+   * live probe from the registry, {@link #liveProbe()}), present when a test injects a
+   * reachable/failing fake (later a preview-simulated incident). Optional by nature, never null: a
+   * test fake lets the scenario play without the host-side {@code incus exec} the live gate still
+   * runs (the un-migrated instance-reachability axis, see {@code SeedSystemdAdapterEndpointGate}).
+   * {@code Resolution.NAME} because its erased type ({@code Optional}) would otherwise collide with
+   * other {@code Optional} scenario-state.
    */
-  @ExpectedScenarioState @MonotonicNonNull SystemdAdapterProbe injectedProbe;
+  @ExpectedScenarioState(resolution = Resolution.NAME)
+  Optional<SystemdAdapterProbe> injectedProbe = Optional.empty();
 
   @ScenarioStage SystemdAdapterScenario.Given given;
   @ScenarioStage SystemdAdapterScenario.When when;
@@ -95,7 +95,7 @@ public class SystemdAdapterStage extends Stage<SystemdAdapterStage> {
    * un-migrated axis), so a test cannot go through it.
    */
   private SystemdAdapterProbe resolveProbe() {
-    return injectedProbe != null ? injectedProbe : liveProbe();
+    return injectedProbe.orElseGet(this::liveProbe);
   }
 
   /** The live probe backed by the runtime-status snapshot resolved from the OSGi registry. */
@@ -130,13 +130,18 @@ public class SystemdAdapterStage extends Stage<SystemdAdapterStage> {
   }
 
   private void consultDoctor(Optional<ObservationView> observation) {
-    final ConsultingService doctor = connection.awaitService(ConsultingService.class, 5000);
-    if (doctor == null || observation.isEmpty() || observation.get().symptom().isEmpty()) {
+    if (observation.isEmpty() || observation.get().symptom().isEmpty()) {
       return;
     }
-    final Document consultation = doctor.consult(consultCheckpoint(observation.get()));
-    log("⚕ " + codec.decode(consultation, Consultation.class).narration());
-    hostFacts.consultations().record(consultation);
+    // The doctor is an OSGi service: absent (a timeout on the registry) → no consultation. Decorate
+    // the registry lookup at the frontier; never reason on a raw null below.
+    Optional.ofNullable(connection.awaitService(ConsultingService.class, 5000))
+        .ifPresent(
+            doctor -> {
+              final Document consultation = doctor.consult(consultCheckpoint(observation.get()));
+              log("⚕ " + codec.decode(consultation, Consultation.class).narration());
+              hostFacts.consultations().record(consultation);
+            });
   }
 
   private Document consultCheckpoint(ObservationView observation) {
@@ -178,8 +183,6 @@ public class SystemdAdapterStage extends Stage<SystemdAdapterStage> {
   }
 
   private void log(String message) {
-    if (hostFacts.readinessLogger() != null) {
-      hostFacts.readinessLogger().accept(message);
-    }
+    hostFacts.readinessLogger().accept(message);
   }
 }

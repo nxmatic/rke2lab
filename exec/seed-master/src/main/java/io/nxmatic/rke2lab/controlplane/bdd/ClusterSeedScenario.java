@@ -3,62 +3,36 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.As;
 import com.tngtech.jgiven.annotation.NestedSteps;
-import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The composing scenario that replaces {@code ClusterSeedPipeline}. Extends {@code
  * ScenarioTestBase} (NOT {@code ScenarioTest}) so we declare the extensions ourselves in order:
- * {@link HostSeeder} FIRST (populates host-facts + connection + hands jGiven the driver's
- * ReportModel before jGiven initializes the scenario), then {@code JGivenExtension}. No {@code
- * Test} suffix on the class → invisible to surefire; played only via the launcher by the driver.
+ * {@link HostSeeder} FIRST, then {@code JGivenExtension}. No {@code Test} suffix on the class →
+ * invisible to surefire; played only via the launcher by the driver.
  *
- * <p>The runbook is NOT harvested back: the driver seeds its OWN {@code ReportModel} into the
- * session store, {@link HostSeeder} plants it in jGiven's store so jGiven writes the run into it,
- * and the driver renders from the reference it already holds. Inject-the-model — one owner, no
- * static, no null (the model is created host-side, never absent).
+ * <p>This class carries NO state and no {@code accept*} channel. {@link HostSeeder} pushes a {@link
+ * StageContext} straight into the run's value-DAG ({@code ScenarioExecutor.readScenarioState}), so
+ * every stage resolves its {@code @ExpectedScenarioState} the one way jGiven flows anything — the
+ * DAG. The scenario's only job is composition: the phase order and the nested sub-trees.
  *
- * <p>The phases run through injected {@link SeedProbes} (live in prod, fakes in tests), fanned out
- * onto the scenario's {@code @ProvidedScenarioState} so each {@code @ScenarioStage} reads the probe
- * it needs — the instance-passing seam that lets the scenario play offline.
+ * <p>The runbook is NOT harvested back either: the driver seeds its OWN {@code ReportModel} into
+ * the session store, {@link HostSeeder} plants it in jGiven's store so jGiven writes the run into
+ * it, and the driver renders from the reference it already holds. The outputs are published by the
+ * terminal {@link OutputsStage} into the driver's sink (jGiven runs {@code @AfterScenario} on
+ * stages only, never on this instance).
  */
-@ExtendWith(HostSeeder.class) // ours first: host-facts + connection + the injected model
+@ExtendWith(
+    HostSeeder.class) // ours first: seeds the StageContext into the DAG + the injected model
 @ExtendWith(JGivenExtension.class) // jGiven second
 public class ClusterSeedScenario
     extends ScenarioTestBase<
-        ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then>
-    implements HostSeeder.HostFactsAware,
-        HostSeeder.ConnectionAware,
-        HostSeeder.ProbesAware,
-        HostSeeder.SystemdProbeAware,
-        HostSeeder.ClusterProbeAware {
-
-  @ProvidedScenarioState HostFacts hostFacts;
-  @ProvidedScenarioState OsgiConnection connection;
-  @ProvidedScenarioState PreflightProbe preflightProbe;
-  @ProvidedScenarioState BboxProbe bboxProbe;
-  @ProvidedScenarioState IncusProbe incusProbe;
-
-  /**
-   * The optional systemd-adapter probe override — set only when a test seeded it (a fake), so the
-   * systemd phase reads it as {@code @ExpectedScenarioState injectedProbe}. Left null in the live
-   * boot, where the stage resolves the live probe from the registry.
-   */
-  @ProvidedScenarioState @MonotonicNonNull SystemdAdapterProbe injectedProbe;
-
-  /**
-   * The optional cluster-readiness probe override — set only when a test seeded it, read by the
-   * nested {@code ClusterReadinessStage} as {@code @ExpectedScenarioState clusterProbe}. Left null
-   * in the live boot, where the stage resolves the live probe from the registry.
-   */
-  @ProvidedScenarioState @MonotonicNonNull ClusterReadinessProbe clusterProbe;
+        ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then> {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
@@ -67,36 +41,20 @@ public class ClusterSeedScenario
     return scenario;
   }
 
-  @Override
-  public void acceptHostFacts(HostFacts facts) {
-    this.hostFacts = facts;
-  }
-
-  @Override
-  public void acceptConnection(OsgiConnection connection) {
-    this.connection = connection;
-  }
-
-  @Override
-  public void acceptProbes(SeedProbes probes) {
-    this.preflightProbe = probes.preflight();
-    this.bboxProbe = probes.bbox();
-    this.incusProbe = probes.incus();
-  }
-
-  @Override
-  public void acceptSystemdProbe(SystemdAdapterProbe probe) {
-    this.injectedProbe = probe;
-  }
-
-  @Override
-  public void acceptClusterProbe(ClusterReadinessProbe probe) {
-    this.clusterProbe = probe;
-  }
-
   @Test
   void the_cluster_is_seeded() {
-    when().preflight().and().bbox().and().incus().and().systemdAdapter().and().resources();
+    when()
+        .preflight()
+        .and()
+        .bbox()
+        .and()
+        .incus()
+        .and()
+        .systemdAdapter()
+        .and()
+        .resources()
+        .and()
+        .outputs();
   }
 
   public static class Given extends Stage<Given> {}
@@ -107,6 +65,7 @@ public class ClusterSeedScenario
     @ScenarioStage IncusStage incus;
     @ScenarioStage SystemdAdapterStage systemdAdapter;
     @ScenarioStage ResourcesStage resources;
+    @ScenarioStage OutputsStage outputs;
 
     @NestedSteps
     @As("preflight")
@@ -140,6 +99,13 @@ public class ClusterSeedScenario
     @As("resources")
     public When resources() {
       resources.the_bootstrap_resources_are_created();
+      return self();
+    }
+
+    @NestedSteps
+    @As("outputs")
+    public When outputs() {
+      outputs.the_stack_outputs_are_collected();
       return self();
     }
   }

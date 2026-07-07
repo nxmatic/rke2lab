@@ -24,6 +24,7 @@ import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
@@ -62,7 +63,7 @@ class SystemdAdapterVerdictTest {
 
   /** Play the scenario with a failing systemd probe and an authority returning {@code action}. */
   private static ExecutionStatus playWithVerdict(Action action) throws Exception {
-    final ReportModel runbook = new ReportModel();
+    final AtomicReference<ReportModel> runbook = new AtomicReference<>();
     final OsgiConnection connection =
         StubConnection.serving(Map.of(ReadinessAuthority.class, authorityReturning(action)));
 
@@ -84,7 +85,7 @@ class SystemdAdapterVerdictTest {
               store.put(ns, HostSeeder.RUN_MODEL, runbook);
             });
 
-    return runbook.getScenarios().get(0).getExecutionStatus();
+    return runbook.get().getScenarios().get(0).getExecutionStatus();
   }
 
   private static ReadinessAuthority authorityReturning(Action action) {

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -61,10 +62,14 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
   @ExpectedScenarioState @MonotonicNonNull Optional<BootstrapResult> bootstrap;
 
   /**
-   * Injected in tests (a per-phase fake/simulated probe); null in the live boot → {@link
-   * #liveProbe()}.
+   * The cluster-readiness probe override — {@link Optional#empty()} in the live boot (the stage
+   * resolves the live probe from the registry, {@link #liveProbe()}), present when a test injects a
+   * per-phase fake/simulated probe. Optional by nature, never null. {@code Resolution.NAME} because
+   * its erased type ({@code Optional}) would otherwise collide with other {@code Optional}
+   * scenario-state.
    */
-  @ExpectedScenarioState @MonotonicNonNull ClusterReadinessProbe clusterProbe;
+  @ExpectedScenarioState(resolution = ScenarioState.Resolution.NAME)
+  Optional<ClusterReadinessProbe> clusterProbe = Optional.empty();
 
   @ScenarioStage ClusterReadinessScenario.Given given;
   @ScenarioStage ClusterReadinessScenario.When when;
@@ -115,7 +120,7 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
   }
 
   private ClusterReadinessProbe resolveProbe() {
-    return clusterProbe != null ? clusterProbe : liveProbe();
+    return clusterProbe.orElseGet(this::liveProbe);
   }
 
   /** The live probe backed by the cluster contact + runtime-status snapshot from the registry. */
@@ -130,23 +135,27 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
   }
 
   private void consultDoctor(Map<ClusterReadinessPhase, ObservationView> phaseObservations) {
-    final ConsultingService doctor = connection.awaitService(ConsultingService.class, 5000);
-    if (doctor == null
-        || phaseObservations.values().stream().noneMatch(o -> o.symptom().isPresent())) {
+    if (phaseObservations.values().stream().noneMatch(o -> o.symptom().isPresent())) {
       return;
     }
-    final Document consultation = doctor.consult(consultCheckpoint(phaseObservations.values()));
-    log("⚕ " + codec.decode(consultation, Consultation.class).narration());
-    hostFacts.consultations().record(consultation);
+    // The doctor is an OSGi service: absent (a timeout on the registry) → no consultation. Decorate
+    // the registry lookup at the frontier; never reason on a raw null below.
+    Optional.ofNullable(connection.awaitService(ConsultingService.class, 5000))
+        .ifPresent(
+            doctor -> {
+              final Document consultation =
+                  doctor.consult(consultCheckpoint(phaseObservations.values()));
+              log("⚕ " + codec.decode(consultation, Consultation.class).narration());
+              hostFacts.consultations().record(consultation);
+            });
   }
 
   private Document consultCheckpoint(Iterable<ObservationView> observations) {
     final List<ObservationWire> wires = new ArrayList<>();
     observations.forEach(observation -> wires.add(observation.toWire()));
     final Optional<Instant> recordedAt =
-        bootstrap != null
-            ? bootstrap.map(result -> result.deployment().timestamp())
-            : Optional.empty();
+        Objects.requireNonNull(bootstrap, "bootstrap (incus phase not run)")
+            .map(result -> result.deployment().timestamp());
     final ReadinessCheckpoint checkpoint =
         new ReadinessCheckpoint(SCENARIO_ID, Optional.empty(), Optional.empty(), recordedAt, wires);
     return new Document(
@@ -177,8 +186,6 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
   }
 
   private void log(String message) {
-    if (hostFacts.readinessLogger() != null) {
-      hostFacts.readinessLogger().accept(message);
-    }
+    hostFacts.readinessLogger().accept(message);
   }
 }

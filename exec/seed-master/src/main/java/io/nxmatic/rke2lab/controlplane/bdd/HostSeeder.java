@@ -1,10 +1,14 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.tngtech.jgiven.Stage;
+import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Config;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
@@ -19,15 +23,15 @@ import org.junit.jupiter.api.extension.TestInstancePostProcessor;
  * <p>Two things ride the store inbound, with different sinks:
  *
  * <ul>
- *   <li>{@link #HOST_FACTS} → the scenario instance's {@code @ProvidedScenarioState} (via {@link
- *       HostFactsAware}).
- *   <li>{@link #RUN_MODEL}, the driver's own {@code ReportModel} → jGiven's OWN store slot. We do
- *       NOT call {@code setModel} on the scenario: jGiven's {@code postProcessTestInstance},
- *       running after us, installs the model from its store and would overwrite ours. Instead we
- *       overwrite jGiven's store entry (namespace {@code com.tngtech.jgiven}, key {@code
- *       report-model}) so jGiven adopts the driver's model as its own. jGiven writes the run into
- *       it; the driver, holding the same reference, renders the runbook from it — one model, one
- *       owner, no harvest-back.
+ *   <li>the phase context ({@link #HOST_FACTS}, {@link #CONNECTION}, {@link #PROBES}, the two probe
+ *       overrides, the outputs sink) → collected into ONE {@link StageContext} carrier and pushed
+ *       into the run's value-DAG with {@code executor.readScenarioState(carrier)}. The stages
+ *       resolve their {@code @ExpectedScenarioState} from that DAG — the single injection channel,
+ *       no {@code *Aware}/{@code accept*} on the scenario.
+ *   <li>the run-model holder ({@link #RUN_MODEL}) → we publish jGiven's OWN {@code ReportModel}
+ *       (created and named in jGiven's {@code beforeAll}, never replaced) into the driver's holder.
+ *       jGiven writes the run into its model; the driver, holding the same reference, renders the
+ *       runbook — one model (jGiven's), no plant, no identity copy, no harvest-back.
  * </ul>
  */
 public final class HostSeeder implements TestInstancePostProcessor, AfterAllCallback {
@@ -48,7 +52,12 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
   /** Store key: the property's value before we overrode it (an {@link java.util.Optional}). */
   private static final String REPORT_ENABLED_PRIOR = "report-enabled-prior";
 
-  /** Inbound key under {@link #NS}: the driver's own {@code ReportModel} (see class javadoc). */
+  /**
+   * Inbound key under {@link #NS}: the driver's run-model holder, an {@link
+   * java.util.concurrent.atomic.AtomicReference} of {@code ReportModel}. HostSeeder publishes
+   * jGiven's OWN (already-named) model into it; the driver reads the same reference after the run
+   * and renders. Inject-the-holder, twin of {@link #OUTPUTS_SINK} — see class javadoc.
+   */
   public static final String RUN_MODEL = "run-model";
 
   /** Inbound key under {@link #NS}: the live OSGi connection the phases attach to. */
@@ -76,6 +85,16 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
   public static final String CLUSTER_PROBE = "cluster-probe";
 
   /**
+   * Inbound key under {@link #NS}: the driver's outputs sink — an {@link
+   * java.util.concurrent.atomic.AtomicReference} the driver holds and the terminal {@link
+   * OutputsStage} publishes the collected outputs into. The inject-the-holder idiom, twin of {@link
+   * #RUN_MODEL}: one holder, seeded by the driver, filled by the run, read by the driver — no
+   * static, no harvest-back. Optional by nature: a focused stage unit test that ignores outputs
+   * omits it, so the carrier's field stays {@link Optional#empty()}.
+   */
+  public static final String OUTPUTS_SINK = "outputs-sink";
+
+  /**
    * jGiven's own report-model store coordinate — derived, not hardcoded: the namespace is jGiven's
    * base package (via {@link Stage}), the key its store slot. We overwrite this so jGiven adopts
    * the driver's model as its own.
@@ -86,42 +105,75 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
 
   @Override
   public void postProcessTestInstance(Object testInstance, ExtensionContext context) {
-    final HostFacts facts = context.getStore(NS).get(HOST_FACTS, HostFacts.class);
-    if (facts != null && testInstance instanceof HostFactsAware aware) {
-      aware.acceptHostFacts(facts);
+    // Only a ScenarioTestBase carries an executor + a value-DAG to seed into; anything else is not
+    // ours to touch.
+    if (!(testInstance instanceof ScenarioTestBase<?, ?, ?> scenarioBase)) {
+      return;
     }
-    final OsgiConnection connection = context.getStore(NS).get(CONNECTION, OsgiConnection.class);
-    if (connection != null && testInstance instanceof ConnectionAware aware) {
-      aware.acceptConnection(connection);
+    // The host bag is REQUIRED: the driver always seeds it before launching, so its absence is a
+    // broken contract, not a case to skip silently.
+    final HostFacts facts =
+        Objects.requireNonNull(
+            context.getStore(NS).get(HOST_FACTS, HostFacts.class),
+            "HOST_FACTS not seeded (the driver must seed the host bag before launching)");
+
+    // Preview (the LiveGate closed): swap in the E9 executor so the runbook renders the full plan
+    // as PENDING without deferring the tree. This runs BEFORE jGiven's postProcessTestInstance,
+    // whose setModel wires the model-builder listener onto whichever executor the scenario holds —
+    // so our decorate is in place before the listener is attached (verified: ScenarioBase.setModel
+    // → executor.setListener). In a live run the default executor stays, so the decorate is inert.
+    if (!facts.liveGate().isOpen()) {
+      scenarioBase.getScenario().setExecutor(new PendingMarkingScenarioExecutor(true));
     }
+
+    // Fill ONE carrier from the store and push it into the run's value-DAG. This is the single way
+    // a stage receives context: it resolves its @ExpectedScenarioState from the same map jGiven
+    // uses for phase-to-phase flow. No parallel *Aware/accept* channel, no pass-through fields on
+    // the scenario. readScenarioState only ADDS to the executor's (final, never-cleared) injector
+    // map, and runs before jGiven's own init (lazy, on first when()), so the seed survives the run.
+    final StageContext carrier = new StageContext();
+    carrier.hostFacts = facts;
+    // The connection is REQUIRED too: every cluster-seed phase reaches the OSGi world through it,
+    // so
+    // the driver (holding a booted framework) always seeds it — its absence is a broken contract.
+    carrier.connection =
+        Objects.requireNonNull(
+            context.getStore(NS).get(CONNECTION, OsgiConnection.class),
+            "CONNECTION not seeded (the driver must seed the OSGi connection before launching)");
     final SeedProbes probes = context.getStore(NS).get(PROBES, SeedProbes.class);
-    if (probes != null && testInstance instanceof ProbesAware aware) {
-      aware.acceptProbes(probes);
+    if (probes != null) {
+      carrier.preflightProbe = probes.preflight();
+      carrier.bboxProbe = probes.bbox();
+      carrier.incusProbe = probes.incus();
     }
-    final SystemdAdapterProbe systemdProbe =
-        context.getStore(NS).get(SYSTEMD_PROBE, SystemdAdapterProbe.class);
-    if (systemdProbe != null && testInstance instanceof SystemdProbeAware aware) {
-      aware.acceptSystemdProbe(systemdProbe);
+    carrier.injectedProbe =
+        Optional.ofNullable(context.getStore(NS).get(SYSTEMD_PROBE, SystemdAdapterProbe.class));
+    carrier.clusterProbe =
+        Optional.ofNullable(context.getStore(NS).get(CLUSTER_PROBE, ClusterReadinessProbe.class));
+    @SuppressWarnings("unchecked")
+    final AtomicReference<Map<String, Object>> outputsSink =
+        context.getStore(NS).get(OUTPUTS_SINK, AtomicReference.class);
+    carrier.outputsSink = Optional.ofNullable(outputsSink);
+    scenarioBase.getScenario().getExecutor().readScenarioState(carrier);
+
+    // Hand the driver jGiven's OWN model — inject-the-holder, the twin of the outputs sink. jGiven
+    // created and NAMED its model in beforeAll (test class + display name) and never replaces that
+    // instance (it re-reads the same store slot in afterAll to finalize it — verified). So rather
+    // than plant our own model and copy jGiven's identity onto it, we just publish jGiven's model
+    // into the driver's holder: jGiven writes the run into it, the driver reads the same reference
+    // and renders. One model, jGiven's, no plant, no identity copy.
+    @SuppressWarnings("unchecked")
+    final AtomicReference<ReportModel> runModelHolder =
+        context.getStore(NS).get(RUN_MODEL, AtomicReference.class);
+    if (runModelHolder != null) {
+      // jGiven's beforeAll (which ran before us) always put its model in this slot — its absence
+      // would be a broken jGiven contract, not a case to skip.
+      runModelHolder.set(
+          Objects.requireNonNull(
+              context.getStore(JGIVEN_NS).get(JGIVEN_REPORT_MODEL, ReportModel.class),
+              "jGiven's ReportModel absent from its store (beforeAll did not run)"));
     }
-    final ClusterReadinessProbe clusterProbe =
-        context.getStore(NS).get(CLUSTER_PROBE, ClusterReadinessProbe.class);
-    if (clusterProbe != null && testInstance instanceof ClusterProbeAware aware) {
-      aware.acceptClusterProbe(clusterProbe);
-    }
-    final ReportModel runbook = context.getStore(NS).get(RUN_MODEL, ReportModel.class);
-    if (runbook != null) {
-      // jGiven created its own model in beforeAll and named it (test class + display name). We
-      // replace it with the driver's, but carry that identity over — else the model is nameless
-      // (a "null.json" report, a "Test Class: null" rendering).
-      final ReportModel named =
-          context.getStore(JGIVEN_NS).get(JGIVEN_REPORT_MODEL, ReportModel.class);
-      if (named != null) {
-        runbook.setName(named.getName());
-        runbook.setClassName(named.getClassName());
-        runbook.setDescription(named.getDescription());
-      }
-      context.getStore(JGIVEN_NS).put(JGIVEN_REPORT_MODEL, runbook);
-    }
+
     // Disable jGiven's on-disk report for this launcher run (see REPORT_ENABLED_PROPERTY), saving
     // the prior value so afterAll can restore it — no leaked global state.
     context
@@ -146,44 +198,5 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
     } else {
       System.setProperty(REPORT_ENABLED_PROPERTY, prior.get());
     }
-  }
-
-  /** Implemented by the scenario so the seeder sets its state without reflection. */
-  public interface HostFactsAware {
-    void acceptHostFacts(HostFacts facts);
-  }
-
-  /**
-   * Implemented by the scenario so the seeder installs the live OSGi connection — the world the
-   * phases attach to (without owning its lifecycle) to reach model services.
-   */
-  public interface ConnectionAware {
-    void acceptConnection(OsgiConnection connection);
-  }
-
-  /**
-   * Implemented by the scenario so the seeder installs the phase collaborators — live in prod,
-   * fakes in tests, the instance-passing seam that lets the scenario play offline.
-   */
-  public interface ProbesAware {
-    void acceptProbes(SeedProbes probes);
-  }
-
-  /**
-   * Implemented by the scenario so the seeder installs the OPTIONAL systemd-adapter probe override
-   * — a test's reachable/failing fake. Absent in the live boot (the stage resolves the live probe
-   * from the registry), so this is only reached when a test seeded {@link #SYSTEMD_PROBE}.
-   */
-  public interface SystemdProbeAware {
-    void acceptSystemdProbe(SystemdAdapterProbe probe);
-  }
-
-  /**
-   * Implemented by the scenario so the seeder installs the OPTIONAL cluster-readiness probe
-   * override — a test's per-phase fake. Absent in the live boot (the stage resolves the live probe
-   * from the registry), so this is only reached when a test seeded {@link #CLUSTER_PROBE}.
-   */
-  public interface ClusterProbeAware {
-    void acceptClusterProbe(ClusterReadinessProbe probe);
   }
 }
