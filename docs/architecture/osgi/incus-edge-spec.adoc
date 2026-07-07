@@ -1,0 +1,70 @@
+= incus-edge — the instance-reachability contact, put in its place
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* IMPLEMENTED (2026-07-07). The fifth external edge of the frontier-playability model, after
+link:pulumi-edge-handoff.adoc[pulumi-edge], link:ssh-to-age-edge-handoff.adoc[ssh-to-age-edge],
+link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] and link:cluster-edge-spec.adoc[cluster-edge]. It
+mirrors their shape: a single `@Component` shells the external tool; everything else consumes a port.
+
+This is the first extraction of the control-plane→OSGi sweep, and it validated the working unit of
+that sweep: *one external contact, extracted atomically* — the port, the edge, AND the re-wiring of
+the consumer, in one change (as ssh-to-age did). A criterion learned the hard way: a type migrates to
+a bundle only if a bundle `@Component` contacts an external system (→ edge) or rides its verb (→
+port). "Pulumi-free" is not enough.
+====
+
+== The contact today — inlined in the host readiness gate
+
+`SeedSystemdAdapterEndpointGate` (seed-master) waited on two axes: the dbus runtime status (already an
+OSGi service, `SystemdRuntimeProbe`) and *instance reachability* — running `ssh … incus exec <node> --
+true` to check a launched Incus instance answers. The second was still host I/O: a `ProcessBuilder`
+inlined in the gate (`probeInstanceReachable` / `incusExec` / `runCommand`), marked
+`@Transitional(to="incus-edge")` precisely because it awaited this extraction.
+
+Only that contact is an edge. The gate's retry loop, deadline, adaptive intervals, and the
+`ObservationView`/`SymptomKind` projection are host orchestration that genuinely stays.
+
+== Resolution — an `incus-edge` `@Component` and an `incus-port` seam
+
+* *incus-port* (`type=seam`): `IncusInstanceContact` — the verb `isReachable(IncusExecRequest) →
+  Optional<String>` (empty = reachable, else the failure summary); and `IncusExecRequest`, the flat
+  seam record (`sshHost`, `incusProject`, `nodeName`) the host projects out of its config at the call
+  site. No host config type crosses.
+* *incus-edge* (`type=edge`, `@Component`): `ProcessBuilderIncusInstanceContact` — shells
+  `ssh … incus exec` and nothing else. Pure `ProcessBuilder` over the JDK, no embedded jars, mirroring
+  cluster-edge's kubectl contact.
+* *seed-master* (host): the gate keeps the orchestration; `SystemdAdapterStage.liveProbe()` resolves
+  `IncusInstanceContact` from the registry (`connection.awaitService`) alongside the
+  `SystemdRuntimeProbe` it already resolved, and passes it to `SeedSystemdAdapterEndpointGate.live`.
+  The host `probeInstanceReachable`/`incusExec`/`runCommand` are gone; the `@Transitional` marker is
+  erased.
+
+[mermaid]
+....
+flowchart LR
+  world["EXTERNAL<br/>the Incus host (ssh + incus exec)"]
+  edge["incus domain — EDGE<br/>incus-edge: @Component IncusInstanceContact<br/>(ssh … incus exec)"]
+  iport["incus domain — PORT<br/>incus-port: IncusInstanceContact, IncusExecRequest"]
+  gate["control-plane — HOST<br/>SeedSystemdAdapterEndpointGate<br/>(retry loop + deadline + ObservationView)"]
+  edge -->|ssh incus exec| world
+  edge -.->|implements| iport
+  gate -->|composes the contact| iport
+  gate -->|projects into ObservationView| gate
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  class edge e;
+  class iport p;
+  class gate h;
+  class world w;
+....
+
+== Related documentation
+
+* link:cluster-edge-spec.adoc[cluster-edge] — the edge this most closely mirrors (kubectl contact).
+* link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] — the other axis of the same readiness gate.
+* link:../patterns/port-edge-domain-ownership.adoc[port-edge-domain ownership] — domain CALLS / port DECLARES / edge PROVIDES.

@@ -159,6 +159,16 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- The incus edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
+         flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
+         the readiness gate resolves IncusInstanceContact from the registry (awaitService). The edge
+         MUST be embedded or the instance-reachability contact never publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-edge</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-port</artifactId>
@@ -177,6 +187,14 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The incus domain's seam: IncusInstanceContact, the instance-reachability contact the host
+         readiness gate composes from the registry (the incus-edge shells `ssh … incus exec`).
+         COMPILE scope like the other -port membranes; type=seam so the host reads it back typed. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- Governance annotations: the controlplane package-info poses REALM_BOUNDARY=WARN so the

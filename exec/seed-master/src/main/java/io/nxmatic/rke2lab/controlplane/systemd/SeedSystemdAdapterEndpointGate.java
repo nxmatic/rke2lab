@@ -2,17 +2,13 @@ package io.nxmatic.rke2lab.controlplane.systemd;
 
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.domain.annotations.Transitional;
+import io.nxmatic.rke2lab.incus.port.IncusExecRequest;
+import io.nxmatic.rke2lab.incus.port.IncusInstanceContact;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -20,20 +16,16 @@ import java.util.function.LongSupplier;
 /**
  * Pulumi-side gate that waits for the dbus-on-TCP probe to report ok.
  *
- * <p>Two axes, at different migration stages: the dbus runtime status is already an OSGi service
- * ({@code SystemdRuntimeProbe}, resolved from the registry), but the instance-reachability axis
- * ({@link #waitForInstanceReachable}) still runs {@code incus exec} host-side because the INCUS
- * external edge does not exist yet. When that edge lands (the external-edges chantier — incus /
- * cluster / host-fs remain), this gate's host I/O dies and the whole readiness path resolves from
- * the registry like dbus. Marked {@code @Transitional} so the code point is navigable back to that
- * pending migration.
+ * <p>Both external axes are now OSGi services resolved from the registry: the dbus runtime status
+ * ({@code SystemdRuntimeProbe}) and the instance-reachability contact ({@code
+ * IncusInstanceContact}, the incus-edge). This gate holds no host I/O — it composes the two
+ * injected contacts and owns the orchestration (the retry loop, the deadline, the {@link
+ * ObservationView} projection).
  */
-@Transitional(to = "incus-edge (external edge, not yet built) — host incus-exec moves into OSGi")
 public final class SeedSystemdAdapterEndpointGate {
 
   private static final String API_VERSION = "rke2lab.nxmatic.io/v1alpha1";
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
-  private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
   // Adaptive retry intervals based on bootstrap phase
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_EARLY = Duration.ofSeconds(15);
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_MID = Duration.ofSeconds(8);
@@ -64,14 +56,24 @@ public final class SeedSystemdAdapterEndpointGate {
     this.instanceReachability = instanceReachability;
   }
 
-  /** The live gate, wired to the real wall clock, sleep, dbus runtime probe, and incus exec. */
+  /**
+   * The live gate, wired to the real wall clock and sleep, the dbus runtime probe, and the
+   * incus-edge instance-reachability contact — both resolved from the OSGi registry by the caller
+   * and passed in. The gate projects the host {@link BootstrapConfig} into the flat {@link
+   * IncusExecRequest} the contact takes.
+   */
   public static SeedSystemdAdapterEndpointGate live(
-      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus) {
+      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus, IncusInstanceContact instanceContact) {
     return new SeedSystemdAdapterEndpointGate(
         System::nanoTime,
         SeedSystemdAdapterEndpointGate::sleep,
         runtimeStatus::snapshot,
-        SeedSystemdAdapterEndpointGate::probeInstanceReachable);
+        config -> instanceContact.isReachable(execRequestFrom(config)));
+  }
+
+  private static IncusExecRequest execRequestFrom(BootstrapConfig config) {
+    return new IncusExecRequest(
+        config.imageBuilderHost(), config.incusProject(), config.nodeName());
   }
 
   public static ObservationView deferredPreview(BootstrapConfig config) {
@@ -300,82 +302,6 @@ public final class SeedSystemdAdapterEndpointGate {
                     "systemd-adapter-runtime"))));
   }
 
-  /** The live instance-reachability check: empty when reachable, the failure summary otherwise. */
-  private static Optional<String> probeInstanceReachable(BootstrapConfig config) {
-    final CommandResult result = runCommand(incusExec(config, "true"));
-    return result.exitCode() == 0 ? Optional.empty() : Optional.of(result.summary());
-  }
-
-  private static CommandResult runCommand(List<String> command) {
-    final ProcessBuilder processBuilder = new ProcessBuilder(command);
-    processBuilder.environment().putIfAbsent("LANG", "C");
-    try {
-      final Process process = processBuilder.start();
-      final boolean exited = process.waitFor(COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-      if (!exited) {
-        process.destroyForcibly();
-        return new CommandResult(-1, "", "timed out after " + COMMAND_TIMEOUT);
-      }
-
-      final String stdout =
-          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      final String stderr =
-          new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-      return new CommandResult(process.exitValue(), stdout, stderr);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      return new CommandResult(-1, "", "command interrupted");
-    } catch (IOException ex) {
-      return new CommandResult(-1, "", "failed to execute command: " + ex.getMessage());
-    }
-  }
-
-  private static List<String> incusExec(BootstrapConfig config, String... args) {
-    // ssh joins post-destination argv with spaces and re-parses on the remote
-    // side, so a multi-line script passed as a separate `sh -lc <script>` argv
-    // entry would be split on whitespace. Build the entire remote command as a
-    // single shell-quoted string and hand it to ssh as one argument.
-    final String remoteIncusCommand =
-        "incus --project "
-            + shellQuote(config.incusProject())
-            + " exec "
-            + shellQuote(config.nodeName())
-            + " -- "
-            + joinShellQuoted(args);
-
-    return List.of(
-        "ssh",
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=10",
-        config.imageBuilderHost(),
-        remoteIncusCommand);
-  }
-
-  private static String joinShellQuoted(String... values) {
-    if (values == null || values.length == 0) {
-      return "";
-    }
-
-    final ArrayList<String> quoted = new ArrayList<>(values.length);
-    for (String value : values) {
-      quoted.add(shellQuote(value == null ? "" : value));
-    }
-    return String.join(" ", quoted);
-  }
-
-  private static String shellQuote(String value) {
-    return "'" + value.replace("'", "'\"'\"'") + "'";
-  }
-
-  private static String firstNonBlankLine(String value) {
-    if (value == null || value.isBlank()) {
-      return "";
-    }
-    return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
-  }
-
   /**
    * The gate's resource-identity metadata ({@code apiVersion}/{@code kind}) merged ahead of the
    * call-site details, forming the {@link ObservationView}'s details map. {@code status}/{@code
@@ -390,25 +316,5 @@ public final class SeedSystemdAdapterEndpointGate {
       map.putAll(callerDetails);
     }
     return map;
-  }
-
-  private record CommandResult(int exitCode, String stdout, String stderr) {
-    private String summary() {
-      if (exitCode == 0) {
-        return "ok";
-      }
-
-      final String firstStderr = firstNonBlankLine(stderr);
-      if (!firstStderr.isBlank()) {
-        return firstStderr;
-      }
-
-      final String firstStdout = firstNonBlankLine(stdout);
-      if (!firstStdout.isBlank()) {
-        return firstStdout;
-      }
-
-      return "exit=" + exitCode;
-    }
   }
 }

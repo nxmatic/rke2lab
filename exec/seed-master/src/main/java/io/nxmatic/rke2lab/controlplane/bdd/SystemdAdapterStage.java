@@ -9,6 +9,7 @@ import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.incus.port.IncusInstanceContact;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
@@ -98,13 +99,17 @@ public class SystemdAdapterStage extends Stage<SystemdAdapterStage> {
     return injectedProbe.orElseGet(this::liveProbe);
   }
 
-  /** The live probe backed by the runtime-status snapshot resolved from the OSGi registry. */
+  /**
+   * The live probe backed by the runtime-status snapshot + incus contact resolved from the
+   * registry.
+   */
   private SystemdAdapterProbe liveProbe() {
     final SeedSystemdAdapterRuntimeStatusSnapshot snapshot =
         new SeedSystemdAdapterRuntimeStatusSnapshot(
             connection.awaitService(SystemdRuntimeProbe.class, 5000));
     final SeedSystemdAdapterEndpointGate endpointGate =
-        SeedSystemdAdapterEndpointGate.live(snapshot);
+        SeedSystemdAdapterEndpointGate.live(
+            snapshot, connection.awaitService(IncusInstanceContact.class, 5000));
     return cfg -> endpointGate.ensureReachable(cfg, hostFacts.readinessLogger());
   }
 
