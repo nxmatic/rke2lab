@@ -7,10 +7,10 @@ import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 
 /**
- * Preflight entry gate, as a phase. Transposes {@code PreflightTopic}'s enforcement calls, run
- * through an injected {@link PreflightProbe} (live enforces against the attached framework; tests
- * inject a fake). The framework is derived from the connection WITHOUT owning its lifecycle ({@link
- * BootedFramework#attached}) — the phase is attached to the world, it did not boot it.
+ * Preflight entry gate, as a phase, run through an injected {@link PreflightProbe} (live enforces
+ * against the attached framework; tests inject a fake). The framework is derived from the
+ * connection WITHOUT owning its lifecycle ({@link BootedFramework#attached}) — the phase is
+ * attached to the world, it did not boot it.
  */
 public class PreflightStage extends Stage<PreflightStage> {
 

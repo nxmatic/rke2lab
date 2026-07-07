@@ -119,8 +119,7 @@ public final class ClusterReadinessScenario {
    * is only ever reached once every phase passed — it is the readable closing assertion of the
    * scenario, not where phase evaluation happens. The failing phase's observation (with its
    * symptom) is captured by the stage via the probe-holder seam, not read back through a stage
-   * getter (JGiven intercepts public stage methods as steps), exactly as {@code
-   * SystemdAdapterTopic} does.
+   * getter (JGiven intercepts public stage methods as steps).
    */
   public static class Then extends Stage<Then> {
 

@@ -5,9 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepModel;
+import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
+import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
+import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
+import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
+import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -15,17 +23,22 @@ import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.engine.support.store.Namespace;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.launch.Framework;
 
 /**
- * The three pure phases play in DAG order under the launcher: preflight gates, bbox reconciles,
- * incus provisions. Driven with INERT fakes (no git/bbox/incus touched) and a connection whose
- * framework the fakes never call — a pure-jGiven test, no Felix, proving the phase composition and
- * the injected-probe seam. The runbook is inject-the-model (the driver holds the reference).
+ * The full seed scenario plays OFFLINE under the launcher: preflight gates, bbox reconciles, incus
+ * provisions, systemd adapter launches — all four phases in DAG order. The three pure phases run
+ * INERT fakes ({@link FakeSeedProbes}); the systemd phase runs an INJECTED reachable probe (its own
+ * channel, {@link HostSeeder#SYSTEMD_PROBE}) so it plays without the live gate's host-side {@code
+ * incus exec}. None touches the world, and the systemd phase short-circuits {@code liveProbe()}, so
+ * the connection's framework is never called — a pure-jGiven test, no Felix. The registry-resolved
+ * path (real fakes in a Felix) is proven separately by {@code SystemdAdapterStageTest}. The runbook
+ * is inject-the-model (the driver holds the reference).
  */
 class PureStagesTest {
 
   @Test
-  void the_three_pure_phases_play_in_dag_order() throws Exception {
+  void the_full_seed_scenario_plays_offline_in_dag_order() throws Exception {
     final ReportModel runbook = new ReportModel();
     final HostFacts facts = sampleFacts();
     final OsgiConnection connection = attachedToUnusedFramework();
@@ -44,21 +57,22 @@ class PureStagesTest {
               store.put(ns, HostSeeder.HOST_FACTS, facts);
               store.put(ns, HostSeeder.CONNECTION, connection);
               store.put(ns, HostSeeder.PROBES, FakeSeedProbes.inert());
+              store.put(ns, HostSeeder.SYSTEMD_PROBE, FakeSeedProbes.reachableSystemdAdapter());
               store.put(ns, HostSeeder.RUN_MODEL, runbook);
             });
 
     assertEquals(1, runbook.getScenarios().size(), "one scenario played into the driver's model");
     assertEquals(ExecutionStatus.SUCCESS, runbook.getScenarios().get(0).getExecutionStatus());
 
-    // The three phases compose as @NestedSteps: each is one root step (preflight / bbox / incus)
-    // carrying its inner phase step. Assert the tree — the root names in DAG order, and that each
-    // root actually nests its phase body (the composition, not just three flat lines).
+    // The four phases compose as @NestedSteps: each is one root step carrying its inner phase step.
+    // Assert the tree — the root names in DAG order, and that each root actually nests its phase
+    // body (the composition, not just four flat lines).
     final List<StepModel> roots =
         runbook.getScenarios().get(0).getScenarioCases().get(0).getSteps();
     assertEquals(
-        List.of("preflight", "bbox", "incus"),
+        List.of("preflight", "bbox", "incus", "systemd adapter"),
         roots.stream().map(StepModel::getName).toList(),
-        "the three phases narrate as root steps in DAG order");
+        "the four phases narrate as root steps in DAG order");
     roots.forEach(
         root ->
             assertEquals(
@@ -80,7 +94,7 @@ class PureStagesTest {
                   if (method.getName().equals("getBundle") && args != null && args.length == 1) {
                     return Proxy.newProxyInstance(
                         PureStagesTest.class.getClassLoader(),
-                        new Class<?>[] {org.osgi.framework.launch.Framework.class},
+                        new Class<?>[] {Framework.class},
                         (p, m, a) -> {
                           throw new UnsupportedOperationException(
                               "inert test: the framework is never called");
@@ -96,14 +110,13 @@ class PureStagesTest {
     return new HostFacts(
         cfg.asBootstrapConfig(),
         cfg.asPolicy(),
-        io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions.from(cfg.asDto()),
-        io.nxmatic.rke2lab.pulumi.edge.LiveGate.forRun(
-            io.nxmatic.rke2lab.pulumi.edge.RunMode.STANDALONE),
-        new io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator(false),
-        new io.nxmatic.rke2lab.controlplane.resources.ResourceManager(),
-        new io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder(),
+        BootstrapOptions.from(cfg.asDto()),
+        LiveGate.forRun(RunMode.STANDALONE),
+        new BboxReconciliationOrchestrator(false),
+        new ResourceManager(),
+        new OutputBuilder(),
         message -> {},
-        io.nxmatic.rke2lab.pipeline.OnFailure.noop(),
-        new io.nxmatic.rke2lab.doctor.port.ConsultationLog());
+        OnFailure.noop(),
+        new ConsultationLog());
   }
 }

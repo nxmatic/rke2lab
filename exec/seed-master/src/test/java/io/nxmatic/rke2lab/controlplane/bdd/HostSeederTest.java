@@ -4,9 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
+import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
+import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
+import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
+import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
+import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
  * The seeder reads HostFacts from the session store and pushes them onto the scenario instance's
@@ -30,11 +40,11 @@ class HostSeederTest implements HostSeeder.HostFactsAware {
     assertSame(FactsStoreSeeder.FACTS, hostFacts, "the exact bag the host seeded");
   }
 
-  static final class FactsStoreSeeder implements org.junit.jupiter.api.extension.BeforeAllCallback {
+  static final class FactsStoreSeeder implements BeforeAllCallback {
     static final HostFacts FACTS = sampleFacts();
 
     @Override
-    public void beforeAll(org.junit.jupiter.api.extension.ExtensionContext context) {
+    public void beforeAll(ExtensionContext context) {
       context.getStore(HostSeeder.NS).put(HostSeeder.HOST_FACTS, FACTS);
     }
 
@@ -43,15 +53,14 @@ class HostSeederTest implements HostSeeder.HostFactsAware {
       return new HostFacts(
           cfg.asBootstrapConfig(),
           cfg.asPolicy(),
-          io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions.from(cfg.asDto()),
-          io.nxmatic.rke2lab.pulumi.edge.LiveGate.forRun(
-              io.nxmatic.rke2lab.pulumi.edge.RunMode.STANDALONE),
-          new io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator(false),
-          new io.nxmatic.rke2lab.controlplane.resources.ResourceManager(),
-          new io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder(),
+          BootstrapOptions.from(cfg.asDto()),
+          LiveGate.forRun(RunMode.STANDALONE),
+          new BboxReconciliationOrchestrator(false),
+          new ResourceManager(),
+          new OutputBuilder(),
           message -> {},
-          io.nxmatic.rke2lab.pipeline.OnFailure.noop(),
-          new io.nxmatic.rke2lab.doctor.port.ConsultationLog());
+          OnFailure.noop(),
+          new ConsultationLog());
     }
   }
 }

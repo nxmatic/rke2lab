@@ -1,0 +1,21 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core.fake
+
+# A FRAGMENT of doctor-core: it attaches to the core by BSN, sharing its classloader. Its classes
+# and OSGI-INF/*.xml become EXTRA RESOURCES of the host. SCR scans the host AND its attached
+# fragments (DS 112.4.1), so the @Components below activate in doctor-core's context when the core
+# starts — publishing fake ReadinessAuthority + ConsultingService next to the live actors.
+# doctor-core declares Service-Component: OSGI-INF/*.xml (findEntries spans fragments) so these
+# descriptors are scanned. The fakes live in their OWN package (…doctor.fake), not doctor-core's
+# sealed package — they implement PUBLIC gateway seams, no white-box access needed.
+Fragment-Host: io.nxmatic.rke2lab.doctor.core
+
+# Selected by OutOfContainerFrameworkExtension via an LDAP filter over these attributes — never by a
+# Bundle-SymbolicName literal. Its host (doctor-core) is found through the Fragment-Host above.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=doctor; role=gateway-fake
+
+# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
+# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
+# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
+# computed imports; the annotations do their job at compile/analysis time only.
+Import-Package: !org.jspecify.annotations, *
+-noimportjava: true

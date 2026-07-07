@@ -113,9 +113,10 @@ class RunbookRenderingTest {
   }
 
   /**
-   * Mirrors {@code SystemdAdapterTopic.launch()} on failure: the Then throws, but {@code
-   * finished()} still runs in a finally so the failed scenario is flushed into the model and
-   * renders (the bug this test guards against).
+   * Plays the systemd-adapter scenario on failure — the {@code Then} throws, but {@code finished()}
+   * still runs in a finally so the failed scenario is flushed into the model and renders (the bug
+   * this test guards against). Isolated on the reused scenario so the renderer is tested on its
+   * own.
    */
   private static ReportModel playFailingScenario() {
     final ReportModel model = new ReportModel();

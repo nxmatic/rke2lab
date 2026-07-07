@@ -10,10 +10,10 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import java.util.Optional;
 
 /**
- * Incus provisioning, as a phase. Transposes {@code IncusTopic.provisionInstance}, run through an
- * injected {@link IncusProbe}. The result is an Outcome — {@link Optional}: present when the
- * mutation ran (a live provisioning), empty when deferred. The framework is derived from the
- * connection without owning its lifecycle ({@link BootedFramework#attached}).
+ * Incus provisioning, as a phase, run through an injected {@link IncusProbe}. The result is an
+ * Outcome — {@link Optional}: present when the mutation ran (a live provisioning), empty when
+ * deferred. The framework is derived from the connection without owning its lifecycle ({@link
+ * BootedFramework#attached}).
  */
 public class IncusStage extends Stage<IncusStage> {
 

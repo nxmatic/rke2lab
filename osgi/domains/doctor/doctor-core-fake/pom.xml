@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>doctor-core-fake</artifactId>
+  <name>osgi/domains/doctor/doctor-core-fake</name>
+  <description>The fake fragment of doctor-core: a Fragment-Host attached to the doctor-core bundle,
+    carrying @Components that publish ReadinessAuthority and ConsultingService with property
+    variant=fake. SCR scans the host's fragments (DS 112.4.1) and activates them in doctor-core's
+    context, alongside the live DefaultReadinessAuthority; a test connection's service selector picks
+    the fake by its property. It lets a host-agnostic pipeline stage exercise its failure path (the
+    consult + verdict) from the registry without the full doctor graph — the test twin of the
+    doctor's gateway seams. Consultation/verdict Documents are encoded with the fragment's own codec,
+    resolved through the doctor-core host at runtime.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+    <!-- provided: the fragment resolves these through the doctor-core host at runtime (this is the
+         compile-time view only). doctor-port for ConsultingService; world-gateway for the seam verbs
+         + value records (ReadinessAuthority, Document, Consultation, ReadinessVerdict); the codec to
+         (de)serialize the Document payloads (nested in the doctor-core host bundle). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>world-gateway</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>gateway-document-codec</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

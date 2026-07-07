@@ -7,9 +7,9 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator.ReconciliationResult;
 
 /**
- * Bbox-reservation reconciliation, as a phase. Transposes {@code BboxTopic.reconcileReservations}.
- * The reconciliation runs through an injected {@link BboxProbe} (live delegates to the real
- * orchestrator; tests inject a fake), so the phase touches no bbox secrets when played offline.
+ * Bbox-reservation reconciliation, as a phase. The reconciliation runs through an injected {@link
+ * BboxProbe} (live delegates to the real orchestrator; tests inject a fake), so the phase touches
+ * no bbox secrets when played offline.
  */
 public class BboxStage extends Stage<BboxStage> {
 

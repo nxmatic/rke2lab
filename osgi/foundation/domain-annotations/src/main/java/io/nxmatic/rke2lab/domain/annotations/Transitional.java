@@ -21,15 +21,38 @@ import java.lang.annotation.Target;
  * <p>Lives in {@code domain-annotations}, a dependency-free bundle common to ALL domains, so even a
  * {@code type=record} leaf under the purity guard can target it without taking a dependency or
  * breaking the leaf, and no domain depends on another's annotation module.
+ *
+ * <p>Two shapes of transition, distinguished by whether {@link #spec} is given:
+ *
+ * <ul>
+ *   <li>type→type, spec-described (the original): {@code to} names the successor TYPE and {@code
+ *       spec} the doc describing it — e.g. {@code TreatmentEfficacy} → {@code EfficacyReport}. The
+ *       {@code SPEC_COVERAGE} gate reads the annotation's PRESENCE and counts the type as
+ *       in-transition rather than drift.
+ *   <li>code-awaiting-a-migration, spec-less: {@code to} describes what this code becomes when a
+ *       PENDING migration lands — e.g. host-side I/O that dies once an external OSGi edge exists
+ *       ({@code to = "incus-edge (external edge, not yet built)"}). Here {@code spec} is left
+ *       empty: there is no successor type in a spec yet, only a named chantier. A documentary
+ *       marker so the code point is navigable back to the debt — the gate only ever reads presence,
+ *       never the values, so an empty {@code spec} changes nothing for it.
+ * </ul>
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Transitional {
 
-  /** The successor type this one migrates to (e.g. {@code "EfficacyReport"}). */
+  /**
+   * What this migrates to: a successor TYPE name (e.g. {@code "EfficacyReport"}) when {@link #spec}
+   * describes it, or a free description of the pending migration (e.g. {@code "incus-edge (external
+   * edge, not yet built)"}) when there is no successor type yet.
+   */
   String to();
 
-  /** The spec file (under {@code docs/architecture/doctor/}) that describes the target model. */
-  String spec();
+  /**
+   * The spec file describing the target model (e.g. under {@code docs/architecture/doctor/}), or
+   * empty when the transition awaits a chantier with no successor-type spec yet (see class
+   * javadoc).
+   */
+  String spec() default "";
 }

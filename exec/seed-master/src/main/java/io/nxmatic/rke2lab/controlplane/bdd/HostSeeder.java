@@ -58,6 +58,16 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
   public static final String PROBES = "probes";
 
   /**
+   * Inbound key under {@link #NS}: an OPTIONAL systemd-adapter endpoint probe. Seeded only by a
+   * test (a reachable/failing fake) so the systemd phase plays offline; absent in the live boot,
+   * where the stage resolves the live probe from the registry itself. A channel of its own, NOT
+   * part of {@link SeedProbes}: the pure phases' probes are injected always, this one only
+   * overrides the registry-resolved live path in tests (the two probe axes — see the systemd
+   * stage).
+   */
+  public static final String SYSTEMD_PROBE = "systemd-probe";
+
+  /**
    * jGiven's own report-model store coordinate — derived, not hardcoded: the namespace is jGiven's
    * base package (via {@link Stage}), the key its store slot. We overwrite this so jGiven adopts
    * the driver's model as its own.
@@ -79,6 +89,11 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
     final SeedProbes probes = context.getStore(NS).get(PROBES, SeedProbes.class);
     if (probes != null && testInstance instanceof ProbesAware aware) {
       aware.acceptProbes(probes);
+    }
+    final SystemdAdapterProbe systemdProbe =
+        context.getStore(NS).get(SYSTEMD_PROBE, SystemdAdapterProbe.class);
+    if (systemdProbe != null && testInstance instanceof SystemdProbeAware aware) {
+      aware.acceptSystemdProbe(systemdProbe);
     }
     final ReportModel runbook = context.getStore(NS).get(RUN_MODEL, ReportModel.class);
     if (runbook != null) {
@@ -139,5 +154,14 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
    */
   public interface ProbesAware {
     void acceptProbes(SeedProbes probes);
+  }
+
+  /**
+   * Implemented by the scenario so the seeder installs the OPTIONAL systemd-adapter probe override
+   * — a test's reachable/failing fake. Absent in the live boot (the stage resolves the live probe
+   * from the registry), so this is only reached when a test seeded {@link #SYSTEMD_PROBE}.
+   */
+  public interface SystemdProbeAware {
+    void acceptSystemdProbe(SystemdAdapterProbe probe);
   }
 }

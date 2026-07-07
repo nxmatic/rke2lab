@@ -25,5 +25,6 @@
     <module>doctor-port-test</module>
     <module>doctor-core</module>
     <module>doctor-core-test</module>
+    <module>doctor-core-fake</module>
   </modules>
 </project>

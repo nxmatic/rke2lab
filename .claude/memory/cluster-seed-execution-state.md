@@ -83,7 +83,98 @@ property in `afterAll` (HostSeeder declared first → its afterAll runs LAST, af
 Save/restore leaves no leaked global state. Cannot contribute a scoped config (singleton closed); a real
 fix would be upstream. This is the dogfooding tax the CLAUDE.md's "BDD-as-engine" predicts.
 
-**THEN:** Tasks 5-9. See [[runmode-livegate-pulumi-abstraction]].
+**IN FLIGHT — Task 5 (SystemdAdapterStage, island 1), design SETTLED after a long joint exploration.**
+Committed nothing yet. Written & compiling: `OsgiConnection.awaitService(Class,long)` (default method,
+lookup via context() — NO static, NO delegation to BootedFramework); `SystemdAdapterStage` (transposes
+SystemdAdapterTopic.launch: play SystemdAdapterScenario nested → success provides `adapterLaunch`
+Map@Resolution.NAME; failure → consultDoctor + ReadinessAuthority verdict → STOP throws / CONTINUE sets
+degraded); composed in ClusterSeedScenario (`.and().systemdAdapter()`). Executor decision: A —
+PendingMarkingScenarioExecutor DEFERRED to Task 7 (executingLive is preview-only, no live client now).
+
+KEY DESIGN CHAIN (user's questions drove it, each verified at source — all REVERSIBLE decisions we
+landed):
+1. Services (SystemdRuntimeProbe/ReadinessAuthority/ConsultingService) resolve via `connection.
+   awaitService(X)` INSIDE the stage — NOT injected by the driver. Why: the launcher is HOST-AGNOSTIC
+   (can run host-side OR in-container via BundleReference/wiringOf). If the driver injected resolved
+   instances, an in-container run would depend on a host resolution → breaks agnosticism. The
+   connection knows which world it's in; the stage just asks it. (This REVERSED an earlier "driver
+   resolves, injects instances" idea — U1-a — which I dropped.)
+2. Can't use DS (@Reference) on a stage: jGiven instantiates stages by reflection (ScenarioExecutor.
+   addStage → newInstance), so SCR has no hook — true even in-container. seed-master is HOST anyway
+   (no @Component, doesn't compile against DS). awaitService IS the host↔OSGi seam (the other half of
+   DS: DS publishes in the registry, the host reads it). Precedent: LiveClusterReadinessProbe receives
+   ClusterReadinessContact resolved by the driver's awaitService.
+3. The probe axis vs the service axis are ORTHOGONAL: the endpoint SystemdAdapterProbe (dbus reachable)
+   stays injectable (F1, live/fake — fake exists); the domain SERVICES come from awaitService. Two
+   natures, two channels.
+4. TEST STRATEGY (user's best insight): NOT a fake connection with hand-made fake services (fiction,
+   like the rejected BootstrapResult.deferredPreview). Instead a **TEST FRAGMENT** contributing fake
+   `@Component`s (ReadinessAuthority/SystemdRuntimeProbe/ConsultingService) attached to the scenario's
+   host bundle → SCR wires them (DS IS the mechanism — user's original unease satisfied) → awaitService
+   finds them → agnostic, real registry, test-controlled, LIGHT Felix. Proven pattern in repo:
+   `osgi/runtime/bench/bench-fragment-contribution` (FragmentContributedComponent = a @Component in a
+   FRAGMENT, awaitService finds it). Copy that template (Fragment-Host bnd + fake @Components). This
+   fragment RESERVES for Task 6 too (cluster-readiness resolves services the same way).
+5. Verdict decision (STOP→throw / CONTINUE→degraded) stays UNIT-testable without Felix (as
+   SystemdAdapterVerdictTest does today via a fake ReadinessAuthority). Two test levels: unit verdict +
+   in-container fragment integration.
+
+TODO Task 5 (resume): (a) write the test fragment module (bnd Fragment-Host + fake @Components, template
+= bench-fragment-contribution); (b) SystemdAdapterStageTest boots light Felix + fragment, seeds
+connection, asserts SUCCESS + "systemd adapter" narrated; (c) migrate SystemdAdapterVerdictTest +
+RunbookRenderingTest off the topic; (d) build green; (e) commit. Whiteboard has the forks. See
+[[jgiven-custom-executor-seam]].
+
+**Task-5 sub-decisions landed (2026-07-06), all verified at source:**
+- Fake fragments SHIPPED (compile+package green, descriptors generated): `dbus-systemd-edge-fake`
+  (FakeSystemdRuntimeProbe) + `doctor-core-fake` (FakeReadinessAuthority + FakeConsultingService),
+  named by HOST (generic reuse). Full design in [[osgi-connection-service-selector]].
+- DEFAULT-SAFETY: every fake carries `variant=fake` + `service.ranking:Integer=-1000` so a nude
+  `awaitService(Class)` NEVER resolves a fake (prod also excludes type=fixture from staging).
+- TWO probe AXES both alive (NOT redundant): axis-1 injected app probe (SeedProbes: pure phases,
+  offline) vs axis-2 OSGi registry service (systemd dbus, cluster kubectl). Asymmetry ASSUMED.
+- INCUS DEBT: `SeedSystemdAdapterEndpointGate.waitForInstanceReachable` still runs `incus exec`
+  host-side (the incus external edge is NOT built — external-edges chantier: incus/cluster/host-fs
+  remain; only pulumi/ssh-to-age/dbus-systemd shipped). So the happy-path CANNOT play via liveProbe()
+  in test (would hit real incus). Marked `@Transitional` (annotation EXTENDED: `spec()` now optional
+  `default ""` for spec-less code-awaiting-a-chantier debt; gate reads presence only, verified).
+- TWO-TEST structure (user chose, then axis-1 reopened "vrai Felix"): (1) happy-path OFFLINE — the
+  stage plays an INJECTED reachable SystemdAdapterProbe (mirrors the old topic's simulated/liveProbe
+  seam, NOT SeedProbes), 4 phases, no Felix, restores Task-4's offline property; (2)
+  SystemdAdapterStageTest — REAL Felix + both fragments attached: injected FAILING probe → onFailure →
+  awaitService(ReadinessAuthority) resolves the fake doctor via `(variant=fake)` → CONTINUE_DEGRADED,
+  plus a direct awaitService(SystemdRuntimeProbe, selector) proving the dbus fragment.
+- NEXT in-flight: SystemdAdapterStage must accept an OPTIONAL injected SystemdAdapterProbe (present →
+  play it; absent → liveProbe() via awaitService). Then write the 2 tests, migrate
+  SystemdAdapterVerdictTest + RunbookRenderingTest off the topic, build green, commit.
+
+**Task 5 DONE (2026-07-07), 3 tests green, ready to commit:**
+- `PureStagesTest` — full 4-phase scenario plays OFFLINE (inert probes + injected reachable systemd
+  probe via `HostSeeder.SYSTEMD_PROBE`); roots `[preflight,bbox,incus,systemd adapter]`.
+- `SystemdAdapterVerdictTest` — a failed probe renders FAILED for BOTH verdicts (fidelity); the
+  verdict is propagation (STOP throws `SeedAborted`) / degraded observation (CONTINUE), NOT status.
+  Uses `StubConnection` (serves fakes by type, no Felix).
+- `SystemdAdapterStageTest` — REAL Felix + both fake fragments attached to their hosts; the
+  `(variant=fake)` selector resolves the fake SystemdRuntimeProbe + ReadinessAuthority from the
+  registry; the negative service.ranking guard asserted on the ServiceReference.
+- `TopicFailure` → `SeedAborted` (new bdd-world type; Topic vocabulary banned in bdd/ EXCEPT the
+  driver `ClusterSeedTopic`, name kept). "transposes XxxTopic" comments stripped from bdd/.
+- Old `SystemdAdapterVerdictTest` + `SystemdAdapterTopicFixture` (pipeline/stages/) DELETED.
+- `RunbookRenderingTest` REVERTED (it never depended on the topic — only a comment; it tests
+  `RunbookRenderer` via `Scenario.create(SystemdAdapterScenario)`, the right isolate). Plan drift:
+  5h "migrate RunbookRenderingTest off the topic" was WRONG — nothing to migrate.
+
+**DEBT for Task 7 (renderer simplifies with the composite migration, NOT a standalone refactor):**
+`RunbookRenderer.normalize()` is N-scenario dead weight — it names the model because checkpoints play
+`Scenario.create()` standalone (no className); the composite scenario is played by the launcher via
+`ClusterSeedScenario` (a real named class) → jGiven fills className natively → `normalize()` GOES.
+`injectDiagnosis()`/`scenarioFor()` join the doctor diagnosis to a top-level scenario BY TITLE
+(`Checkpoint.scenarioTitle().equals(scenario.getDescription())`); the composite has ONE scenario with
+systemd as a NESTED STEP, so the injection must retarget scenario→nested-step. Both are Task 7 (rendu
+composite), user agreed to defer. The JSON→AsciiDoc pipeline + best-effort try/catch are essential
+(jGiven requires the intermediate JSON dir), keep them.
+
+**THEN:** Tasks 6-9. See [[runmode-livegate-pulumi-abstraction]].
 
 **THEN resume ClusterSeed Tasks 3-9:** 3=ClusterSeedRun+scenario skeleton; 4=attached-framework seam
 (OsgiConnection.framework() + BootedFramework.attached()) + Preflight/Bbox/Incus stages; 5=SystemdAdapterStage

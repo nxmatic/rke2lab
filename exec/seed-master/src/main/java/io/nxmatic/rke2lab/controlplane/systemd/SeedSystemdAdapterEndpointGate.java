@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.systemd;
 
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +17,18 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 
-/** Pulumi-side gate that waits for the dbus-on-TCP probe to report ok. */
+/**
+ * Pulumi-side gate that waits for the dbus-on-TCP probe to report ok.
+ *
+ * <p>Two axes, at different migration stages: the dbus runtime status is already an OSGi service
+ * ({@code SystemdRuntimeProbe}, resolved from the registry), but the instance-reachability axis
+ * ({@link #waitForInstanceReachable}) still runs {@code incus exec} host-side because the INCUS
+ * external edge does not exist yet. When that edge lands (the external-edges chantier — incus /
+ * cluster / host-fs remain), this gate's host I/O dies and the whole readiness path resolves from
+ * the registry like dbus. Marked {@code @Transitional} so the code point is navigable back to that
+ * pending migration.
+ */
+@Transitional(to = "incus-edge (external edge, not yet built) — host incus-exec moves into OSGi")
 public final class SeedSystemdAdapterEndpointGate {
 
   private static final String API_VERSION = "rke2lab.nxmatic.io/v1alpha1";

@@ -149,6 +149,18 @@ slot is a structure", its inner shape owned where it is produced. The reader cla
 those inner graphs (`ConsultationReportReader`, `ExpectationReader`, `InterventionReader`,
 `MedicalRecordReader`) are bundle-internal, OSGi-side.
 
+* *The host READ ports* — the Layer-1 seams the host implements so OSGi reads the stack history
+  WITHOUT interpreting it. Their signatures speak only `Document` (and the seam key `Patient`): a
+  `doctor.records` type NEVER crosses — the typed record (`Visit`, `InterventionLedger`) is rebuilt
+  OSGi-side FROM the opaque blobs, on the far side of the membrane, never returned across the port:
++
+[cols="1,2",options="header"]
+|===
+| read port | role
+| `MedicalRecordJournal` | `historyOf(Patient)` walks the patient's Pulumi stack timeline and yields one opaque `visit` `Document` per readable entry (payload = the raw consultation-report + expectation blobs); `MedicalRecordReader` folds them into a typed `Visit` OSGi-side. Also enumerates the cohort (sibling stacks — Layer-1 host knowledge). The read twin of the write port `MedicalRecordRegistry`.
+| `InterventionJournal` | `entries()` walks the one fixed intervention-ledger stack (`intervention-ledger/dev`) and yields one opaque `intervention` `Document` per history entry; `InterventionReader` rebuilds the `InterventionLedger` OSGi-side. Unkeyed — there is exactly one ledger stack.
+|===
+
 == The contract: a wire-record per coordinate, the schema projected from it
 
 A `Document` payload is untyped text; without a contract we would trade a type leak for silent schema

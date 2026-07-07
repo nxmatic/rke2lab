@@ -6,10 +6,10 @@ import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import java.util.Optional;
 
 /**
- * The live incus probe — transposes {@code IncusTopic.provisionInstance}: constructs {@code
- * IncusResourceBootstrap} against the attached framework and applies it, touching real incus. The
- * result is always present here (a live provisioning produced a {@link BootstrapResult}); the empty
- * case is the deferred path, carried by a fake, never by this live probe.
+ * The live incus probe: constructs {@code IncusResourceBootstrap} against the attached framework
+ * and applies it, touching real incus. The result is always present here (a live provisioning
+ * produced a {@link BootstrapResult}); the empty case is the deferred path, carried by a fake,
+ * never by this live probe.
  */
 public final class LiveIncusProbe implements IncusProbe {
 
