@@ -24,6 +24,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rke2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rke2lab.incus.port.ImageBuilder;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeRequest;
@@ -117,7 +118,7 @@ public final class IncusResourceBootstrap {
     this.bootstrapContext =
         new BootstrapContext(
             config,
-            new PulumiIncusImageProvider(config),
+            new PulumiIncusImageProvider(config, singleSpiProvider(ImageBuilder.class)),
             HostMountSourceVerifier.INSTANCE,
             new NodeConfigRegenerator(
                 new CloudConfigSecretRenderer(singleSpiProvider(ManifestDocumentService.class))),

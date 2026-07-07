@@ -12,10 +12,13 @@
 
   <artifactId>incus-edge</artifactId>
   <name>osgi/domains/incus/incus-edge</name>
-  <description>The live incus edge: an @Component satisfying IncusInstanceContact by shelling
-    `ssh … incus exec` via ProcessBuilder — the instance-reachability contact formerly inlined in the
-    host SeedSystemdAdapterEndpointGate (@Transitional to="incus-edge"). Pure ProcessBuilder over the
-    JDK, no embedded jars, mirroring cluster-edge's kubectl contact.</description>
+  <description>The live incus edge: two @Components toward an Incus host. ProcessBuilderIncusInstanceContact
+    satisfies IncusInstanceContact by shelling `ssh … incus exec` (the instance-reachability contact
+    formerly inlined in the host SeedSystemdAdapterEndpointGate); DistrobuilderImageBuilder satisfies
+    ImageBuilder by shelling `distrobuilder build-incus` locally or streaming its bundled ssh recipe
+    remotely (the build mechanism formerly inlined in the host PulumiIncusImageProvider). Pure
+    ProcessBuilder over the JDK, no embedded third-party jars (the recipe rides as a bundle resource),
+    mirroring cluster-edge's kubectl contact.</description>
 
   <dependencies>
     <dependency>

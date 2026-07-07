@@ -15,9 +15,9 @@ import com.pulumi.resources.Resource;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig.WorktreeHost;
+import io.nxmatic.rke2lab.incus.port.ImageBuildRequest;
+import io.nxmatic.rke2lab.incus.port.ImageBuilder;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -28,10 +28,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Stage A seed image orchestration for Incus image lifecycle.
@@ -42,20 +40,18 @@ import java.util.Set;
  */
 public final class PulumiIncusImageProvider {
 
-  private static final URI REMOTE_BUILD_SCRIPT_RESOURCE =
-      URI.create(
-          "classpath:/META-INF/io.nxmatic/rke2lab/controlplane/incus/image/remote-build-incus-image.sh");
-
   private static final String INCUS_METADATA_FILENAME = "incus.tar.xz";
 
   private static final String INCUS_ROOTFS_FILENAME = "rootfs.squashfs";
 
   private final BootstrapConfig config;
+  private final ImageBuilder imageBuilder;
 
   private String lastBuildChecksum = "";
 
-  public PulumiIncusImageProvider(BootstrapConfig config) {
+  public PulumiIncusImageProvider(BootstrapConfig config, ImageBuilder imageBuilder) {
     this.config = config;
+    this.imageBuilder = imageBuilder;
   }
 
   /** Ensure the seed image exists and return its fingerprint output. */
@@ -189,16 +185,16 @@ public final class PulumiIncusImageProvider {
           "Failed to create image artifact directory: " + artifactDir, ex);
     }
 
-    final String distrobuilderExecutable = tryResolveExecutable(config.imageBuilderBinary());
-    if (!distrobuilderExecutable.isBlank()) {
-      final List<String> buildCommand =
-          buildIncusAsRootCommand(
-              distrobuilderExecutable, distrobuilderConfigPath.toString(), artifactDir.toString());
-      runCommandOrThrow(
-          workspace, buildCommand, "Failed to build Incus image artifacts using distrobuilder");
-    } else {
-      runRemoteBuildOrThrow(workspace, distrobuilderConfigPath, artifactDir);
-    }
+    imageBuilder.build(
+        new ImageBuildRequest(
+            config.imageBuilderBinary(),
+            workspace.toString(),
+            distrobuilderConfigPath.toString(),
+            artifactDir.toString(),
+            config.imageBuilderHost() == null ? "" : config.imageBuilderHost(),
+            toNixosPath(workspace),
+            toNixosPath(distrobuilderConfigPath),
+            toNixosPath(resolveSharedFolder(workspace).resolve(config.imageAlias()))));
 
     writeChecksumMarker(checksumMarkerPath, expectedBuildChecksum);
 
@@ -244,8 +240,7 @@ public final class PulumiIncusImageProvider {
       digest.update(builderHost.getBytes(StandardCharsets.UTF_8));
 
       digest.update((byte) '\n');
-      digest.update(
-          loadClasspathScript(REMOTE_BUILD_SCRIPT_RESOURCE).getBytes(StandardCharsets.UTF_8));
+      digest.update(imageBuilder.recipeDigest().getBytes(StandardCharsets.UTF_8));
 
       return HexFormat.of().formatHex(digest.digest());
     } catch (IOException ex) {
@@ -377,218 +372,8 @@ public final class PulumiIncusImageProvider {
     return resolved.normalize();
   }
 
-  private String tryResolveExecutable(String configuredBinary) {
-    if (configuredBinary == null || configuredBinary.isBlank()) {
-      return "";
-    }
-
-    final String trimmedBinary = configuredBinary.trim();
-    if (trimmedBinary.contains("/")) {
-      final Path explicitPath = Path.of(trimmedBinary).toAbsolutePath().normalize();
-      if (Files.isExecutable(explicitPath)) {
-        return explicitPath.toString();
-      }
-      return "";
-    }
-
-    final Set<Path> searchDirectories = new LinkedHashSet<>();
-
-    final String pathEnv = System.getenv("PATH");
-    if (pathEnv != null && !pathEnv.isBlank()) {
-      for (String entry : pathEnv.split(":")) {
-        if (entry != null && !entry.isBlank()) {
-          searchDirectories.add(Path.of(entry).toAbsolutePath().normalize());
-        }
-      }
-    }
-
-    final String javaHome = System.getProperty("java.home", "");
-    if (!javaHome.isBlank()) {
-      searchDirectories.add(Path.of(javaHome).resolve("bin").toAbsolutePath().normalize());
-    }
-
-    searchDirectories.add(Path.of("/run/current-system/sw/bin"));
-    searchDirectories.add(Path.of("/nix/var/nix/profiles/default/bin"));
-    searchDirectories.add(Path.of("/opt/homebrew/bin"));
-    searchDirectories.add(Path.of("/usr/local/bin"));
-    searchDirectories.add(Path.of("/usr/bin"));
-    searchDirectories.add(Path.of("/bin"));
-
-    final String home = System.getProperty("user.home", "");
-    if (!home.isBlank()) {
-      searchDirectories.add(Path.of(home).resolve(".flox/bin").toAbsolutePath().normalize());
-    }
-
-    for (Path directory : searchDirectories) {
-      final Path candidate = directory.resolve(trimmedBinary).normalize();
-      if (Files.isExecutable(candidate)) {
-        return candidate.toString();
-      }
-    }
-
-    return "";
-  }
-
-  private List<String> buildIncusAsRootCommand(
-      String distrobuilderExecutable, String configPath, String artifactDir) {
-    final List<String> buildCommand =
-        List.of(distrobuilderExecutable, "build-incus", configPath, artifactDir);
-
-    if (isRunningAsRoot()) {
-      return buildCommand;
-    }
-
-    final String sudoExecutable = tryResolveExecutable("sudo");
-    if (sudoExecutable.isBlank()) {
-      throw new IllegalStateException(
-          "distrobuilder build requires root privileges, but sudo was not found");
-    }
-
-    return List.of(
-        sudoExecutable, "-n", distrobuilderExecutable, "build-incus", configPath, artifactDir);
-  }
-
-  private boolean isRunningAsRoot() {
-    return "root".equals(System.getProperty("user.name", ""));
-  }
-
-  private void runRemoteBuildOrThrow(
-      Path worktreeDir, Path distrobuilderConfigFile, Path artifactDir) {
-    final String remoteHost = config.imageBuilderHost();
-    if (remoteHost == null || remoteHost.isBlank()) {
-      throw new IllegalStateException(
-          "Unable to locate local executable '"
-              + config.imageBuilderBinary()
-              + "' and no remote "
-              + "image.builderHost is configured");
-    }
-
-    final String binary =
-        config.imageBuilderBinary() == null || config.imageBuilderBinary().isBlank()
-            ? "distrobuilder"
-            : config.imageBuilderBinary().trim();
-    final String remoteWorktreeDir = toNixosPath(worktreeDir);
-    final String remoteDistrobuilderConfigFile = toNixosPath(distrobuilderConfigFile);
-    final String remoteArtifactDir =
-        toNixosPath(resolveSharedFolder(worktreeDir).resolve(config.imageAlias()));
-
-    runRemoteScriptOverSshOrThrow(
-        worktreeDir,
-        remoteHost,
-        REMOTE_BUILD_SCRIPT_RESOURCE,
-        List.of(remoteWorktreeDir, remoteDistrobuilderConfigFile, remoteArtifactDir, binary),
-        "Failed to build Incus image artifacts on remote builder host " + remoteHost);
-  }
-
   private String toNixosPath(Path path) {
     return config.pathOn(WorktreeHost.NIXOS, path).toString();
-  }
-
-  private void runRemoteScriptOverSshOrThrow(
-      Path workingDirectory,
-      String remoteHost,
-      URI scriptResourcePath,
-      List<String> scriptArgs,
-      String failureMessage) {
-    final String script = loadClasspathScript(scriptResourcePath);
-
-    final List<String> command = new ArrayList<>();
-    command.add("ssh");
-    command.add(remoteHost);
-    command.add("sh");
-    command.add("-lc");
-    command.add(
-        "'set -eu; tmp_dir=$(mktemp -d); trap \"rm -rf \\\"$tmp_dir\\\"\" EXIT; "
-            + "script_path=\"$tmp_dir/remote-build-incus-image.sh\"; "
-            + "cat > \"$script_path\"; chmod 700 \"$script_path\"; "
-            + "\"$script_path\" \"$@\"'");
-    command.add("--");
-    command.addAll(scriptArgs);
-
-    final ProcessBuilder pb = new ProcessBuilder(command);
-    pb.directory(workingDirectory.toFile());
-    pb.redirectErrorStream(true);
-
-    try {
-      final Process process = pb.start();
-      try (OutputStream stdin = process.getOutputStream()) {
-        stdin.write(script.getBytes(StandardCharsets.UTF_8));
-        stdin.flush();
-      }
-
-      final String output =
-          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      final int exitCode = process.waitFor();
-
-      if (exitCode != 0) {
-        throw new IllegalStateException(
-            failureMessage
-                + " (exit="
-                + exitCode
-                + ")\nCommand: "
-                + String.join(" ", command)
-                + "\nOutput:\n"
-                + output);
-      }
-    } catch (IOException | InterruptedException ex) {
-      if (ex instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new IllegalStateException(failureMessage + ": " + ex.getMessage(), ex);
-    }
-  }
-
-  private String loadClasspathScript(URI resourcePath) {
-    if (resourcePath == null || !"classpath".equals(resourcePath.getScheme())) {
-      throw new IllegalStateException("Expected classpath URI, got: " + resourcePath);
-    }
-
-    String path = resourcePath.getPath();
-    if (path == null || path.isBlank()) {
-      throw new IllegalStateException("Classpath URI has empty path: " + resourcePath);
-    }
-    if (path.startsWith("/")) {
-      path = path.substring(1);
-    }
-
-    try (var in = getClass().getClassLoader().getResourceAsStream(path)) {
-      if (in == null) {
-        throw new IllegalStateException("Classpath script not found: " + path);
-      }
-      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-    } catch (IOException ex) {
-      throw new IllegalStateException("Failed to load classpath script: " + path, ex);
-    }
-  }
-
-  private void runCommandOrThrow(
-      Path workingDirectory, List<String> command, String failureMessage) {
-    final ProcessBuilder pb = new ProcessBuilder(command);
-    pb.directory(workingDirectory.toFile());
-    pb.redirectErrorStream(true);
-
-    try {
-      final Process process = pb.start();
-      final String output =
-          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      final int exitCode = process.waitFor();
-
-      if (exitCode != 0) {
-        throw new IllegalStateException(
-            failureMessage
-                + " (exit="
-                + exitCode
-                + ")\nCommand: "
-                + String.join(" ", command)
-                + "\nOutput:\n"
-                + output);
-      }
-    } catch (IOException | InterruptedException ex) {
-      if (ex instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new IllegalStateException(failureMessage + ": " + ex.getMessage(), ex);
-    }
   }
 
   private record BuiltImageArtifacts(Path metadataPath, Path dataPath) {}

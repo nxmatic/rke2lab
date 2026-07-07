@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.auth.port.AuthTokenContact;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
+import io.nxmatic.rke2lab.incus.port.ImageBuilder;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
@@ -100,6 +101,15 @@ class EmbeddedBundlesBootTest {
         "the embedded auth-edge bundle booted and SCR published AuthTokenContact — the host"
             + " launch-secrets updater resolves the gh/flox token contact from the registry"
             + " (auth-port seam single-exporter, typed, no ClassCastException)");
+  }
+
+  @Test
+  void embeddedIncusImageEdgePublishesTheBuilderContactTyped() {
+    assertNotNull(
+        framework.awaitService(ImageBuilder.class, 5000),
+        "the embedded incus-image-edge bundle booted and SCR published ImageBuilder — the host"
+            + " PulumiIncusImageProvider resolves the distrobuilder/ssh build contact from the"
+            + " registry (incus-image-port seam single-exporter, typed, no ClassCastException)");
   }
 
   /**

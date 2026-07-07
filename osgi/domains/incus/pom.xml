@@ -13,11 +13,15 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/domains/incus</name>
-  <description>The incus domain: the external contacts toward an Incus host. Its first content is the
-    instance-reachability contact (incus-port declares the verb, incus-edge shells `ssh … incus exec`
-    via ProcessBuilder), extracted from the host SeedSystemdAdapterEndpointGate that was marked
-    @Transitional(to="incus-edge"). The host keeps the readiness orchestration and composes this
-    contact from the registry — the same shape as the shipped dbus-systemd and cluster edges.</description>
+  <description>The incus domain: the external contacts toward an Incus host — one bundle pair, two
+    contacts, because an Incus instance needs an Incus image (they are the same concern). incus-port
+    declares both verbs: the instance-reachability contact (IncusInstanceContact, shelled by incus-edge
+    as `ssh … incus exec`, extracted from the host SeedSystemdAdapterEndpointGate) and the image-build
+    contact (ImageBuilder, shelled by incus-edge as `distrobuilder build-incus` locally or its ssh
+    recipe remotely, extracted from the host PulumiIncusImageProvider). incus-edge publishes both
+    @Components. The host keeps the readiness orchestration and the Pulumi Image resource + cache, and
+    composes each contact from the registry — the same shape as the shipped dbus-systemd and cluster
+    edges.</description>
 
   <modules>
     <module>incus-port</module>

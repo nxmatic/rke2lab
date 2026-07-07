@@ -160,9 +160,11 @@
       <scope>runtime</scope>
     </dependency>
     <!-- The incus edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
-         flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
-         the readiness gate resolves IncusInstanceContact from the registry (awaitService). The edge
-         MUST be embedded or the instance-reachability contact never publishes. -->
+         flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl.
+         Publishes BOTH incus contacts: the readiness gate resolves IncusInstanceContact and
+         PulumiIncusImageProvider resolves ImageBuilder, each from the registry (awaitService). The edge
+         carries the remote image-build recipe as a bundle resource. MUST be embedded or the contacts
+         never publish. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-edge</artifactId>
@@ -209,9 +211,12 @@
       <artifactId>cluster-port</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The incus domain's seam: IncusInstanceContact, the instance-reachability contact the host
-         readiness gate composes from the registry (the incus-edge shells `ssh … incus exec`).
-         COMPILE scope like the other -port membranes; type=seam so the host reads it back typed. -->
+    <!-- The incus domain's seam, both contacts: IncusInstanceContact (the instance-reachability
+         contact the readiness gate composes) and ImageBuilder + the flat ImageBuildRequest (the
+         image-build contact PulumiIncusImageProvider composes — it projects the build coordinates out
+         of its config and folds the edge's recipeDigest into its image-cache key; no build mechanism
+         lives host-side). COMPILE scope like the other -port membranes; type=seam so the host reads
+         them back typed. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-port</artifactId>
