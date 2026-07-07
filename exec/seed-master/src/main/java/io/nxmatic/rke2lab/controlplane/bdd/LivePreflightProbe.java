@@ -1,14 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.RuntimeCommandPreflight;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
-import java.util.List;
 
 /**
- * The live preflight probe — three enforcement calls: the entry gates (against the attached
- * framework), the required local commands, and the remote command on the image builder host. Reads
- * the real git worktree, flake lock, and PATH.
+ * The live preflight probe — enforces the entry gates (git worktree + flake lock) against the
+ * attached framework. The former command-availability checks (local {@code ssh}/{@code kubectl} on
+ * PATH, remote {@code incus} over ssh) are gone: the hosts are provisioned by nix, so those tools
+ * are present by construction — the checks guarded an invariant nix already guarantees.
  */
 public final class LivePreflightProbe implements PreflightProbe {
 
@@ -18,9 +17,5 @@ public final class LivePreflightProbe implements PreflightProbe {
         hostFacts.config().localWorktreePath(),
         hostFacts.options().cleanWorktreeRequired(),
         framework);
-    RuntimeCommandPreflight.enforceRequiredCommands(
-        List.of("ssh", "kubectl"), hostFacts.readinessLogger());
-    RuntimeCommandPreflight.enforceRemoteCommandAvailable(
-        hostFacts.config().imageBuilderHost(), "incus", hostFacts.readinessLogger());
   }
 }
