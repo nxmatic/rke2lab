@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.osgi;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.auth.port.AuthTokenContact;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
@@ -90,6 +91,15 @@ class EmbeddedBundlesBootTest {
         "the embedded cluster-edge bundle booted and SCR published ClusterReadinessContact — the"
             + " host resolves the kubectl contact from the registry (cluster-port seam"
             + " single-exporter, typed, no ClassCastException)");
+  }
+
+  @Test
+  void embeddedAuthEdgePublishesTheTokenContactTyped() {
+    assertNotNull(
+        framework.awaitService(AuthTokenContact.class, 5000),
+        "the embedded auth-edge bundle booted and SCR published AuthTokenContact — the host"
+            + " launch-secrets updater resolves the gh/flox token contact from the registry"
+            + " (auth-port seam single-exporter, typed, no ClassCastException)");
   }
 
   /**

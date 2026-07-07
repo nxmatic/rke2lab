@@ -179,6 +179,16 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
+         flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
+         the launch-secrets updater resolves AuthTokenContact from the registry (singleSpiProvider).
+         The edge MUST be embedded or the token contact never publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>auth-edge</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-port</artifactId>
@@ -213,6 +223,16 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The auth domain's seam: AuthTokenContact + the AuthTokenSource enum. The host launch-secrets
+         updater keeps the env-var precedence and the YAML upsert, and composes this contact from the
+         registry only when the environment yielded nothing (the auth-edge shells `gh auth token` /
+         `flox auth token`). COMPILE scope like the other -port membranes; type=seam so the host reads
+         the token back typed. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>auth-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- Governance annotations: the controlplane package-info poses REALM_BOUNDARY=WARN so the

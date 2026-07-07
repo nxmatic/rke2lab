@@ -17,6 +17,8 @@ import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rke2lab.auth.port.AuthTokenContact;
+import io.nxmatic.rke2lab.auth.port.AuthTokenSource;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig.WorktreeHost;
@@ -1508,7 +1510,9 @@ public final class IncusResourceBootstrap {
     if (Deployment.getInstance().isDryRun()) {
       return;
     }
-    bootstrapContext.launchSecretsUpdater().ensureTokensPresent(secretsFile);
+    bootstrapContext
+        .launchSecretsUpdater()
+        .ensureTokensPresent(secretsFile, singleSpiProvider(AuthTokenContact.class));
   }
 
   private ClusterNetworkBlueprint deriveBlueprint(String nodeName) {
@@ -3345,13 +3349,13 @@ public final class IncusResourceBootstrap {
 
     private LaunchSecretsUpdater() {}
 
-    private void ensureTokensPresent(Path secretsFile) {
-      ensureGithubTokenPresent(secretsFile);
-      ensureFloxHubTokenPresent(secretsFile);
+    private void ensureTokensPresent(Path secretsFile, AuthTokenContact tokens) {
+      ensureGithubTokenPresent(secretsFile, tokens);
+      ensureFloxHubTokenPresent(secretsFile, tokens);
     }
 
-    private void ensureGithubTokenPresent(Path secretsFile) {
-      final String githubToken = resolveGithubToken();
+    private void ensureGithubTokenPresent(Path secretsFile, AuthTokenContact tokens) {
+      final String githubToken = resolveGithubToken(tokens);
       if (githubToken.isBlank()) {
         return;
       }
@@ -3367,8 +3371,8 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    private void ensureFloxHubTokenPresent(Path secretsFile) {
-      final String floxToken = resolveFloxHubToken();
+    private void ensureFloxHubTokenPresent(Path secretsFile, AuthTokenContact tokens) {
+      final String floxToken = resolveFloxHubToken(tokens);
       if (floxToken.isBlank()) {
         return;
       }
@@ -3560,16 +3564,16 @@ public final class IncusResourceBootstrap {
       return "'" + value.replace("'", "''") + "'";
     }
 
-    private String resolveGithubToken() {
+    private String resolveGithubToken(AuthTokenContact tokens) {
       final String envToken =
           firstNonBlank(System.getenv("GITHUB_TOKEN"), System.getenv("GH_TOKEN"));
       if (!envToken.isBlank()) {
         return envToken;
       }
-      return captureCommandOutput("gh", "auth", "token");
+      return tokens.tokenFor(AuthTokenSource.GITHUB).orElse("");
     }
 
-    private String resolveFloxHubToken() {
+    private String resolveFloxHubToken(AuthTokenContact tokens) {
       final String envToken =
           firstNonBlank(
               System.getenv("FLOXHUB_TOKEN"),
@@ -3578,7 +3582,7 @@ public final class IncusResourceBootstrap {
       if (!envToken.isBlank()) {
         return envToken;
       }
-      return captureCommandOutput("flox", "auth", "token");
+      return tokens.tokenFor(AuthTokenSource.FLOXHUB).orElse("");
     }
 
     private String firstNonBlank(String... candidates) {
@@ -3588,22 +3592,6 @@ public final class IncusResourceBootstrap {
         }
       }
       return "";
-    }
-
-    private String captureCommandOutput(String... command) {
-      final ProcessBuilder pb = new ProcessBuilder(command);
-      pb.redirectError(ProcessBuilder.Redirect.DISCARD);
-      try {
-        final Process process = pb.start();
-        final String output = new String(process.getInputStream().readAllBytes()).trim();
-        final int exit = process.waitFor();
-        return exit == 0 ? output : "";
-      } catch (IOException | InterruptedException ex) {
-        if (ex instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
-        return "";
-      }
     }
   }
 
