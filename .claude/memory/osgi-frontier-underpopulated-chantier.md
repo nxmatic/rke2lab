@@ -66,5 +66,28 @@ report/asciidoc deps). Do NOT blanket-add the namespace to every bnd: fixtures/t
   the confusion came from the frontier being under-populated. See [[fragment-contribution-mediation-model]].
 - doctor-core embedding (b4c9535c) was the FIRST correct step of THIS chantier, done early by luck.
 
+## 2026-07-07 — this chantier is now the BLOCKER of the BDD-pipeline migration
+
+The ClusterSeed BDD migration reached a STABLE PLATEAU (Task 8 committed `f99e1b7b2` on
+`feature/cluster-seed-scenario`, NOT yet integrated into design/pre-integration; the fluent world
+deleted, build green). The user then SUSPENDED the rest — the 6 other pipelines AND the offline
+exercise of ClusterSeed — on a project-sequencing decision that is NOT derivable from code/git:
+
+*we cannot exercise a pipeline fully OFFLINE until every domain it touches lives in the OSGi world
+with a well-defined fake.* A fake is a fragment `@Component` attached to a **host bundle** ([[per-domain-osgi-fakes-chantier]]);
+if a domain has no OSGi bundle, there is no host to attach a fake to. Verified 2026-07-07:
+**`incus` has NO module anywhere under `osgi/`** — provisioning still lives host-side
+(`IncusResourceBootstrap`, `incus exec` in `SeedSystemdAdapterEndpointGate`). That is the wall the
+`NestedRunbookTest` `@Disabled` debt and the deferred `ResourcesStageTest` both hit (no offline
+BootstrapResult because incus provisioning is host-side and un-faked).
+
+So the forward order is now: **this frontier chantier + the incus external edge FIRST**, then
+[[per-domain-osgi-fakes-chantier]] (a fake per newly-in-framework domain), and ONLY THEN resume the
+BDD offline work (re-enable NestedRunbookTest, migrate the other 6 pipelines). The incus edge is the
+top priority hole — above unitrepo/jgiven from the 2026-06-23 order — because it is what blocks the
+offline pipeline TODAY. See [[external-edges-chantier-handoff]] (incus/cluster/host-fs edges remain)
+and [[incus-edge-placement-backlog]].
+
 See [[fragment-contribution-mediation-model]] [[external-edges-chantier-handoff]]
-[[osgi-runtime-migration-state]] [[bundle-on-jcl-is-wrong-classpath]] [[unitrepo-design-unification-state]].
+[[osgi-runtime-migration-state]] [[bundle-on-jcl-is-wrong-classpath]] [[unitrepo-design-unification-state]]
+[[per-domain-osgi-fakes-chantier]] [[cluster-seed-execution-state]] [[incus-edge-placement-backlog]].

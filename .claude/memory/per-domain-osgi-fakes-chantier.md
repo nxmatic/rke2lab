@@ -33,6 +33,13 @@ path (FAILED checkpoint + doctor consult + targeted runbook) and its `Scenario.c
 reproduce jGiven interception. Rebuild it on launcher+Felix with a new `cluster-core-fake` fragment
 (mirror `SystemdAdapterStageTest`); the assertions already written in the disabled file are the spec.
 
+**PREREQUISITE (2026-07-07):** a fake needs a HOST BUNDLE to attach to. Domains still absent from
+`osgi/` have no host — chiefly **incus** (verified: no module under `osgi/`; provisioning is host-side
+`IncusResourceBootstrap`/`incus exec`). So this chantier is GATED BY the frontier re-population +
+the incus external edge — see [[osgi-frontier-underpopulated-chantier]] (§2026-07-07) and
+[[external-edges-chantier-handoff]]. Order: frontier/incus-edge FIRST, then fakes, then resume BDD
+offline. This is WHY the user suspended the BDD offline work at the Task-8 plateau.
+
 **Operating model:** run in its OWN external worktree off the Task-8 stable commit (per the
 workspace-isolation rule). BDD-pipeline migration of the other 6 pipelines is a SEPARATE worktree /
 chantier ([[bdd-pipeline-migration-plan]]) — the user sequences them independently.
