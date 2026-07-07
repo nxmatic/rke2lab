@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.0.0</version>
+    <relativePath>../../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>config-domain</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>osgi/domains/config</name>
+  <description>The config domain: the flat bootstrap configuration vocabulary the OSGi world reasons
+    with. config-port carries BootstrapConfig — the Pulumi-free record of derived Stage-A settings
+    (paths, hosts, endpoints, timeouts) plus the pure NFS-automount path rewriting. The derivation
+    FROM the Pulumi-backed Rke2labConfig stays host (BootstrapConfig.from touches com.pulumi); the
+    record itself is the shared frontier value both worlds carry.</description>
+
+  <modules>
+    <module>config-port</module>
+  </modules>
+</project>

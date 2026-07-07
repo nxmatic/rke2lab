@@ -23,5 +23,6 @@
     <module>netplan</module>
     <module>unitrepo</module>
     <module>ssh-to-age-edge</module>
+    <module>config</module>
   </modules>
 </project>

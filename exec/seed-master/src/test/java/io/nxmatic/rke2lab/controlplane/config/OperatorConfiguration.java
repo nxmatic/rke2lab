@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
+import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -86,7 +87,7 @@ public final class OperatorConfiguration {
   }
 
   public BootstrapConfig asBootstrapConfig() {
-    return BootstrapConfig.from(asDto());
+    return BootstrapConfigFactory.from(asDto());
   }
 
   public ControlplanePolicy asPolicy() {

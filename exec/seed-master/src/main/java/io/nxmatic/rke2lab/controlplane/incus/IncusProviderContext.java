@@ -4,7 +4,7 @@ import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.incus.Provider;
 import com.pulumi.incus.ProviderArgs;
 import com.pulumi.incus.inputs.ProviderRemoteArgs;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 
 /** Shared provider wiring for Incus resource operations and invoke calls. */
 public record IncusProviderContext(Provider provider, InvokeOptions invokeOptions) {

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import java.io.IOException;
 import java.io.InputStream;

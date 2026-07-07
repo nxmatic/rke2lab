@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.config.port.BootstrapConfig;
 
 /**
  * Probes one {@link ClusterReadinessPhase}, returning its {@link ObservationView} (status {@code
