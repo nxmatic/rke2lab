@@ -37,7 +37,8 @@ public class ClusterSeedScenario
     implements HostSeeder.HostFactsAware,
         HostSeeder.ConnectionAware,
         HostSeeder.ProbesAware,
-        HostSeeder.SystemdProbeAware {
+        HostSeeder.SystemdProbeAware,
+        HostSeeder.ClusterProbeAware {
 
   @ProvidedScenarioState HostFacts hostFacts;
   @ProvidedScenarioState OsgiConnection connection;
@@ -51,6 +52,13 @@ public class ClusterSeedScenario
    * boot, where the stage resolves the live probe from the registry.
    */
   @ProvidedScenarioState @MonotonicNonNull SystemdAdapterProbe injectedProbe;
+
+  /**
+   * The optional cluster-readiness probe override — set only when a test seeded it, read by the
+   * nested {@code ClusterReadinessStage} as {@code @ExpectedScenarioState clusterProbe}. Left null
+   * in the live boot, where the stage resolves the live probe from the registry.
+   */
+  @ProvidedScenarioState @MonotonicNonNull ClusterReadinessProbe clusterProbe;
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
@@ -81,9 +89,14 @@ public class ClusterSeedScenario
     this.injectedProbe = probe;
   }
 
+  @Override
+  public void acceptClusterProbe(ClusterReadinessProbe probe) {
+    this.clusterProbe = probe;
+  }
+
   @Test
   void the_cluster_is_seeded() {
-    when().preflight().and().bbox().and().incus().and().systemdAdapter();
+    when().preflight().and().bbox().and().incus().and().systemdAdapter().and().resources();
   }
 
   public static class Given extends Stage<Given> {}
@@ -93,6 +106,7 @@ public class ClusterSeedScenario
     @ScenarioStage BboxStage bbox;
     @ScenarioStage IncusStage incus;
     @ScenarioStage SystemdAdapterStage systemdAdapter;
+    @ScenarioStage ResourcesStage resources;
 
     @NestedSteps
     @As("preflight")
@@ -119,6 +133,13 @@ public class ClusterSeedScenario
     @As("systemd adapter")
     public When systemdAdapter() {
       systemdAdapter.the_systemd_adapter_is_launched();
+      return self();
+    }
+
+    @NestedSteps
+    @As("resources")
+    public When resources() {
+      resources.the_bootstrap_resources_are_created();
       return self();
     }
   }

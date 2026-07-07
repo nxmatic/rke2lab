@@ -20,14 +20,4 @@ final class FakeSeedProbes {
         hostFacts -> new ReconciliationResult("", Map.of()),
         (hostFacts, framework) -> Optional.empty());
   }
-
-  /**
-   * The systemd-adapter probe override for the offline scenario: a reachable endpoint (status=ok),
-   * so the systemd phase plays green without the live gate's host-side {@code incus exec}. Its own
-   * channel ({@link HostSeeder#SYSTEMD_PROBE}), not part of {@link SeedProbes} — the two probe
-   * axes.
-   */
-  static SystemdAdapterProbe reachableSystemdAdapter() {
-    return FakeSystemdAdapterProbes.reachable();
-  }
 }

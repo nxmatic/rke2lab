@@ -1,18 +1,12 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
-import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
-import io.nxmatic.rke2lab.controlplane.bdd.LiveClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessTopic;
-import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
@@ -25,78 +19,42 @@ import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
- * Functional pipeline for bootstrap resource creation.
- *
- * <p>Organizes resource creation into composable stages: systemd adapter, readiness verification,
- * registry provisioning, image builds, and manifest synthesis.
+ * Functional pipeline for bootstrap resource creation — PURE resource assembly. It receives a
+ * cluster-readiness {@link ClusterBootstrapReadinessVerifier.VerificationResult} already PLAYED (by
+ * {@code ClusterReadinessStage} in the composite scenario, or by the fluent {@code
+ * ResourceManager.createResources} before it built this pipeline) and mirrors it into a resource;
+ * it never plays readiness itself. That is the full-BDD shape: the checkpoint is a scenario phase,
+ * this is only the registry/image/manifest assembly.
  */
 final class ResourceCreationPipeline {
 
   private final BootstrapConfig config;
-  private final ControlplanePolicy policy;
-  private final boolean readinessEnabled;
   private final Consumer<String> readinessLogger;
-  private final Optional<ReportModel> runbook;
   private final Optional<ConsultationLog> consultations;
-  private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
-  private final ClusterReadinessContact clusterReadinessContact;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
   private final LiveGate gate;
+  private final ClusterBootstrapReadinessVerifier.VerificationResult readiness;
   private final DocumentCodec codec = new DocumentCodec();
 
   ResourceCreationPipeline(
       BootstrapConfig config,
-      ControlplanePolicy policy,
-      boolean readinessEnabled,
       Consumer<String> readinessLogger,
-      Optional<ReportModel> runbook,
       Optional<ConsultationLog> consultations,
-      ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
-      ClusterReadinessContact clusterReadinessContact,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary,
-      LiveGate gate) {
+      LiveGate gate,
+      ClusterBootstrapReadinessVerifier.VerificationResult readiness) {
     this.config = config;
-    this.policy = policy;
-    this.readinessEnabled = readinessEnabled;
     this.readinessLogger = readinessLogger;
-    this.runbook = runbook;
     this.consultations = consultations;
-    this.doctor = doctor;
     this.systemdRuntimeStatus = systemdRuntimeStatus;
-    this.clusterReadinessContact = clusterReadinessContact;
     this.bootstrapResult = bootstrapResult;
     this.systemdAdapterLaunchSummary = systemdAdapterLaunchSummary;
     this.gate = gate;
-  }
-
-  /**
-   * Play the cluster-readiness checkpoint as a BDD scenario, eager — the result is the same whether
-   * Pulumi-managed or standalone (the resource just mirrors it). Records into the shared runbook
-   * and consults the doctor on failure.
-   */
-  private ClusterBootstrapReadinessVerifier.VerificationResult playClusterReadiness() {
-    final ClusterBootstrapReadinessVerifier.VerificationResult[] holder =
-        new ClusterBootstrapReadinessVerifier.VerificationResult[1];
-    new ClusterReadinessTopic(
-            config,
-            policy,
-            readinessEnabled,
-            gate,
-            readinessLogger,
-            runbook,
-            consultations,
-            doctor,
-            new LiveClusterReadinessProbe(
-                policy, systemdRuntimeStatus, clusterReadinessContact, readinessLogger),
-            systemdAdapterLaunchSummary,
-            result -> holder[0] = result,
-            bootstrapResult.deployment().timestamp())
-        .launch();
-    return holder[0];
+    this.readiness = readiness;
   }
 
   /**
@@ -157,16 +115,14 @@ final class ResourceCreationPipeline {
     }
 
     PulumiResourceBuilder withReadiness() {
-      // The checkpoint is played eagerly as a BDD scenario (records into the runbook, consults the
-      // doctor); the resource is a thin graph mirror of the result + the dependsOn edge. The edge
-      // points at the systemd-adapter resource (the real business dependency), so the persisted
-      // Pulumi graph matches the runbook's BDD nesting. Play before the join so any raised report
-      // is already in the shared log when consultationFor reads it.
-      final ClusterBootstrapReadinessVerifier.VerificationResult result = playClusterReadiness();
+      // The checkpoint was already played (by a stage, or by the fluent createResources); the
+      // resource is a thin graph mirror of the result + the dependsOn edge. The edge points at the
+      // systemd-adapter resource (the real business dependency), so the persisted Pulumi graph
+      // matches the runbook's BDD nesting. The consultation, if any, is already in the shared log.
       this.readiness =
           new ClusterReadinessResource(
               Checkpoint.CLUSTER_READINESS.resourceName(),
-              result,
+              ResourceCreationPipeline.this.readiness,
               consultationFor(Checkpoint.CLUSTER_READINESS),
               Objects.requireNonNull(
                   this.systemdAdapter, "systemdAdapter (call withSystemdAdapter first)"));
@@ -245,9 +201,9 @@ final class ResourceCreationPipeline {
     private @MonotonicNonNull Object systemdRuntimeStatus;
 
     StandaloneResourceBuilder withReadiness() {
-      // Same eager BDD checkpoint as the Pulumi path; standalone keeps the plain VerificationResult
-      // (no Pulumi resource wrapping). Unified by the pulumiMode flag, as SystemdAdapterTopic is.
-      this.readinessOutput = playClusterReadiness();
+      // The readiness result was already played upstream; standalone keeps the plain
+      // VerificationResult (no Pulumi resource wrapping), unified by the pulumiMode flag.
+      this.readinessOutput = ResourceCreationPipeline.this.readiness;
       return this;
     }
 

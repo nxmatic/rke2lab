@@ -148,7 +148,7 @@ RunbookRenderingTest off the topic; (d) build green; (e) commit. Whiteboard has 
   play it; absent → liveProbe() via awaitService). Then write the 2 tests, migrate
   SystemdAdapterVerdictTest + RunbookRenderingTest off the topic, build green, commit.
 
-**Task 5 DONE (2026-07-07), 3 tests green, ready to commit:**
+**Task 5 COMMITTED `3869cdd64` (2026-07-07), full build green (spec-coverage 0/0):**
 - `PureStagesTest` — full 4-phase scenario plays OFFLINE (inert probes + injected reachable systemd
   probe via `HostSeeder.SYSTEMD_PROBE`); roots `[preflight,bbox,incus,systemd adapter]`.
 - `SystemdAdapterVerdictTest` — a failed probe renders FAILED for BOTH verdicts (fidelity); the
@@ -173,6 +173,49 @@ RunbookRenderingTest off the topic; (d) build green; (e) commit. Whiteboard has 
 systemd as a NESTED STEP, so the injection must retarget scenario→nested-step. Both are Task 7 (rendu
 composite), user agreed to defer. The JSON→AsciiDoc pipeline + best-effort try/catch are essential
 (jGiven requires the intermediate JSON dir), keep them.
+
+**Task 6 IN FLIGHT (2026-07-07):**
+- `ClusterReadinessStage` written+compiles: plays readiness phases WITHOUT the nested systemd replay
+  (the composite plays systemd as a top-level phase → dependency is the top-level order + consumed
+  `adapterLaunch` state, explicit not narrated). The reused `ClusterReadinessScenario` KEEPS its
+  `the_systemd_adapter_dependency_is_satisfied()` replay method (marked `@Transitional`) for the
+  still-live isolated `ClusterReadinessTopic` — the stage just doesn't call it.
+- `@Transitional` EXTENDED to `@Target({TYPE, METHOD})` (spec-less form): marks a method of the old
+  model kept alive only for a condemned caller.
+- RESOURCE PIPELINE made PURE (no duplication — "mieux que la duplication", user's words):
+  `ResourceCreationPipeline` now RECEIVES a `VerificationResult readiness` (required, non-null) and
+  never plays readiness. Lost doctor/clusterReadinessContact/readinessEnabled/runbook (all eager-play
+  only). The eager-play REMOVED from the pipeline and INLINED into the fluent
+  `ResourceManager.createResources` (`@Transitional`, builds ClusterReadinessTopic locally — doctor/
+  contact stay local, never enter the pure pipeline). New `createResources(…, VerificationResult)`
+  calls the pure pipeline directly. ZERO null, ZERO Optional-of-service. Compiles green.
+- DERIVE-GUARD (user corrected me twice): do NOT make one pipeline serve both fluent+composite via
+  null/Optional-of-service — that was the drift. One pure pipeline, the eager-play lives with the
+  condemned fluent caller.
+
+**TARGET VISION (user, 2026-07-07): the `bdd/` package is TRANSITIONAL.** It coexists with the old
+world (`pipeline/`, `pipeline/stages/`, `resources/` eager). When ALL 7 pipelines are pure-BDD
+(Task 8+ finishes the migration), `bdd/` has no reason to exist: the stages/scenarios move to their
+definitive home and the old world (Topic, fluent runner, eager ResourceCreationPipeline) is deleted
+in one block. "on ajoute le neuf, on marque l'ancien @Transitional, on coupe en bloc à la fin."
+
+**Task 6 DONE (2026-07-07), full build green (spec-coverage 0/0), ready to commit:** ClusterReadinessStage
++ ResourcesStage (fan-in, nests cluster-readiness) written+compile; composed in ClusterSeedScenario
+(5 phases: preflight/bbox/incus/systemd/resources). Pure pipeline (no null/Optional-of-service). New
+`HostSeeder.CLUSTER_PROBE` channel + `ClusterProbeAware` (mirror of SYSTEMD_PROBE). HostFacts gained
+`materialises` (RunMode's 2nd projection, resource-path face). PureStagesTest DELETED (offline play of
+the full scenario is scaffolding that never runs in the target — resources/cluster are axis-2, they
+dialogue with the world) + `FakeSeedProbes.reachableSystemdAdapter` dead-removed. Fixed a PRE-EXISTING
+socle regression [[boot-discovery-mandatory-import-incontainer]].
+
+**Task 6 DEFERRED (plan drift, tracked):**
+- `ResourcesStageTest` (full 5-phase DAG in real Felix) NOT written: `ResourcesStage` needs a WHOLE
+  `BootstrapResult` (10 Pulumi composites, no test form — the recurring wall since Task 4). Fabricating
+  one is forbidden (memory). Deferred to Task 7, where a real end-to-end BootstrapResult + composite
+  rendering are needed anyway. The 5-phase DAG composition is thus NOT yet asserted by a test.
+- `NestedRunbookTest` NOT migrated to drive the stage (plan said to): it drives the still-live
+  condemned `ClusterReadinessTopic`, stays green, no real dependency to migrate now — migrates when
+  the topic dies (Task 8), like RunbookRenderingTest in Task 5.
 
 **THEN:** Tasks 6-9. See [[runmode-livegate-pulumi-abstraction]].
 

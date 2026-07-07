@@ -9,6 +9,7 @@ import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -74,7 +75,15 @@ public final class ClusterReadinessScenario {
     @ProvidedScenarioState
     Map<ClusterReadinessPhase, ObservationView> phaseObservations = new LinkedHashMap<>();
 
-    /** Nested: replay the upstream systemd-adapter scenario as sub-steps of this checkpoint. */
+    /**
+     * Nested: replay the upstream systemd-adapter scenario as sub-steps of this checkpoint — kept
+     * for the isolated {@code ClusterReadinessTopic}, which needs the dependency re-narrated
+     * because it plays alone. The composite {@code ClusterReadinessStage} does NOT call this: the
+     * seed scenario plays systemd as a top-level phase, so the dependency is the top-level order
+     * plus the consumed {@code adapterLaunch} state — explicit, not replayed.
+     */
+    @Transitional(
+        to = "removed with ClusterReadinessTopic — the composite stage consumes adapterLaunch")
     @NestedSteps
     public When the_systemd_adapter_dependency_is_satisfied() {
       givenSystemdAdapter

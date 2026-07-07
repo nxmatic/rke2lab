@@ -68,6 +68,14 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
   public static final String SYSTEMD_PROBE = "systemd-probe";
 
   /**
+   * Inbound key under {@link #NS}: an OPTIONAL cluster-readiness phase probe. Seeded only by a test
+   * (a per-phase fake) so the cluster-readiness phase plays offline; absent in the live boot, where
+   * the stage resolves the live probe from the registry (the kubectl contact). The cluster twin of
+   * {@link #SYSTEMD_PROBE}.
+   */
+  public static final String CLUSTER_PROBE = "cluster-probe";
+
+  /**
    * jGiven's own report-model store coordinate — derived, not hardcoded: the namespace is jGiven's
    * base package (via {@link Stage}), the key its store slot. We overwrite this so jGiven adopts
    * the driver's model as its own.
@@ -94,6 +102,11 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
         context.getStore(NS).get(SYSTEMD_PROBE, SystemdAdapterProbe.class);
     if (systemdProbe != null && testInstance instanceof SystemdProbeAware aware) {
       aware.acceptSystemdProbe(systemdProbe);
+    }
+    final ClusterReadinessProbe clusterProbe =
+        context.getStore(NS).get(CLUSTER_PROBE, ClusterReadinessProbe.class);
+    if (clusterProbe != null && testInstance instanceof ClusterProbeAware aware) {
+      aware.acceptClusterProbe(clusterProbe);
     }
     final ReportModel runbook = context.getStore(NS).get(RUN_MODEL, ReportModel.class);
     if (runbook != null) {
@@ -163,5 +176,14 @@ public final class HostSeeder implements TestInstancePostProcessor, AfterAllCall
    */
   public interface SystemdProbeAware {
     void acceptSystemdProbe(SystemdAdapterProbe probe);
+  }
+
+  /**
+   * Implemented by the scenario so the seeder installs the OPTIONAL cluster-readiness probe
+   * override — a test's per-phase fake. Absent in the live boot (the stage resolves the live probe
+   * from the registry), so this is only reached when a test seeded {@link #CLUSTER_PROBE}.
+   */
+  public interface ClusterProbeAware {
+    void acceptClusterProbe(ClusterReadinessProbe probe);
   }
 }

@@ -17,14 +17,18 @@ import java.util.function.Consumer;
  * (doctor/systemdProbe/clusterContact/readinessAuthority) are NOT here — the scenario resolves them
  * from its OSGi connection.
  *
- * <p>Carries {@link LiveGate}, not {@code RunMode}: the domain consumes the abstract live/deferred
- * face, never the Pulumi-vocabulary state it projects from — the edge does the projection.
+ * <p>Carries {@code RunMode}'s TWO PROJECTIONS, never the enum itself: {@link LiveGate} (touch
+ * reality? — the live/deferred face) and {@code materialises} (materialise Pulumi resources? — the
+ * resource-path face the resources fan-in reads to pick Pulumi vs standalone). The domain consumes
+ * the projections; the edge does the projection from {@code RunMode}, so no {@code com.pulumi}
+ * vocabulary crosses.
  */
 public record HostFacts(
     BootstrapConfig config,
     ControlplanePolicy policy,
     BootstrapOptions options,
     LiveGate liveGate,
+    boolean materialises,
     BboxReconciliationOrchestrator bboxOrchestrator,
     ResourceManager resourceManager,
     OutputBuilder outputBuilder,

@@ -10,22 +10,20 @@ Export-Package: \
     io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container, \
     io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic
 
-# The seam half (OutOfContainerFrameworkExtension) pulls the framework-launch API + felix + the
-# shared boot-discovery model + slf4j (the resolution-failure diagnostic logger), none of which exist
-# inside the framework. The SCR runtime API (ScrDiagnostics) is present only when a test boots SCR.
-# They are needed only when this jar runs on the flat host classpath (where they are present);
-# marking them optional lets the bundle still RESOLVE when installed in-container to provide the
-# runner package — a consumer that has no slf4j provider (e.g. a non-jGiven in-container test) still
-# wires. A bundle is a superset of a plain jar — this keeps both uses true from one artifact.
+# The seam half (OutOfContainerFrameworkExtension) pulls the framework-launch API + felix + slf4j
+# (the resolution-failure diagnostic logger), needed only on the flat host classpath; marking them
+# optional lets the bundle still RESOLVE when installed in-container to provide the runner package.
+# boot.discovery is NOT optional: the IN-CONTAINER runner path (JUnitLauncherCore.wiringOf →
+# ClassRealm.of) loads it unconditionally, so a consumer must wire it or fail at resolution rather
+# than with a late NoClassDefFoundError — its package is system-exported by the in-container test
+# harness (withJUnitRunner). A bundle is a superset of a plain jar — this keeps both uses true.
 Import-Package: \
     !org.jspecify.annotations, \
     !org.checkerframework.checker.nullness.qual, \
     org.osgi.framework.launch;resolution:=optional, \
-    org.apache.felix.framework.util;resolution:=optional, \
     org.osgi.service.component.runtime;resolution:=optional, \
     org.osgi.service.component.runtime.dto;resolution:=optional, \
     io.nxmatic.rke2lab.osgi.runtime.framework;resolution:=optional, \
-    io.nxmatic.rke2lab.osgi.boot.discovery;resolution:=optional, \
     io.nxmatic.rke2lab.osgi.bnd;resolution:=optional, \
     org.slf4j;resolution:=optional, \
     *

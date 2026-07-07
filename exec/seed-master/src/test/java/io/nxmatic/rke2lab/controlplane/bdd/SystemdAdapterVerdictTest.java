@@ -102,6 +102,7 @@ class SystemdAdapterVerdictTest {
         cfg.asPolicy(),
         BootstrapOptions.from(cfg.asDto()),
         LiveGate.forRun(RunMode.STANDALONE),
+        RunMode.STANDALONE.materialises(),
         new BboxReconciliationOrchestrator(false),
         new ResourceManager(),
         new OutputBuilder(),

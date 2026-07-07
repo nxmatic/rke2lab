@@ -36,10 +36,14 @@ import java.lang.annotation.Target;
  *       marker so the code point is navigable back to the debt — the gate only ever reads presence,
  *       never the values, so an empty {@code spec} changes nothing for it.
  * </ul>
+ *
+ * <p>Targets a TYPE or a METHOD. On a method it marks a member of the old model kept ALIVE only for
+ * a condemned caller — it dies when that caller is removed (its {@code to} names the removal, not a
+ * successor). Method use is documentary only; the {@code SPEC_COVERAGE} gate reads exported TYPES.
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.METHOD})
 public @interface Transitional {
 
   /**

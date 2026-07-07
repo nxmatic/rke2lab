@@ -200,6 +200,12 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
      */
     public Builder withJUnitRunner() {
       this.classpathBundles.addAll(JUNIT_RUNNER_BUNDLES);
+      // The in-container runner (scenario-engine) loads ClassRealm from boot.discovery
+      // unconditionally (JUnitLauncherCore.wiringOf), so its package must resolve. System-exported
+      // (host-flat, from the test classpath) rather than installed as a bundle: the launcher runs
+      // at
+      // the membrane and reads it through the system bundle, like the JUnit-platform packages.
+      this.systemPackages.add("io.nxmatic.rke2lab.osgi.boot.discovery");
       return this;
     }
 
