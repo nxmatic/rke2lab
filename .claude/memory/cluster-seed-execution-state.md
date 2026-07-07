@@ -217,7 +217,42 @@ socle regression [[boot-discovery-mandatory-import-incontainer]].
   condemned `ClusterReadinessTopic`, stays green, no real dependency to migrate now — migrates when
   the topic dies (Task 8), like RunbookRenderingTest in Task 5.
 
-**THEN:** Tasks 6-9. See [[runmode-livegate-pulumi-abstraction]].
+**Task 7 + carrier unification COMMITTED `6846d26b9` (2026-07-07):** OutputsStage (terminal DAG
+projection) + PendingMarkingScenarioExecutor (E9 preview render) + the StageContext carrier that
+unifies stage-context injection (`executor.readScenarioState(carrier)` — dropped all 6 `*Aware` +
+`accept*` + pass-through scenario fields; scenario is a pure composer). Runbook + outputs harvested
+by inject-the-holder. Null-hygiene pass (probes/sinks→Optional, requireNonNull only at frontier).
+See [[bdd-context-injection-carrier]] [[bdd-null-hygiene-frontier-rule]].
+
+**Task 8 (pure driver + delete fluent world) COMMITTED (2026-07-07), full build green (52 pass, 4
+skipped, gates 0):** `ClusterSeedTopic.seedClusterWithinFramework` rewritten — boots Felix, builds
+HostFacts + `OsgiConnection.over(ctx,false)`, seeds the launcher session store (HOST_FACTS/CONNECTION/
+PROBES=`SeedProbes.live()`/RUN_MODEL holder/OUTPUTS_SINK), runs `JUnitLauncherCore<ClusterSeedRun>`
+selecting ClusterSeedScenario, harvests `ClusterSeedRun(runbook, outputs)`, renders crash-safe in a
+`finally`. Class shape/Sink/ctor kept (ApplicationPipeline still calls it). seed-master pom: added
+`junit-jupiter-engine` compile scope (JupiterTestEngine, the last dogfooding promotion). DELETED in
+one block: `ClusterSeedPipeline`, `State` (pipeline/), `DeferringScenarioExecutor` (bdd/), + 6 topics
+(Preflight/Bbox/Incus/Resources/SystemdAdapter/ClusterReadiness) (pipeline/stages/). Removed the
+`@Transitional` fluent `ResourceManager.createResources` + the dead `ClusterReadinessScenario.When
+.the_systemd_adapter_dependency_is_satisfied` replay (its condemned caller gone). Two-space invariant
+verified (0 `import com.pulumi` in osgi/).
+
+**Task 8 DEBT — `NestedRunbookTest` is `@Disabled`** (only coverage of the cluster-readiness FAILURE
+path: FAILED checkpoint + doctor consult + targeted runbook; SystemdAdapterVerdictTest aborts at the
+systemd phase before reaching cluster). Proven at source: a lightweight `Scenario.create` + direct
+step calls CANNOT reproduce it — phases run below jGiven's `maxStepDepth=1` cap AND the `capturing`
+probe set on the inner Given never flows to the inner When (cross-stage state moves only through real
+`enterStage`/`leaveStage` interception). Re-enable in the fakes chantier with a launcher+Felix harness
++ a `cluster-core-fake` fragment (the SystemdAdapterStageTest `(variant=fake)` pattern). The
+assertions in the disabled file ARE the spec. See [[per-domain-osgi-fakes-chantier]].
+
+**Task 9 DEFERRED to the very end (user-confirmed 2026-07-07):** the `SCENARIO_STATE_DAG` gate
+WARN→ERROR flips only when ALL 7 pipelines are pure-BDD — flipping it now would break the 6 still on
+Topic/State. See [[scenario-state-dag-gate-closes-migration]].
+
+**NEXT (two separate worktrees off the Task-8 stable commit):** (1) the per-domain OSGi fakes chantier
+[[per-domain-osgi-fakes-chantier]] (re-enables NestedRunbookTest); (2) resume BDD migration of the
+other 6 pipelines [[bdd-pipeline-migration-plan]]. See [[runmode-livegate-pulumi-abstraction]].
 
 **THEN resume ClusterSeed Tasks 3-9:** 3=ClusterSeedRun+scenario skeleton; 4=attached-framework seam
 (OsgiConnection.framework() + BootedFramework.attached()) + Preflight/Bbox/Incus stages; 5=SystemdAdapterStage

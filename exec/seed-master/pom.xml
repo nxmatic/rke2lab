@@ -308,6 +308,14 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
     </dependency>
+    <!-- The Jupiter engine is runtime code here too: the ClusterSeedTopic driver (src/main) hands
+         JupiterTestEngine.class to JUnitLauncherCore to play ClusterSeedScenario — the seeding is
+         the launcher running jGiven scenarios, so the engine is a compile dep, not test-only. The
+         final leg of the same dogfooding promotion. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>

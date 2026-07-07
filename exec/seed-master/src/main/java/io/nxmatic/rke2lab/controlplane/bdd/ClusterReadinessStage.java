@@ -39,11 +39,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  *
  * <p>The dependency on systemd-adapter is EXPLICIT, not replayed: the seed scenario plays systemd
  * as a top-level phase before this one, so the dependency is the top-level order plus the {@code
- * adapterLaunch} state this stage consumes (whereas the isolated {@code ClusterReadinessTopic}
- * still re-narrates it via {@code the_systemd_adapter_dependency_is_satisfied}). The readiness
- * phases form a strict chain (kubeconfig → API → controllers); a failing phase throws so the
- * runbook shows where it broke, then the stage consults the doctor and projects the failed {@link
- * VerificationResult}.
+ * adapterLaunch} state this stage consumes. The readiness phases form a strict chain (kubeconfig →
+ * API → controllers); a failing phase throws so the runbook shows where it broke, then the stage
+ * consults the doctor and projects the failed {@link VerificationResult}.
  */
 public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
 

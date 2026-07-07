@@ -3,36 +3,28 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.Hidden;
-import com.tngtech.jgiven.annotation.NestedSteps;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
-import com.tngtech.jgiven.annotation.ScenarioStage;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * The cluster-readiness checkpoint, grouped: its {@link Given}/{@link When}/{@link Then} stages
- * live as nested static classes so the scenario reads as one unit. It depends on the
- * systemd-adapter scenario — the {@link When} replays {@link SystemdAdapterScenario}'s stages
- * nested (the follow-the-chain dependency edge) before walking the readiness phases.
+ * live as nested static classes so the scenario reads as one unit. The {@link When} walks the
+ * readiness phases in canonical order; the systemd-adapter dependency is a sibling phase the seed
+ * scenario plays before this one (consumed as {@code adapterLaunch} state), not replayed here.
  */
 public final class ClusterReadinessScenario {
 
   private ClusterReadinessScenario() {}
 
-  /**
-   * Given: establishes the bootstrap config, the per-phase probe, and the upstream systemd-adapter
-   * probe whose scenario is played nested (the dependency edge — cluster-ready depends on
-   * systemd-adapter).
-   */
+  /** Given: establishes the bootstrap config and the per-phase readiness probe. */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState BootstrapConfig config;
     @ProvidedScenarioState ClusterReadinessProbe phaseProbe;
-    @ProvidedScenarioState SystemdAdapterProbe systemdAdapterProbe;
 
     public Given the_cluster(@Quoted String name, @Hidden BootstrapConfig config) {
       this.config = config;
@@ -44,55 +36,24 @@ public final class ClusterReadinessScenario {
       this.phaseProbe = phaseProbe;
       return self();
     }
-
-    /** The upstream dependency's probe — its scenario is played nested in the When stage. */
-    @Hidden
-    public Given depending_on_systemd_adapter(SystemdAdapterProbe systemdAdapterProbe) {
-      this.systemdAdapterProbe = systemdAdapterProbe;
-      return self();
-    }
   }
 
   /**
-   * When: first it walks the dependency chain — the systemd-adapter scenario is replayed as nested
-   * steps (the cert-manager "follow the chain": cluster-ready depends on systemd-adapter) — then
-   * each readiness phase is its own fluent step, chained in canonical order. The phases form a
-   * strict chain (kubeconfig → API → controllers): each is a precondition of the next, so a failing
-   * step throws and JGiven skips the bodies of the downstream chained steps, marking them SKIPPED
-   * in the runbook. Fail-fast is the fluent chain's own semantics — no manual break, and the
-   * operator still sees every phase, with the one that broke and the ones not reached.
+   * When: each readiness phase is its own fluent step, chained in canonical order. The phases form
+   * a strict chain (kubeconfig → API → controllers): each is a precondition of the next, so a
+   * failing step throws and JGiven skips the bodies of the downstream chained steps, marking them
+   * SKIPPED in the runbook. Fail-fast is the fluent chain's own semantics — no manual break, and
+   * the operator still sees every phase, with the one that broke and the ones not reached. The
+   * systemd-adapter dependency is a sibling phase the seed scenario plays before this one (consumed
+   * as {@code adapterLaunch} state), not re-narrated here.
    */
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState BootstrapConfig config;
     @ExpectedScenarioState ClusterReadinessProbe phaseProbe;
-    @ExpectedScenarioState SystemdAdapterProbe systemdAdapterProbe;
-
-    @ScenarioStage SystemdAdapterScenario.Given givenSystemdAdapter;
-    @ScenarioStage SystemdAdapterScenario.When whenSystemdAdapter;
-    @ScenarioStage SystemdAdapterScenario.Then thenSystemdAdapter;
 
     @ProvidedScenarioState
     Map<ClusterReadinessPhase, ObservationView> phaseObservations = new LinkedHashMap<>();
-
-    /**
-     * Nested: replay the upstream systemd-adapter scenario as sub-steps of this checkpoint — kept
-     * for the isolated {@code ClusterReadinessTopic}, which needs the dependency re-narrated
-     * because it plays alone. The composite {@code ClusterReadinessStage} does NOT call this: the
-     * seed scenario plays systemd as a top-level phase, so the dependency is the top-level order
-     * plus the consumed {@code adapterLaunch} state — explicit, not replayed.
-     */
-    @Transitional(
-        to = "removed with ClusterReadinessTopic — the composite stage consumes adapterLaunch")
-    @NestedSteps
-    public When the_systemd_adapter_dependency_is_satisfied() {
-      givenSystemdAdapter
-          .the_seed_node(config.systemdAdapterDbusHost(), config)
-          .probed_by(systemdAdapterProbe);
-      whenSystemdAdapter.the_systemd_adapter_probe_runs();
-      thenSystemdAdapter.the_dbus_endpoint_responds();
-      return self();
-    }
 
     public When the_kubeconfig_is_published() {
       return checking(ClusterReadinessPhase.KUBECONFIG_PUBLISHED);
