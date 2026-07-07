@@ -13,6 +13,14 @@ control-plane pipeline that runs `pulumi preview`/`up` — the one process that 
 system's two boundaries. Folds in the link:../osgi/pipeline-spec.adoc[pipeline design of record (OSGi-owned)], and
 carries the null-safety governance note.
 
+[NOTE]
+====
+This view is the *avant* for the control-plane→OSGi domain migration. The host logic drawn here (config,
+policy, readiness, incus, bbox) is being lifted into OSGi domain services the host calls; see
+link:../osgi/controlplane-to-osgi-migration-spec.adoc[control-plane → OSGi — migrating the domains] for
+the après (the 87 Pulumi-free files migrated, only the 17 `com.pulumi` edge staying host).
+====
+
 === The thesis — the pipeline owns two gates; nothing else decides a crossing
 
 The pipeline is the sole orchestrator of two boundaries, and until now both were crossed by scattered

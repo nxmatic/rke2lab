@@ -1,0 +1,15 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.host.edge
+# Self-declares this jar as an embeddable EDGE bundle (scanned + installed under META-INF/bundles by
+# the same io.nxmatic.rke2lab.embed capability as the other carriers). See cluster-edge.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=edge; edge=host
+
+# No -includeresource: this edge embeds NOTHING. Three components are pure java.nio/JDK; the fourth
+# (LiveGitFactsReader) imports org.eclipse.jgit.*, which resolves as a real OSGi bundle (the jgit jar
+# carries Bundle-SymbolicName + Export-Package), staged by the osgi-staging-extension like any other
+# carrier — an Import-Package, not a nested jar.
+# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
+# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
+# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
+# computed imports; the annotations do their job at compile/analysis time only.
+Import-Package: !org.jspecify.annotations, *
+-noimportjava: true
