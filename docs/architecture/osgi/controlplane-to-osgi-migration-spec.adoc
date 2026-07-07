@@ -1,270 +1,160 @@
-= control-plane → OSGi — migrating the domains, populating the frontier
+= control-plane → OSGi — the external-contact sweep
 :toc: left
 :toclevels: 3
 
 [NOTE]
 ====
-*Status:* SPEC (2026-07-07). Design of record for migrating the host-side `controlplane/` logic into
-OSGi domain services the host CALLS. Converged from the brainstorm on `feature/cluster-seed-scenario`
-and a file-by-file placeability verification (this document's §<<verification>>). The reference pattern
-is the shipped link:cluster-edge-spec.adoc[cluster-edge] (port + core + edge/fake); the frame lives in
-`.claude/claude-preview.adoc` and the memory `controlplane-to-osgi-migration-frame.md`.
+*Status:* SHIPPED (2026-07-07). Record of the completed sweep that moved the host-side
+`controlplane/` external contacts into OSGi edges the host composes. This document is the *index and
+rationale* of the sweep; each contact has its own edge spec (linked below). It is read FROM the code
+(the shipped edges + the stage imports of 2026-07-07), not imposed on it.
 
-This is a *before / after* document, read from the code (the surface inventory of 2026-07-07), not
-imposed on it.
+*This supersedes an earlier framing.* The first draft of this spec proposed migrating "the 87
+Pulumi-free `controlplane/` files into domain services (port + core + fake), in coupling order
+config→policy→readiness→…". That framing was wrong and was abandoned: two increments built on it
+(config, policy) were reverted (commit `8eec94a`). The correct model — and what actually shipped — is
+below.
 ====
 
-== Scope — we migrate the DOMAINS, not the pipeline split
+== The criterion — what migrates, learned the hard way
 
-Two chantiers; this spec is ONLY the first.
+A type moves into an OSGi bundle *if and only if* a bundle `@Component` **contacts an external
+system** (→ it belongs in an `-edge`) or **rides that contact's verb** as a parameter/return (→ it
+belongs in a `-port`). Nothing else moves.
 
-* *Ours — birthing the services.* Create the missing OSGi domains (incus, bbox), extract the
-  Pulumi-free logic (config, policy, readiness-verifier, the bdd fragments) into their domains as
-  callable services with tests and a fake. Result: the OSGi frontier is populated and correct; the old
-  host path stays wired.
-* *Not ours — the pipeline split (later).* Re-wiring `ClusterSeedScenario` so a stage CALLS the OSGi
-  service instead of the old host code, and deciding which phase lives where. That is *consumption* of
-  what we birth, tracked in the migration plan, out of scope here.
+"Pulumi-free" is NOT the criterion. Being reachable on `{JDK ∪ ports}` (a closed dependency DAG) is
+*necessary* but not *sufficient*: a class can be perfectly placeable and still have no reason to
+cross, because nothing about it touches the frontier. Orchestration, config-input records, the bdd
+`Stage`s, the retry loops, the Pulumi resource graph — all of that is placeable AND stays host,
+because none of it is an external contact.
 
-The one fuzzy seam: extracting `IncusResourceBootstrap`'s flat decision into an incus `@Component` is
- OURS (the service is born); re-pointing the host to call it is the split (not ours). The old host code
-stays in place until the split unwires it.
+The consequence: the real migration surface was never "87 files". It was a handful of *external
+contacts* — the points where host code shelled a process, opened a socket, or drove a CLI. Each was
+extracted atomically.
 
-== The cut line — the two-worlds invariant decides
+== The working unit — one contact, extracted atomically
 
-`grep -ri pulumi osgi/ == 0` ⇒ `com.pulumi` CANNOT enter Felix. So migration is not "move packages",
-it is cutting along the plan/render seam. Verified inventory (2026-07-07):
+Every extraction is one change that ships together:
 
-* `controlplane/` = *104 files*; exactly *17 import `com.pulumi.*`* → they ARE the edge (resource
-  registration + `Output<T>` wiring), STAY host.
-* the other *87 are Pulumi-free* → migrate to OSGi.
+. `-port` declares the verb (a `type=seam` interface) + its flat request/result records. One shared
+  class across the host↔bundle boundary; no host config type crosses.
+. `-edge` provides it (`@Component`, `type=edge`) — the single door to that external system, and
+  nothing else.
+. the host CONSUMER is re-wired in the SAME change to compose the edge from the registry
+  (`awaitService` in a `Stage`, `singleSpiProvider` in host Pulumi code) — the old inlined mechanism
+  is deleted, not deprecated.
+. a boot proof asserts the embedded edge resolves and SCR publishes the contact typed across the
+  seam.
 
-The host is a *midwife*: `Pulumi.run(ctx)` crosses the frontier first, calls OSGi through the gateway,
-receives a flat value, materialises `com.pulumi.*` resources, then its job is done. One direction only
-(host → OSGi via `awaitService`); OSGi never calls back, it returns a flat `Document`. The frontier is
-a *birth canal*: crossed once at master's seed, then sealed. The current gateway suffices; no new
-machinery.
+The pattern has two shapes: *bare `ProcessBuilder`* (incus, auth, cluster, ssh-to-age — pure JDK, no
+embedded jar) and *library-backed* (bbox — a third-party client made an OSGi bundle and imported, the
+library vocabulary translated to a home vocabulary at the edge so no library type crosses the seam).
 
-[[verification]]
-== Verification — the 87 are all placeable (no dead-end)
+== The cut line — the two-worlds invariant
 
-File-by-file (5 parallel passes over the 22 files with a host touch). Result: *no host dead-end*. One
-hard edge only (`RuntimeCommandPreflight`: `PATH` probe + `ProcessBuilder`, all-static, no seam); the
-rest is PLACEABLE or MIXED-healthy (a flat decision core + a host seam already parameterised by an
-injected `Path`/`BootstrapPaths`/`Function`, liftable behind a port). The cluster-edge law — *the host
-owns the file/loop, the bundle owns the decision* — covers 100% of cases.
+`grep -ri pulumi osgi/ == 0` ⇒ `com.pulumi` CANNOT enter Felix. The host is a *midwife*:
+`Pulumi.run(ctx)` crosses the frontier first, calls OSGi through the registry, receives a flat value,
+materialises `com.pulumi.*` resources, then its job is done. One direction only (host → OSGi via
+`awaitService`); OSGi never calls back, it returns flat records (or a serialized `Document` for
+deep-DAG data). The frontier is a *birth canal*: crossed once at master's seed, then sealed. The
+existing gateway suffices; the sweep added no new machinery.
 
-The four seam types:
+== The shipped edges — the whole surface
+
+[cols="1,2,2,1",options="header"]
+|===
+| Domain | Port contact | Edge `@Component` (external contact) | Spec
+| ssh-to-age
+| the age-key conversion verb
+| `ProcessBuilderSshToAgeConverter` (`ssh-to-age`)
+| link:ssh-to-age-edge-handoff.adoc[handoff]
+| systemd
+| `SystemdRuntimeProbe`
+| `DbusSystemdProbe` (dbus socket)
+| link:dbus-systemd-edge-spec.adoc[spec]
+| cluster
+| `ClusterReadinessContact`
+| `KubectlClusterContact` (`kubectl`)
+| link:cluster-edge-spec.adoc[spec]
+| incus
+| `IncusInstanceContact` + `ImageBuilder`
+| `ProcessBuilderIncusInstanceContact` (`ssh … incus exec`) + `DistrobuilderImageBuilder` (`distrobuilder` / ssh recipe)
+| link:incus-edge-spec.adoc[spec]
+| bbox
+| `BboxReconciler`
+| `LiveBboxReconciler` (java-bbox-api-client, bundled + imported)
+| link:bbox-edge-spec.adoc[spec]
+| auth
+| `AuthTokenContact`
+| `CliAuthTokenContact` (`gh auth token` / `flox auth token`)
+| link:auth-edge-spec.adoc[spec]
+| pulumi
+| (host-side edge)
+| the `com.pulumi.*` registration + `Output<T>` wiring
+| link:pulumi-edge-handoff.adoc[handoff]
+|===
+
+One domain, one bundle pair, one or more `@Component`s: incus carries TWO contacts (reachability and
+image-build) in a single `incus-port`/`incus-edge` pair, because an Incus instance needs an Incus
+image — the same concern, not a reason to split the module.
+
+== What stays host — and why it is NOT a dead-end
+
+The bulk of `controlplane/` is placeable yet stays host, because it is not an external contact:
+
+* *Orchestration* — `IncusResourceBootstrap` (the 3000-line provisioning graph, `Output<T>` wiring),
+  `BboxReconciliationOrchestrator` (blueprint enumeration + the Pulumi resource graph),
+  `SeedSystemdAdapterEndpointGate` (the retry loop, deadline, `ObservationView` projection). Each now
+  composes its edge from the registry; the orchestration around it never crossed.
+* *Config input* — `Rke2labConfig`/`BootstrapConfig` read Pulumi config host-side and project flat
+  scalars into the edge requests.
+* *The Pulumi edge* — the 17 `com.pulumi` files (resource registration + `Output<T>`).
+* *The scenario spine* — `ClusterSeedScenario`, `StageContext`, `SeedProbes`, the `Outputs`/`Resources`
+  stages: the assembly that runs ON `scenario-engine` and composes the domains. Owner is the
+  seeding-scenario concern, not a leaf domain.
+* *Determinism made it moot* — `RuntimeCommandPreflight` (command-availability checks) was deleted, not
+  migrated: nodes are provisioned with nix, so their environment is deterministic and the checks
+  guarded nothing.
+
+== How the stages consume the edges
+
+A `Stage` reaches its contact through the registry, never through a host import of the mechanism.
+Read from the imports (2026-07-07):
 
 [cols="1,3",options="header"]
 |===
-| Seam type | Files
-| ① HARD — host exec (→ stays host as edge)
-| `RuntimeCommandPreflight` (irreducible). `SeedSystemdAdapterEndpointGate` = FALSE alarm: cut already
-  made (4 injected collaborators, `@Transitional`).
-| ② SOFT — absolute host path (→ lift behind a port)
-| `IncusIdentityMaterialAssembler`, `GitMetadataExtractor`, `DeploymentMetadata`, `BboxSecretsReader`,
-  `EntryGatePolicyEnforcer`, `ClusterBootstrapReadinessVerifier`, `SeedNodeBootstrapWatcher`.
-| ③ SINK — artifact write (flat-out law → trivial edge)
-| `ClasspathTreeCopier`, `SystemdTarget`, `MedicalRecordDump`, `RunbookRenderer`,
-  `RecordInterventionCommand`, `ClusterSeedTopic` (runbook dir).
-| ④ ENV — trivially injectable
-| `SeedLog` (log-level at init); `HostSeeder` (JUnit session + system props → stays host, test support).
+| Stage | How it reaches its contact
+| `SystemdAdapterStage`
+| `awaitService(SystemdRuntimeProbe)` + `awaitService(IncusInstanceContact)` — both edges, composed by
+  the host gate it drives.
+| `BboxStage`
+| `awaitService(BboxReconciler)` — threaded through its probe to the host orchestrator.
+| `IncusStage`
+| stays on the host `IncusResourceBootstrap` (the Pulumi `Image` graph); the incus contacts
+  (`IncusInstanceContact`, `ImageBuilder`) are composed INSIDE that host code via `singleSpiProvider`,
+  not by the stage. The stage consumes only its `BootstrapResult`.
 |===
 
-The verification revealed *four cross-cutting ports* to extract once, shared across domains — the
-common prerequisite (increment-0):
+The lesson the earlier draft got wrong: `IncusStage` was never "blocked pending a service". The incus
+contacts DID migrate (into `incus-edge`), but their consumer is host Pulumi code, not the stage — so
+the stage keeps calling the host, which now composes the edges. Migrating a contact does not imply
+re-pointing a stage.
 
-[cols="1,1,3",options="header"]
-|===
-| Cross-cutting port | Domains served | What it isolates
-| `HostPathResolver` | config | NFS-automount topology `/net`↔`/private`, `toAbsolutePath()` on CWD
-| `GitFactsReader` | policy, incus | jgit worktree (dirty, commit) → flat facts
-| `SecretsSource` | bbox, incus | `.secrets` read → bytes/InputStream
-| `ArtifactSink` | bdd (×3), incus | rendered-artifact write → the host persists
-|===
+== The SPEC_COVERAGE ratchet
 
-== Three strata — engine, scenarios, domains
-
-`bdd/` is NOT a domain. Its 33 files split three ways:
-
-* Each triple `XxxStage` + `XxxProbe` + `Simulated/LiveXxxProbe` JOINS its domain (the `Stage` is how
-  the domain enters the scenario; `SimulatedXxxProbe` is its fake).
-* The engine already EXISTS in OSGi — `osgi/runtime/scenario-engine` (`JUnitLauncherCore`,
-  `InContainerJUnitRunner`, `IsolatedWorld`, `OsgiConnection`). It is the *après* that replaces
-  `osgi/foundation/pipeline` (`Topic`/`FluentTopicRunner`, in dissolution). It STAYS in `runtime/`:
-  `foundation/` never depends on `runtime/`, and scenario-engine depends on `framework-launcher` +
-  `junit-testkit` (runtime siblings) — moving it to foundation would invert the layering.
-* The remaining spine (`ClusterSeedScenario`, `StageContext`, `SeedProbes`, `Outputs/ResourcesStage`,
-  record/render) is the *scenario = the assembly* that runs ON the engine and composes the domains. Its
-  "no owner" is normal — owner is the seeding-scenario concern, not a leaf domain.
-
-[mermaid]
-....
-flowchart TB
-  subgraph engine["MOTEUR BDD — osgi/runtime/scenario-engine (EXISTS, replaces foundation/pipeline)"]
-    e1["JUnitLauncherCore · InContainerJUnitRunner · IsolatedWorld · OsgiConnection"]
-  end
-  subgraph asm["SCÉNARIOS = the assembly (run ON the engine) — full-BDD: 1 pipeline = 1 scenario"]
-    s1["ClusterSeedScenario · StageContext · SeedProbes · Outputs/ResourcesStage · record/render"]
-  end
-  subgraph doms["DOMAINES MIGRÉS — core + Stage + fake (cluster-edge pattern)"]
-    d1["config · policy · readiness · systemd · bbox (new) · incus (new)"]
-  end
-  subgraph ports["PORTS TRANSVERSES — extracted once (increment-0)"]
-    p1["HostPathResolver · GitFactsReader · SecretsSource · ArtifactSink"]
-  end
-  edge["RESTE HOST — PreflightStage/Probe + RuntimeCommandPreflight + 17 com.pulumi"]
-  e1 -->|launches| s1
-  s1 -->|awaitService| doms
-  doms --> ports
-  classDef en fill:#ede7f6,stroke:#5e35b1,stroke-width:2px;
-  classDef as fill:#fff3e0,stroke:#fb8c00,stroke-width:2px;
-  classDef dm fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
-  classDef pt fill:#e1f5ff,stroke:#0066cc,stroke-width:2px;
-  classDef h fill:#fdd,stroke:#c33,stroke-width:2px;
-  class e1 en;
-  class s1 as;
-  class d1 dm;
-  class p1 pt;
-  class edge h;
-....
-
-== The migration mechanism is already proven — the stage gradient
-
-The bascule is not a design; it is *already happening in the code*. A stage migrates by turning
-`import controlplane.xxx.ConcreteClass` (direct host call) into `connection.awaitService(XxxPort.class)`
-(the OSGi service via the gateway). Read from the imports (2026-07-07):
-
-[cols="1,2,1",options="header"]
-|===
-| Stage | How it calls its logic | State
-| `SystemdAdapterStage` | `awaitService(SystemdRuntimeProbe)`, `ReadinessAuthority`, `ConsultingService` — ports only | ✅ migrated
-| `ClusterReadinessStage` | `awaitService(SystemdRuntimeProbe)` + `cluster.port.*` BUT still `import controlplane.readiness.ClusterBootstrapReadinessVerifier` | 🟡 half
-| `IncusStage` | `import controlplane.incus.IncusResourceBootstrap` direct, zero awaitService | 🔴 blocked (no service yet)
-| `BboxStage` | `import controlplane.bbox.BboxReconciliationOrchestrator` direct | 🔴 blocked (no service yet)
-|===
-
-The stages that are NOT migrated are exactly incus and bbox — the two domains with no OSGi module. You
-cannot migrate `IncusStage` to `awaitService(IncusPort)` until the incus service exists. *Each domain we
-birth unblocks its stage's bascule.* That is the proof the decomposition holds.
-
-== The atlas — before/after, per domain (named erasure)
-
-Blue = shipped host code, untouched by us (unwired later by the split). Green = the OSGi service we
-birth. Red-dashed = the host seam lifted behind a cross-cutting port. Order = increasing coupling.
-
-[mermaid]
-....
-flowchart LR
-  subgraph B[before — host owns everything]
-    b_cfg["config: Rke2labConfig + path rewriting inline"]
-    b_pol["policy: EntryGatePolicyEnforcer shells jgit"]
-    b_rdy["readiness: verifier (already cluster-edge-thinned)"]
-    b_bbx["bbox: BboxReconciliationOrchestrator (host)"]
-    b_inc["incus: IncusResourceBootstrap (3000 lines, Output<T> + decision)"]
-  end
-  subgraph A[after — OSGi services the host calls]
-    a_cfg["config-core (+ HostPathResolver port)"]
-    a_pol["policy-core (+ GitFactsReader, SecretsSource)"]
-    a_rdy["readiness-core (kubeconfig via HostPathResolver)"]
-    a_bbx["bbox-port/core/fake (+ SecretsSource)"]
-    a_inc["incus-port/core/fake (planner) — Output<T> wiring stays host"]
-  end
-  b_cfg -.->|lift path rewriting| a_cfg
-  b_pol -.->|lift git facts| a_pol
-  b_rdy --> a_rdy
-  b_bbx --> a_bbx
-  b_inc -.->|flat plan out, wiring stays| a_inc
-  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
-  classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
-  class b_cfg,b_pol,b_rdy,b_bbx,b_inc built;
-  class a_cfg,a_pol,a_rdy,a_bbx,a_inc new;
-....
-
-=== config — the cleanest entry (one seam)
-
-*Before:* `Rke2labConfig`/`BootstrapConfig` carry the DTO + `from()` derivation (placeable) mixed with
-`pathOn`/`normalizeAbsolutePath` — NFS-automount host topology and a `toAbsolutePath()` CWD read.
-*After:* the record becomes placeable; the path rewriting moves behind a `HostPathResolver` port (core =
-the pure `/net`↔`/private` mapping given an injected base; fake = a fixed-root resolver).
-
-=== policy — most host-anchored (git facts)
-
-*Before:* `EntryGatePolicyEnforcer` opens a real jgit repo at `worktreePath.toAbsolutePath()`
-(`enforceCleanWorktree`, `enforceFlakeLockCoherence`); the flake/manifest parsing underneath is pure.
-*After:* the flake reasoning is a placeable core; the worktree inspection moves behind a `GitFactsReader`
-port returning flat facts (dirty?, HEAD commit). `enforceManifestUpdateGate` already reads the OSGi
-registry — fine as-is.
-
-=== readiness — already cluster-edge, one file poll left
-
-*Before:* `ClusterBootstrapReadinessVerifier` already delegates API/controller checks to the injected
-`ClusterReadinessContact` (kubectl mechanism gone). The residue is `waitForKubeconfigPublished` reading
-`config.kubeconfigRef().toAbsolutePath()`. *After:* the poll uses `HostPathResolver`; the verdict
-construction is already flat. This domain is nearly done — it validates the pattern.
-
-=== bdd fragments — dispersed to their domains
-
-*Before:* `bdd/` holds per-domain triples plus the scenario spine. *After:* each `XxxStage`/`XxxProbe`/
-`SimulatedXxxProbe` joins its domain (readiness, systemd already; bbox, incus on creation); the artifact
-writers (`MedicalRecordDump`, `RunbookRenderer`, `RecordInterventionCommand`) keep their flat rendering
-core and write through an `ArtifactSink`; `HostSeeder` stays host (JUnit session + system props).
-
-=== bbox — new domain
-
-*Before:* `BboxReconciliationOrchestrator` is a flat decision (a `pulumiMode` branch forwarding a
-`Path`); `BboxSecretsReader` resolves `worktreePath/.secrets` (host path) then parses in-memory.
-*After:* `bbox-port` (reconcile contract + `SecretsSource` seam), `bbox-core` (the parse/validate +
-reconcile decision `@Component`), `bbox-*-fake` (in-memory YAML). The `com.pulumi` reconciler component
-stays host. Unblocks `BboxStage`.
-
-=== incus — the hub (four ports, the heaviest)
-
-*Before:* 15 files. Two are already pure (`ProvisioningTarget`, `ProvisioningTargetRegistry`); the rest
-are MIXED-healthy — each pairs a flat core (SHA-256 checksum + foreign-descendant exclusion in
-`TargetChecksumPipeline`; YAML key-block parse + classpath cert read in the assembler; build-id
-formatting in `GitMetadataExtractor`) with an injected host edge (`Path`/`BootstrapPaths`). The fat
-class `IncusResourceBootstrap` interlaces the flat provisioning decision with `Output<T>` wiring.
-*After:* `incus-port` (provisioning-plan contract), `incus-core` (the checksum/identity/target-plan
-`@Component`, consuming `GitFactsReader` + `SecretsSource` + `ArtifactSink` + `HostPathResolver`),
-`incus-*-fake`. The flat plan crosses back to the host, which wires `com.pulumi.incus.*` with `Output<T>`
-(that wiring is the split, not ours). Unblocks `IncusStage`.
-
-== What stays host
-
-`RuntimeCommandPreflight` (irreducible exec edge; a thin flat veneer — build-ssh-argv, interpret
-exit-code — may be lifted, the substance stays). `PreflightStage`/`Probe`. The 17 `com.pulumi` files
-(resource registration + `Output<T>`). `HostSeeder` (test-session coupling). `scenario-engine` stays in
-`runtime/` (already OSGi, correct layer).
-
-== Build order — each increment green before the next
-
-0. *cross-cutting ports* — `HostPathResolver`, `GitFactsReader`, `SecretsSource`, `ArtifactSink` as seam
-   modules (`type=seam`), with in-memory fakes. The shared prerequisite.
-1. *config* — record placeable; path rewriting behind `HostPathResolver`. Green.
-2. *policy* — flake core; worktree behind `GitFactsReader`. Green.
-3. *readiness* — kubeconfig poll via `HostPathResolver`; fold in its bdd Stage/fake. Green.
-4. *bdd split* — disperse remaining fragments; artifact writers behind `ArtifactSink`. Green.
-5. *bbox* — new port/core/fake; unblock `BboxStage`. Green.
-6. *incus* — new port/core/fake, the four ports consumed; extract the flat plan from
-   `IncusResourceBootstrap` (wiring stays host); unblock `IncusStage`. Green.
-
-Each domain migrated only BIRTHS the service (tests + fake). Re-pointing the stage to
-`awaitService(port)` is the split — tracked separately.
-
-== The SPEC_COVERAGE ratchet during migration
-
-The gate requires every type a bundle EXPORTS to be named in some `docs/` spec. It is a code-first
-ratchet, not a violation counter: while `pipeline-port` still exports `Topic`/`FluentTopicRunner`
-(because live code — seed AND boot — still uses them), the gate DEMANDS they stay documented. They leave
-the specs only when the CODE stops exporting them — when the last pipeline has migrated and
-`pipeline-port`'s exports shrink. Migration progress is tracked in the migration plan, not by a gate
-count.
+The `SPEC_COVERAGE` gate (`maven-embed-staging-ext`) requires every type a bundle EXPORTS to be
+named as a whole word in some `docs/` `.adoc`, OR to carry `@Transitional`. It is a code-first ratchet,
+not a violation counter: a type leaves the specs only when the CODE stops exporting it. So while
+`pipeline-port` still exports the fluent-grammar types (`Topic`, `FluentTopicRunner`, `PipelineContext`,
+`TopicFailure`) — because live code still uses them — the gate DEMANDS they stay documented; they are
+covered by link:pipeline-spec.adoc[pipeline-spec] and the atlas, not here. Each shipped edge's exported
+port types are covered by that edge's own spec (table above). This index names them once more so the
+sweep reads whole in one place.
 
 == Related documentation
 
-* link:cluster-edge-spec.adoc[cluster-edge] — the shipped port+core+edge/fake pattern this repeats.
+* link:cluster-edge-spec.adoc[cluster-edge] — the reference port+edge shape the sweep repeats.
+* link:incus-edge-spec.adoc[incus-edge] · link:bbox-edge-spec.adoc[bbox-edge] · link:auth-edge-spec.adoc[auth-edge] — the control-plane extractions.
 * link:pipeline-spec.adoc[pipeline-spec] — the BDD-as-engine design of record (scenarios on the launcher).
-* link:../atlas/host-pipeline.adoc[atlas L1 — host pipeline] — the avant view (Diagram Q) this migrates.
-* link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] — the exec-edge shape (systemd contact).
+* link:../atlas/host-pipeline.adoc[atlas L1 — host pipeline] — the avant view (Diagram Q) this migrates from.
+* link:../patterns/port-edge-domain-ownership.adoc[port-edge-domain ownership] — domain CALLS / port DECLARES / edge PROVIDES.
