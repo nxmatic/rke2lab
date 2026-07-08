@@ -1,16 +1,53 @@
-= The world gateway — ports are services, data crosses as validated Documents
+= The seed-broker — a client sows a seed, the crossing is a detail
 :toc: left
 :toclevels: 3
 
 [NOTE]
 ====
-The design-of-record for the host↔OSGi data/behaviour boundary. The *contract layer* is BUILT — the
-seam types, the per-realm codec, and the two build-time gates that enforce the boundary
-(`REALM_BOUNDARY`, `SCHEMA_CONCORD`, both at `ERROR`). The *host-side migration* it governs is
-PARTIAL: the last leaks (the JSON Schema files, the residual `Severity`/`toOutputMap` sites on the
-host) are still open — see § <<remaining-migration>>. Written from the code: every claim below was
-checked against the real modules and bundle manifests.
+The design-of-record for the host↔OSGi boundary — the module named `world-gateway` in code today, whose
+CONCEIVED form is a **seed-broker**: a client hands it a seed (a request `Document`) and it sows that
+seed at the right place, the host↔OSGi world-crossing being a broker-internal detail the client never
+sees. This spec describes the system *as conceived*; the before/after figures show today's shape
+(BEFORE) versus that conceived shape (AFTER), so a realization plan can be read straight off them.
+
+*Built today (the BEFORE, verified from the code):* the seam types, the per-realm codec, the two
+build-time gates (`REALM_BOUNDARY`, `SCHEMA_CONCORD`, both `ERROR`), and the crossing realised as
+THREE shared `Document→Document` service interfaces (`ConsultingService`, `ReadinessAuthority`,
+`InterventionIntake`). *Conceived (the AFTER, NOT built):* those N service interfaces collapse into ONE
+broker door dispatched by `coordinate`; the doctor vocabulary recedes to OSGi-internal; the module is
+renamed `world-gateway → seed-broker`. The host-side migration (§ <<remaining-migration>>) and the
+broker unification (§ <<open-extensibility-chantier>>) are the two open worklists a plan draws from.
 ====
+
+== The keystone: crossing worlds is a detail; the client sows a seed
+
+The load-bearing reframe. We are tempted to treat the host↔OSGi seam as *the* subject — classloader
+realms, the three natures of a crossing object, seams to system-export. From the CLIENT's view all of
+that is broker-internal plumbing. The client does not say "I cross a classloader frontier"; it says
+*sow this seed*. Whether the broker sows it by switching into Felix, staying flat, or tomorrow going
+HTTP-remote is behind the door — the client has ONE relationship and ONE local signal.
+
+[mermaid]
+....
+flowchart LR
+  client["a client<br/>(a pipeline stage / the host)"]
+  broker["seed-broker<br/>handle(seed) → verdict"]
+  terrain["the terrain<br/>(provisioned resources / master)"]
+
+  client -->|"'sow this seed'<br/>(a request Document)"| broker
+  broker -.->|"routes by coordinate,<br/>maybe crosses into OSGi —<br/>a DETAIL the client never sees"| broker
+  broker -->|"sows at the right place"| terrain
+  broker -->|"the verdict (the response)"| client
+
+  classDef hidden fill:#f6f6f6,stroke:#bbb,stroke-dasharray:3 3;
+  class broker hidden;
+....
+
+The metaphor names every part: the *seed* = the request `Document`; the *seed-broker* = the exchange
+organ (`handle`); *at the right place* = dispatch by `coordinate`; the *terrain* = the provisioned
+resources (Pulumi / master); *sows it* = execution, of which the world-crossing is only an internal
+detail. This is REST's core promise — the client is blind to the server's implementation — and it is
+the remedy to the seam's difficulty: the crossing is HIDDEN behind one door, not made omnipresent.
 
 == The mental model: REST, in our embedded model
 
@@ -42,36 +79,104 @@ set of verbs — and the data those verbs carry crosses as a **`Document`**, val
 Schema keyed on the document type**. OSGi holds the authority and owns all rich typing; the host
 transports. One rule, uniformly applied, closes every boundary leak.
 
-== The principle: ports are services, Documents are data
+== The principle: Documents are data — BEFORE (N service verbs) → AFTER (one broker door)
 
+The seam already crosses `Document→Document`, never a data type. The turn is HOW MANY doors: today a
+*set of shared service interfaces* (RPC-shaped), conceived as ONE broker door dispatched by
+`coordinate`.
+
+.BEFORE — N shared service interfaces, each `Document→Document`
 [mermaid]
 ....
 flowchart LR
-  subgraph "HOST own types"
-    hm["host facts"]
+  subgraph host["HOST — own types"]
+    hm["host facts / a pipeline stage"]
   end
-  subgraph "SEAM service only"
-    svc["port verb takes Document returns Document"]
+  subgraph seam["SEAM — world-gateway (shared)"]
+    ca["ConsultingService.consult(Document)→Document"]
+    ra["ReadinessAuthority.assess(Document)→Document"]
+    ii["InterventionIntake.canonicalize(Document)→Document"]
   end
-  subgraph "OSGi authority owns types"
-    om["records and reasoning"]
+  subgraph osgi["OSGi — authority owns types"]
+    om["records + reasoning"]
   end
-  hm -->|Document in| svc
-  svc -->|Document out| hm
-  svc --> om
+  hm -->|resolves + calls| ca
+  hm -->|resolves + calls| ra
+  hm -->|resolves + calls| ii
+  ca --> om
+  ra --> om
+  ii --> om
 ....
 
-* A `-port` (`type=seam`) exposes *verbs*. Its method signatures take and return `Document`, never a
-  data type: `consult(Symptom, Observation) -> RemediationPlan` becomes `consult(Document) ->
-  Document`. The seam stops being dozens of exported record types and becomes a handful of service
-  interfaces.
-* The only shared classes are the service interfaces plus the seam types (`Document`, the coordinate
-  vocabulary, the wire-records). No domain data type (no `Severity`, no `Observation`, no
-  `MedicalRecord`) ever crosses. A seam cannot name a record because its signatures speak `Document`.
+Reads as: *three shared service interfaces cross the seam; the host resolves each and calls its verb.
+Strong per-verb typing, but the crossing surface grows one interface per concern, and each is a
+separate thing the host must know.*
 
-`consult(Document) -> Document` is realised today on the doctor seams (`ConsultingService`,
-`ReadinessAuthority`); the record-typed reasoning moved bundle-internal (`ClinicalReasoning` +
-`adapt(Class)` face-by-capability).
+.AFTER — one broker door, dispatched by `coordinate`
+[mermaid]
+....
+flowchart LR
+  subgraph host["HOST — own types"]
+    hm["a pipeline stage"]
+  end
+  subgraph seam["SEAM — seed-broker (shared, minimal)"]
+    door["SeedBroker.handle(Document)→Document"]
+    rt["routing: coordinate → Exchange(request→response)"]
+  end
+  subgraph osgi["OSGi — authority (verbs now internal)"]
+    disp["dispatch by coordinate"]
+    om["records + reasoning<br/>(assess/consult/canonicalize<br/>now internal handlers)"]
+  end
+  hm -->|"handle(request Document)"| door
+  door --> rt --> disp --> om
+  om -->|"verdict Document"| door
+  door -->|returns| hm
+....
+
+Reads as: *one door, one gesture. The pairing request-coordinate → response-coordinate is DATA (an
+`Exchange`), verifiable at build by `SCHEMA_CONCORD`, not N Java signatures. `ConsultingService` and
+kin stop crossing — they become the doctor's internal handlers behind the door.*
+
+* A `-port` (`type=seam`) still speaks only `Document`, never a data type. What changes: the seam stops
+  being *N service interfaces* and becomes ONE `handle(Document)→Document` + a routing table. The only
+  shared classes are the broker door + the seam types (`Document`, the coordinate vocabulary, the
+  wire-records). No domain data type (`Severity`, `Observation`, `MedicalRecord`) ever crosses.
+* BEFORE is realised today (`ConsultingService`, `ReadinessAuthority`, `InterventionIntake`); the
+  record-typed reasoning is already bundle-internal (`ClinicalReasoning` + `adapt(Class)`
+  face-by-capability). AFTER folds the N interfaces into the one door — the unification chantier
+  (§ <<open-extensibility-chantier>>).
+
+=== A scenario's two outputs — the verdict drives, the ReportModel narrates
+
+What must the host know of a played scenario's `ReportModel` to materialize resources/outputs? Nothing.
+Verified: no resource/output/pulumi component reads `ReportModel`; resources consume a flat projected
+verdict (`VerificationResult`). A scenario emits TWO things down TWO disjoint channels — only one is a
+"result" in the REST sense.
+
+[mermaid]
+....
+flowchart TB
+  scn["a domain scenario (played in-container)"]
+  subgraph machine["MACHINE channel — the REST response"]
+    verdict["Verdict / VerificationResult<br/>flat: apiReady, handoffReady, bootstrapStatus"]
+    pul["→ ResourceManager / OutputsTopic → Pulumi"]
+  end
+  subgraph human["HUMAN channel — observability"]
+    report["ReportModel (narration)"]
+    adoc["→ grafted, RunbookRenderer → AsciiDoc"]
+  end
+  scn -->|"the response body"| verdict --> pul
+  scn -->|"an observability artifact"| report --> adoc
+  classDef m fill:#fff4e6,stroke:#ff9900;
+  classDef h fill:#eef,stroke:#446;
+  class machine m;
+  class human h;
+....
+
+The host ACTS only on the verdict (machine → Pulumi); it grafts-and-renders the `ReportModel` (human →
+AsciiDoc) WITHOUT interpreting it. So an `Exchange`'s RESPONSE is the verdict, NOT the `ReportModel` —
+the runbook rides a separate observability channel (serialized, grafted, never read to decide). REST's
+own split: status/headers for the machine, a log body for the human.
 
 == OSGi holds the authority; the host transports (the asymmetry)
 
@@ -111,8 +216,9 @@ rebuilding doctor types — re-creates a doctor vocabulary on the host, the very
 
 == The seam types — what actually crosses
 
-The seam module `osgi/foundation/world-gateway` (`type=seam`, system-exported, one shared copy) holds
-the entire crossing vocabulary in package `io.nxmatic.rke2lab.world.gateway.port`:
+The seam module `osgi/foundation/world-gateway` (`type=seam`, system-exported, one shared copy —
+renamed `seed-broker` in the conceived form; § <<the-rename>>) holds the entire crossing vocabulary in
+package `io.nxmatic.rke2lab.world.gateway.port`:
 
 * *The envelope* — `Document(String domain, String coordinate, String payload)`. The payload is a
   serialized `String`, NOT a `JsonNode` — so jackson never crosses the seam; each realm parses the
@@ -389,6 +495,72 @@ axis. This chantier merges them — the roster reopens per-domain extensibility,
 typed `Document` contract, and the frontier is the single line where records become Documents. The
 exact shape (does the roster replace the central `Coordinate` enum or feed it; where precisely the
 adapter sits) is the chantier's own design work — the DIRECTION is fixed here.
+
+=== The unification: the broker door subsumes the N verbs AND the roster
+
+The keystone reframe (§ top) resolves a question this roster design left open. The multiplexor was
+conceived for the *data-egress* axis (records → DAG → Pulumi, one direction); the N service interfaces
+(`ConsultingService`, `ReadinessAuthority`, `InterventionIntake`) carry the *request/response* axis
+(`consult`, `assess`) — and were left as RPC, the `ConsultingService` "in-process vs across-runs" knot
+explicitly deferred. The Exchange model UNIFIES the two: a `consult` is an Exchange
+`readiness-checkpoint → consultation`; a data egress is an Exchange `domain-facts → pulumi-output`.
+Same shape — one broker door, dispatched by `coordinate`, is the single organ for both. So the
+conceived AFTER is: the broker door subsumes the N service verbs *and* the roster; the door dispatches
+each request-coordinate to the domain handler that owns it (whether that handler consults or maps for
+egress); the doctor's verbs become internal handlers. This closes the deferred knot — there is no
+separate RPC surface left to decide about.
+
+[[the-rename]]
+=== The rename: `world-gateway` → `seed-broker` (honest about what the module IS)
+
+The module is named `world-gateway` in code, framed first as a generic organ. The code does not support
+"generic": its only consumers are the seeding host + doctor, and the ONE bundle FUSES neutral transport
+(`Document`, `Coordinate`, `WireEnum`, `DocumentContract`) with provisioning vocabulary (`Checkpoint`,
+`ReadinessCheckpoint`, `ReadinessVerdict`, `Consultation`, `Patient`, `SymptomKind`). It is already a
+provisioning broker wearing a generic name. The conceived name is **`seed-broker`** — honest about what
+it is: the whole system is `seed-master` (la graine); the broker is the organ that sows.
+
+The two layers are real but NOT split into modules now (rule-of-three; no abstraction at N=1): the
+neutral transport (`Document`/`coordinate`/`handle`) and the seed-specific coordinate catalog live in
+one `seed-broker` bundle. A future split into a reusable `broker-core` transport is a documented split
+point, triggered only by a real second non-seeding consumer. The rename touches ~10 `bnd.bnd` + imports
+across the tree (`gateway-document-codec` → `seed-broker-codec`, or folded in); do it in one atomic
+pass (delete the old name entirely — no compat shim), ridden on the unification chantier above.
+
+[[one-seam]]
+=== One seam only — the `-port`s stop being seams, become domain APIs
+
+If a client speaks only to the broker, nothing else crosses the WORLDS — so the seed-broker is the
+ONLY `type=seam`. Today TEN modules are `type=seam`: the eight domain `-port`s
+(`cluster`/`doctor`/`systemd`/`incus`/`netplan`/`manifests`/`bbox`/`auth`), plus `pipeline-port` and
+`world-gateway`. The conceived form keeps ONE — `seed-broker`.
+
+The `-port`s do NOT disappear — they REMAIN, structural, but CHANGE NATURE: from inter-WORLD seams
+(shared host↔OSGi, system-exported) to a domain's **external API** — an inter-DOMAIN vocabulary
+consumed only inside the OSGi world, how one domain exposes itself to the others. `ClusterReadinessContact`,
+`SystemdRuntimeProbe`, a domain's `Specialist` SPI: these are how domains wire to *each other*, never
+how the host reaches into OSGi.
+
+.The two natures a `-port` can have
+[cols="1,2,2",options="header"]
+|===
+| | inter-WORLD seam (today) | inter-DOMAIN API (conceived)
+
+| crosses | host ↔ OSGi (system-exported, shared copy) | domain ↔ domain, inside OSGi only
+| `type=` | `seam` | a bundle export (not a seam)
+| host imports it? | yes (the leak) | NO — the host speaks only to the broker
+|===
+
+Why the `-port`s are seams *today* is the LEAK the keystone closes: each is consumed host-side now
+(measured: `doctor-port` 9 host files, `manifests-port` 8, `bbox-port` 8, `cluster-port` 6,
+`systemd`/`incus` 4, `netplan` 2, `auth` 1) BECAUSE the logic still lives host-side (readiness, consult,
+the resource stages). Once the client speaks only to the broker, those host imports vanish and the
+`-port` reverts to inter-domain-only.
+
+This gives a NET, verifiable criterion a realization plan tracks per-port: **a `-port` stops being
+`type=seam` when zero host files import it** — the host-side count drives to 0, and `REALM_BOUNDARY`
+(which already knows realms) confirms it. The end-state the two-worlds architecture was always reaching
+for: ONE frontier door (seed-broker), everything else inter-domain wiring that never leaves OSGi.
 
 == Related documentation
 

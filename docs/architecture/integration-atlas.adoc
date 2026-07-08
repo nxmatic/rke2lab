@@ -117,7 +117,18 @@ The two-spaces seam is also a *vocabulary* seam. The same real-world thing is na
 each world, on purpose: the OSGi world speaks the *diagnostic* model, the host world speaks the
 *stack* model, and they never share a type. They meet only at a serialized `Document(domain,
 coordinate, payload)`. The stage column names where the host pipeline handles each pairing *today*
-(read from the code) — a maintenance map for the link:osgi/world-gateway-spec.adoc[world-gateway design].
+(read from the code) — a maintenance map for the link:osgi/world-gateway-spec.adoc[seed-broker design].
+
+[NOTE]
+====
+The seam's CONCEIVED form (link:osgi/world-gateway-spec.adoc[seed-broker design]) reframes this
+vocabulary meeting as a broker: a client sows a seed (a request `Document`) and the seed-broker sows it
+at the right place, the host↔OSGi world-crossing being a broker-internal detail. Today the crossing is
+N shared `Document→Document` service interfaces (`ConsultingService`, `ReadinessAuthority`,
+`InterventionIntake`); the conceived form collapses them into ONE broker door dispatched by
+`coordinate` (module renamed `world-gateway → seed-broker`). The two-vocabularies invariant is
+unchanged — the broker only concentrates the crossing into one door.
+====
 
 *The frame (general):* an OSGi-world word names a pure model; its host-world counterpart names the
 actualised, Pulumi-typed thing. They never share a type — *the ports speak `Document`, not data*, and

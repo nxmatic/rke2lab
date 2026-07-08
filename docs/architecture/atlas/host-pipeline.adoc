@@ -261,7 +261,7 @@ flowchart LR
   end
   subgraph INV["atlas invariants — unchanged (the turn rests on these)"]
     i_r4["R4 boot seam<br/>Felix in Pulumi.run"]:::inv
-    i_gw["world-gateway<br/>Document(String) at the port"]:::inv
+    i_gw["world-gateway → seed-broker<br/>Document(String) at the port<br/>(N verbs today → one broker door, conceived)"]:::inv
     i_jg["jGiven bundle-only per world<br/>never system-exported"]:::inv
   end
   a_scn -->|played by| s_launch
