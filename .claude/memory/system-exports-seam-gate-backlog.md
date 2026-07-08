@@ -39,3 +39,35 @@ One of three gate ideas now queued: this one, extend INSTANCE_DISCIPLINE to host
 ([[instance-discipline-gate-misses-host-backlog]]), and the dependency-analyze gate
 ([[dependency-analyze-gate-backlog]]). See [[build-gates-over-review-reminders]]
 [[spec-coverage-gate-state]] [[bundle-on-jcl-is-wrong-classpath]].
+
+## The TEST-side twin of this backlog (user, 2026-07-08 — "rendre la règle plus facile à observer")
+
+The gate above guards PRODUCTION (what lands in `system.packages.extra` must be a seam). The user
+raised the dual pain from the seat of a test: the seam RULE is invisible where you hit it. Concrete
+trigger — adding `Document` (world-gateway, `type=seam`) to `cluster-bdd` broke the out-of-container
+test with a bare `BundleException: missing requirement …world.gateway.port`, and the fix was to HAND-ADD
+`world.gateway.port` to `OutOfContainerFrameworkExtension.systemPackages(...)`. Measured that day:
+**~15 test/testkit sites hand-list seam packages** (`JGivenTestkit`, `OutOfContainerFrameworkExtension`,
+every `*InContainerTest` / `*BootTest`), while **`BootPlanner.deriveSystemExports` already derives the
+exact same set for the LIVE boot from the `type=seam` capabilities.** The source of truth exists for
+production and is COPIED BY HAND for tests. That copy is the debt, not a fatality.
+
+Three complementary axes the user chose (do as a dedicated chantier on a green base, NOT mid-fork-B):
+
+1. **Test-kit derives like the boot (attacks the cause).** `OutOfContainerFrameworkExtension`/
+   `JGivenTestkit` gain a `withSeamsFromDiscovery()` that derives system-exports from the discovered
+   `type=seam` capabilities — the same derivation as `BootPlanner`. Deletes the ~15 hand lists; a new
+   seam is available everywhere with no edit.
+2. **Diagnostic that points at the cause (symptom→cause).** A `SeamResolutionDiagnostics` SIBLING of
+   `ScrDiagnostics` in `scenario-engine/.../diagnostic/` — the javadoc there literally invites it
+   ("siblings: bundle resolution, the service registry, join as they are needed"). On a resolve failure
+   whose unmet package is owned by a `type=seam` bundle, it says "this is a seam: system-export it /
+   `withSeamsFromDiscovery()`" instead of a bare BundleException. USE THE EXISTING `.diagnostic` HOME —
+   the user's own steer 2026-07-08: "on a déjà un endroit prévu pour définir/partager des diagnostics".
+3. **A doc-map of the seams (human aid).** A section in `world-gateway-spec.adoc` listing the 10
+   `type=seam` bundles + the rule (type=seam → system-export, never installed) vs the domain ports;
+   referenced from each bnd. Weakest (a doc can drift from code) — the executable axes (1,2) lead.
+
+The 10 seams as of 2026-07-08 (all `-port` + world-gateway): cluster-port, auth-port, systemd-port,
+doctor-port, incus-port, netplan-port, manifests-port, bbox-port, pipeline-port, world-gateway.
+See [[osgi-system-export-resolution-only]] (the founding invariant) [[world-gateway-frontier-discipline]].
