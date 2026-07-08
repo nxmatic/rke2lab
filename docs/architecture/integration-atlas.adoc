@@ -171,6 +171,52 @@ The right column is *also* a design tool: a stage that touches two unrelated pai
 candidate to split; a pairing handled in no stage is dead. The before/after of the pipeline refactor
 this design implies is drawn in the link:atlas/doctor.adoc[doctor L1] view.
 
+=== Does it hold? — the seed-broker is additive (a foundation integrating worlds + domains)
+
+The seed-broker (link:osgi/world-gateway-spec.adoc[design]) is a NEW model of the frontier, so the
+atlas owes it the additivity test — and it lands HERE, at L0, because the broker is not a subsystem: it
+is a `foundation` that INTEGRATES on two axes. (1) Between the two WORLDS — the host↔OSGi inter-space
+seam. (2) Between the DOMAINS — it routes by `coordinate`, and the coordinates span doctor + cluster +
+systemd (`readiness-checkpoint`, `consultation`, `intervention`, `visit`), so it is also the
+inter-domain integrator. That dual role is exactly why it lives in `osgi/foundation/` and belongs to no
+domain: a foundation serves ALL domains and BOTH worlds. The test is monotone before/after: draw the
+seam without the broker, then with it; additive iff no box is erased and no arrow rewired — only
+additions (and named erasures).
+
+[mermaid]
+....
+flowchart LR
+  subgraph B["before — N shared service interfaces cross the seam"]
+    b_ca["ConsultingService"]:::gone
+    b_ra["ReadinessAuthority"]:::gone
+    b_ii["InterventionIntake"]:::gone
+    b_doc["Document envelope + coordinate vocabulary"]:::keep
+    b_voc["doctor words SHARED at the seam<br/>(ObservationWire, Consultation, Patient…)"]:::gone
+  end
+  subgraph A["after — one broker door, dispatched by coordinate"]
+    a_door["SeedBroker.handle(Document)→Document"]:::new
+    a_rt["coordinate → Exchange(request→response)"]:::new
+    a_doc["Document envelope + coordinate vocabulary"]:::keep
+    a_int["doctor words now OSGi-INTERNAL"]:::new
+  end
+  b_doc -.kept identically.-> a_doc
+  classDef keep fill:#eef,stroke:#88a;
+  classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+  classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+....
+
+*Verdict — additive-with-named-erasure.* The `Document` envelope + the coordinate vocabulary + the
+two-vocabularies invariant survive UNCHANGED (the blue box crosses identically; each world still maps
+`Document` to its own types). Three things are erased, each named, none silent: the N shared service
+interfaces (`ConsultingService`/`ReadinessAuthority`/`InterventionIntake`, collapsed into one
+`handle` door), the doctor words shared at the seam (recede to OSGi-internal), and — the same erasure
+the "one seam only" rule tracks — the `-port`s' `type=seam` status as their host imports drive to zero.
+No box of the two-spaces frame is rubbed out; the seam gains one door and loses N interfaces. It holds.
+
+This is a CONCEIVED model (not built): the verdict certifies the DESIGN is additive against the atlas,
+so a realization plan can proceed knowing it does not force rewriting the two-spaces frame. The
+build-time proof (the crossing realised as one door) lands when the code does.
+
 == Integration & value threads — how the logic articulates across the system
 
 The L1 views describe each subsystem alone. This section is the reason the atlas is levelled: a *value
