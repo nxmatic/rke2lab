@@ -249,6 +249,29 @@ NATURE not the mechanism ([[cluster-seed-execution-state]] placement rule). seed
 `ClusterSeedScenario` + broker-post/graft wiring; nothing else — the misplaced domain scenarios go home
 to their own `X-bdd`. A plan tracks it as: extract seed-bdd, descend the 2 host-side domain scenarios.
 
+## The germination cascade — the broker is NOT symmetric (user, 2026-07-08)
+
+Asked whether the broker-gardener could route a seed freely to a HOST-side OR an OSGi-side handler
+(symmetry). User's answer: for seed-master, NO — and the honest image is a generative cascade:
+*"une graine semée par l'acteur Pulumi fait éclore une plante qui essaime de nouvelles graines qui
+elles vont éclore dans le monde OSGi"* — then the technical anchor: *scenario → sub-scenario*.
+
+- Pulumi (driving actor, C1) sows the FIRST seed = launches the ROOT scenario, host-side.
+- it germinates into a host plant = the root plays its host phases (preflight/bbox/incus, Pulumi-native).
+- the plant SEEDS ANEW = a phase opens a SUB-SCENARIO (readiness, systemd-adapter checkpoints).
+- those new seeds bloom in OSGi = the sub-scenario is played IN-CONTAINER, its `ScenarioModel` grafts
+  back (`addNestedStep`).
+
+So symmetry is REJECTED, and here is the why (worth writing so it isn't re-litigated): the seed has ONE
+origin (host-born, because Pulumi the driving actor lives host-side), and the SAME seed does not cross —
+the host plant produces a SECOND generation, and it is the offspring that reach OSGi. Directional,
+nothing flows back up but the grafted model. This is NOT in tension with the spec's existing
+"OSGi holds the authority (the asymmetry)" section — it is the same directionality on the type axis:
+the OSGi bloom owns what it grows, the host owns the seed's birth. The broker-gardener has several
+parcels IN PRINCIPLE (host/OSGi/remote), but seed-master's seed is not freely routable — born host,
+offspring bloom OSGi. Documented in world-gateway-spec.adoc § "The germination cascade". See
+[[cluster-seed-execution-state]] (the scenario→sub-scenario graft is fork B's 2b).
+
 Session state: fork B increment 2a committed (`953612b25`), tree clean; 2b (host graft) NOT started —
 deliberately parked to brainstorm this first.
 Dispatch owner: leaning multiplexor, MUST re-confront it to the Exchange needs (it predates them). See

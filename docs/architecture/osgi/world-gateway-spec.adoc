@@ -49,6 +49,50 @@ resources (Pulumi / master); *sows it* = execution, of which the world-crossing 
 detail. This is REST's core promise — the client is blind to the server's implementation — and it is
 the remedy to the seam's difficulty: the crossing is HIDDEN behind one door, not made omnipresent.
 
+=== The germination cascade — why the crossing is NOT symmetric (seed-master)
+
+The client sees one door; the flow BEHIND it is directional, and worth naming because it settles a
+tempting-but-wrong idea (that the broker routes freely to a host-side OR an OSGi-side handler,
+symmetrically). For seed-master it does not. The seed has ONE origin and germinates in a cascade:
+
+[mermaid]
+....
+flowchart LR
+  pulumi(["Pulumi (the driving actor)<br/>sows the FIRST seed"]):::ext
+  seedh["host plant<br/>the seed germinates HOST-side<br/>(preflight · bbox · incus — Pulumi-native phases)"]:::host
+  newseed["it seeds anew<br/>the host plant produces NEW seeds<br/>(readiness · systemd checkpoints)"]:::host
+  osgi["OSGi bloom<br/>those new seeds germinate IN OSGi<br/>(consult the doctor, verify readiness)"]:::osgi
+  pulumi -->|"first seed"| seedh
+  seedh -->|"germinates, then seeds anew"| newseed
+  newseed -->|"cross the seam, bloom"| osgi
+  classDef ext fill:#efe6fb,stroke:#8250df;
+  classDef host fill:#fde,stroke:#a58;
+  classDef osgi fill:#eef,stroke:#88a;
+....
+
+*Pulumi sows a seed → it germinates into a plant (host-side) → the plant seeds anew → those new seeds
+bloom in the OSGi world.* In the technical model the cascade IS *scenario → sub-scenario*: Pulumi
+launches the ROOT scenario (host); it plays its host phases; a phase that needs OSGi *opens a
+sub-scenario* (seeding anew) which is *played in-container* and whose `ScenarioModel` grafts back
+(`addNestedStep`) — the bloom. "Seed anew" = open a sub-scenario; "bloom in OSGi" = that sub-scenario
+played in-container, its model grafted up. Three things this captures that a flat "host, then OSGi"
+misses:
+
+* *Single origin.* Pulumi is the first sower — the seed is host-born because the driving actor lives
+  host-side (the R4 boot seam, `Pulumi.run`; see the system-context view). The host is not one parcel
+  among equals — it is the soil where the first seed germinates.
+* *Generation, not transit.* The SAME seed does not cross. The host plant *produces new seeds* — the
+  readiness / systemd-adapter checkpoints are born of the host phases, and it is THOSE that cross to
+  bloom in OSGi. What crosses the seam is a second generation, engendered host-side.
+* *Directional.* Each germination precedes the next sowing; nothing flows back up. So the seam is
+  asymmetric BY ORIGIN, which is why the authority asymmetry below (OSGi owns the rich types, the host
+  transports) is not a contradiction but the same directionality seen from the type axis: the OSGi
+  bloom owns what it grows, the host owns the seed's birth.
+
+So the broker-gardener has, in principle, several parcels (host, OSGi, tomorrow remote) — but for
+seed-master the seed is NOT freely routable to either: it is born host-side (Pulumi hands it over) and
+only its offspring reach OSGi. Symmetry considered, rejected, and here is why.
+
 == The mental model: REST, in our embedded model
 
 The whole design is one idea: *we do REST, but in our embedded model.* Every decision below is a REST
