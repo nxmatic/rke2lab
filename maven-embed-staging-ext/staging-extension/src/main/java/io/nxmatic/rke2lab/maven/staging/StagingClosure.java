@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.maven.staging;
 
 import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
 import io.nxmatic.rke2lab.osgi.bnd.Clause;
+import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -9,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -135,19 +137,19 @@ public record StagingClosure(
      */
     private void indexHostFlatPackages() {
       for (ResolvedBundle bundle : resolved) {
-        if (bundle.embed() != null && (bundle.embed().isDomain() || bundle.embed().isLibrary())) {
+        if (bundle.embed().map(e -> e.isDomain() || e.isLibrary()).orElse(false)) {
           hostFlatPackages.addAll(bundle.imports().names());
         }
       }
     }
 
-    /** Seed: our model/edge bundles (by capability) + the boot-stack (by symbolic name). */
+    /** Seed: our model/edge/runtime bundles (by capability) + the boot-stack (by symbolic name). */
     private void seed() {
       for (ResolvedBundle bundle : resolved) {
-        if (bundle.embed() != null && bundle.embed().isDomain()) {
-          stage(bundle, "seed: embed type=" + bundle.embed().type());
-        } else if (bundle.symbolicName() != null
-            && bootStackSymbolicNames.contains(bundle.symbolicName())) {
+        final Optional<EmbedCapability> embed = bundle.embed();
+        if (embed.map(e -> e.isDomain() || e.isRuntime()).orElse(false)) {
+          stage(bundle, "seed: embed type=" + embed.orElseThrow().type());
+        } else if (bundle.symbolicName().map(bootStackSymbolicNames::contains).orElse(false)) {
           stage(bundle, "seed: boot-stack");
         }
       }
@@ -162,7 +164,7 @@ public record StagingClosure(
     private void seedRealmLibraries() {
       final Set<String> domainImports = new LinkedHashSet<>();
       for (ResolvedBundle b : resolved) {
-        if (b.embed() != null && (b.embed().isDomain() || b.embed().isLibrary())) {
+        if (b.embed().map(e -> e.isDomain() || e.isLibrary()).orElse(false)) {
           domainImports.addAll(b.imports().names());
         }
       }
@@ -181,7 +183,7 @@ public record StagingClosure(
     private Set<String> bootStackExportedPackages() {
       final Set<String> exports = new LinkedHashSet<>();
       for (ResolvedBundle b : resolved) {
-        if (b.symbolicName() != null && bootStackSymbolicNames.contains(b.symbolicName())) {
+        if (b.symbolicName().map(bootStackSymbolicNames::contains).orElse(false)) {
           exports.addAll(b.exports().names());
         }
       }
@@ -208,9 +210,9 @@ public record StagingClosure(
       if (!b.isBundle() || b.launcher()) {
         return false;
       }
-      if (b.embed() != null) {
+      if (b.embed().isPresent()) {
         // Ours: only a type=library is dual (staged + flat); model/edge/record/seam are not.
-        return b.embed().isLibrary();
+        return b.embed().orElseThrow().isLibrary();
       }
       for (String exported : b.exports().names()) {
         if (!ResolvedBundle.isOurs(exported)
@@ -237,7 +239,9 @@ public record StagingClosure(
           }
           for (ResolvedBundle exporter : exportersByPackage.getOrDefault(pkg, List.of())) {
             if (isStageable(exporter)) {
-              stage(exporter, "closure: " + bundle.symbolicName() + " imports " + pkg);
+              stage(
+                  exporter,
+                  "closure: " + bundle.symbolicName().orElse(bundle.ga()) + " imports " + pkg);
             }
           }
         }
@@ -248,7 +252,7 @@ public record StagingClosure(
       if (exporter.launcher()) {
         return false; // the framework itself — system bundle 0, never staged.
       }
-      return exporter.embed() == null || !exporter.embed().isSeam(); // a seam is host-flat.
+      return exporter.embed().map(e -> !e.isSeam()).orElse(true); // a seam is host-flat.
     }
 
     private static boolean isOptional(Clause imported) {

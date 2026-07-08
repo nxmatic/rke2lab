@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import io.nxmatic.rke2lab.osgi.bnd.OsgiHeader;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class StagingClosureTest {
@@ -15,9 +16,10 @@ class StagingClosureTest {
         g,
         a,
         "1",
-        null,
-        g + "." + a,
-        EmbedCapability.of(OsgiHeader.parse("io.nxmatic.rke2lab.embed;type=" + type)),
+        Optional.empty(),
+        Optional.of(g + "." + a),
+        Optional.ofNullable(
+            EmbedCapability.of(OsgiHeader.parse("io.nxmatic.rke2lab.embed;type=" + type))),
         OsgiHeader.parse(imports),
         OsgiHeader.parse(exports),
         false);
@@ -28,9 +30,9 @@ class StagingClosureTest {
         g,
         a,
         "1",
-        null,
-        g + "." + a,
-        null,
+        Optional.empty(),
+        Optional.of(g + "." + a),
+        Optional.empty(),
         OsgiHeader.parse(null),
         OsgiHeader.parse(exports),
         false);
@@ -42,9 +44,9 @@ class StagingClosureTest {
         g,
         a,
         "1",
-        null,
-        symbolicName,
-        null,
+        Optional.empty(),
+        Optional.of(symbolicName),
+        Optional.empty(),
         OsgiHeader.parse(null),
         OsgiHeader.parse(exports),
         false);

@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.osgi.bnd.OsgiHeader;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
@@ -23,9 +24,9 @@ public record ResolvedBundle(
     String groupId,
     String artifactId,
     String version,
-    File file,
-    String symbolicName,
-    EmbedCapability embed,
+    Optional<File> file,
+    Optional<String> symbolicName,
+    Optional<EmbedCapability> embed,
     OsgiHeader imports,
     OsgiHeader exports,
     boolean launcher) {
@@ -46,9 +47,9 @@ public record ResolvedBundle(
           groupId,
           artifactId,
           version,
-          file,
-          null,
-          null,
+          Optional.ofNullable(file),
+          Optional.empty(),
+          Optional.empty(),
           OsgiHeader.parse(null),
           OsgiHeader.parse(null),
           false);
@@ -65,9 +66,9 @@ public record ResolvedBundle(
           groupId,
           artifactId,
           version,
-          file,
-          bsn,
-          EmbedCapability.of(provide),
+          Optional.of(file),
+          Optional.ofNullable(bsn),
+          Optional.ofNullable(EmbedCapability.of(provide)),
           imports,
           exports,
           launcher);
@@ -115,7 +116,7 @@ public record ResolvedBundle(
 
   /** Whether this jar is a real OSGi bundle (declares a {@code Bundle-SymbolicName}). */
   public boolean isBundle() {
-    return symbolicName != null;
+    return symbolicName.isPresent();
   }
 
   /**
@@ -160,11 +161,12 @@ public record ResolvedBundle(
 
   /** Every {@code .class} in this carrier's jar (top-level and nested), for body-level scans. */
   public java.util.List<ClassEntry> classEntries() {
-    if (file() == null || !file().isFile()) {
+    final File jarFile = file().filter(File::isFile).orElse(null);
+    if (jarFile == null) {
       return java.util.List.of();
     }
     final java.util.List<ClassEntry> entries = new java.util.ArrayList<>();
-    try (JarFile jar = new JarFile(file())) {
+    try (JarFile jar = new JarFile(jarFile)) {
       final java.util.Enumeration<java.util.jar.JarEntry> e = jar.entries();
       while (e.hasMoreElements()) {
         final java.util.jar.JarEntry entry = e.nextElement();

@@ -48,7 +48,7 @@ final class GovernanceReader {
   /** The level each gate reports this bundle at; a gate absent from the map defaults to ERROR. */
   Map<StagingGate, EnforcementLevel> levels() {
     final Map<StagingGate, EnforcementLevel> levels = new EnumMap<>(StagingGate.class);
-    try (JarFile jar = new JarFile(bundle.file())) {
+    try (JarFile jar = new JarFile(bundle.file().orElseThrow())) {
       final Enumeration<JarEntry> entries = jar.entries();
       while (entries.hasMoreElements()) {
         final JarEntry entry = entries.nextElement();

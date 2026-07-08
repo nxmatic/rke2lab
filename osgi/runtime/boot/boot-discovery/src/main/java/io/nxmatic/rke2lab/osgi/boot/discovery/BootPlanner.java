@@ -116,7 +116,7 @@ public final class BootPlanner {
         return startLevelFor(jar.layer());
       }
     }
-    if (manifest.embed().map(EmbedCapability::isDomain).orElse(false)) {
+    if (manifest.embed().map(e -> e.isDomain() || e.isRuntime()).orElse(false)) {
       return BootPlan.START_LEVEL_BUNDLES;
     }
     return BootPlan

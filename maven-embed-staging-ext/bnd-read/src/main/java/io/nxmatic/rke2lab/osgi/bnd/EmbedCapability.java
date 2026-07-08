@@ -75,13 +75,15 @@ public record EmbedCapability(Clause clause) {
   public static final String TYPE_LIBRARY = "library";
 
   /**
-   * The bundles a runtime INSTALLS into the framework: domain {@code model} + {@code edge} + {@code
-   * record} + our dual-realm {@code library}, all loading on the bundle side. Excludes {@code seam}
-   * (system-exported, not installed) and {@code fixture} (test-only). The single source for the
-   * prod discovery filter.
+   * A neutral runtime MECHANISM installed in-framework: a {@code @Component} that is neither a
+   * domain model nor an edge — it belongs to no domain and serves them all. Installed AND activated
+   * bundle-side like a model (its exports, if any, are its own and never system-exported), but its
+   * nature is the framework's own machinery, not a domain's. Exemplar: {@code seed-broker-runtime}
+   * (the {@code DefaultSeedBroker} that collects every {@code SeedHandler} by DS and dispatches by
+   * coordinate) — the dual-axis integrator that serves all domains and both worlds, so it lives in
+   * {@code foundation}, not under a domain.
    */
-  public static final String INSTALL_FILTER =
-      "(|(type=model)(type=edge)(type=record)(type=library))";
+  public static final String TYPE_RUNTIME = "runtime";
 
   /**
    * The embed capability declared in {@code provideCapability}, or {@code null} if the header does
@@ -126,6 +128,17 @@ public record EmbedCapability(Clause clause) {
    */
   public boolean isLibrary() {
     return TYPE_LIBRARY.equals(type());
+  }
+
+  /**
+   * Whether this carrier is a neutral runtime MECHANISM — installed AND activated in-framework like
+   * a domain (staged, resolves at the bundle start level), but belonging to no domain. It shares a
+   * {@code model}'s INSTALL/ACTIVATION regime, NOT its leak-guard: a {@code runtime} bundle is a
+   * pure {@code @Component} that exports nothing (its contract is the seam it serves), so it has no
+   * bundle-only exports the flat host could leak. Exemplar: {@code seed-broker-runtime}.
+   */
+  public boolean isRuntime() {
+    return TYPE_RUNTIME.equals(type());
   }
 
   /** Whether {@code filter} (an LDAP filter over the embed attributes) selects this capability. */

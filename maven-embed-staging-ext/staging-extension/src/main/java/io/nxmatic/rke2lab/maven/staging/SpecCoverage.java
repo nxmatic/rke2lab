@@ -56,7 +56,7 @@ final class SpecCoverage {
     if (exportedPackages.isEmpty()) {
       return List.of();
     }
-    try (JarFile jar = new JarFile(bundle.file())) {
+    try (JarFile jar = new JarFile(bundle.file().orElseThrow())) {
       final String docsCorpus = readDocsCorpus();
       final List<String> violations = new ArrayList<>();
       final Enumeration<JarEntry> entries = jar.entries();

@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.maven.staging;
 
 import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
+import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -156,7 +157,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     final GateReport report = new GateReport();
     for (ResolvedBundle bundle : resolved) {
       final Map<StagingGate, EnforcementLevel> governance = bundle.governance().levels();
-      if (bundle.embed() != null && bundle.embed().isRecord()) {
+      if (bundle.embed().map(EmbedCapability::isRecord).orElse(false)) {
         report.record(
             StagingGate.RECORD_PURITY,
             governance,
@@ -164,7 +165,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
             bundle.recordPurity().violations(),
             "exports non-data types (only records / enums / sealed ADT roots allowed)");
       }
-      if (docsDir != null && bundle.isBundle() && bundle.embed() != null) {
+      if (docsDir != null && bundle.isBundle() && bundle.embed().isPresent()) {
         report.record(
             StagingGate.SPEC_COVERAGE,
             governance,
@@ -172,7 +173,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
             bundle.specCoverage(docsDir).violations(),
             "exports types absent from docs/ specs and not @Transitional");
       }
-      if (bundle.isBundle() && bundle.embed() != null) {
+      if (bundle.isBundle() && bundle.embed().isPresent()) {
         report.record(
             StagingGate.INSTANCE_DISCIPLINE,
             governance,
@@ -185,7 +186,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     // ---- REALM_BOUNDARY: no class references a type unreachable in its realm ----
     final Set<String> forbidden = new java.util.LinkedHashSet<>();
     for (ResolvedBundle b : resolved) {
-      if (b.embed() != null && b.embed().isDomain()) {
+      if (b.embed().map(EmbedCapability::isDomain).orElse(false)) {
         forbidden.addAll(b.ourExportedPackages());
       }
     }
@@ -199,7 +200,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
           java.nio.file.Path.of(session.getCurrentProject().getBuild().getOutputDirectory());
       flatClasses.addAll(ResolvedBundle.classEntriesOf(ownClasses));
       for (ResolvedBundle b : resolved) {
-        final boolean domain = b.embed() != null && b.embed().isDomain();
+        final boolean domain = b.embed().map(EmbedCapability::isDomain).orElse(false);
         if (b.launcher() || domain) {
           continue; // the framework, and bundle-side domains, are not in the flat realm.
         }
@@ -223,13 +224,13 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       // Bundle realms: each isDomain carrier may reference only its own + imported + system
       // packages.
       for (ResolvedBundle b : resolved) {
-        if (b.embed() == null || !b.embed().isDomain()) {
+        if (!b.embed().map(EmbedCapability::isDomain).orElse(false)) {
           continue;
         }
         final Set<String> visible = new java.util.LinkedHashSet<>(b.ourExportedPackages());
         visible.addAll(b.imports().names());
         final RealmBoundary realm =
-            new RealmBoundary("bundle:" + b.symbolicName(), forbidden, visible);
+            new RealmBoundary("bundle:" + b.symbolicName().orElse(b.ga()), forbidden, visible);
         final List<String> v = new ArrayList<>();
         for (ResolvedBundle.ClassEntry c : b.classEntries()) {
           v.addAll(realm.violations(c.binaryName(), c.bytes()));
@@ -269,7 +270,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     }
     final Set<String> seamSurface = new java.util.LinkedHashSet<>();
     for (ResolvedBundle b : resolved) {
-      if (b.embed() != null && b.embed().isSeam()) {
+      if (b.embed().map(EmbedCapability::isSeam).orElse(false)) {
         seamSurface.addAll(b.exports().names());
       }
     }
@@ -277,7 +278,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     final List<String> duplicateViolations = new ArrayList<>();
     for (ResolvedBundle b : closure.staged()) {
       for (String pkg : duplicate.violations(b)) {
-        duplicateViolations.add(b.symbolicName() + " exports " + pkg);
+        duplicateViolations.add(b.symbolicName().orElse(b.ga()) + " exports " + pkg);
       }
     }
     report.record(
@@ -294,8 +295,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     // marker — NOT in closure.staged(); find it by the export package it owns.
     ResolvedBundle worldGatewayBundle = null;
     for (ResolvedBundle b : resolved) {
-      if (b.embed() != null
-          && b.embed().isSeam()
+      if (b.embed().map(EmbedCapability::isSeam).orElse(false)
           && b.exports().names().contains("io.nxmatic.rke2lab.world.gateway.port")) {
         worldGatewayBundle = b;
         break;

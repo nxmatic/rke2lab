@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.osgi.bnd.OsgiHeader;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -16,9 +17,9 @@ class DuplicateRealmClassTest {
         "g",
         "a",
         "1",
-        null,
-        "io.nxmatic.rke2lab.bundle",
-        null,
+        Optional.empty(),
+        Optional.of("io.nxmatic.rke2lab.bundle"),
+        Optional.empty(),
         OsgiHeader.parse(null),
         OsgiHeader.parse(exportHeader),
         false);

@@ -43,7 +43,7 @@ final class RecordPurity {
   List<String> violations() {
     final Set<String> exportedPackages = bundle.ourExportedPackages();
     final List<String> violations = new ArrayList<>();
-    try (JarFile jar = new JarFile(bundle.file())) {
+    try (JarFile jar = new JarFile(bundle.file().orElseThrow())) {
       final Enumeration<JarEntry> entries = jar.entries();
       while (entries.hasMoreElements()) {
         final JarEntry entry = entries.nextElement();
