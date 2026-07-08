@@ -21,5 +21,6 @@
     <module>cluster-port</module>
     <module>cluster-core</module>
     <module>cluster-edge</module>
+    <module>cluster-bdd</module>
   </modules>
 </project>

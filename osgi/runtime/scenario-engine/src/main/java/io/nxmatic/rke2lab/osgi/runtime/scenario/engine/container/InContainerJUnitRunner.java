@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.JUnitLauncherCore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;

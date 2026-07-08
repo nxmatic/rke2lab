@@ -50,5 +50,15 @@ contributor set" evolutions, done WHEN we get there (do NOT invent the exact new
 the existing designs + the direction). Both docs keep their open design as FUTURE, framed "required by
 the distributed p2p mode".
 
+**Trigger criterion (user, 2026-07-08).** The 2026-07-08 two-worlds recomposition brainstorm re-raised
+this (a domain sub-scenario played in-container). Decision: do NOT open the multiplexor by anticipation.
+EXTEND the closed `Domain` enum (one line) IF AND ONLY IF a new domain must appear IN the gateway (i.e.
+publish its own doc-type/coordinate). The mere multiplication of OSGi domains does NOT trigger it — in
+centralized bootstrap, adding an enum member is cheap and sound. The real trigger stays the p2p mode
+(a peer publishes a domain as a bundle, editing-a-center-impossible). Verified corollary: cluster-
+readiness in-container surfaces `Domain.DOCTOR` + `Coordinate.READINESS_*` (it CONSULTS the doctor,
+publishes no "cluster" doc-type) → no new domain → the current chantier does not exercise this debt.
+See [[world-gateway-frontier-discipline]] [[cluster-seed-execution-state]].
+
 See [[federated-unitrepo-p2p-design]] [[fragment-contribution-mediation-model]] [[multiplexor-two-models-design]]
 [[osgi-frontier-underpopulated-chantier]] [[atlas-before-after-shift-at-merge]].

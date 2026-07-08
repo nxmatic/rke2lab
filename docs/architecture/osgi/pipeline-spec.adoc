@@ -409,6 +409,43 @@ verdict (`executionStatus` → the propagation). This is proven *in isolation* o
 `URLClassLoader` realm stand-in, an in-JVM JSON round-trip); wiring it to the real embedded Felix
 (`ClusterSeedTopic.seedCluster()`) is the migration increment, not re-proof.
 
+=== Where a scenario lives — the placement & naming rule
+
+If OSGi owns the scenarios, *which module* holds each one, and how is it told apart from a domain's own
+tests? Two needs that must never be conflated (a scenario is the seeding ENGINE, live; a domain test is
+test-only), separated three ways at once — by name, by mechanism, and by world-of-life:
+
+[cols="1,1,1,1,1",options="header"]
+|===
+| class name | what | played by | lives in | rides live?
+| `+*Test+` | a domain's own tests (actor behaviour) | `InContainerJUnitRunner` enumerating `+*Test.class+` over the host wiring (`BundleWiring.listResources`) | a *test fragment* (`-core-test`) | *no* — fragment-only, never staged
+| `+*Scenario+` | the seeding engine (BDD-as-engine) | the launcher, explicit `selectClass(+*Scenario+)` | *production* (`-core` or `-bdd`) | *yes* — this IS the real seeding
+|===
+
+The two enumerations never cross: a domain `+*Test+` must never be swept into the live seeding engine
+(that would run tests in production). `InContainerJUnitRunner` STAYS on `+*Test+` — it is the tool for a
+domain's in-container tests; production `+*Scenario+`s are selected by class, not by that pattern. (The
+scenario's entry method is still `@Test`-annotated — a jGiven/Jupiter requirement; the `+*Scenario+`
+convention is on the class NAME, the unit of selection, not the method annotation.)
+
+*The placement rule — the criterion is `REALM_BOUNDARY` (reach into a bundle's internals or not):*
+
+[cols="1,1,2",options="header"]
+|===
+| the `+*Scenario+`… | lives in | why
+| needs a `-core`'s sealed internals | `-core` (the bundle itself) | white-box, same classloader realm — it must share the core's loader to reach package-private actors
+| touches only ports | `-bdd` (a dedicated production OSGi bundle) | it consumes contracts, is played in-container; imports the domain ports + `pipeline-jgiven`
+| — (never `-port`) | NOT `-port` | a `-port` is PURE contract (interface/enum/record, zero impl, zero jGiven). Cross-world reachability is by the LAUNCHER (discovery) plus the `ScenarioModel` (Document) that crosses — the scenario CLASS never crosses, so it has no reason to sit in the port.
+|===
+
+The `-bdd` bundle is justified by realm + port-purity + an execution front-door (a `run()`, like
+`DoctorCoreTests.run()` — it *executes* its scenarios, it does not *catalogue* them). It does NOT expose
+a registry: a scenario is never published as an OSGi service; discovery is by class-selection /
+package-enumeration. A registry of graftable scenarios becomes relevant only when a root scenario must
+graft N sub-scenarios from N domains without naming them — that is the future per-domain roster
+(multiplexor), not a present-day charge of `-bdd`. Importing several ports is already an accepted pattern
+(`manifests-core` imports four); `REALM_BOUNDARY` governs "no type outside its realm", not the port count.
+
 == The OSGi world is detached by design — embedded exec is a special case
 
 *Lead: the general case is a detached OSGi world (remote); seed-master's embedded exec merely folds the

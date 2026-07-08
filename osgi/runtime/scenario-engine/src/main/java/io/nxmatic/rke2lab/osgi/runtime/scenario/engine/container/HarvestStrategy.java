@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
+package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
