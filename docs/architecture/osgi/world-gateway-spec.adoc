@@ -568,5 +568,5 @@ for: ONE frontier door (seed-broker), everything else inter-domain wiring that n
   specializes (a `-port` is `type=seam`; its verbs speak `Document`).
 * link:staging-gates-governance-spec.adoc[staging-gates governance] — the `REALM_BOUNDARY` +
   `SCHEMA_CONCORD` gates that mechanize this spec's invariant and contract at build time.
-* link:pipeline-spec.adoc[The pipeline — BDD-as-engine] — the model the GROUND/GATEWAY/APPLY host flow
+* link:../bdd/bdd.adoc[The pipeline — BDD-as-engine] — the model the GROUND/GATEWAY/APPLY host flow
   feeds.

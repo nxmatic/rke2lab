@@ -6,7 +6,7 @@
 ====
 *Status:* BUILT (increment 1 landed 2026-07-05, `feature/engine-lifecycle-socle`, all tests +
 6 staging gates green). This is the SOCLE (foundation) of the BDD-as-engine migration — it lands
-before the ClusterSeed vertical (link:pipeline-spec.adoc[pipeline-spec]) consumes it. The realised
+before the ClusterSeed vertical (link:../bdd/bdd.adoc[BDD-as-engine]) consumes it. The realised
 module is `osgi/runtime/scenario-engine` (the boot module was renamed `osgi/runtime/framework-launcher`
 alongside); `OsgiConnection` shipped as a `context()`-based contract (not `world()`), and the machinery
 sits behind a realm/seam package split (in-realm exported, seam unexported). See the
@@ -54,7 +54,7 @@ compose the run. This spec fixes the ownership and the scoping.
 
 == The subject — three stacked lifecycles, held lexically today
 
-The BDD-as-engine model (link:pipeline-spec.adoc[pipeline-spec]) plays the seeding as jGiven
+The BDD-as-engine model (link:../bdd/bdd.adoc[BDD-as-engine]) plays the seeding as jGiven
 scenarios on an embedded JUnit launcher, inside Felix. Three engines stack, each with a lifecycle,
 and each is held TODAY at the grain of the *scenario / test case* — which is acceptable when a test
 may fall after each case, and WRONG at runtime where the world must survive the whole seed run.
@@ -100,7 +100,7 @@ extension — never a home-grown registry.*
 The realisation (2026-07-04): we already make JUnit carry the two hard parts — discovering the
 framework's install set and creating the framework in-container. Making it also carry *when* the
 framework, launcher and runbook live and die is not new surface — it is the same substrate, one cran
-further. This is the dogfooding rule (link:pipeline-spec.adoc[pipeline-spec] § "Why embed JUnit +
+further. This is the dogfooding rule (link:../bdd/bdd.adoc[BDD-as-engine] § "Why embed JUnit +
 jGiven at runtime") applied to lifecycle: we extend JUnit, we do not reinvent it beside itself.
 
 *Read Figure 2 as three boxes NESTED one inside the other — session ⊃ class ⊃ method. That nesting IS
@@ -471,7 +471,7 @@ breakdown in the increment-1 plan.
 
 == Related documentation
 
-* link:pipeline-spec.adoc[The pipeline — BDD-as-engine] — the model this socle serves: scenarios ARE
+* link:../bdd/bdd.adoc[The pipeline — BDD-as-engine] — the model this socle serves: scenarios ARE
   the seeding engine, the launcher orchestrates, the runbook is the operator's view (the compass).
 * link:osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] — the `BootPlanner`/`BootPlan`, the
   named start levels, the `DiscoveryPolicy`; the role→level authority this spec's lever rests on.

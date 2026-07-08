@@ -7,7 +7,7 @@
 *Status:* SHIPPED (2026-06-23), on `refactor/osgi-boot-alignment`. Decomposes the embedded-OSGi
 boot so the pure *decision* (what to install, at what start-level, with what `system.packages.extra`) is
 told apart from the effectful *act* (boot Felix and make it so), expressed in the project's
-former fluent pipeline grammar (link:pipeline-spec.adoc#the-avant[the avant — former fluent grammar];
+former fluent pipeline grammar (link:../bdd/bdd.adoc#the-avant[the avant — former fluent grammar];
 now superseded by BDD-as-engine, jGiven scenarios on the JUnit launcher), so that `OsgiRuntime` and
 `SeedRuntime` — a blurry pair with no principled split — dissolve into four phase-roles that each
 answer one question: *what is your one job?*
@@ -156,7 +156,7 @@ flowchart TB
 ----
 
 Mapped onto the grammar machinery (reused from `osgi/pipeline/pipeline-core`, see
-link:pipeline-spec.adoc#the-avant[the avant — former fluent grammar]):
+link:../bdd/bdd.adoc#the-avant[the avant — former fluent grammar]):
 
 * *Topics* `discovery` / `plan` / `launch` → `DiscoveryStage` / `PlanStage` / `LaunchStage`
   (package-private builder interfaces).
@@ -371,7 +371,7 @@ Each step is a GREEN commit; squash-merge into `design/pre-integration`, never `
 
 * link:../patterns/port-edge-domain-ownership.adoc#the-boot-face[The boot face] — the seam law the
   decomposition keeps; the seam guard moves into `BootPlanner` unchanged.
-* link:pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] — the
+* link:../bdd/bdd.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] — the
   former type-state machinery `BootPipeline` instantiates; `pipeline-core` is reused as-is (the current
   model is BDD-as-engine, jGiven scenarios on the JUnit launcher).
 * link:osgi-boot-single-source-handoff.adoc[OSGi boot single-source handoff] — the `boot-discovery` model

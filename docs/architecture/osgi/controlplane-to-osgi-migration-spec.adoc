@@ -147,7 +147,7 @@ named as a whole word in some `docs/` `.adoc`, OR to carry `@Transitional`. It i
 not a violation counter: a type leaves the specs only when the CODE stops exporting it. So while
 `pipeline-port` still exports the fluent-grammar types (`Topic`, `FluentTopicRunner`, `PipelineContext`,
 `TopicFailure`) — because live code still uses them — the gate DEMANDS they stay documented; they are
-covered by link:pipeline-spec.adoc[pipeline-spec] and the atlas, not here. Each shipped edge's exported
+covered by link:../bdd/bdd.adoc[BDD-as-engine] and the atlas, not here. Each shipped edge's exported
 port types are covered by that edge's own spec (table above). This index names them once more so the
 sweep reads whole in one place.
 
@@ -155,6 +155,6 @@ sweep reads whole in one place.
 
 * link:cluster-edge-spec.adoc[cluster-edge] — the reference port+edge shape the sweep repeats.
 * link:incus-edge-spec.adoc[incus-edge] · link:bbox-edge-spec.adoc[bbox-edge] · link:auth-edge-spec.adoc[auth-edge] — the control-plane extractions.
-* link:pipeline-spec.adoc[pipeline-spec] — the BDD-as-engine design of record (scenarios on the launcher).
-* link:../atlas/host-pipeline.adoc[atlas L1 — host pipeline] — the avant view (Diagram Q) this migrates from.
+* link:../bdd/bdd.adoc[BDD-as-engine] — the BDD-as-engine design of record (scenarios on the launcher).
+* link:../atlas/seed.adoc[atlas L1 — host pipeline] — the avant view (Diagram Q) this migrates from.
 * link:../patterns/port-edge-domain-ownership.adoc[port-edge-domain ownership] — domain CALLS / port DECLARES / edge PROVIDES.

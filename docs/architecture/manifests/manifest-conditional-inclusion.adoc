@@ -516,7 +516,7 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 == Related Documentation
 
-* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
+* link:../bdd/bdd.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access patterns
 * link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan — the current CAPI/GitOps roadmap]
 

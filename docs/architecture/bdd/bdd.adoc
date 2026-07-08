@@ -1,4 +1,4 @@
-= The pipeline — the seeding as jGiven scenarios on the JUnit launcher
+= BDD-as-engine — the seeding as jGiven scenarios on the JUnit launcher
 :toc: left
 :toclevels: 3
 
@@ -6,7 +6,7 @@
 ====
 *Status:* the BDD-as-engine model is the *source of truth* for how rke2lab seeds. *GO reached
 2026-07-04*, and *increment 1 — the engine-lifecycle socle — SHIPPED 2026-07-05*
-(link:engine-lifecycle-spec.adoc[engine-lifecycle-spec], `osgi/runtime/scenario-engine`): the launcher
+(link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec], `osgi/runtime/scenario-engine`): the launcher
 (`JUnitLauncherCore`), the world connection (`OsgiConnection`), the start-level lever, the
 `@SeedRuntime`/`@IsolatedWorld` disciplines, and a green connected `BulletproofPipeline` are LIVE. What
 remains is *increment 2* — the ClusterSeed vertical that expresses the seeding on that socle — and then
@@ -18,12 +18,12 @@ jGiven `Stage`, the value-DAG is carried by `@Provided/ExpectedScenarioState` (+
 `SCENARIO_STATE_DAG` gate, the vertical's closing task), the missing dynamics are contributed as
 Jupiter extensions. The substrate is the shipped socle above; the disposable bench that first proved
 viability survives only at tag `spike/bdd-pipeline-poc`, and the discovery record (the four operator
-paths, the ten learnings E1–E10) is link:bdd-pipeline-poc-design.adoc[the bdd-pipeline POC].
+paths, the ten learnings E1–E10) is link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC].
 
 *The former model — the fluent `during`/`then` grammar, `Topic` / `State<I,B>` / `PipelineContext` /
 `FluentTopicRunner` (shipped in the 212-commit pipeline-port arc) — is superseded.* It survives only
 as the *avant* of the evolution figure (§ <<the-avant>>): the graved before/after lives in
-link:../atlas/host-pipeline.adoc#the-bdd-as-engine-turn[host-pipeline L1, Diagram Q],
+link:../atlas/seed.adoc#the-bdd-as-engine-turn[host-pipeline L1, Diagram Q],
 and the full former text lives in git (`pipeline-spec.adoc` at commit `39fe4d8a`). It is not
 maintained in parallel — this is code hygiene applied to specs: one living model, the old one in
 history.
@@ -95,7 +95,7 @@ Zoom inside rke2lab. It is split into *two spaces* (the invariant `grep -ri pulu
 *actualises* over Pulumi. The pipeline is the spine of the OSGi world; the other subsystems are the
 capabilities it orchestrates (doctor, manifests, netplan, systemd-port…); the host boots the world and
 carries the Pulumi edge. This spec is about the OSGi-world spine; the host edge is
-link:../atlas/host-pipeline.adoc[host-pipeline L1].
+link:../atlas/seed.adoc[seed orchestration L1].
 
 [mermaid]
 ....
@@ -152,7 +152,7 @@ Both are *battle-proven*: each has shown, over years and across ecosystems, robu
 flexibility to adapt to real use cases — precisely the properties a runtime engine for the bootstrap
 must have. Building a bespoke orchestrator + BDD engine of comparable richness would be a large,
 under-tested reinvention of exactly what these two already do (the "home-grown BDD engine" and "Spock"
-alternatives were rejected for this reason — see link:bdd-pipeline-poc-design.adoc[the POC record]).
+alternatives were rejected for this reason — see link:../osgi/bdd-pipeline-poc-design.adoc[the POC record]).
 
 *The re-entrance / dogfooding rule.* We already run both frameworks — jGiven as an OSGi bundle
 (`pipeline-jgiven`), the JUnit launcher in-container (`InContainerJUnitRunner`) — to *test* rke2lab.
@@ -561,7 +561,7 @@ is loquacity polish, not on the critical path.
 stays at the host edge as a `PulumiOutputContributor` (SPI) + `PulumiOutputRegistry` (guaranteed
 assembly): each domain contributes a pure `Map` (no Pulumi dependency crosses the seam), the registry
 assembles them with unique-key + deterministic-order guarantees, host-side. This is orthogonal to the
-scenario model and unchanged by the turn — see link:../atlas/host-pipeline.adoc[host-pipeline L1] for
+scenario model and unchanged by the turn — see link:../atlas/seed.adoc[seed orchestration L1] for
 the contributor/registry design and the `SystemdRuntimeStatusReport` typed record.
 
 [[dag-gate]]
@@ -580,20 +580,20 @@ difference is genuinely topological, on test-classpath bytecode; confirming it o
 is part of the migration.
 
 This is one more `StagingGate` (ASM over staged bytecode, reached from `ResolvedBundle`, governable per
-package via `@GovernedBy`) — see link:staging-gates-governance-spec.adoc[staging-gates governance]. It
+package via `@GovernedBy`) — see link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance]. It
 supersedes `PIPELINE_PATTERN` (which policed the former Topic/Sink shape).
 
 [[the-avant]]
 == The avant — the fluent grammar / Topic / State model (reference only)
 
 *This is the model the BDD-as-engine turn supersedes. It is kept here only as the "avant" of the
-evolution figure — enough to read link:../atlas/host-pipeline.adoc#the-bdd-as-engine-turn[Diagram Q].
+evolution figure — enough to read link:../atlas/seed.adoc#the-bdd-as-engine-turn[Diagram Q].
 The full former text is in git: `pipeline-spec.adoc` at commit `39fe4d8a` (and the fluent grammar
 convention doc it folded in). It is NOT maintained.*
 
 The former seeding was a *fluent type-state pipeline*: a compiler-ordered chain of scoped topic
 lambdas. Its full vocabulary and the concept-by-concept avant→après correspondence are graved in the
-evolution figure — see link:../atlas/host-pipeline.adoc#the-bdd-as-engine-turn[Diagram Q and its
+evolution figure — see link:../atlas/seed.adoc#the-bdd-as-engine-turn[Diagram Q and its
 correspondence table] (host-pipeline L1). The full former text is in git (`pipeline-spec.adoc` at
 commit `39fe4d8a`). It is NOT maintained here.
 
@@ -607,7 +607,7 @@ worktree scheduling — integration obliges the worktrees, the spec does not.*
   avant reference above. (Closed before the socle landed.)
 . *Engine-lifecycle socle — increment 1, SHIPPED (2026-07-05).* The launcher, connection, lever and
   disciplines are live in `osgi/runtime/scenario-engine`; see
-  link:engine-lifecycle-spec.adoc[engine-lifecycle-spec]. This is the substrate the vertical rests on —
+  link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec]. This is the substrate the vertical rests on —
   no longer a bench stand-in.
 . *ClusterSeed-vertical migration — increment 2, one pipeline at a time.* Migrate ONLY
   `ClusterSeedPipeline` first, end-to-end into `seed-master` on the shipped socle (real embedded Felix):
@@ -627,21 +627,21 @@ form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological g
 
 == Related documentation
 
-* link:bdd-pipeline-poc-design.adoc[bdd-pipeline POC] — the discovery record: the four operator paths
+* link:../osgi/bdd-pipeline-poc-design.adoc[bdd-pipeline POC] — the discovery record: the four operator paths
   (P1–P4), the ten measured learnings (E1–E10) that back this model.
-* link:../atlas/host-pipeline.adoc[host-pipeline L1] — the graved avant/après (Diagram Q, socle shipped
+* link:../atlas/seed.adoc[seed orchestration L1] — the graved avant/après (Diagram Q, socle shipped
   = invariant blue), the concept correspondence table (anchored on the shipped socle + the vertical),
   the four-invariant additivity verdict, and the collapsed go/no-go pointer. The output-gate design
   (`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) lives here too.
-* link:osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] — the boot seam
+* link:../osgi/osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] — the boot seam
   (`BootPlanner`/`FrameworkLauncher`) the launcher rests on; how the host boots the OSGi world the
   reasoning lives in.
-* link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — jGiven already runs as an OSGi bundle
+* link:../osgi/jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — jGiven already runs as an OSGi bundle
   (`pipeline-jgiven`) and the JUnit launcher already runs in-container (`InContainerJUnitRunner`); the
   substrate this spec puts the engine on.
-* link:world-gateway-spec.adoc[World gateway] — the `Document` +
+* link:../osgi/world-gateway-spec.adoc[World gateway] — the `Document` +
   `consult(Document)` seam the cross-world scenario graft (E10) reuses.
-* link:pulumi-edge-handoff.adoc[pulumi-edge] — the host edge where the output SPI, registry, and the
+* link:../osgi/pulumi-edge-handoff.adoc[pulumi-edge] — the host edge where the output SPI, registry, and the
   Pulumi-bound preview trigger live.
-* link:staging-gates-governance-spec.adoc[staging-gates governance] — the DAG gate is a new
+* link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance] — the DAG gate is a new
   `StagingGate` sibling; the SPEC_COVERAGE gate this document answers for the new types.

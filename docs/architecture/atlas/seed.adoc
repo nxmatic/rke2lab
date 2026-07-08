@@ -1,4 +1,4 @@
-= Atlas L1 — Host / control-plane pipeline view
+= Atlas L1 — Seed orchestration view (the control-plane, host-side)
 :toc: left
 :toclevels: 3
 
@@ -6,12 +6,14 @@ _Level-1 (per-subsystem) view of the link:../integration-atlas.adoc[integration 
 _L0 shows how this subsystem integrates with the others and the value that emerges; this file is the detail._
 
 [[host-pipeline-view]]
-== Host / control-plane pipeline — per-subsystem view
+== Seed orchestration — per-subsystem view
 
-The sixth view, and the first for the HOST world (the five before are OSGi-centric). It holds the
-control-plane pipeline that runs `pulumi preview`/`up` — the one process that decides what crosses the
-system's two boundaries. Folds in the link:../osgi/pipeline-spec.adoc[pipeline design of record (OSGi-owned)], and
-carries the null-safety governance note.
+The seed's orchestration, host-side — historically "the control-plane / host-pipeline" (three names,
+one thing: the process that orchestrates the seed and runs `pulumi preview`/`up`, deciding what crosses
+the system's two boundaries). Named `seed` here by its stable NATURE, not its transitional host
+(`seed-master`'s `controlplane` package is being redistributed into sub-modules). Folds in the
+link:../bdd/bdd.adoc[BDD-as-engine design of record (OSGi-owned)], and carries the null-safety
+governance note.
 
 [NOTE]
 ====
@@ -116,7 +118,7 @@ and loses four scattered anti-patterns.* Status: DESIGN — the living gate is t
 The Topic / `State<I,B>` / fluent-grammar role map in this section is the model *as shipped* (the
 212-commit pipeline-port arc). It is kept here as the *avant* of the evolution figure — read it to
 understand where Diagram Q (below) starts from. The *current* model is the BDD-as-engine turn (§
-<<the-bdd-as-engine-turn>>) and its spec is link:../osgi/pipeline-spec.adoc[pipeline-spec]. The former
+<<the-bdd-as-engine-turn>>) and its spec is link:../bdd/bdd.adoc[BDD-as-engine]. The former
 grammar convention doc was folded into pipeline-spec's avant section and deleted.
 ====
 
@@ -178,7 +180,7 @@ reference) is a DERIVATION the `PIPELINE_PATTERN` governance gate is meant to ca
 The role map above is the *avant*. This section is the *après* — the current model: express the whole
 seeding as *jGiven scenarios orchestrated by the JUnit Platform launcher*, the fluent grammar
 dissolved, the missing dynamics contributed as Jupiter extensions. Its spec is
-link:../osgi/pipeline-spec.adoc[pipeline-spec]; the discovery record is
+link:../bdd/bdd.adoc[BDD-as-engine]; the discovery record is
 link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC] (ten measured learnings E1–E10). *GO
 was reached 2026-07-04* (a bench transposed the entire ClusterSeed pipeline and rendered a real
 runbook), and *increment 1 — the engine-lifecycle socle — then SHIPPED* (2026-07-05,

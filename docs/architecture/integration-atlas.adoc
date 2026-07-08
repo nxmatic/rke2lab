@@ -136,7 +136,7 @@ each world maps the `Document` to its own types (the OSGi `DomainDagMapper` to r
 adapter to the stack model). *Reserved to the host world only:* `Pulumi`, `Stack`, `output` —
 enforced by `grep -ri pulumi osgi/` == 0. Doctor↔stack is the first (and today only) concrete
 pairing; further domains slot in as rows when they acquire a DAG. The refactored stage decomposition
-this implies — GROUND / GATEWAY / APPLY — is now designed (world-gateway spec), drawn in Diagram O in the link:atlas/host-pipeline.adoc[host-pipeline L1] view.
+this implies — GROUND / GATEWAY / APPLY — is now designed (world-gateway spec), drawn in Diagram O in the link:atlas/seed.adoc[seed orchestration L1] view.
 
 [cols="1,1,1",options="header"]
 |===
@@ -188,7 +188,7 @@ bootstrap), who plays the roles Pulumi fills at bootstrap — the orchestration 
 *The answer already exists — it is the intersection of four models*, and drawing them together is what
 stops the re-derivation:
 
-* link:osgi/pipeline-spec.adoc[pipeline (OSGi-owned)] establishes that the reasoning world is *detached
+* link:bdd/bdd.adoc[pipeline (OSGi-owned)] establishes that the reasoning world is *detached
   by design*; embedded exec is the special case, and *the detached OSGi world knows nothing of Pulumi*.
 * link:cluster-api/post-bootstrap-in-cluster-ownership-plan.adoc[post-bootstrap ownership]
   names the in-cluster orchestrators (CAPI + GitOps + node-local reconcilers) that replace Pulumi.
@@ -246,10 +246,10 @@ monotone before/after figures.
   behind <<thread-manifestations,Thread 1>>. See link:unit-repository/model-overview.adoc[model overview].
 * link:atlas/manifests.adoc[Manifests subsystem] — the CDK8s manifest-synthesis layer resolved by the
   same Felix `UnitResolver`. Almost entirely shipped. See link:manifests/manifests-architecture.adoc[architecture].
-* link:atlas/host-pipeline.adoc[Host / control-plane pipeline] — the host side that runs `pulumi
+* link:atlas/seed.adoc[Host / control-plane pipeline] — the host side that runs `pulumi
   preview`/`up`: the output gate, the preview `ExecutionCondition` (`RunMode` re-posed off the erased
   `LiveGate`), the null-safety governance note, and the graved avant/après of the BDD-as-engine turn
-  (Diagram Q). Folds in link:osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)].
+  (Diagram Q). Folds in link:bdd/bdd.adoc[the pipeline (OSGi-owned)].
 
 == Related documentation
 

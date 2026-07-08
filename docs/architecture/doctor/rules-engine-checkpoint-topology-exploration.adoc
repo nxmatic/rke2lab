@@ -14,7 +14,7 @@ the point-in-time thinking; see link:glossary.adoc[the glossary] for current nam
 decision; grounded in the source. +
 *Branch (when started):* TBD — likely a `refactor/` branch (it restructures the diagnosis layer,
 external behaviour unchanged) for options ①/②; option ③ would be a `feature/` branch. +
-*Workshop:* parked in `wip/` deliberately. Sibling to link:../osgi/pipeline-spec.adoc[the
+*Workshop:* parked in `wip/` deliberately. Sibling to link:../bdd/bdd.adoc[the
 pipeline spec (JGiven shared-engine, OSGi-owned)] and link:preview-whatif-replay-exploration.adoc[the what-if subject];
 all three touch the BDD/diagnosis layer but are independent. Do NOT interleave.
 
@@ -435,7 +435,7 @@ counterfactual replay propagates along.
 
 * link:preview-whatif-replay-exploration.adoc[preview-whatif] — rests on a *declared* edge (Option
   ①); the what-if propagates along exactly the edge this doc proposes to single-source.
-* link:../osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)] — the JGiven shared-engine subject; both
+* link:../bdd/bdd.adoc[the pipeline (OSGi-owned)] — the JGiven shared-engine subject; both
   touch the BDD layer but are independent. Neither needs a rules engine.
 * link:runbook-doctor.adoc[runbook-doctor] — the doctor (`Generalist`/`Specialist`) this doc's Option ②
   de-duplicates; the checkpoints Option ① gives topology to.

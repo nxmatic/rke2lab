@@ -687,7 +687,7 @@ systemctl show -p After,Wants,Requires <unit>
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - The runtime journey those installer services drive
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context injection used by scripts
 * link:systemd-dbus-adapter-architecture.adoc[D-Bus TCP Adapter] - Remote systemd control via D-Bus
-* link:../osgi/pipeline-spec.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
+* link:../bdd/bdd.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
 
 == Migration from Previous Versions
 

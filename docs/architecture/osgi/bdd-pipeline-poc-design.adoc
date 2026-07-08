@@ -9,8 +9,8 @@ conception de l'implémentation de référence* : il a cadré une *évaluation d
 refactor), la viabilité est prouvée, et le seeding-comme-scénarios-BDD est adopté comme modèle
 cible. Le code du POC vivait dans un module `bench/` jetable ; il survit à la suppression de la
 branche, *épinglé au tag `spike/bdd-pipeline-poc`* (les 7 mécanismes prouvés — voir la table
-go/no-go dans link:../atlas/host-pipeline.adoc[host-pipeline L1]). L'avant/après gravé et la preuve
-d'additivité sur l'atlas vivent dans link:pipeline-spec.adoc[pipeline-spec] + host-pipeline ; ce
+go/no-go dans link:../atlas/seed.adoc[seed orchestration L1]). L'avant/après gravé et la preuve
+d'additivité sur l'atlas vivent dans link:../bdd/bdd.adoc[BDD-as-engine] + host-pipeline ; ce
 document garde le *narratif de découverte* (les 4 chemins P1–P4, les learnings E1–E10).
 ====
 
@@ -366,13 +366,13 @@ laissées ouvertes :
 *La suite (gravée dans le plan de migration) :* un cleanup de légibilité du réseau de specs
 d'abord, puis la migration ClusterSeed-verticale, une pipeline à la fois, les 6 autres coexistant
 sur Topic/State. Ce document est désormais un record de référence ; la spec courante est
-link:pipeline-spec.adoc[pipeline-spec] (le modèle BDD-as-engine y est le contenu primaire).
+link:../bdd/bdd.adoc[BDD-as-engine] (le modèle BDD-as-engine y est le contenu primaire).
 
 == Related Documentation
 
-* link:pipeline-spec.adoc[Pipeline spec] — la spec courante : le seeding-comme-scénarios-BDD dont ce
+* link:../bdd/bdd.adoc[Pipeline spec] — la spec courante : le seeding-comme-scénarios-BDD dont ce
   POC a prouvé la viabilité (le modèle BDD-as-engine y est le contenu primaire).
-* link:pipeline-spec.adoc#the-avant[Pipeline spec — l'avant] — la grammaire type-state `during`/`then`
+* link:../bdd/bdd.adoc#the-avant[Pipeline spec — l'avant] — la grammaire type-state `during`/`then`
   que ce POC a remplacée, repliée là comme référence de l'avant/après.
 * link:world-gateway-spec.adoc[World gateway] — le seam `Document` +
   `consult(Document)` que l'arête cross-monde réutilise.
