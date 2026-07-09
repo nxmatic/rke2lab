@@ -61,5 +61,34 @@ asks the broker "what can you grow?", the broker answers from what its handlers 
 description (coordinate + wire-record/schema), or does the broker derive it from the roster
 (serves() + reflect the @DocumentContract record)? Decide when building #2, on #1's stabilized shape.
 
+## Client-side état des lieux (started 2026-07-09, doctor = the only domain today)
+
+Doctor exposes TWO surfaces to a client: doctor-port (services: ConsultingService, HealthSystem,
+InterventionLedgerWriter, the journals) and the seed-broker-port wire-records (ReadinessCheckpoint,
+ReadinessVerdict, Consultation, InterventionRequest/Wire, VisitWire, Patient, Action, SymptomKind,
+Checkpoint, ObservationWire). Scanning what the CLIENT (host seed-master + cluster, not doctor) still
+touches of the doctor data structure — THREE natures, only the second is debt:
+
+1. **LEGITIMATE — the client speaks the protocol** (it consults the doctor, so it knows the schema of
+   the resources it calls, exactly like a REST client). cluster BUILDS a ReadinessCheckpoint +
+   ObservationWire/SymptomKind to consult; the host READS ReadinessVerdict.action() to decide
+   stop/continue. Knowing the exchange vocabulary is normal.
+2. **DEBT — the host reads INTO a structure it should transport opaque.** THE clearest symptom:
+   `SystemdAdapterResource.copyDiagnosticOutputs` does `CODEC.decode(consultation, Consultation.class)`
+   then reads `decoded.consultationReport()` / `decoded.expectations()` only to re-route them to two
+   Pulumi output keys. It KNOWS two internal fields of a Document it claims to carry opaquely. The
+   proof it is residue: `SeedBrokerCatalog` (the two `FIELD_CONSULTATION_REPORT`/`FIELD_EXPECTATIONS`
+   keys) exists ONLY for this re-routing — the exact thing the multiplexer was meant to erase. The host
+   opens the parcel to sort its contents instead of passing it sealed.
+3. **NEUTRAL host, not doctor** — `ConsultationLog` (a host container), and most of the big counts are
+   tests.
+
+**The point:** the client needs the PROTOCOL (nature 1), not the internal STRUCTURE (nature 2). Today
+it knows both; nature 2 is the debt. And it ties to introspection (#2 build above): if the client could
+DISCOVER a coordinate's schema (offered by the broker), it would never hardcode knowledge of internal
+fields — introspection is the cure for the structure-debt. RESUME the état-des-lieux here: classify all
+~16 types by nature for the full client-decoupling map, or zoom on the SystemdAdapterResource /
+SeedBrokerCatalog symptom first (the sharpest instance of nature 2).
+
 See [[gateway-is-rest-in-jvm-insight]] [[multiplexor-two-models-design]]
 [[world-gateway-lost-open-extensibility-debt]] (this is that debt's concrete resolution path).
