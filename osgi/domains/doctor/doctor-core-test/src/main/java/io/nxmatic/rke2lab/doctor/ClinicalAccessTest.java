@@ -8,7 +8,7 @@ import io.nxmatic.rke2lab.doctor.internal.GrantPolicy;
 import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.dsproof;
 
 import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
 import org.osgi.service.component.annotations.Component;
 
@@ -15,7 +15,7 @@ import org.osgi.service.component.annotations.Component;
 public final class FakeInterventionJournal implements InterventionJournal {
 
   @Override
-  public List<Document> entries() {
+  public List<SeedEnvelope> entries() {
     return List.of();
   }
 }

@@ -8,7 +8,7 @@ class DocumentCodecTest {
 
   @Test
   void encodeDecodeRoundTripsAndValidationIsInertByDefault() {
-    final DocumentCodec codec = new DocumentCodec();
+    final SeedCodec codec = new SeedCodec();
     final String json = codec.encode(codec.decode("{\"action\":\"hold\"}"));
     assertTrue(json.contains("\"action\""));
     // validation OFF by default: a payload matching no schema still passes (the embedded posture —

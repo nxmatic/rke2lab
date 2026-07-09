@@ -6,13 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.records.InterventionRequest;
+import io.nxmatic.rke2lab.doctor.records.ReadinessVerdict;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
-import io.nxmatic.rke2lab.seed.broker.port.InterventionRequest;
-import io.nxmatic.rke2lab.seed.broker.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.time.Instant;
 import java.util.Map;
@@ -33,7 +32,7 @@ import org.osgi.framework.FrameworkUtil;
 class InterventionIntakeTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final DocumentCodec CODEC = new DocumentCodec();
+  private static final SeedCodec CODEC = new SeedCodec();
   private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
   /** The {@link SeedHandler} SCR publishes for the {@code intervention} coordinate. */
@@ -46,7 +45,7 @@ class InterventionIntakeTest {
             + ScrDiagnostics.of(context).map(ScrDiagnostics::report).orElse(""));
     for (var reference : references) {
       final SeedHandler handler = context.getService(reference);
-      if (handler != null && handler.serves() == Coordinate.INTERVENTION) {
+      if (handler != null && handler.serves() == DoctorCoordinate.INTERVENTION) {
         return handler;
       }
     }
@@ -67,13 +66,13 @@ class InterventionIntakeTest {
             Optional.empty(),
             Optional.empty(),
             Instant.parse("2026-06-14T09:30:00Z"));
-    final Document rawFacts =
-        new Document(
-            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
+    final SeedEnvelope rawFacts =
+        new SeedEnvelope(
+            "doctor", DoctorCoordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
-    final Document canonical = intake.handle(rawFacts);
+    final SeedEnvelope canonical = intake.handle(rawFacts);
     assertEquals(
-        Coordinate.INTERVENTION.slug(),
+        DoctorCoordinate.INTERVENTION.slug(),
         canonical.coordinate(),
         "valid facts must canonicalize, not return an error verdict");
     final Map<String, Object> payload = MAPPER.readValue(canonical.payload(), MAP);
@@ -94,13 +93,13 @@ class InterventionIntakeTest {
             Optional.empty(),
             Optional.empty(),
             Instant.parse("2026-06-14T09:30:00Z"));
-    final Document rawFacts =
-        new Document(
-            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
+    final SeedEnvelope rawFacts =
+        new SeedEnvelope(
+            "doctor", DoctorCoordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
-    final Document verdict = intake.handle(rawFacts);
+    final SeedEnvelope verdict = intake.handle(rawFacts);
     assertEquals(
-        Coordinate.READINESS_VERDICT.slug(),
+        DoctorCoordinate.READINESS_VERDICT.slug(),
         verdict.coordinate(),
         "a bad reference must return an error verdict, not throw across the seam");
     final ReadinessVerdict decoded = CODEC.decode(verdict, ReadinessVerdict.class);

@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -6,21 +6,26 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the gateway vocabulary's closed domains — coordinates, actions, and symptom kinds. The slugs
- * cross the wire as strings in {@link Document}, so we lock them down: a refactor cannot drift the
- * value without breaking the test.
+ * Pins the doctor domain's seed vocabulary — its coordinates, actions, and symptom kinds. The slugs
+ * cross the wire as strings in a {@code SeedEnvelope}, so we lock them down: a refactor cannot
+ * drift the value without breaking the test. This vocabulary is doctor's own (moved out of the
+ * neutral seam when the broker was made domain-agnostic), so it is pinned here in the doctor
+ * domain.
  */
-class BrokerVocabularyTest {
+class DoctorVocabularyTest {
 
   @Test
-  void coordinateSlugsArePinnedAndRoundTrip() {
-    assertEquals("readiness-checkpoint", Coordinate.READINESS_CHECKPOINT.slug());
-    assertEquals("readiness-verdict", Coordinate.READINESS_VERDICT.slug());
-    assertEquals("consultation", Coordinate.CONSULTATION.slug());
-    assertEquals(Optional.of(Coordinate.CONSULTATION), Coordinate.parse("consultation"));
-    assertEquals(Optional.empty(), Coordinate.parse("nope"));
-    assertEquals(Optional.empty(), Coordinate.parse(""));
-    assertEquals(Optional.empty(), Coordinate.parse("   "));
+  void coordinateSlugsAndDomainArePinned() {
+    assertEquals("readiness-checkpoint", DoctorCoordinate.READINESS_CHECKPOINT.slug());
+    assertEquals("readiness-verdict", DoctorCoordinate.READINESS_VERDICT.slug());
+    assertEquals("consultation", DoctorCoordinate.CONSULTATION.slug());
+    assertEquals("intervention-request", DoctorCoordinate.INTERVENTION_REQUEST.slug());
+    assertEquals("intervention", DoctorCoordinate.INTERVENTION.slug());
+    assertEquals("visit", DoctorCoordinate.VISIT.slug());
+    // Every coordinate answers its owning domain — no central Domain enum.
+    for (DoctorCoordinate coordinate : DoctorCoordinate.values()) {
+      assertEquals("doctor", coordinate.domain());
+    }
   }
 
   @Test
@@ -46,14 +51,5 @@ class BrokerVocabularyTest {
     assertEquals(Optional.empty(), SymptomKind.parse("nope"));
     assertEquals(Optional.empty(), SymptomKind.parse(""));
     assertEquals(Optional.empty(), SymptomKind.parse("   "));
-  }
-
-  @Test
-  void domainSlugsArePinnedAndRoundTrip() {
-    assertEquals("doctor", Domain.DOCTOR.slug());
-    assertEquals(Optional.of(Domain.DOCTOR), Domain.parse("doctor"));
-    assertEquals(Optional.empty(), Domain.parse("nope"));
-    assertEquals(Optional.empty(), Domain.parse(""));
-    assertEquals(Optional.empty(), Domain.parse("   "));
   }
 }

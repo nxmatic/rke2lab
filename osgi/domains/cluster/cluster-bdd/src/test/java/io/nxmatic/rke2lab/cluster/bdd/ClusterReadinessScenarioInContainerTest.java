@@ -12,15 +12,14 @@ import com.tngtech.jgiven.report.model.StepModel;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.Consultation;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
-import io.nxmatic.rke2lab.seed.broker.port.Consultation;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -54,7 +53,7 @@ class ClusterReadinessScenarioInContainerTest {
 
   private static final String CLUSTER_BDD = "(&(type=model)(model=cluster-bdd))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.cluster.bdd.ClusterBddScenarios";
-  private static final DocumentCodec CODEC = new DocumentCodec();
+  private static final SeedCodec CODEC = new SeedCodec();
 
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
@@ -62,7 +61,7 @@ class ClusterReadinessScenarioInContainerTest {
           // The three seams the scenario speaks are system-exported — the boot's own posture. A
           // seam (type=seam) is shared FLAT across realms from ONE exporter, never installed as a
           // bundle, so the in-container scenario and the host read the same class (no split, no
-          // ClassCastException): cluster.port (DSL + contact), seed.broker.port (the Document
+          // ClassCastException): cluster.port (DSL + contact), seed.broker.port (the SeedEnvelope
           // envelope + checkpoint/observation vocabulary), doctor.port (the ConsultingService the
           // domain consults). Hand-listed here, derived automatically in the live boot — the DX
           // debt
@@ -225,14 +224,14 @@ class ClusterReadinessScenarioInContainerTest {
   /**
    * A mock doctor — the mock-service idiom for {@link ConsultingService}. It records each consulted
    * checkpoint's payload (so the test can assert the domain routed the typed symptom) and returns a
-   * minimal {@code consultation} Document naming the checkpoint the host joins on. Not a frozen
+   * minimal {@code consultation} SeedEnvelope naming the checkpoint the host joins on. Not a frozen
    * fragment fake: a test-configured service the test seeds into the registry before playing.
    */
   private static final class RecordingDoctor implements ConsultingService {
     final List<String> consultedCheckpoints = new ArrayList<>();
 
     @Override
-    public Document consult(Document checkpoint) {
+    public SeedEnvelope consult(SeedEnvelope checkpoint) {
       consultedCheckpoints.add(checkpoint.payload());
       final Consultation reply =
           new Consultation(
@@ -241,8 +240,7 @@ class ClusterReadinessScenarioInContainerTest {
               "",
               Map.of(),
               List.of());
-      return new Document(
-          Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), CODEC.encode(reply));
+      return SeedEnvelope.of(DoctorCoordinate.CONSULTATION, CODEC.encode(reply));
     }
 
     @Override

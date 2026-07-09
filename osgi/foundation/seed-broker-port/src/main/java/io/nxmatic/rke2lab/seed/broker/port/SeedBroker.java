@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.seed.broker.port;
 
 /**
- * The one door every seed crosses: a client hands a seed (a request {@link Document}) and names the
- * coordinate it wants to reap ({@code wanted} — the response type), and the broker sows it at the
- * right place and returns the reaped {@link Document}. The single verb subsumes the former N
- * service interfaces (one per crossing): the caller no longer resolves {@code ReadinessAuthority}
+ * The one door every seed crosses: a client hands a seed (a request {@link SeedEnvelope}) and names
+ * the coordinate it wants to reap ({@code wanted} — the response type), and the broker sows it at
+ * the right place and returns the reaped {@link SeedEnvelope}. The single verb subsumes the former
+ * N service interfaces (one per crossing): the caller no longer resolves {@code ReadinessAuthority}
  * then {@code InterventionIntake} etc., it resolves ONE {@code SeedBroker} and routes by {@code
  * wanted}.
  *
@@ -17,10 +17,10 @@ package io.nxmatic.rke2lab.seed.broker.port;
 public interface SeedBroker {
 
   /**
-   * Sow {@code seed} and reap the {@code wanted} coordinate's {@link Document}. Routes to the
+   * Sow {@code seed} and reap the {@code wanted} coordinate's {@link SeedEnvelope}. Routes to the
    * {@link SeedHandler} that {@link SeedHandler#serves serves} {@code wanted}; throws {@link
    * IllegalStateException} if no handler serves it (a coordinate with no grower is a wiring bug,
    * not a runtime condition).
    */
-  Document sow(Coordinate wanted, Document seed);
+  SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed);
 }

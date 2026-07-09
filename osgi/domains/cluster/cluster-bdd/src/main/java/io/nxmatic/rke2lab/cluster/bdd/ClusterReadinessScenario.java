@@ -13,14 +13,13 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
-import io.nxmatic.rke2lab.seed.broker.port.ObservationWire;
-import io.nxmatic.rke2lab.seed.broker.port.ReadinessCheckpoint;
-import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.records.ObservationWire;
+import io.nxmatic.rke2lab.doctor.records.ReadinessCheckpoint;
+import io.nxmatic.rke2lab.doctor.records.SymptomKind;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
@@ -64,7 +63,7 @@ public class ClusterReadinessScenario
   // The doctor consultations the run raised on a failing phase, harvested by the front-door into
   // the
   // envelope alongside the runbook. Empty when every phase passed (a healthy run consults no one).
-  private static final AtomicReference<List<Document>> LAST_CONSULTATIONS =
+  private static final AtomicReference<List<SeedEnvelope>> LAST_CONSULTATIONS =
       new AtomicReference<>(List.of());
 
   static ReportModel lastRunbook() {
@@ -72,7 +71,7 @@ public class ClusterReadinessScenario
         LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
   }
 
-  static List<Document> lastConsultations() {
+  static List<SeedEnvelope> lastConsultations() {
     return LAST_CONSULTATIONS.get();
   }
 
@@ -105,12 +104,12 @@ public class ClusterReadinessScenario
    * consult, not the host). A phase reported not-ready recorded its {@link ObservationWire}
    * carrying a typed {@link SymptomKind}; if any is non-ok, resolve the doctor's {@link
    * ConsultingService} from THIS bundle's registry — the same way the contact is resolved — build
-   * the {@code readiness-checkpoint} Document around the observations, and consult. The returned
-   * {@code consultation} Documents ride the envelope back to the host, which records them into its
-   * shared log (it no longer computes the diagnosis, only renders it). A healthy run raised no
-   * symptom, so it consults no one and returns an empty list.
+   * the {@code readiness-checkpoint} SeedEnvelope around the observations, and consult. The
+   * returned {@code consultation} Documents ride the envelope back to the host, which records them
+   * into its shared log (it no longer computes the diagnosis, only renders it). A healthy run
+   * raised no symptom, so it consults no one and returns an empty list.
    */
-  private List<Document> consultOnFailure(
+  private List<SeedEnvelope> consultOnFailure(
       Map<ClusterReadinessPhase, ObservationWire> observations) {
     final boolean anySymptom =
         observations.values().stream().anyMatch(o -> o.symptom().isPresent());
@@ -122,8 +121,10 @@ public class ClusterReadinessScenario
         .orElseGet(List::of);
   }
 
-  /** The {@code readiness-checkpoint} Document the domain hands the doctor — its observations. */
-  private static Document consultCheckpoint(
+  /**
+   * The {@code readiness-checkpoint} SeedEnvelope the domain hands the doctor — its observations.
+   */
+  private static SeedEnvelope consultCheckpoint(
       Map<ClusterReadinessPhase, ObservationWire> observations) {
     final ReadinessCheckpoint checkpoint =
         new ReadinessCheckpoint(
@@ -132,9 +133,8 @@ public class ClusterReadinessScenario
             Optional.empty(),
             Optional.empty(),
             List.copyOf(observations.values()));
-    final DocumentCodec codec = new DocumentCodec();
-    return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
+    final SeedCodec codec = new SeedCodec();
+    return SeedEnvelope.of(DoctorCoordinate.READINESS_CHECKPOINT, codec.encode(checkpoint));
   }
 
   /**

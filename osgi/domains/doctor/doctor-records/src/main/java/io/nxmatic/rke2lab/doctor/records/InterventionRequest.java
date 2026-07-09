@@ -1,5 +1,6 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -10,11 +11,10 @@ import java.util.Optional;
  * ({@code ProblemRef}, {@code Provenance}, {@code RemediationProgramRef}) only OSGi-side, which
  * owns that schema; the host never holds a doctor type. {@code provenance} and {@code
  * prescriptionRef} are optional (provenance defaults to operator-manual OSGi-side; prescriptionRef
- * is absent unless engine-driven). The record's components ARE the schema (projected build-time by
- * {@code SCHEMA_CONCORD}); each realm maps it ↔ {@code String} with its own jackson via {@code
- * DocumentCodec}.
+ * is absent unless engine-driven). The record's components ARE the wire shape; each realm maps it ↔
+ * {@code String} with its own jackson via {@code SeedCodec}.
  */
-@DocumentContract(Coordinate.INTERVENTION_REQUEST)
+@SeedContract("intervention-request")
 public record InterventionRequest(
     String problem,
     String what,

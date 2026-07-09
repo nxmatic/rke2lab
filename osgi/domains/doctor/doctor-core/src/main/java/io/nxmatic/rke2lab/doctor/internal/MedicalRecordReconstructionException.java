@@ -6,11 +6,11 @@ import java.util.Optional;
 
 /**
  * The doctor layer's own aggregator exception: the fold reached the end of the journal but at least
- * one {@code visit} {@link io.nxmatic.rke2lab.seed.broker.port.Document} was unreadable. It carries
- * the PARTIAL {@link MedicalRecord} it managed to build and, via {@link #getSuppressed()}, one
- * {@link EntryFailure} per unreadable entry. The aggregator does fail-at-end; the CALLER decides —
- * strict (rethrow) or lenient (read {@link #partialRecord()} and walk the suppressed). It is never
- * log-and-swallowed.
+ * one {@code visit} {@link io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope} was unreadable. It
+ * carries the PARTIAL {@link MedicalRecord} it managed to build and, via {@link #getSuppressed()},
+ * one {@link EntryFailure} per unreadable entry. The aggregator does fail-at-end; the CALLER
+ * decides — strict (rethrow) or lenient (read {@link #partialRecord()} and walk the suppressed). It
+ * is never log-and-swallowed.
  */
 public final class MedicalRecordReconstructionException extends Exception {
 

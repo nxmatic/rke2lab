@@ -4,12 +4,16 @@ import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
+import io.nxmatic.rke2lab.doctor.records.Consultation;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
+import io.nxmatic.rke2lab.doctor.records.ObservationWire;
 import io.nxmatic.rke2lab.doctor.records.ProblemReview;
+import io.nxmatic.rke2lab.doctor.records.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
@@ -20,13 +24,8 @@ import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Consultation;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
-import io.nxmatic.rke2lab.seed.broker.port.ObservationWire;
-import io.nxmatic.rke2lab.seed.broker.port.ReadinessCheckpoint;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,7 +64,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   private final DriftSpecialist driftSpecialist;
   private final Optional<InterventionJournal> interventionJournal;
   private final InterventionLedgerReader ledgerReader = new InterventionLedgerReader();
-  private final DocumentCodec codec = new DocumentCodec();
+  private final SeedCodec codec = new SeedCodec();
 
   private Generalist(
       List<Specialist> specialists,
@@ -182,13 +181,13 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   }
 
   /**
-   * Consult on a checkpoint {@link Document}: route its symptom + observation to the specialists
-   * and synthesize the narration and the rendered AsciiDoc diagnosis, returned as a {@code
-   * consultation} Document. The twin of the readiness authority's assess — same checkpoint, the
-   * consulting concern rather than the provisioning verdict.
+   * Consult on a checkpoint {@link SeedEnvelope}: route its symptom + observation to the
+   * specialists and synthesize the narration and the rendered AsciiDoc diagnosis, returned as a
+   * {@code consultation} SeedEnvelope. The twin of the readiness authority's assess — same
+   * checkpoint, the consulting concern rather than the provisioning verdict.
    */
   @Override
-  public Document consult(Document checkpoint) {
+  public SeedEnvelope consult(SeedEnvelope checkpoint) {
     final ReadinessCheckpoint decoded = codec.decode(checkpoint, ReadinessCheckpoint.class);
     final String scenarioId = decoded.scenarioId();
     final List<Observation> observations = observationsFrom(decoded);
@@ -223,8 +222,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
                 .map(codec::toMap)
                 .map(Object.class::cast)
                 .toList());
-    return new Document(
-        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), codec.encode(consultation));
+    return SeedEnvelope.of(DoctorCoordinate.CONSULTATION, codec.encode(consultation));
   }
 
   /**

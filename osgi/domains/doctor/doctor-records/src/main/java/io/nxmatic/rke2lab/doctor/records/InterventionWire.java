@@ -1,5 +1,6 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -15,11 +16,10 @@ import java.util.Optional;
  * <p>ONE intervention, not a list: a ledger history entry records exactly one intervention, and the
  * host journal emits one {@code intervention} Document per entry. (The former {@code
  * {interventions:[…]}} envelope was Pulumi's array-valued {@code outputsNamed} framing leaking into
- * the payload — transport, not contract.) The record's components ARE the schema (projected
- * build-time by {@code SCHEMA_CONCORD}); each realm maps it ↔ {@code String} via {@code
- * DocumentCodec}.
+ * the payload — transport, not contract.) The record's components ARE the wire shape; each realm
+ * maps it ↔ {@code String} via {@code SeedCodec}.
  */
-@DocumentContract(Coordinate.INTERVENTION)
+@SeedContract("intervention")
 public record InterventionWire(
     String provenance,
     Instant when,

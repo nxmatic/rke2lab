@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.Observation;
@@ -16,7 +17,6 @@ import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

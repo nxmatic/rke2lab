@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.doctor.dsproof;
 
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
 import org.osgi.service.component.annotations.Component;
 
@@ -18,7 +18,7 @@ import org.osgi.service.component.annotations.Component;
 public final class FakeMedicalRecordJournal implements MedicalRecordJournal {
 
   @Override
-  public List<Document> historyOf(Patient patient) {
+  public List<SeedEnvelope> historyOf(Patient patient) {
     return List.of();
   }
 

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.dsproof;
 
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -13,7 +13,7 @@ import org.osgi.service.component.annotations.Component;
 public final class FakeInterventionLedgerWriter implements InterventionLedgerWriter {
 
   @Override
-  public void append(Document intervention) {
+  public void append(SeedEnvelope intervention) {
     // no-op: the DS proof does not assert persistence
   }
 }

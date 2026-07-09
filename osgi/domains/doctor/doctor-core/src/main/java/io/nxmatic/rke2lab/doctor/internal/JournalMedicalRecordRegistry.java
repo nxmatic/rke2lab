@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -14,10 +14,10 @@ import org.osgi.service.component.annotations.Reference;
 
 /**
  * The OSGi-side {@link MedicalRecordRegistry}: it folds the host {@link MedicalRecordJournal}'s
- * opaque {@code visit} {@link Document}s into a {@link MedicalRecord} INSIDE the bundle realm, via
- * the moved {@link MedicalRecordReader} (and the readers behind it). The host produces the blobs by
- * reading the Pulumi stack; this component is the SOLE place that interprets their medical content
- * — the leak (a {@code doctor.records} value crossing host→OSGi) is gone.
+ * opaque {@code visit} {@link SeedEnvelope}s into a {@link MedicalRecord} INSIDE the bundle realm,
+ * via the moved {@link MedicalRecordReader} (and the readers behind it). The host produces the
+ * blobs by reading the Pulumi stack; this component is the SOLE place that interprets their medical
+ * content — the leak (a {@code doctor.records} value crossing host→OSGi) is gone.
  *
  * <p>Published as the {@code MedicalRecordRegistry} service the institution ({@code
  * DefaultHealthSystem}) references, so the host no longer publishes the registry — only the journal

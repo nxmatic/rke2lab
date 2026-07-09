@@ -1,5 +1,6 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.util.List;
 import java.util.Map;
 
@@ -10,13 +11,12 @@ import java.util.Map;
  * {@code consultationReport} and {@code expectations} OPAQUELY — they are a doctor→doctor payload
  * the host copies verbatim into its Pulumi outputs, never interpreting them.
  *
- * <p>Those two are therefore modelled as open slots ({@link Map} / {@link List}), for which the
- * {@code SCHEMA_CONCORD} projector emits an open {@code object} / {@code array}: the contract is
+ * <p>Those two are therefore modelled as open slots ({@link Map} / {@link List}): the contract is
  * "this slot is a nested structure", its inner shape (the {@code ConsultationReport} / {@code
- * Expectation} record graph) owned OSGi-side, where {@code DocumentCodec.fromMap} decodes it. Each
- * realm maps this record ↔ {@code String} via {@code DocumentCodec}.
+ * Expectation} record graph) owned OSGi-side, where {@code SeedCodec.fromMap} decodes it. Each
+ * realm maps this record ↔ {@code String} via {@code SeedCodec}.
  */
-@DocumentContract(Coordinate.CONSULTATION)
+@SeedContract("consultation")
 public record Consultation(
     String scenarioId,
     String narration,

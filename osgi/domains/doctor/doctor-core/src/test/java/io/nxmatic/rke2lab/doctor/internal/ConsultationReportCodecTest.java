@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
@@ -14,8 +15,7 @@ import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,8 +24,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * The {@link DocumentCodec} round-trip of a {@link ConsultationReport} through its opaque {@code
- * Map} blob (the shape a Document's open slot carries) — the direct-decode path that replaced the
+ * The {@link SeedCodec} round-trip of a {@link ConsultationReport} through its opaque {@code Map}
+ * blob (the shape a Document's open slot carries) — the direct-decode path that replaced the
  * hand-rolled {@code ConsultationReportReader}. Proves the record graph (observations, plan,
  * replies, assessment, prescription) survives {@code toMap → fromMap} with kebab-cased enum ids,
  * that additive keys are tolerated ({@code FAIL_ON_UNKNOWN_PROPERTIES} off), and that a
@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
  */
 class ConsultationReportCodecTest {
 
-  private static final DocumentCodec CODEC = new DocumentCodec();
+  private static final SeedCodec CODEC = new SeedCodec();
 
   private static ConsultationReport sampleReport() {
     final Observation observation =

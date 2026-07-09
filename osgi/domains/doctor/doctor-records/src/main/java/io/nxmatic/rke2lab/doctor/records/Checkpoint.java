@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
 import java.util.Optional;
 

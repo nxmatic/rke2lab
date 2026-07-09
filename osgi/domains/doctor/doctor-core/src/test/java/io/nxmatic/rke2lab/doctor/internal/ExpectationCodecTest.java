@@ -3,29 +3,29 @@ package io.nxmatic.rke2lab.doctor.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * The {@link DocumentCodec} round-trip of an {@link Expectation} through its opaque {@code Map}
- * blob — the direct-decode path that replaced the hand-rolled {@code ExpectationReader}. Each
- * required field decodes via its annotated value type ({@link ProblemRef} / {@link
- * RemediationProgramRef} strings, the polymorphic predicate, the ISO-8601 {@code recordedAt}); a
- * missing or unparseable required field makes the compact-ctor guard throw, so the {@code
- * MedicalRecordReader} boundary degrades the entry rather than folding a half-null record.
+ * The {@link SeedCodec} round-trip of an {@link Expectation} through its opaque {@code Map} blob —
+ * the direct-decode path that replaced the hand-rolled {@code ExpectationReader}. Each required
+ * field decodes via its annotated value type ({@link ProblemRef} / {@link RemediationProgramRef}
+ * strings, the polymorphic predicate, the ISO-8601 {@code recordedAt}); a missing or unparseable
+ * required field makes the compact-ctor guard throw, so the {@code MedicalRecordReader} boundary
+ * degrades the entry rather than folding a half-null record.
  */
 class ExpectationCodecTest {
 
-  private static final DocumentCodec CODEC = new DocumentCodec();
+  private static final SeedCodec CODEC = new SeedCodec();
 
   private static Expectation sample() {
     return new Expectation(

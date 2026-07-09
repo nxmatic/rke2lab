@@ -5,18 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerReader;
 import io.nxmatic.rke2lab.doctor.internal.InterventionReader;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.records.InterventionWire;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
-import io.nxmatic.rke2lab.seed.broker.port.InterventionWire;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -25,19 +24,19 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins the fold {@link InterventionLedgerReader} performs over the host journal's {@code
- * intervention} {@link Document}s: each Document carries ONE {@link InterventionWire} (one ledger
- * history entry = one intervention), which the reader decodes with the realm codec and passes to
- * {@link InterventionReader#fromWire}. A malformed Document (undecodable, or a wire whose required
- * refs do not parse) degrades to no contribution — never throws — while the readable rest survives.
- * The ledger time-orders by {@code when}, so order assertions are over that sort.
+ * intervention} {@link SeedEnvelope}s: each SeedEnvelope carries ONE {@link InterventionWire} (one
+ * ledger history entry = one intervention), which the reader decodes with the realm codec and
+ * passes to {@link InterventionReader#fromWire}. A malformed SeedEnvelope (undecodable, or a wire
+ * whose required refs do not parse) degrades to no contribution — never throws — while the readable
+ * rest survives. The ledger time-orders by {@code when}, so order assertions are over that sort.
  */
 class InterventionLedgerReaderTest {
 
-  private static final DocumentCodec CODEC = new DocumentCodec();
+  private static final SeedCodec CODEC = new SeedCodec();
 
   @Test
   void read_twoInterventionDocuments_returnsLedgerWithBothInTimeOrderFieldsIntact() {
-    final Document earlier =
+    final SeedEnvelope earlier =
         interventionDocument(
             new InterventionWire(
                 "operator-manual",
@@ -46,7 +45,7 @@ class InterventionLedgerReaderTest {
                 "systemd-adapter/connection-refused",
                 Optional.empty(),
                 Map.of()));
-    final Document later =
+    final SeedEnvelope later =
         interventionDocument(
             new InterventionWire(
                 "pulumi-engine",
@@ -96,8 +95,8 @@ class InterventionLedgerReaderTest {
   void read_documentWithUnparseableWire_contributesNothingWithoutThrowing() {
     // A wire whose required `provenance` ref does not parse — fromWire yields empty, so the entry
     // is
-    // skipped; a sibling readable Document still reads.
-    final Document malformed =
+    // skipped; a sibling readable SeedEnvelope still reads.
+    final SeedEnvelope malformed =
         interventionDocument(
             new InterventionWire(
                 "not-a-provenance",
@@ -106,7 +105,7 @@ class InterventionLedgerReaderTest {
                 "systemd-adapter/timeout",
                 Optional.empty(),
                 Map.of()));
-    final Document good =
+    final SeedEnvelope good =
         interventionDocument(
             new InterventionWire(
                 "operator-manual",
@@ -124,13 +123,13 @@ class InterventionLedgerReaderTest {
 
   @Test
   void read_documentWithMalformedPayload_contributesNothingWithoutThrowing() {
-    final Document garbage =
-        new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), "not-json");
+    final SeedEnvelope garbage =
+        new SeedEnvelope("doctor", DoctorCoordinate.INTERVENTION.slug(), "not-json");
     final InterventionLedger ledger = new InterventionLedgerReader().read(List.of(garbage));
     assertTrue(ledger.interventions().isEmpty(), "an undecodable payload contributes nothing");
   }
 
-  private static Document interventionDocument(InterventionWire wire) {
-    return new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), CODEC.encode(wire));
+  private static SeedEnvelope interventionDocument(InterventionWire wire) {
+    return new SeedEnvelope("doctor", DoctorCoordinate.INTERVENTION.slug(), CODEC.encode(wire));
   }
 }

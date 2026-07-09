@@ -22,7 +22,7 @@ import java.util.Arrays;
  * closed-vocabulary enum typed (the typing the {@code FIELD_*} strings lacked) while the seam enum
  * itself carries no jackson annotation and stays flat. Serialization writes {@code slug()};
  * deserialization matches an enum constant by {@code slug()} (never the constant name). One module
- * for all coordinates' enums — registered once by {@link DocumentCodec}.
+ * for all coordinates' enums — registered once by {@link SeedCodec}.
  */
 public final class WireEnumModule extends SimpleModule {
 

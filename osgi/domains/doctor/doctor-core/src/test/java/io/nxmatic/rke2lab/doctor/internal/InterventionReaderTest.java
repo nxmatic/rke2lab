@@ -3,13 +3,13 @@ package io.nxmatic.rke2lab.doctor.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.InterventionWire;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
-import io.nxmatic.rke2lab.seed.broker.port.InterventionWire;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;

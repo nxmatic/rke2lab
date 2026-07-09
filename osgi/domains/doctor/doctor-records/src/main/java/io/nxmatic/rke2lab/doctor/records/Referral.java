@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.Objects;
 
 /**

@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.doctor.records;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 

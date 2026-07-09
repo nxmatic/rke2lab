@@ -189,5 +189,27 @@ introspection). Sequence unchanged: socle first (Coordinate→interface + doctor
 Pulumi decorrelation as its own increment. RESUME after socle: build the component marker + the frontier
 introspector, delete SeedBrokerCatalog + the two OUTPUT_KEY.
 
+## The sealed-envelope invariant + which gate it obsoletes (user, 2026-07-09)
+
+User's crisp statement of the target: **the broker distributes envelopes, but for a given envelope
+sender == recipient == the domain.** The host is only the postman — it carries the sealed envelope, it
+neither opens nor writes it. Consequence for governance (two gates, OPPOSITE effects):
+
++ *SCHEMA_CONCORD becomes obsolete AS A SEAM GATE* — its justification is an inter-realm AGREEMENT (both
+  worlds parse the payload with their own jackson, so they must agree on the schema). When the envelope
+  is unopenable host-side, there is only ONE reader (the domain, on both ends of the round-trip): an
+  agreement with one party guards nothing. NET, MEASURABLE retirement criterion: **SCHEMA_CONCORD dies
+  the day NO host code does `codec.decode(WireRecord.class)`.** NOT yet — the host still decodes typed
+  (the deferred nature-2 debt), so today the gate still guards a real two-reader agreement; keep it
+  through the transition (adapting it to domain-owned coordinate enums is NOT wasted). What survives its
+  death: `RecordSchemaProjector` (record→JSON Schema) recycles as the runtime introspection source
+  (`sow(shape,…)`); "every coordinate has a wire-record / schema well-formed" become tests INTERNAL to
+  the domain, not seam governance.
++ *REALM_BOUNDARY becomes LOAD-BEARING, the opposite* — it forbids a flat/host class from referencing a
+  bundle-only domain type. Moving the wire-records from the seam (`type=seam`, shared) INTO doctor-records
+  (`type=record`, not system-exported) is what makes the envelope unopenable host-side, and REALM_BOUNDARY
+  is the gate that ENFORCES it. It is the mechanism of the sealed envelope, not obsolete.
+
 See [[gateway-is-rest-in-jvm-insight]] [[multiplexor-two-models-design]]
-[[world-gateway-lost-open-extensibility-debt]] (this is that debt's concrete resolution path).
+[[world-gateway-lost-open-extensibility-debt]] (this is that debt's concrete resolution path)
+[[spec-coverage-gate-state]] (the gate whose seam-justification this retires).

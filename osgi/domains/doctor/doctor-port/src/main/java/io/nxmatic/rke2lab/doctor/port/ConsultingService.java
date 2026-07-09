@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.Optional;
 
 /**
@@ -18,13 +18,13 @@ public interface ConsultingService {
 
   /**
    * Consult on a checkpoint: route its symptom + observation to the specialists and synthesize the
-   * narration and the rendered AsciiDoc diagnosis, returned as a {@code consultation} Document. The
-   * twin of the {@code readiness-verdict} SeedHandler — same checkpoint, the consulting concern
+   * narration and the rendered AsciiDoc diagnosis, returned as a {@code consultation} SeedEnvelope.
+   * The twin of the {@code readiness-verdict} SeedHandler — same checkpoint, the consulting concern
    * rather than the provisioning verdict. The ONLY consult verb that crosses the seam; the
    * record-typed routing/narration is the bundle-side {@link
    * io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning}, reached via {@link #adapt}.
    */
-  Document consult(Document checkpoint);
+  SeedEnvelope consult(SeedEnvelope checkpoint);
 
   /**
    * The follow-up coordination at reconstruction: rebuild the admitted patient's record (through

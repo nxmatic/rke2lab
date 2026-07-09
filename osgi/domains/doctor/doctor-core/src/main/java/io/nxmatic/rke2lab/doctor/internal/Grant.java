@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 
 /**
  * The right of a {@link ClinicianId} to read a {@link Patient}'s record. The grant key; there is no

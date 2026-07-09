@@ -1,5 +1,6 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,11 +19,10 @@ import java.util.Optional;
  * </ul>
  *
  * Every field beyond {@code scenarioId} is optional because a given producer fills only its
- * concern; the record's components ARE the schema (projected build-time by {@code SCHEMA_CONCORD},
- * recursing into {@link ObservationWire}). Each realm maps it ↔ {@code String} via {@code
- * DocumentCodec}.
+ * concern; the record's components ARE the wire shape (nesting {@link ObservationWire}). Each realm
+ * maps it ↔ {@code String} via {@code SeedCodec}.
  */
-@DocumentContract(Coordinate.READINESS_CHECKPOINT)
+@SeedContract("readiness-checkpoint")
 public record ReadinessCheckpoint(
     String scenarioId,
     Optional<Boolean> failed,

@@ -9,6 +9,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.internal.DriftSpecialist;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
@@ -20,9 +22,7 @@ import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,16 +142,16 @@ class DriftSpecialistTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
-    private final List<Document> captured = new ArrayList<>();
+    private final List<SeedEnvelope> captured = new ArrayList<>();
 
     @Override
-    public void append(Document intervention) {
-      // Only the canonical intervention Document crosses the seam now.
-      Assertions.assertEquals(Coordinate.INTERVENTION.slug(), intervention.coordinate());
+    public void append(SeedEnvelope intervention) {
+      // Only the canonical intervention SeedEnvelope crosses the seam now.
+      Assertions.assertEquals(DoctorCoordinate.INTERVENTION.slug(), intervention.coordinate());
       captured.add(intervention);
     }
 
-    /** The flat output-map shape carried by the captured Document at {@code index}. */
+    /** The flat output-map shape carried by the captured SeedEnvelope at {@code index}. */
     Map<String, Object> payloadOf(int index) {
       try {
         return MAPPER.readValue(captured.get(index).payload(), MAP);

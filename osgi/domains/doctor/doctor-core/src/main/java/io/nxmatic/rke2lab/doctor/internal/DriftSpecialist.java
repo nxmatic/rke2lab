@@ -76,7 +76,7 @@ public final class DriftSpecialist {
     }
 
     writer.append(
-        InterventionDocuments.of(
+        InterventionWriter.of(
             new Intervention(
                 Provenance.EXTERNAL_CHANGE_DETECTED,
                 review.nextVisit().when(),

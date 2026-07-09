@@ -7,15 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.ChiefComplaint;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
-import io.nxmatic.rke2lab.seed.broker.port.VisitWire;
+import io.nxmatic.rke2lab.doctor.records.VisitWire;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,38 +23,39 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins the aggregator contract of {@link MedicalRecordReader} over the host {@code visit} {@link
- * Document}s: a per-entry fold that fails AT END (partial record + suppressed identity-enriched
+ * SeedEnvelope}s: a per-entry fold that fails AT END (partial record + suppressed identity-enriched
  * failures), never fail-fast and never log-and-swallow. An empty journal is genuine nothing-here
  * (empty record, no exception). The CALLER decides what to do with the partial. The reader parses
- * each Document's blobs with its own jackson — the same shape {@code StackMedicalRecordJournal}
+ * each SeedEnvelope's blobs with its own jackson — the same shape {@code StackMedicalRecordJournal}
  * produces (version + when + the consultationReport/expectations blob lists).
  */
 class MedicalRecordReaderTest {
 
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "dev");
-  private static final DocumentCodec CODEC = new DocumentCodec();
+  private static final SeedCodec CODEC = new SeedCodec();
 
   /**
-   * A well-formed {@code visit} Document for {@code symptom} at {@code version}, like the journal.
+   * A well-formed {@code visit} SeedEnvelope for {@code symptom} at {@code version}, like the
+   * journal.
    */
-  private static Document visit(int version, Symptom symptom) {
+  private static SeedEnvelope visit(int version, Symptom symptom) {
     return visitOf(version, List.of(reportBlob(symptom)));
   }
 
   /** A readable visit that raised no consultationReport — the healthy run. */
-  private static Document healthyVisit(int version) {
+  private static SeedEnvelope healthyVisit(int version) {
     return visitOf(version, List.of());
   }
 
-  /** A malformed visit Document: a payload that is not parseable JSON. */
-  private static Document brokenVisit(int version) {
-    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), "not json {");
+  /** A malformed visit SeedEnvelope: a payload that is not parseable JSON. */
+  private static SeedEnvelope brokenVisit(int version) {
+    return SeedEnvelope.of(DoctorCoordinate.VISIT, "not json {");
   }
 
-  private static Document visitOf(int version, List<Object> reportBlobs) {
+  private static SeedEnvelope visitOf(int version, List<Object> reportBlobs) {
     final VisitWire visit =
         new VisitWire(version, Instant.ofEpochSecond(version), reportBlobs, List.of());
-    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), CODEC.encode(visit));
+    return SeedEnvelope.of(DoctorCoordinate.VISIT, CODEC.encode(visit));
   }
 
   /**
@@ -76,7 +76,7 @@ class MedicalRecordReaderTest {
 
   @Test
   void read_twoReadableEntries_returnsUsableRecord() throws Exception {
-    final List<Document> journal =
+    final List<SeedEnvelope> journal =
         List.of(visit(1, Symptom.TIMEOUT), visit(2, Symptom.CONNECTION_REFUSED));
 
     final MedicalRecord record = new MedicalRecordReader().read(PATIENT, journal);
@@ -116,7 +116,7 @@ class MedicalRecordReaderTest {
 
   @Test
   void read_middleEntryMalformed_throwsWithPartialRecordAndIdentityEnrichedSuppressed() {
-    final List<Document> journal =
+    final List<SeedEnvelope> journal =
         List.of(visit(1, Symptom.TIMEOUT), brokenVisit(2), visit(3, Symptom.CONNECTION_REFUSED));
 
     final MedicalRecordReconstructionException ex =
@@ -137,7 +137,7 @@ class MedicalRecordReaderTest {
 
   @Test
   void read_twoEntriesMalformed_suppressesBothAndKeepsTheRest() {
-    final List<Document> journal =
+    final List<SeedEnvelope> journal =
         List.of(brokenVisit(1), visit(2, Symptom.TIMEOUT), brokenVisit(3));
 
     final MedicalRecordReconstructionException ex =

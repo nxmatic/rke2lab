@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
 import java.util.Map;
 import java.util.Optional;
@@ -11,9 +11,8 @@ import java.util.Optional;
  * details} bag for producer-specific context ({@code source}, {@code probeMode}, …).
  *
  * <p>A nested wire-record (not a top-level coordinate): {@link ReadinessCheckpoint} holds a {@code
- * List<ObservationWire>}, and the {@code SCHEMA_CONCORD} projector recurses into it. The host
- * builds these from its {@code ObservationView}; OSGi maps them to its own {@code Observation} — no
- * doctor type crosses the seam.
+ * List<ObservationWire>}. The host builds these from its {@code ObservationView}; OSGi maps them to
+ * its own {@code Observation} — no doctor type crosses the seam.
  */
 public record ObservationWire(
     String status, String summary, Optional<SymptomKind> symptom, Map<String, Object> details) {

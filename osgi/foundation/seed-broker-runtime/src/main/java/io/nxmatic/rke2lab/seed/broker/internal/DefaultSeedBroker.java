@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.seed.broker.internal;
 
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +29,7 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 @Component(service = SeedBroker.class)
 public final class DefaultSeedBroker implements SeedBroker {
 
-  private final Map<Coordinate, SeedHandler> handlers;
+  private final Map<SeedCoordinate, SeedHandler> handlers;
 
   @Activate
   public DefaultSeedBroker(
@@ -52,7 +52,7 @@ public final class DefaultSeedBroker implements SeedBroker {
   }
 
   @Override
-  public Document sow(Coordinate wanted, Document seed) {
+  public SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed) {
     final SeedHandler handler = handlers.get(wanted);
     if (handler == null) {
       throw new IllegalStateException(

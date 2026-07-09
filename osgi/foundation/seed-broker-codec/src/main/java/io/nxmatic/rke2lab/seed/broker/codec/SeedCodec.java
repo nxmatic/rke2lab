@@ -9,14 +9,14 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.nxmatic.rke2lab.seed.broker.codec.internal.WireEnumModule;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.DocumentContract;
+import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Map;
 
 /**
- * The JSON (de)serialization + (capability) validation of {@code Document} payloads — the JSON
+ * The JSON (de)serialization + (capability) validation of {@code SeedEnvelope} payloads — the JSON
  * analogue of the manifests domain's {@code YamlMapper}. Written ONCE here; loaded per realm as our
  * own dual-realm library bundle ({@code embed; type=library}): staged as a bundle OSGi-side
  * (binding the OSGi jackson) and shaded flat host-side (binding the host jackson). No codec type
@@ -35,7 +35,7 @@ import java.util.Map;
  * Runtime schema validation is WIRED but OFF by default (the embedded posture); the remote capstone
  * flips it on via {@link #withValidation(boolean)}.
  */
-public final class DocumentCodec {
+public final class SeedCodec {
 
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
@@ -53,24 +53,24 @@ public final class DocumentCodec {
 
   private final boolean validationEnabled;
 
-  public DocumentCodec() {
+  public SeedCodec() {
     this(false);
   }
 
-  private DocumentCodec(boolean validationEnabled) {
+  private SeedCodec(boolean validationEnabled) {
     this.validationEnabled = validationEnabled;
   }
 
   /** The off→on switch the capstone flips; embedded keeps the default (off). */
-  public DocumentCodec withValidation(boolean enabled) {
-    return new DocumentCodec(enabled);
+  public SeedCodec withValidation(boolean enabled) {
+    return new SeedCodec(enabled);
   }
 
   public String encode(JsonNode node) {
     try {
       return MAPPER.writeValueAsString(node);
     } catch (IOException ex) {
-      throw new UncheckedIOException("Failed to encode Document payload", ex);
+      throw new UncheckedIOException("Failed to encode SeedEnvelope payload", ex);
     }
   }
 
@@ -78,11 +78,13 @@ public final class DocumentCodec {
     try {
       return MAPPER.readTree(payload);
     } catch (IOException ex) {
-      throw new UncheckedIOException("Failed to decode Document payload", ex);
+      throw new UncheckedIOException("Failed to decode SeedEnvelope payload", ex);
     }
   }
 
-  /** Serialize a wire-record to its Document payload String (seam enums render as their slug). */
+  /**
+   * Serialize a wire-record to its SeedEnvelope payload String (seam enums render as their slug).
+   */
   public String encode(Object wireRecord) {
     try {
       return MAPPER.writeValueAsString(wireRecord);
@@ -91,7 +93,9 @@ public final class DocumentCodec {
     }
   }
 
-  /** Deserialize a Document payload String into its wire-record (slugs resolve to seam enums). */
+  /**
+   * Deserialize a SeedEnvelope payload String into its wire-record (slugs resolve to seam enums).
+   */
   public <T> T decode(String payload, Class<T> type) {
     try {
       return MAPPER.readValue(payload, type);
@@ -101,29 +105,29 @@ public final class DocumentCodec {
   }
 
   /**
-   * Deserialize a {@link Document} into the wire-record {@code type}, first checking the Document's
-   * coordinate matches the coordinate {@code type} declares via {@link DocumentContract} — so
-   * decoding an {@code intervention} Document as a {@code ReadinessVerdict} fails loudly at the
-   * seam rather than silently mis-parsing. The one call site's {@code decode(doc.payload(),
+   * Deserialize a {@link SeedEnvelope} into the wire-record {@code type}, first checking the
+   * SeedEnvelope's coordinate matches the coordinate {@code type} declares via {@link SeedContract}
+   * — so decoding an {@code intervention} SeedEnvelope as a {@code ReadinessVerdict} fails loudly
+   * at the seam rather than silently mis-parsing. The one call site's {@code decode(doc.payload(),
    * X.class)} is this, minus the guard.
    */
-  public <T> T decode(Document document, Class<T> type) {
-    final DocumentContract contract = type.getAnnotation(DocumentContract.class);
-    if (contract != null && !contract.value().slug().equals(document.coordinate())) {
+  public <T> T decode(SeedEnvelope document, Class<T> type) {
+    final SeedContract contract = type.getAnnotation(SeedContract.class);
+    if (contract != null && !contract.value().equals(document.coordinate())) {
       throw new IllegalArgumentException(
           "cannot decode a '"
               + document.coordinate()
-              + "' Document as "
+              + "' SeedEnvelope as "
               + type.getSimpleName()
               + " (contract coordinate '"
-              + contract.value().slug()
+              + contract.value()
               + "')");
     }
     return decode(document.payload(), type);
   }
 
   /**
-   * Convert an already-parsed structure (the opaque {@code Map}/{@code List} blob a Document
+   * Convert an already-parsed structure (the opaque {@code Map}/{@code List} blob a SeedEnvelope
    * carries in an open slot) DIRECTLY into a typed record — no re-serialization round-trip. The
    * inverse of {@link #toMap}; the same MAPPER, so seam enums, {@code Instant}, {@code Optional},
    * and the annotated value types decode exactly as from a String payload. Unknown keys are
@@ -136,10 +140,10 @@ public final class DocumentCodec {
   }
 
   /**
-   * Render a typed record to its opaque {@code Map} blob (the shape a Document's open slot carries,
-   * and the host copies verbatim into a Pulumi output). The inverse of {@link #fromMap}; enum refs
-   * render as their annotated slug, {@code Instant} as ISO-8601 — the exact flat shape the deleted
-   * {@code toOutputMap()} methods produced.
+   * Render a typed record to its opaque {@code Map} blob (the shape a SeedEnvelope's open slot
+   * carries, and the host copies verbatim into a Pulumi output). The inverse of {@link #fromMap};
+   * enum refs render as their annotated slug, {@code Instant} as ISO-8601 — the exact flat shape
+   * the deleted {@code toOutputMap()} methods produced.
    */
   public Map<String, Object> toMap(Object record) {
     return MAPPER.convertValue(record, MAP_TYPE);

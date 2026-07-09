@@ -1,15 +1,15 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.InterventionWire;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.seed.broker.port.InterventionWire;
 import java.util.Optional;
 
 /**
- * The tolerant inverse of {@link InterventionDocuments}: rebuilds a typed {@link Intervention} from
- * an {@link InterventionWire} (the flat wire shape a ledger entry registered). It never throws —
+ * The tolerant inverse of {@link InterventionWriter}: rebuilds a typed {@link Intervention} from an
+ * {@link InterventionWire} (the flat wire shape a ledger entry registered). It never throws —
  * malformed input yields {@link Optional#empty()} — so a stale or partially-written intervention
  * degrades instead of crashing the read.
  *

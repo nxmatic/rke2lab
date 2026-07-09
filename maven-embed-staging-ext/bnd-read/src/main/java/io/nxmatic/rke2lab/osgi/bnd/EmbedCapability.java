@@ -70,7 +70,7 @@ public record EmbedCapability(Clause clause) {
    * legitimately lives in two realms — exempt from {@code DUPLICATE_REALM_CLASS} like jackson,
    * because it is NOT a seam surface (no type of it crosses the String-only seam; each realm holds
    * its own copy bound to its own jackson). Exemplar: {@code seed-broker-codec} (the {@code
-   * DocumentCodec}, one source, two realm-bound copies).
+   * SeedCodec}, one source, two realm-bound copies).
    */
   public static final String TYPE_LIBRARY = "library";
 

@@ -1,5 +1,6 @@
-package io.nxmatic.rke2lab.seed.broker.port;
+package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.time.Instant;
 import java.util.List;
 
@@ -9,13 +10,12 @@ import java.util.List;
  * two blob lists are the raw consultation-report and expectation Pulumi outputs the host copied
  * WITHOUT interpreting them.
  *
- * <p>Both lists are OPAQUE ({@code List} of open objects, for which the {@code SCHEMA_CONCORD}
- * projector emits an open {@code array}): they carry the {@code outputsNamed} transport framing
- * (one inner element per resource) that OSGi's {@code MedicalRecordReader} unwraps and folds into a
- * typed {@code Visit} via {@code DocumentCodec.fromMap}. The host never parses the blobs; each
- * realm maps this record ↔ {@code String} via {@code DocumentCodec}.
+ * <p>Both lists are OPAQUE ({@code List} of open objects): they carry the {@code outputsNamed}
+ * transport framing (one inner element per resource) that OSGi's {@code MedicalRecordReader}
+ * unwraps and folds into a typed {@code Visit} via {@code SeedCodec.fromMap}. The host never parses
+ * the blobs; each realm maps this record ↔ {@code String} via {@code SeedCodec}.
  */
-@DocumentContract(Coordinate.VISIT)
+@SeedContract("visit")
 public record VisitWire(
     int version, Instant when, List<Object> consultationReport, List<Object> expectations) {
 

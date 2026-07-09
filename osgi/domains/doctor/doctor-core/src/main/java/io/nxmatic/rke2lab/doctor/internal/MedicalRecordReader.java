@@ -3,11 +3,11 @@ package io.nxmatic.rke2lab.doctor.internal;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.records.Visit;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
-import io.nxmatic.rke2lab.seed.broker.port.VisitWire;
+import io.nxmatic.rke2lab.doctor.records.VisitWire;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,13 +17,13 @@ import java.util.Optional;
  * Reconstructs a {@link Patient}'s {@link MedicalRecord} by folding the host {@link
  * io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal}'s {@code visit} Documents into one {@link
  * Visit} per readable entry — INSIDE the bundle realm, where the {@code doctor.records} types are
- * legal. Each Document's payload is the opaque blob the host produced WITHOUT interpreting it:
+ * legal. Each SeedEnvelope's payload is the opaque blob the host produced WITHOUT interpreting it:
  * {@code version} + {@code when} plus the raw consultation-report and expectation output blob
- * lists. This reader decodes the payload with doctor-core's OWN jackson (via {@link DocumentCodec},
- * no jackson type crosses the seam) and rebuilds the typed visit by decoding each opaque blob
- * directly into its record ({@link ConsultationReport} / {@link Expectation}).
+ * lists. This reader decodes the payload with doctor-core's OWN jackson (via {@link SeedCodec}, no
+ * jackson type crosses the seam) and rebuilds the typed visit by decoding each opaque blob directly
+ * into its record ({@link ConsultationReport} / {@link Expectation}).
  *
- * <p>The aggregator does fail-AT-END, not fail-fast: an unreadable Document is collected
+ * <p>The aggregator does fail-AT-END, not fail-fast: an unreadable SeedEnvelope is collected
  * (identity-enriched) and the fold continues; if any entry failed it throws a {@link
  * MedicalRecordReconstructionException} carrying the partial record plus one suppressed {@link
  * MedicalRecordReconstructionException.EntryFailure} per failure, leaving the policy decision to
@@ -31,14 +31,14 @@ import java.util.Optional;
  */
 public final class MedicalRecordReader {
 
-  private final DocumentCodec codec = new DocumentCodec();
+  private final SeedCodec codec = new SeedCodec();
 
-  public MedicalRecord read(Patient patient, List<Document> journal)
+  public MedicalRecord read(Patient patient, List<SeedEnvelope> journal)
       throws MedicalRecordReconstructionException {
     final List<Visit> visits = new ArrayList<>();
     final List<Throwable> failures = new ArrayList<>();
 
-    for (Document entry : journal) {
+    for (SeedEnvelope entry : journal) {
       try {
         visits.add(visitOf(entry));
       } catch (EntryReadException e) {
@@ -57,7 +57,7 @@ public final class MedicalRecordReader {
     throw failed(patient, partial, failures);
   }
 
-  private Visit visitOf(Document entry) throws EntryReadException {
+  private Visit visitOf(SeedEnvelope entry) throws EntryReadException {
     final VisitWire visit;
     try {
       visit = codec.decode(entry, VisitWire.class);

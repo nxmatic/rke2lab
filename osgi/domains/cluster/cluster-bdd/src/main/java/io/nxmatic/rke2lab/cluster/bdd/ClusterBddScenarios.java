@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.cluster.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
@@ -21,10 +21,10 @@ import org.junit.platform.engine.discovery.DiscoverySelectors;
  * live: the jGiven {@code ReportModel} is loaded by THIS bundle's loader and would {@code
  * ClassCastException} on the flat host loader; and returning a single reflective value forbids a
  * live-object-plus-json mix. So the whole envelope is JSON — the runbook as its {@code
- * ScenarioJsonWriter} text, the consultations as {@link Document}s (already flat 3-String records
- * whose payload is itself JSON). The host parses the envelope with ITS OWN jackson — no jGiven or
- * jackson type ever crosses — and rebuilds the model + records the consultations in its realm. This
- * is the cross-world graft's membrane, in the form the design mandates.
+ * ScenarioJsonWriter} text, the consultations as {@link SeedEnvelope}s (already flat 3-String
+ * records whose payload is itself JSON). The host parses the envelope with ITS OWN jackson — no
+ * jGiven or jackson type ever crosses — and rebuilds the model + records the consultations in its
+ * realm. This is the cross-world graft's membrane, in the form the design mandates.
  *
  * <p>Invoked through the bundle loader, so this class's loader IS the bundle's — the {@code
  * BundleReference} the launcher binds the worker thread to, and the loader the Jupiter engine
@@ -40,7 +40,7 @@ public final class ClusterBddScenarios {
    * ReportModel}; {@code consultations} are the doctor consultations the scenario raised on a
    * failing phase (empty when every phase passed). The host reads it back with its own jackson.
    */
-  public record RunbookEnvelope(String runbook, List<Document> consultations) {}
+  public record RunbookEnvelope(String runbook, List<SeedEnvelope> consultations) {}
 
   /**
    * Play {@link ClusterReadinessScenario} in-container and return its {@link RunbookEnvelope}
@@ -50,7 +50,7 @@ public final class ClusterBddScenarios {
    * — a caller seeds a mock before invoking, or the live edge published one.
    */
   public static String run() throws InterruptedException {
-    final DocumentCodec codec = new DocumentCodec();
+    final SeedCodec codec = new SeedCodec();
     return new JUnitLauncherCore<String>()
         .run(
             ClusterBddScenarios.class.getClassLoader(),

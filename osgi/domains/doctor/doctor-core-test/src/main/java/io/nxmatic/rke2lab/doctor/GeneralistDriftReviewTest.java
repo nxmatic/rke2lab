@@ -10,10 +10,13 @@ import io.nxmatic.rke2lab.doctor.internal.DriftSpecialist;
 import io.nxmatic.rke2lab.doctor.internal.Generalist;
 import io.nxmatic.rke2lab.doctor.internal.GrantPolicy;
 import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
@@ -24,10 +27,7 @@ import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
-import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +55,7 @@ class GeneralistDriftReviewTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
-  private static Map<String, Object> payloadOf(Document document) {
+  private static Map<String, Object> payloadOf(SeedEnvelope document) {
     try {
       return MAPPER.readValue(document.payload(), MAP);
     } catch (Exception e) {
@@ -65,7 +65,7 @@ class GeneralistDriftReviewTest {
 
   @Test
   void resolvedExpectationIsReviewedAndExternalChangeInferred() {
-    final List<Document> captured = new ArrayList<>();
+    final List<SeedEnvelope> captured = new ArrayList<>();
     final DriftSpecialist drift = new DriftSpecialist(captured::add);
     final Generalist generalist =
         Generalist.builder()
@@ -95,7 +95,7 @@ class GeneralistDriftReviewTest {
     assertEquals(1, letters.size());
     assertEquals("drift/confounded-inferred/v1", letters.get(0).assessment().schemaRef().id());
     assertEquals(1, captured.size());
-    assertEquals(Coordinate.INTERVENTION.slug(), captured.get(0).coordinate());
+    assertEquals(DoctorCoordinate.INTERVENTION.slug(), captured.get(0).coordinate());
     final Map<String, Object> inferred = payloadOf(captured.get(0));
     assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED.id(), inferred.get("provenance"));
     assertEquals(problem.toRef(), inferred.get("problem"));
@@ -119,7 +119,7 @@ class GeneralistDriftReviewTest {
         new Visit(1, Instant.ofEpochSecond(2), List.of(connectionRefusedReport()), List.of());
 
     final MedicalRecord record2 = new MedicalRecord(PATIENT, List.of(visit1, visit2dirty));
-    final List<Document> captured2 = new ArrayList<>();
+    final List<SeedEnvelope> captured2 = new ArrayList<>();
     final Generalist g2 =
         Generalist.builder()
             .specialists(List.of())
