@@ -86,9 +86,65 @@ touches of the doctor data structure — THREE natures, only the second is debt:
 **The point:** the client needs the PROTOCOL (nature 1), not the internal STRUCTURE (nature 2). Today
 it knows both; nature 2 is the debt. And it ties to introspection (#2 build above): if the client could
 DISCOVER a coordinate's schema (offered by the broker), it would never hardcode knowledge of internal
-fields — introspection is the cure for the structure-debt. RESUME the état-des-lieux here: classify all
-~16 types by nature for the full client-decoupling map, or zoom on the SystemdAdapterResource /
-SeedBrokerCatalog symptom first (the sharpest instance of nature 2).
+fields — introspection is the cure for the structure-debt.
+
+## The Pulumi-frontier decorrelation — resolved by INTROSPECTION, not by a new common model (2026-07-09)
+
+User's constraint (2026-07-09): "le domaine doctor ne doit pas avoir connaissance des contraintes liées
+à la frontière pulumi — ça doit rester à la frontière et ne pas transpirer dans les domaines via le
+seed broker." It is VIOLATED today, at two exact points, and this is nature-2's concrete cure.
+
+**The leak, precisely (two points, two names):**
+
++ WRITE — `SystemdAdapterResource.copyDiagnosticOutputs` (seed-master): `CODEC.decode(consultation,
+  Consultation.class)`, then splits `.consultationReport()` / `.expectations()` under TWO Pulumi keys.
++ READ — `StackMedicalRecordJournal.visitDocument` (pulumi-edge): reads those two named keys back and
+  reassembles a `VisitWire`.
++ The two names that ARE the whole leak: `SeedBrokerCatalog.FIELD_*` (foundation) + `ConsultationReport
+  .OUTPUT_KEY` / `Expectation.OUTPUT_KEY` (doctor-records). The domain carries the NAME of Pulumi slots.
+
+**The key finding — the "common contract" already EXISTS; it is doctor's own aggregate model.** Navigating
+the doctor records, every Pulumi term has a doctor counterpart, one-to-one:
+
+| Pulumi | Doctor | proof in the records |
+| --- | --- | --- |
+| stack (org/project/stack) | `Patient` / `MedicalRecord` | `Patient(org, project, stack)` — literally the same record |
+| a stack update (version, when) | `Visit` | `Visit(version, when, …)` ← `StackHistory.Entry(version, when)` |
+| a **resource** (SystemdAdapterResource, ClusterReadinessResource) | a **`ConsultationReport`** | both are ONE-per-checkpoint; the resource IS a checkpoint's consultation |
+| an **output** (named key) | a sub-tree the `Visit` aggregates | `Visit = reports[] + expectations[]` → the two keys |
+
+So the two-key split is NOT legacy accident and NOT a Pulumi need — it is doctor's OWN structure: `Visit`
+holds `reports` (per-checkpoint / per-resource) AND `expectations` (per-Visit, aggregated across
+resources, checked against the NEXT visit — the `MedicalRecord.efficacyOf` lookahead). Two doctor lists →
+two keys. Pulumi is merely a BACKEND that realizes this shape (stack=record, update=visit, resource=report,
+output=aggregated visit sub-tree). No new common model to invent.
+
+**The cure = runtime INTROSPECTION of the wire-record, the twin of the build-time `RecordSchemaProjector`.**
+The wire-record (`VisitWire`, `Consultation`) is `type=seam` → the host holds a copy → at the frontier the
+host can `getRecordComponents()` and read the structure WITHOUT knowing the domain. The Pulumi key = the
+COMPONENT NAME (`consultationReport`, `expectations`), discovered reflectively. `SeedBrokerCatalog` and
+`OUTPUT_KEY` die; the frontier names nothing in hard code — it iterates components. This is exactly the
+runtime twin of `RecordSchemaProjector` (which already projects a record's components → JSON Schema at
+build time, gate-guarded): same "read the record's components", now to derive storage slots instead of
+schema. Not a new model — a build-time principle runtime-ified.
+
+**Roles decided (user: "chacun son rôle", deterministic — 2026-07-09):**
+
++ the DOMAIN *declares*: a component-level marker (the field-level analogue of `@DocumentContract`) on the
+  wire-record components that are addressable storage slots (the "outputs"). Doctor declares WHICH fields
+  are persistable — never WHERE/HOW Pulumi stores them.
++ the FRONTIER *executes*: reads the marked components reflectively, routes each slot under a Pulumi key =
+  the component name, transports the rest opaque. Knows no domain, hardcodes no name.
++ Rejected: the convention "`List<…>` component = aggregated slot". Too implicit (a future non-output list
+  would break it) — against the user's determinism discipline. Explicit marker, gate-guardable like
+  SCHEMA_CONCORD, is the chosen shape. NOT exposed on the SeedHandler interface (that would put storage
+  vocabulary back into the domain contract — the leak displaced, not removed; the handler stays
+  `Document → Document`, backend-blind).
+
+This is the concrete resolution of nature-2 AND the bridge between the two fronts (doctor contribution +
+introspection). Sequence unchanged: socle first (Coordinate→interface + doctor-broker-port), THEN this
+Pulumi decorrelation as its own increment. RESUME after socle: build the component marker + the frontier
+introspector, delete SeedBrokerCatalog + the two OUTPUT_KEY.
 
 See [[gateway-is-rest-in-jvm-insight]] [[multiplexor-two-models-design]]
 [[world-gateway-lost-open-extensibility-debt]] (this is that debt's concrete resolution path).
