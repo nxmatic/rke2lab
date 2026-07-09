@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
+import io.nxmatic.rke2lab.controlplane.readiness.RequiredControllers;
 import io.nxmatic.rke2lab.controlplane.resources.SeedNodeBootstrapWatcher;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
@@ -42,7 +43,8 @@ public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
       SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
       ClusterReadinessContact contact,
       Consumer<String> logger) {
-    this.verifier = new ClusterBootstrapReadinessVerifier(contact, policy, logger);
+    this.verifier =
+        new ClusterBootstrapReadinessVerifier(contact, RequiredControllers.from(policy), logger);
     this.runtimeStatus = runtimeStatus;
     this.logger = logger;
   }

@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap.BootstrapResult;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
+import io.nxmatic.rke2lab.controlplane.readiness.RequiredControllers;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
@@ -83,7 +84,7 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
       log("cluster readiness disabled by configuration");
       this.verification =
           ClusterBootstrapReadinessVerifier.skipped(
-              hostFacts.policy(), hostFacts.readinessLogger());
+              RequiredControllers.from(hostFacts.policy()), hostFacts.readinessLogger());
       return self();
     }
 
@@ -108,7 +109,8 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
           .the_required_controllers_are_effective();
       then.the_cluster_is_ready();
       log("✓ " + SCENARIO_ID + " ready: kubeconfig published, API ready, controllers effective");
-      this.verification = ClusterBootstrapReadinessVerifier.ready(hostFacts.policy());
+      this.verification =
+          ClusterBootstrapReadinessVerifier.ready(RequiredControllers.from(hostFacts.policy()));
       return self();
     } catch (Throwable failure) {
       consultDoctor(phaseObservations);
@@ -174,7 +176,7 @@ public class ClusterReadinessStage extends Stage<ClusterReadinessStage> {
             .findFirst()
             .orElse("cluster readiness failed");
     return ClusterBootstrapReadinessVerifier.failed(
-        kubeconfig, api, controllers, summary, hostFacts.policy());
+        kubeconfig, api, controllers, summary, RequiredControllers.from(hostFacts.policy()));
   }
 
   private static boolean phaseOk(

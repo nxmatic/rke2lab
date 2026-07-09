@@ -20,7 +20,8 @@ class ClusterReadinessProjectionTest {
 
   @Test
   void ready_projection_signals_handoff_to_stage_b() {
-    final VerificationResult result = ClusterBootstrapReadinessVerifier.ready(policy());
+    final VerificationResult result =
+        ClusterBootstrapReadinessVerifier.ready(RequiredControllers.from(policy()));
     assertEquals("Ready", result.bootstrapStatus());
     assertTrue(result.handoffReady());
 
@@ -37,7 +38,11 @@ class ClusterReadinessProjectionTest {
     // api-ready phase failed: kubeconfig ok, api false, controllers not reached.
     final VerificationResult result =
         ClusterBootstrapReadinessVerifier.failed(
-            true, false, false, "kubernetes API did not report readyz=ok", policy());
+            true,
+            false,
+            false,
+            "kubernetes API did not report readyz=ok",
+            RequiredControllers.from(policy()));
     assertEquals("Failed", result.bootstrapStatus());
     assertFalse(result.handoffReady());
 

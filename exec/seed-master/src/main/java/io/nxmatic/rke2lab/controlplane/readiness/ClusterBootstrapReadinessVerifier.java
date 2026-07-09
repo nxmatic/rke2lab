@@ -3,13 +3,11 @@ package io.nxmatic.rke2lab.controlplane.readiness;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,13 +40,15 @@ public final class ClusterBootstrapReadinessVerifier {
   private static final Duration LOG_PROGRESS_INTERVAL = Duration.ofSeconds(30);
 
   private final ClusterReadinessContact contact;
-  private final ControlplanePolicy policy;
+  private final List<ControllerRef> requiredControllers;
   private final Consumer<String> logger;
 
   public ClusterBootstrapReadinessVerifier(
-      ClusterReadinessContact contact, ControlplanePolicy policy, Consumer<String> logger) {
+      ClusterReadinessContact contact,
+      List<ControllerRef> requiredControllers,
+      Consumer<String> logger) {
     this.contact = contact;
-    this.policy = policy;
+    this.requiredControllers = List.copyOf(requiredControllers);
     this.logger = logger;
   }
 
@@ -88,19 +88,22 @@ public final class ClusterBootstrapReadinessVerifier {
   /** Outcome of a single readiness phase: passed, plus a human detail line. */
   public record PhaseOutcome(boolean ok, String detail) {}
 
-  public static VerificationResult skipped(ControlplanePolicy policy, Consumer<String> logger) {
+  public static VerificationResult skipped(
+      List<ControllerRef> requiredControllers, Consumer<String> logger) {
     logger.accept("readiness check disabled by configuration (rke2lab:readiness.enabled=false)");
-    return VerificationResult.skipped(requiredControllerRefs(policy));
+    return VerificationResult.skipped(refs(requiredControllers));
   }
 
   /**
    * Projection factories the BDD checkpoint uses to build a {@link VerificationResult} from the
    * per-phase outcomes it played — the verifier stays the owner of result construction, so the
    * output contract (handoffReady → nextStep, bootstrapStatus, the output keys) is produced in one
-   * place whether reached via the phases or via the scenario.
+   * place whether reached via the phases or via the scenario. The host projects the policy into the
+   * required controllers ({@link RequiredControllers}); these factories take the projected refs,
+   * not the policy — the reasoning never sees it.
    */
-  public static VerificationResult ready(ControlplanePolicy policy) {
-    return VerificationResult.ready(requiredControllerRefs(policy));
+  public static VerificationResult ready(List<ControllerRef> requiredControllers) {
+    return VerificationResult.ready(refs(requiredControllers));
   }
 
   public static VerificationResult failed(
@@ -108,13 +111,9 @@ public final class ClusterBootstrapReadinessVerifier {
       boolean apiReady,
       boolean controllersEffective,
       String summary,
-      ControlplanePolicy policy) {
+      List<ControllerRef> requiredControllers) {
     return VerificationResult.failed(
-        kubeconfigPublished,
-        apiReady,
-        controllersEffective,
-        summary,
-        requiredControllerRefs(policy));
+        kubeconfigPublished, apiReady, controllersEffective, summary, refs(requiredControllers));
   }
 
   private boolean waitForKubeconfigPublished(Path kubeconfigPath, Duration timeout) {
@@ -190,12 +189,11 @@ public final class ClusterBootstrapReadinessVerifier {
   }
 
   /**
-   * The host projects the policy into the required {@link ControllerRef}s and owns the retry loop;
-   * the edge answers the single point-in-time "are these effective now?" question per poll. The
-   * edge never sees the policy — only the projected refs.
+   * The host projected the policy into the required {@link ControllerRef}s (held as a field); this
+   * owns the retry loop and the edge answers the single point-in-time "are these effective now?"
+   * question per poll. The edge never sees the policy — only the projected refs.
    */
   private ControllerVerification verifyRequiredControllers(Path kubeconfigPath, Duration timeout) {
-    final List<ControllerRef> requiredControllers = requiredControllers(policy);
     if (requiredControllers.isEmpty()) {
       logger.accept("no required controllers configured for readiness gate");
       return new ControllerVerification(true, "no required controllers", List.of());
@@ -209,7 +207,7 @@ public final class ClusterBootstrapReadinessVerifier {
       if (contact.areControllersEffective(kubeconfigPath, requiredControllers)) {
         logger.accept("all required controllers are effective after " + elapsedSince(startedAt));
         return new ControllerVerification(
-            true, "all required controllers rolled out", requiredControllerRefs(policy));
+            true, "all required controllers rolled out", refs(requiredControllers));
       }
 
       final long now = System.nanoTime();
@@ -223,9 +221,7 @@ public final class ClusterBootstrapReadinessVerifier {
 
     logger.accept("required-controller wait timed out after " + timeout);
     return new ControllerVerification(
-        false,
-        "required controllers not effective within " + timeout,
-        requiredControllerRefs(policy));
+        false, "required controllers not effective within " + timeout, refs(requiredControllers));
   }
 
   private static String describeKubeconfigState(Path kubeconfigPath) {
@@ -255,39 +251,8 @@ public final class ClusterBootstrapReadinessVerifier {
     return Duration.ofNanos(Math.max(0L, System.nanoTime() - startedAtNanos)).toString();
   }
 
-  private static List<ControllerRef> requiredControllers(ControlplanePolicy policy) {
-    final ArrayList<ControllerRef> refs = new ArrayList<>();
-
-    if (policy.manifestLink().highAvailabilityEnabled()) {
-      refs.add(new ControllerRef("daemonset", "kube-vip-ds", "kube-vip"));
-    }
-
-    if (policy.manifestLink().networkingEnabled()) {
-      refs.add(new ControllerRef("deployment", "cilium-operator", "kube-system"));
-      refs.add(new ControllerRef("deployment", "kdns", "rke2lab-system"));
-    }
-
-    if (policy.manifestLink().platformEnabled()) {
-      refs.add(new ControllerRef("deployment", "kubernetes-replicator", "kube-system"));
-    }
-
-    if (policy.manifestLink().storageEnabled()) {
-      refs.add(new ControllerRef("deployment", "openebs-zfs-zfs-localpv-controller", "openebs"));
-      refs.add(new ControllerRef("daemonset", "openebs-zfs-zfs-localpv-node", "openebs"));
-    }
-
-    if (policy.manifestLink().meshEnabled()) {
-      refs.add(new ControllerRef("deployment", "headscale", "mesh-system"));
-      refs.add(new ControllerRef("deployment", "headscale-gateway", "mesh-system"));
-      refs.add(new ControllerRef("daemonset", "headscale-client", "mesh-system"));
-      refs.add(new ControllerRef("deployment", "headplane", "mesh-system"));
-    }
-
-    return List.copyOf(refs);
-  }
-
-  private static List<String> requiredControllerRefs(ControlplanePolicy policy) {
-    return requiredControllers(policy).stream().map(ControllerRef::ref).toList();
+  private static List<String> refs(List<ControllerRef> requiredControllers) {
+    return requiredControllers.stream().map(ControllerRef::ref).toList();
   }
 
   private static void sleep(Duration duration) {
