@@ -153,8 +153,8 @@ public record ControlplanePolicy(
   /**
    * Operator override of readiness-scenario severity, keyed by scenario id (e.g. {@code
    * "systemd-adapter"}), carried as the RAW config string. The host does not interpret it — it
-   * hands the raw value to the OSGi-side ReadinessAuthority, which owns the severity vocabulary and
-   * decides.
+   * hands the raw value to the OSGi-side readiness-verdict handler, which owns the severity
+   * vocabulary and decides.
    */
   public record ReadinessPolicy(Map<String, String> rawOverrides) {
     public ReadinessPolicy {

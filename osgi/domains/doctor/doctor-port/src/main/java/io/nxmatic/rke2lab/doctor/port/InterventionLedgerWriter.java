@@ -10,9 +10,9 @@ import io.nxmatic.rke2lab.world.gateway.port.Document;
  * on Pulumi internals.
  *
  * <p>The crossing carries a neutral {@link Document}, never a doctor record: the canonical shape is
- * owned OSGi-side ({@code InterventionIntake} for the ingress path, {@code DriftSpecialist} for the
- * inferred path) and serialized into the Document's {@code payload}; the host writer deserializes
- * it with its own jackson and persists the map. No doctor type and no jackson type cross this seam.
+ * owned OSGi-side (the intervention ingress SeedHandler, {@code DriftSpecialist} for the inferred
+ * path) and serialized into the Document's {@code payload}; the host writer deserializes it with
+ * its own jackson and persists the map. No doctor type and no jackson type cross this seam.
  */
 public interface InterventionLedgerWriter {
 

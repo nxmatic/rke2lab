@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
-import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
@@ -11,6 +10,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedBroker;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -25,17 +25,17 @@ import java.util.Optional;
  * efficacy to its own engine.
  *
  * <p>Option A: the host holds NO doctor type. It parses argv to raw strings, builds an {@code
- * intervention-request} Document with its own jackson, and crosses the seam to the OSGi {@link
- * InterventionIntake} verb that owns the intervention schema — it canonicalizes (or rejects) the
- * facts and returns a canonical {@code intervention} Document, which the host then appends. The
- * doctor vocabulary ({@code ProblemRef} / {@code Provenance} / {@code RemediationProgramRef}) never
- * leaves the bundle.
+ * intervention-request} Document with its own jackson, and sows it through the {@link SeedBroker}
+ * for the {@code intervention} coordinate — the OSGi handler owns the intervention schema, so it
+ * canonicalizes (or rejects) the facts and returns a canonical {@code intervention} Document, which
+ * the host then appends. The doctor vocabulary ({@code ProblemRef} / {@code Provenance} / {@code
+ * RemediationProgramRef}) never leaves the bundle.
  *
- * <p>The wall clock is never read in the core. {@link #record(String[], Instant,
- * InterventionIntake, InterventionLedgerWriter)} is the testable seam — args, the run instant, the
- * canonicalize handle, and the writer are all injected; only {@link #main(String[])} supplies
- * {@link Instant#now()}, boots the embedded framework for the real {@link InterventionIntake}, and
- * builds the real {@link PulumiInterventionLedgerWriter}.
+ * <p>The wall clock is never read in the core. {@link #record(String[], Instant, SeedBroker,
+ * InterventionLedgerWriter)} is the testable seam — args, the run instant, the broker, and the
+ * writer are all injected; only {@link #main(String[])} supplies {@link Instant#now()}, boots the
+ * embedded framework for the real {@link SeedBroker}, and builds the real {@link
+ * PulumiInterventionLedgerWriter}.
  */
 public final class RecordInterventionCommand {
 
@@ -53,7 +53,7 @@ public final class RecordInterventionCommand {
    * @throws InterventionRejected if the verb returns an error verdict (a bad reference)
    */
   static Document record(
-      String[] args, Instant now, InterventionIntake intake, InterventionLedgerWriter writer) {
+      String[] args, Instant now, SeedBroker broker, InterventionLedgerWriter writer) {
     final Args parsed = Args.parse(args);
 
     final InterventionRequest request =
@@ -67,7 +67,7 @@ public final class RecordInterventionCommand {
     final Document rawFacts =
         new Document(
             Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
-    final Document canonical = intake.canonicalize(rawFacts);
+    final Document canonical = broker.sow(Coordinate.INTERVENTION, rawFacts);
     if (!Coordinate.INTERVENTION.slug().equals(canonical.coordinate())) {
       throw new InterventionRejected(reasonOf(canonical));
     }
@@ -81,9 +81,9 @@ public final class RecordInterventionCommand {
       FrameworkLaunchPipeline.embedded()
           .during(
               "record-intervention",
-              InterventionIntake.class,
-              intake ->
-                  record(args, Instant.now(), intake, new PulumiInterventionLedgerWriter(backend)));
+              SeedBroker.class,
+              broker ->
+                  record(args, Instant.now(), broker, new PulumiInterventionLedgerWriter(backend)));
     } catch (InterventionRejected rejected) {
       SeedLog.error(
           "record-intervention",

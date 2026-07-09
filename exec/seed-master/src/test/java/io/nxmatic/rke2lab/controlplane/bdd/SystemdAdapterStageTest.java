@@ -8,7 +8,6 @@ import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -72,15 +71,6 @@ class SystemdAdapterStageTest {
     assertNotNull(
         selecting.awaitService(SystemdRuntimeProbe.class, 5000),
         "the (variant=fake) selector resolves the fragment-contributed fake SystemdRuntimeProbe");
-  }
-
-  @Test
-  void theSelectorResolvesTheFakeReadinessAuthority() throws Exception {
-    final OsgiConnection selecting =
-        OsgiConnection.over(felix.context(), false, () -> {}, Optional.of("(variant=fake)"));
-    assertNotNull(
-        selecting.awaitService(ReadinessAuthority.class, 5000),
-        "the (variant=fake) selector resolves the fragment-contributed fake ReadinessAuthority");
   }
 
   @Test

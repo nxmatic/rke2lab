@@ -18,6 +18,7 @@
   <modules>
     <module>domain-annotations</module>
     <module>world-gateway</module>
+    <module>seed-broker-runtime</module>
     <module>pipeline</module>
     <module>gateway-document-codec</module>
   </modules>

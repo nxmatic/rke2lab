@@ -164,31 +164,38 @@ flowchart LR
     hm["a pipeline stage"]
   end
   subgraph seam["SEAM — seed-broker (shared, minimal)"]
-    door["SeedBroker.handle(Document)→Document"]
-    rt["routing: coordinate → Exchange(request→response)"]
+    door["SeedBroker.sow(Coordinate wanted, Document seed)→Document"]
+    sh["SeedHandler { Coordinate serves(); Document handle(Document) }"]
   end
-  subgraph osgi["OSGi — authority (verbs now internal)"]
-    disp["dispatch by coordinate"]
-    om["records + reasoning<br/>(assess/consult/canonicalize<br/>now internal handlers)"]
+  subgraph osgi["OSGi — authority (verbs now internal handlers)"]
+    disp["DefaultSeedBroker: @Reference(MULTIPLE) List&lt;SeedHandler&gt;<br/>indexed by serves(), dispatched by wanted"]
+    om["records + reasoning<br/>(assess→readiness-verdict handler,<br/>canonicalize→intervention handler)"]
   end
-  hm -->|"handle(request Document)"| door
-  door --> rt --> disp --> om
-  om -->|"verdict Document"| door
+  hm -->|"sow(wanted, seed Document)"| door
+  door --> disp --> sh --> om
+  om -->|"response Document"| door
   door -->|returns| hm
 ....
 
-Reads as: *one door, one gesture. The pairing request-coordinate → response-coordinate is DATA (an
-`Exchange`), verifiable at build by `SCHEMA_CONCORD`, not N Java signatures. `ConsultingService` and
-kin stop crossing — they become the doctor's internal handlers behind the door.*
+Reads as: *one door, one gesture. The client names the coordinate it wants to reap (`wanted`) and
+hands its seed; the broker routes to the `SeedHandler` that `serves()` that coordinate. Routing is
+DATA (a `Coordinate`), not N Java signatures — a domain contributes a `SeedHandler` `@Component` per
+coordinate it grows, and `DefaultSeedBroker` collects them by DS. The former verbs stop crossing —
+they become the doctor's internal handlers behind the door.*
 
-* A `-port` (`type=seam`) still speaks only `Document`, never a data type. What changes: the seam stops
-  being *N service interfaces* and becomes ONE `handle(Document)→Document` + a routing table. The only
-  shared classes are the broker door + the seam types (`Document`, the coordinate vocabulary, the
+* The seam speaks only `Document`, never a data type. What changed: the seam stopped being *N service
+  interfaces* and became ONE `SeedBroker.sow(Coordinate, Document)→Document` + the `SeedHandler`
+  contract the domains implement. The only shared classes are the broker door (`SeedBroker`), the
+  handler contract (`SeedHandler`), and the seam types (`Document`, the coordinate vocabulary, the
   wire-records). No domain data type (`Severity`, `Observation`, `MedicalRecord`) ever crosses.
-* BEFORE is realised today (`ConsultingService`, `ReadinessAuthority`, `InterventionIntake`); the
-  record-typed reasoning is already bundle-internal (`ClinicalReasoning` + `adapt(Class)`
-  face-by-capability). AFTER folds the N interfaces into the one door — the unification chantier
-  (§ <<open-extensibility-chantier>>).
+* AFTER is realised for `assess` (now the `readiness-verdict` handler `DefaultReadinessAuthority`) and
+  `canonicalize` (the `intervention` handler `DefaultInterventionIntake`): both are `SeedHandler`
+  `@Component`s collected by `DefaultSeedBroker` (`osgi/foundation/seed-broker-runtime`, `embed
+  type=runtime`), and the host resolves ONE `SeedBroker` instead of N interfaces. `consult` stays a
+  `ConsultingService` verb for now (its real provider is not yet wired host-side — it needs
+  `HealthSystem.admit(patient)`, a separate doctor-migration increment); it folds into the door once
+  that lands. The record-typed reasoning is already bundle-internal (`ClinicalReasoning` +
+  `adapt(Class)` face-by-capability).
 
 === A scenario's two outputs — the verdict drives, the ReportModel narrates
 

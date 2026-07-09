@@ -19,9 +19,9 @@ public interface ConsultingService {
   /**
    * Consult on a checkpoint: route its symptom + observation to the specialists and synthesize the
    * narration and the rendered AsciiDoc diagnosis, returned as a {@code consultation} Document. The
-   * twin of {@link io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority#assess} — same
-   * checkpoint, the consulting concern rather than the provisioning verdict. The ONLY consult verb
-   * that crosses the seam; the record-typed routing/narration is the bundle-side {@link
+   * twin of the {@code readiness-verdict} SeedHandler — same checkpoint, the consulting concern
+   * rather than the provisioning verdict. The ONLY consult verb that crosses the seam; the
+   * record-typed routing/narration is the bundle-side {@link
    * io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning}, reached via {@link #adapt}.
    */
   Document consult(Document checkpoint);

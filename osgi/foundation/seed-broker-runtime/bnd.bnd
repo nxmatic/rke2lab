@@ -1,0 +1,14 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.seed.broker.runtime
+# Exports NOTHING: the door contract (SeedBroker, SeedHandler) is the world-gateway seam; this
+# bundle only IMPLEMENTS it. io.nxmatic.rke2lab.seed.broker.internal (DefaultSeedBroker) is sealed —
+# reached only through the seam service the @Component publishes.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=runtime
+# type=runtime: a neutral runtime MECHANISM — installed AND activated in-framework like a model
+# (staged, resolves at the bundle start level so SCR instantiates DefaultSeedBroker and injects the
+# @Reference(MULTIPLE) List<SeedHandler>), but belonging to no domain. It exports nothing, so it is
+# not a seam and not subject to the leak guard. See maven-embed-staging-ext EmbedCapability#isRuntime.
+Service-Component: OSGI-INF/*.xml
+# JSpecify annotations are compile-only null-safety metadata, RUNTIME-retained; drop the computed
+# Import-Package for a package nothing resolves at runtime.
+Import-Package: !org.jspecify.annotations, *
+-noimportjava: true

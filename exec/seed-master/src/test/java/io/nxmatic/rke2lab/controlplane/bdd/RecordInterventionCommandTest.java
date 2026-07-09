@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
@@ -14,6 +13,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.InterventionWire;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedBroker;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,13 +39,13 @@ class RecordInterventionCommandTest {
   }
 
   /**
-   * A faithful stand-in for the OSGi {@link InterventionIntake} verb: it echoes the request fields
-   * into a canonical {@code intervention} Document (provenance defaulting to operator-manual), or
-   * an error verdict for the one unknown-problem case below — without pulling in any doctor type,
-   * the same discipline the production CLI keeps.
+   * A faithful stand-in for the {@link SeedBroker}: for the {@code intervention} coordinate it
+   * echoes the request fields into a canonical {@code intervention} Document (provenance defaulting
+   * to operator-manual), or an error verdict for the one unknown-problem case below — without
+   * pulling in any doctor type, the same discipline the production CLI keeps.
    */
-  private static InterventionIntake fakeIntake() {
-    return rawFacts -> {
+  private static SeedBroker fakeBroker() {
+    return (wanted, rawFacts) -> {
       final InterventionRequest req = CODEC.decode(rawFacts, InterventionRequest.class);
       if (req.problem().startsWith("no-such")) {
         return new Document(
@@ -77,7 +77,7 @@ class RecordInterventionCommandTest {
               "--problem", "systemd-adapter/connection-refused", "--what", "nft delete ..."
             },
             now,
-            fakeIntake(),
+            fakeBroker(),
             writer);
 
     final InterventionWire wire = wireOf(recorded);
@@ -105,7 +105,7 @@ class RecordInterventionCommandTest {
               "2026-06-10T00:00:00Z"
             },
             injectedNow,
-            fakeIntake(),
+            fakeBroker(),
             writer);
 
     assertEquals(Instant.parse("2026-06-10T00:00:00Z"), wireOf(recorded).when());
@@ -126,7 +126,7 @@ class RecordInterventionCommandTest {
               "restart-systemd-unit"
             },
             Instant.parse("2026-06-14T09:30:00Z"),
-            fakeIntake(),
+            fakeBroker(),
             writer);
 
     assertEquals(Optional.of("restart-systemd-unit"), wireOf(recorded).prescriptionRef());
@@ -143,7 +143,7 @@ class RecordInterventionCommandTest {
                 RecordInterventionCommand.record(
                     new String[] {"--what", "nft delete ..."},
                     Instant.parse("2026-06-14T09:30:00Z"),
-                    fakeIntake(),
+                    fakeBroker(),
                     writer));
 
     assertTrue(
@@ -161,7 +161,7 @@ class RecordInterventionCommandTest {
             RecordInterventionCommand.record(
                 new String[] {"--problem", "systemd-adapter/connection-refused"},
                 Instant.parse("2026-06-14T09:30:00Z"),
-                fakeIntake(),
+                fakeBroker(),
                 writer));
   }
 
@@ -180,7 +180,7 @@ class RecordInterventionCommandTest {
                       "--problem", "no-such-checkpoint/whatever", "--what", "something"
                     },
                     Instant.parse("2026-06-14T09:30:00Z"),
-                    fakeIntake(),
+                    fakeBroker(),
                     writer));
 
     assertTrue(rejected.getMessage().contains("no-such-checkpoint"));
@@ -203,7 +203,7 @@ class RecordInterventionCommandTest {
                   "--when", "not-a-timestamp"
                 },
                 Instant.parse("2026-06-14T09:30:00Z"),
-                fakeIntake(),
+                fakeBroker(),
                 writer));
   }
 

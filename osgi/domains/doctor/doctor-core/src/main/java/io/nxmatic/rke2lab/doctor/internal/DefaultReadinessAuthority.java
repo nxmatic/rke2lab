@@ -6,9 +6,9 @@ import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedHandler;
 import java.util.Map;
 import org.osgi.service.component.annotations.Component;
 
@@ -17,14 +17,20 @@ import org.osgi.service.component.annotations.Component;
  * Given a checkpoint Document (scenario id, failed, optional operator override), it resolves the
  * effective severity — the operator override if present, else the scenario's intrinsic severity —
  * and maps it to a provisioning verdict ({@code stop} iff CRITICAL, else {@code
- * continue-degraded}). Published as the {@link ReadinessAuthority} seam so the flat host reads only
- * the verdict's action field.
+ * continue-degraded}). Published as a {@link SeedHandler} serving {@code readiness-verdict}, so the
+ * broker routes a readiness checkpoint here when the host sows for a verdict; the flat host reads
+ * only the verdict's action field.
  *
  * <p>The Document payload is a serialized JSON {@code String}; this authority parses and serializes
  * it with its OWN jackson (a doctor-core bundle dependency) — no jackson type crosses the seam.
  */
-@Component(service = ReadinessAuthority.class)
-public final class DefaultReadinessAuthority implements ReadinessAuthority {
+@Component(service = SeedHandler.class)
+public final class DefaultReadinessAuthority implements SeedHandler {
+
+  @Override
+  public Coordinate serves() {
+    return Coordinate.READINESS_VERDICT;
+  }
 
   /**
    * Each checkpoint's intrinsic severity — the doctor's vocabulary. systemd-adapter: master can
@@ -38,7 +44,7 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
   private final DocumentCodec codec = new DocumentCodec();
 
   @Override
-  public Document assess(Document checkpoint) {
+  public Document handle(Document checkpoint) {
     final ReadinessCheckpoint decoded = codec.decode(checkpoint, ReadinessCheckpoint.class);
     final String scenarioId = decoded.scenarioId();
 

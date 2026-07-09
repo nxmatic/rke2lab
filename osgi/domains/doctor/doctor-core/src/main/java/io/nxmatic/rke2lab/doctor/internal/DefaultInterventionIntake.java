@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
@@ -12,6 +11,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedHandler;
 import java.util.Map;
 import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
@@ -25,18 +25,23 @@ import org.osgi.service.component.annotations.Component;
  * an error {@code readiness-verdict} Document ({@code action=stop} + {@code reason}) rather than a
  * thrown exception across the seam — the doctor record types never leave this method.
  *
- * <p>Published as the {@link InterventionIntake} seam with NO references, so SCR activates it on
- * its own — the CLI awaits it without admitting a patient or publishing an EHR/ledger. The Document
- * payload is decoded/encoded through the {@link DocumentCodec} (this realm's own jackson copy); no
- * jackson type crosses the seam.
+ * <p>Published as a {@link SeedHandler} serving {@code intervention} with NO references, so SCR
+ * activates it on its own — the CLI sows an intervention-request through the broker without
+ * admitting a patient or publishing an EHR/ledger. The Document payload is decoded/encoded through
+ * the {@link DocumentCodec} (this realm's own jackson copy); no jackson type crosses the seam.
  */
-@Component(service = InterventionIntake.class)
-public final class DefaultInterventionIntake implements InterventionIntake {
+@Component(service = SeedHandler.class)
+public final class DefaultInterventionIntake implements SeedHandler {
 
   private final DocumentCodec codec = new DocumentCodec();
 
   @Override
-  public Document canonicalize(Document rawFacts) {
+  public Coordinate serves() {
+    return Coordinate.INTERVENTION;
+  }
+
+  @Override
+  public Document handle(Document rawFacts) {
     final InterventionRequest request = codec.decode(rawFacts, InterventionRequest.class);
 
     if (isBlank(request.problem())) {

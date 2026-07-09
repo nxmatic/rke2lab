@@ -248,8 +248,8 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The world-gateway seam: Document + ReadinessAuthority. The stage builds a checkpoint
-         Document and reads the verdict's action, instead of reasoning on Severity. -->
+    <!-- The world-gateway seam: Document + SeedBroker. The stage sows a checkpoint Document through
+         the broker and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>world-gateway</artifactId>
@@ -263,6 +263,17 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>gateway-document-codec</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <!-- The seed-broker mechanism (embed type=runtime): the DefaultSeedBroker @Component that
+         collects every SeedHandler by DS and dispatches by coordinate. RUNTIME scope like an
+         embedded model bundle — seed-master's code never references DefaultSeedBroker (it resolves
+         the SeedBroker seam via awaitService); the bundle is staged under META-INF/bundles and
+         installed by OsgiRuntime so SCR publishes the door in-container. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-runtime</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not
          runtime like manifests-core): seed-master's staying code — the live registry, the reader,

@@ -10,8 +10,9 @@ import java.util.Optional;
  * checkpoint object, so one coordinate, one schema):
  *
  * <ul>
- *   <li>the VERDICT checkpoint (host → {@code ReadinessAuthority.assess}): {@code scenarioId} plus
- *       {@code failed} and an operator {@code override?} — the authority reads only these;
+ *   <li>the VERDICT checkpoint (host → the {@code readiness-verdict} SeedHandler): {@code
+ *       scenarioId} plus {@code failed} and an operator {@code override?} — the authority reads
+ *       only these;
  *   <li>the CONSULT checkpoint (host → the doctor's {@code consult}): {@code scenarioId}, a {@code
  *       recordedAt?} run instant, and the captured {@code observations} the doctor routes on.
  * </ul>

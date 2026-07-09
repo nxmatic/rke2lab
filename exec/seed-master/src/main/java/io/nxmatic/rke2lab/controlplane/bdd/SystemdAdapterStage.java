@@ -19,9 +19,9 @@ import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedBroker;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -122,8 +122,8 @@ public class SystemdAdapterStage extends Stage<SystemdAdapterStage> {
   private SystemdAdapterStage onFailure(Throwable failure, Optional<ObservationView> captured) {
     consultDoctor(captured);
 
-    final ReadinessAuthority authority = connection.awaitService(ReadinessAuthority.class, 5000);
-    final Document verdict = authority.assess(checkpointDocument());
+    final SeedBroker broker = connection.awaitService(SeedBroker.class, 5000);
+    final Document verdict = broker.sow(Coordinate.READINESS_VERDICT, checkpointDocument());
     final Action action = codec.decode(verdict, ReadinessVerdict.class).action();
     if (action == Action.STOP) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");

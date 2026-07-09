@@ -20,8 +20,8 @@ import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedBroker;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,9 +37,9 @@ import org.junit.platform.engine.support.store.Namespace;
  * {@code NestedRunbookTest}). The verdict is NOT the scenario status (always FAILED on a failed
  * probe): it is what the phase's {@code onFailure} does with the authority's answer — STOP throws
  * {@code TopicFailure} (propagates out, aborting the seed), CONTINUE_DEGRADED records a degraded
- * observation and returns (the seed continues). The authority is served by a {@link StubConnection}
- * — the decision is stage LOGIC, unit-tested without a Felix; the OSGi wiring that resolves the
- * real authority is proven in {@code SystemdAdapterStageTest}. Replaces the old {@code
+ * observation and returns (the seed continues). The broker is served by a {@link StubConnection} —
+ * the decision is stage LOGIC, unit-tested without a Felix; the OSGi wiring that resolves the real
+ * broker is proven in {@code SystemdAdapterStageTest}. Replaces the old {@code
  * SystemdAdapterTopic}-based verdict test.
  */
 class SystemdAdapterVerdictTest {
@@ -65,7 +65,7 @@ class SystemdAdapterVerdictTest {
   private static ExecutionStatus playWithVerdict(Action action) throws Exception {
     final AtomicReference<ReportModel> runbook = new AtomicReference<>();
     final OsgiConnection connection =
-        StubConnection.serving(Map.of(ReadinessAuthority.class, authorityReturning(action)));
+        StubConnection.serving(Map.of(SeedBroker.class, brokerReturning(action)));
 
     new JUnitLauncherCore<Void>()
         .run(
@@ -88,8 +88,12 @@ class SystemdAdapterVerdictTest {
     return runbook.get().getScenarios().get(0).getExecutionStatus();
   }
 
-  private static ReadinessAuthority authorityReturning(Action action) {
-    return checkpoint ->
+  /**
+   * A broker whose {@code sow(READINESS_VERDICT, …)} returns a verdict Document with {@code
+   * action}.
+   */
+  private static SeedBroker brokerReturning(Action action) {
+    return (wanted, seed) ->
         new Document(
             Domain.DOCTOR.slug(),
             Coordinate.READINESS_VERDICT.slug(),

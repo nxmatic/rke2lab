@@ -3,7 +3,7 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core.fake
 # A FRAGMENT of doctor-core: it attaches to the core by BSN, sharing its classloader. Its classes
 # and OSGI-INF/*.xml become EXTRA RESOURCES of the host. SCR scans the host AND its attached
 # fragments (DS 112.4.1), so the @Components below activate in doctor-core's context when the core
-# starts — publishing fake ReadinessAuthority + ConsultingService next to the live actors.
+# starts — publishing the fake ConsultingService next to the live actors.
 # doctor-core declares Service-Component: OSGI-INF/*.xml (findEntries spans fragments) so these
 # descriptors are scanned. The fakes live in their OWN package (…doctor.fake), not doctor-core's
 # sealed package — they implement PUBLIC gateway seams, no white-box access needed.

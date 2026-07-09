@@ -8,9 +8,9 @@ import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
+import io.nxmatic.rke2lab.world.gateway.port.SeedHandler;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class ReadinessAuthorityTest {
 
   private static final DocumentCodec CODEC = new DocumentCodec();
-  private final ReadinessAuthority authority = new DefaultReadinessAuthority();
+  private final SeedHandler authority = new DefaultReadinessAuthority();
 
   private static Document checkpoint(String scenarioId, boolean failed, String override) {
     final ReadinessCheckpoint payload =
@@ -38,20 +38,20 @@ class ReadinessAuthorityTest {
 
   @Test
   void intrinsicWarningContinuesDegraded() {
-    final Document verdict = authority.assess(checkpoint("systemd-adapter", true, null));
+    final Document verdict = authority.handle(checkpoint("systemd-adapter", true, null));
     assertEquals(Coordinate.READINESS_VERDICT.slug(), verdict.coordinate());
     assertEquals(Action.CONTINUE_DEGRADED, action(verdict));
   }
 
   @Test
   void operatorCriticalOverrideStops() {
-    final Document verdict = authority.assess(checkpoint("systemd-adapter", true, "critical"));
+    final Document verdict = authority.handle(checkpoint("systemd-adapter", true, "critical"));
     assertEquals(Action.STOP, action(verdict));
   }
 
   @Test
   void operatorWarningOverrideContinuesDegraded() {
-    final Document verdict = authority.assess(checkpoint("systemd-adapter", true, "warning"));
+    final Document verdict = authority.handle(checkpoint("systemd-adapter", true, "warning"));
     assertEquals(Action.CONTINUE_DEGRADED, action(verdict));
   }
 }

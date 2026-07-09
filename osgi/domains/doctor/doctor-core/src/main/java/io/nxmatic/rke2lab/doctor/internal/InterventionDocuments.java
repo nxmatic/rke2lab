@@ -11,8 +11,8 @@ import io.nxmatic.rke2lab.world.gateway.port.InterventionWire;
  * Wraps a doctor-side {@link Intervention} into the canonical {@code intervention} {@link Document}
  * the write seam carries — the one place that projects an {@link Intervention} onto its {@link
  * InterventionWire} and encodes it with the realm's {@link DocumentCodec}, shared by both producers
- * ({@code InterventionIntake} ingress, {@code DriftSpecialist} inference) so the canonical shape is
- * written once. The {@link Intervention} (and the doctor vocabulary its refs carry) stays
+ * (the intervention ingress SeedHandler, {@code DriftSpecialist} inference) so the canonical shape
+ * is written once. The {@link Intervention} (and the doctor vocabulary its refs carry) stays
  * OSGi-internal; only the flat {@link Document} crosses the seam.
  */
 final class InterventionDocuments {
