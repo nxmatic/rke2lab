@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.bbox.port.BboxReconciler;
 import io.nxmatic.rke2lab.bbox.port.BboxReservationRequest;
 import io.nxmatic.rke2lab.bbox.port.BboxRowOutcome;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
+import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,7 +30,7 @@ public final class BboxReconcilerComponent {
    * @return reconciliation result containing the resource URN and summary map, or a skipped result
    */
   public static ReconcileResult reconcileForPulumi(
-      BboxReconciler reconciler, java.nio.file.Path worktreePath, boolean failOnError) {
+      BboxReconciler reconciler, Path worktreePath, boolean failOnError) {
     final boolean dryRun = Deployment.getInstance().isDryRun();
     return buildBboxReservationsResource(reconciler, worktreePath, dryRun, failOnError)
         .map(
@@ -46,7 +47,7 @@ public final class BboxReconcilerComponent {
    * @return summary map of reconciliation results
    */
   public static Map<String, Object> reconcileStandalone(
-      BboxReconciler reconciler, java.nio.file.Path worktreePath, boolean failOnError) {
+      BboxReconciler reconciler, Path worktreePath, boolean failOnError) {
     final BboxSecretsReader.BboxCoordinates coordinates;
     try {
       coordinates = BboxSecretsReader.readBboxCoordinates(worktreePath);
@@ -82,10 +83,7 @@ public final class BboxReconcilerComponent {
   }
 
   private static Optional<BboxReservationsResource> buildBboxReservationsResource(
-      BboxReconciler reconciler,
-      java.nio.file.Path worktreePath,
-      boolean dryRun,
-      boolean failOnError) {
+      BboxReconciler reconciler, Path worktreePath, boolean dryRun, boolean failOnError) {
     final BboxSecretsReader.BboxCoordinates coordinates;
     try {
       coordinates = BboxSecretsReader.readBboxCoordinates(worktreePath);

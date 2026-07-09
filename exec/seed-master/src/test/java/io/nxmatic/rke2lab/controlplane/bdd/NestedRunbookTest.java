@@ -22,6 +22,7 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
@@ -234,7 +235,7 @@ class NestedRunbookTest {
         new ResourceManager(),
         new OutputBuilder(),
         message -> {},
-        io.nxmatic.rke2lab.pipeline.OnFailure.noop(),
+        OnFailure.noop(),
         consultations);
   }
 

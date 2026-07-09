@@ -64,15 +64,15 @@ public class ClusterReadinessScenario
   // The doctor consultations the run raised on a failing phase, harvested by the front-door into
   // the
   // envelope alongside the runbook. Empty when every phase passed (a healthy run consults no one).
-  private static final AtomicReference<List<io.nxmatic.rke2lab.seed.broker.port.Document>>
-      LAST_CONSULTATIONS = new AtomicReference<>(List.of());
+  private static final AtomicReference<List<Document>> LAST_CONSULTATIONS =
+      new AtomicReference<>(List.of());
 
   static ReportModel lastRunbook() {
     return Objects.requireNonNull(
         LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
   }
 
-  static List<io.nxmatic.rke2lab.seed.broker.port.Document> lastConsultations() {
+  static List<Document> lastConsultations() {
     return LAST_CONSULTATIONS.get();
   }
 

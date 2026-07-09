@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.StepModel;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
@@ -166,7 +167,7 @@ class ClusterReadinessScenarioInContainerTest {
   /** The scenario's narrated lines, joined — what the operator reads in the runbook. */
   private static String narrationOf(ReportModel runbook) {
     return runbook.getScenarios().get(0).getScenarioCases().get(0).getSteps().stream()
-        .map(com.tngtech.jgiven.report.model.StepModel::getCompleteSentence)
+        .map(StepModel::getCompleteSentence)
         .reduce("", (a, b) -> a + "\n" + b);
   }
 

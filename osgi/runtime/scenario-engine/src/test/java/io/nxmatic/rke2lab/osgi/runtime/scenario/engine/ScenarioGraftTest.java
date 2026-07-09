@@ -12,6 +12,7 @@ import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -88,8 +89,7 @@ class ScenarioGraftTest {
    * {@code Scenario.create}, not the JUnit runner). {@code finished()} throws on the failing path
    * but has already flushed the FAILED scenario into the model, so it is swallowed.
    */
-  private static <T extends Stage<T>> ReportModel play(
-      Class<T> stageType, java.util.function.Consumer<T> body) {
+  private static <T extends Stage<T>> ReportModel play(Class<T> stageType, Consumer<T> body) {
     final ReportModel model = new ReportModel();
     model.setClassName(stageType.getSimpleName());
     final Scenario<T, T, T> scenario = Scenario.create(stageType);

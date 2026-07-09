@@ -28,20 +28,14 @@ import java.util.function.Consumer;
  */
 public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
 
-  private final ControlplanePolicy policy;
-  private final SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus;
-  private final ClusterReadinessContact contact;
-  private final Consumer<String> logger;
+  private final ClusterBootstrapReadinessVerifier verifier;
 
   public LiveClusterReadinessProbe(
       ControlplanePolicy policy,
       SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
       ClusterReadinessContact contact,
       Consumer<String> logger) {
-    this.policy = policy;
-    this.runtimeStatus = runtimeStatus;
-    this.contact = contact;
-    this.logger = logger;
+    this.verifier = new ClusterBootstrapReadinessVerifier(contact, policy, runtimeStatus, logger);
   }
 
   @Override
@@ -49,21 +43,12 @@ public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
     return switch (phase) {
       case KUBECONFIG_PUBLISHED ->
           toObservation(
-              phase,
-              ClusterBootstrapReadinessVerifier.checkKubeconfigPublished(
-                  config, runtimeStatus, logger),
-              SymptomKind.KUBECONFIG_MISSING);
+              phase, verifier.checkKubeconfigPublished(config), SymptomKind.KUBECONFIG_MISSING);
       case API_READY ->
-          toObservation(
-              phase,
-              ClusterBootstrapReadinessVerifier.checkApiReady(config, contact, logger),
-              SymptomKind.API_NOT_READY);
+          toObservation(phase, verifier.checkApiReady(config), SymptomKind.API_NOT_READY);
       case CONTROLLERS_EFFECTIVE ->
           toObservation(
-              phase,
-              ClusterBootstrapReadinessVerifier.checkControllersEffective(
-                  config, contact, policy, logger),
-              SymptomKind.CONTROLLER_NOT_READY);
+              phase, verifier.checkControllersEffective(config), SymptomKind.CONTROLLER_NOT_READY);
     };
   }
 
