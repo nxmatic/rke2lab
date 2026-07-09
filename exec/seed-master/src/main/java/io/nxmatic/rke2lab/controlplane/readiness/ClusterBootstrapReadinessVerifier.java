@@ -4,8 +4,6 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rke2lab.controlplane.resources.SeedNodeBootstrapWatcher;
-import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,9 +19,10 @@ import java.util.function.Consumer;
  * Deterministic bootstrap readiness verification.
  *
  * <p>An INSTANCE holds the collaborators a readiness run reasons with — the cluster contact, the
- * bootstrap policy, the systemd runtime-status snapshot, and the progress logger — so the per-phase
- * checks and their retry waiters read them as fields instead of threading them through every call.
- * Checks in canonical order:
+ * bootstrap policy, and the progress logger — so the per-phase checks and their retry waiters read
+ * them as fields instead of threading them through every call. The reasoning is systemd-free: the
+ * seed-node bootstrap gate is a host concern the caller runs before the kubeconfig phase. Checks in
+ * canonical order:
  *
  * <ol>
  *   <li>kubeconfig is published at expected host path.
@@ -44,17 +43,12 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private final ClusterReadinessContact contact;
   private final ControlplanePolicy policy;
-  private final SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus;
   private final Consumer<String> logger;
 
   public ClusterBootstrapReadinessVerifier(
-      ClusterReadinessContact contact,
-      ControlplanePolicy policy,
-      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
-      Consumer<String> logger) {
+      ClusterReadinessContact contact, ControlplanePolicy policy, Consumer<String> logger) {
     this.contact = contact;
     this.policy = policy;
-    this.runtimeStatus = runtimeStatus;
     this.logger = logger;
   }
 
@@ -62,27 +56,14 @@ public final class ClusterBootstrapReadinessVerifier {
    * One readiness phase checked in isolation — the per-phase seam the BDD checkpoint plays against
    * (a live {@code ClusterReadinessProbe} maps this to an {@code ObservationView}). The verifier
    * stays free of any {@code bdd} types (no package cycle).
+   *
+   * <p>This phase is now a pure kubeconfig poll: the seed-node systemd/bootstrap gate that used to
+   * precede it (phase-0) is a host, systemd-domain concern and lives in the caller, not here — so
+   * this reasoning carries no systemd type and can descend to the cluster domain.
    */
   public PhaseOutcome checkKubeconfigPublished(BootstrapConfig config) {
-    // Phase-0 gate (preserved from the former verify()): the seed node's systemd/bootstrap
-    // preconditions must converge before the kubeconfig can appear. Folded into the first
-    // phase so the live ordering is unchanged.
-    final Duration timeout = config.readinessTimeout();
-    if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
-        config,
-        runtimeStatus,
-        new SeedNodeBootstrapWatcher.WaitConfig(timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL),
-        logger)) {
-      return new PhaseOutcome(
-          false,
-          "seed node bootstrap gate did not converge (systemd jobs/services + rke2"
-              + " preconditions) for "
-              + config.nodeName()
-              + " in project "
-              + config.incusProject());
-    }
     final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
-    final boolean ok = waitForKubeconfigPublished(kubeconfigPath, timeout);
+    final boolean ok = waitForKubeconfigPublished(kubeconfigPath, config.readinessTimeout());
     return new PhaseOutcome(
         ok,
         ok
