@@ -85,17 +85,38 @@ check is trivial kubeconfig!=null); (2) the policy→controllers projection (hos
 cluster-bdd uses List.of() = vacuously effective); (3) VerificationResult production + graph handoff
 (cluster-bdd emits RunbookEnvelope, no VerificationResult).
 
-**The 7 fibers, in safe cut order (1-5 = strate-1 foundation, mechanical, each drops one import; 6-7 =
-strate-2 business, depend on the graft being wired into the host pipeline):**
-1. Cut SeedLog from the verifier (inject logger only).
-2. Split the kubeconfig-published phase from the systemd-bootstrap gate (systemd gate stays host).
-3. Move the policy→List<ControllerRef> projection OUT of the verifier (host projects, domain reasons
-   over refs). THE load-bearing cut — controller-catalog knowledge is what says "this is domain."
-4. Narrow BootstrapConfig to a small port-owned readiness input {kubeconfigPath, timeout, nodeName}.
-5. Relocate the now-pure verifier reasoning into cluster-core; VerificationResult stays host.
-6. Migrate the 3 live gaps into cluster-bdd's scenario (systemd ordering, real controller set, wait
-   loops) to reach live parity.
-7. Delete the host avant (bdd/ClusterReadinessScenario/Stage/Probe/Live+Simulated) once the host
-   consumes the cluster-bdd graft (ClusterBddScenarios.run()) instead — keep only the pulumi-irreducible
-   ClusterReadinessResource + ReadinessOutputMapper + VerificationResult + broker sow/graft. Today the
-   graft is exercised only by ClusterReadinessScenarioInContainerTest, not by ResourceCreationPipeline.
+**The fibers, in safe cut order. REVISED 2026-07-09 (fibers 1-4 SHIPPED; fiber 5 collapses into
+strate 2 — see below). 1-4 = strate-1 foundation, mechanical, each drops one host import; the rest =
+strate-2 business, depend on the graft being wired into the host pipeline:**
+
+1. ✅ SHIPPED (c17dbb063) Cut SeedLog from the verifier + static→instance (fields, not threaded).
+2. ✅ SHIPPED (4b575c0ff) Split the kubeconfig poll from the systemd-bootstrap gate — the gate moved
+   UP into LiveClusterReadinessProbe (host); verifier lost runtimeStatus + 2 systemd imports.
+3. ✅ SHIPPED (91add82f1) THE load-bearing cut: the `policy→List<ControllerRef>` projection OUT of the
+   verifier into RequiredControllers.from(policy) (host); verifier lost ControlplanePolicy.
+4. ✅ SHIPPED (492870c5f) Narrow BootstrapConfig → cluster-port record ReadinessInput
+   {kubeconfigPath, timeout}; verifier lost its LAST host import. It now depends only on cluster-port
+   (ClusterReadinessContact, ControllerRef, ReadinessInput) — READY to descend, but not descended.
+
+**Fiber 5 was mis-scoped and is CANCELLED as a standalone step (2026-07-09).** The plan said "relocate
+the pure verifier reasoning into cluster-core." But: (a) cluster-core is SEALED (0 export, crosses only
+as the ClusterSpecialist service) and NEITHER seed-master NOR cluster-bdd depends on it — both know
+only cluster-port. So a reasoning class in cluster-core is unreachable by its intended consumers.
+(b) The point-in-time reasoning ALREADY EXISTS in cluster-bdd's ClusterReadinessScenario (the "après"),
+today as a STUB — kubeconfig!=null (trivial), controllers=List.of() (vacuously ready). The host verifier
+is the "avant" holding the REAL logic (rich NIO kubeconfig check, projected controllers, retry loops).
+This avant/après pair is NOT duplication-to-unify-now — it is the expected transitional state (the "3
+live gaps" of the cluster scan). Making the dying host depend on cluster-core just before deleting it
+would be throwaway coupling. So the "relocate" IS strate-2 fiber 6 (fill the gaps in cluster-bdd), not a
+separate mechanical cut. Strate 1c's real achievement = fibers 1-4: the verifier is cluster-port-only,
+ready. (A premature ClusterReadinessReasoning in cluster-core was created then removed — don't recreate
+it; the reasoning's home is cluster-bdd's scenario, reached in strate 2.)
+
+**Strate-2 fibers (the descent proper):**
+6. Migrate the 3 live gaps into cluster-bdd's scenario (systemd ordering, real controller set via the
+   projected refs, the rich kubeconfig check + wait loops) to reach live parity with the host avant.
+7. Delete the host avant (bdd/ClusterReadinessScenario/Stage/Probe/Live+Simulated + the verifier's
+   reasoning half) once the host consumes the cluster-bdd graft (ClusterBddScenarios.run()) instead —
+   keep only the pulumi-irreducible ClusterReadinessResource + ReadinessOutputMapper +
+   VerificationResult + RequiredControllers (host projection) + broker sow/graft. Today the graft is
+   exercised only by ClusterReadinessScenarioInContainerTest, not by ResourceCreationPipeline.
