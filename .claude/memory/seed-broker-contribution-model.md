@@ -128,18 +128,31 @@ runtime twin of `RecordSchemaProjector` (which already projects a record's compo
 build time, gate-guarded): same "read the record's components", now to derive storage slots instead of
 schema. Not a new model — a build-time principle runtime-ified.
 
-**Roles decided (user: "chacun son rôle", deterministic — 2026-07-09):**
+**Roles decided (user: "chacun son rôle", deterministic — 2026-07-09; CORRECTED same day — the frontier
+does NOT reflect locally, it ASKS the broker):** the user caught that reflecting AT the frontier would
+make it HOLD the seam class — the very tie to remove. Introspection here is the SAME "ask the broker"
+mechanism (the final key applied to the Pulumi frontier too): "what are the storage slots of coordinate
+X?" is a `sow` at a META-coordinate. REFLECTION lives where the CLASS lives (OSGi-side).
 
 + the DOMAIN *declares*: a component-level marker (the field-level analogue of `@DocumentContract`) on the
   wire-record components that are addressable storage slots (the "outputs"). Doctor declares WHICH fields
   are persistable — never WHERE/HOW Pulumi stores them.
-+ the FRONTIER *executes*: reads the marked components reflectively, routes each slot under a Pulumi key =
-  the component name, transports the rest opaque. Knows no domain, hardcodes no name.
-+ Rejected: the convention "`List<…>` component = aggregated slot". Too implicit (a future non-output list
-  would break it) — against the user's determinism discipline. Explicit marker, gate-guardable like
-  SCHEMA_CONCORD, is the chosen shape. NOT exposed on the SeedHandler interface (that would put storage
-  vocabulary back into the domain contract — the leak displaced, not removed; the handler stays
-  `Document → Document`, backend-blind).
++ the META-HANDLER *reflects*: reads the marked components OSGi-side (its realm holds the wire-record
+  class), answers the slot names as a Document (Strings). The runtime twin of `RecordSchemaProjector`,
+  but OSGi-side, not at the frontier.
++ the FRONTIER *asks + executes*: `sow(slots, {coordinate})`, then routes each returned slot NAME to a
+  Pulumi key = that name, transports the rest opaque. Holds NO wire-record class, hardcodes NO name.
++ This satisfies BOTH constraints at once: Pulumi never transpires into the domain (marker + reflection
+  OSGi-side), AND the host holds no class (true from PALIER 2, not only palier 3 — the frontier only
+  asks). ONE mechanism (ask the broker), two application points (Pulumi frontier, then sowing) — no
+  throwaway local reflection.
++ Rejected: the frontier reflecting locally (it would hold the seam class); the convention "`List<…>`
+  component = aggregated slot" (too implicit, against determinism); the marker on SeedHandler (storage
+  vocabulary back in the domain contract — the handler stays `Document → Document`, backend-blind).
++ In-JVM note (user, 2026-07-09): `sow` passes the Document BY REFERENCE (no copy) — but only the NEUTRAL
+  `Document` (record of Strings, immutable, same classloader both sides) crosses; the `String payload` is
+  the wall that stops any typed wire-record reference from crossing realms. Introspection answers are
+  Strings (slot names), so no wire-record class crosses even there.
 
 This is the concrete resolution of nature-2 AND the bridge between the two fronts (doctor contribution +
 introspection). Sequence unchanged: socle first (Coordinate→interface + doctor-broker-port), THEN this

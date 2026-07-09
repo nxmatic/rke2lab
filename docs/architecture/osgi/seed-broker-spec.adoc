@@ -497,17 +497,27 @@ model. `Patient(org,project,stack)` = a stack; `Visit(version,when,…)` = a sta
 The two-key split is not a Pulumi need nor legacy — it is `Visit`'s own two lists (`reports` +
 `expectations`). Pulumi merely REALIZES that shape.
 
-So the frontier stops decoding-and-sorting and INTROSPECTS instead — the runtime twin of the build-time
-`RecordSchemaProjector` (which already projects a record's components → JSON Schema). Roles, decided
-deterministically: the DOMAIN *declares* a component-level marker (the field analogue of
-`@DocumentContract`) on the wire-record components that are addressable storage slots; the FRONTIER
-*executes* — reads the marked components reflectively and routes each under a Pulumi key = the component
-NAME, transporting the rest opaque. `SeedBrokerCatalog` + both `OUTPUT_KEY` die; the frontier names
-nothing in hard code. Rejected: the convention "a `List` component is a slot" (too implicit — a future
-non-output list would break it, against the determinism discipline); and putting the marker on
-`SeedHandler` (that re-introduces storage vocabulary into the domain contract — the handler stays
+So the frontier stops decoding-and-sorting — but it does NOT reflect on the wire-record itself (that
+would make it HOLD the seam class, the tie § <<contribution-and-opacity>> removes). Introspection here
+is the SAME "ask the broker" mechanism: "what are the storage slots of coordinate X?" is a `sow` at a
+META-coordinate. The REFLECTION happens OSGi-side, in the meta-handler, where the wire-record's class is
+loaded (its own realm) and the marker is declared — the runtime twin of the build-time
+`RecordSchemaProjector`. Roles, decided deterministically (reflection lives where the class lives): the
+DOMAIN *declares* a component-level marker (the field analogue of `@DocumentContract`) on the wire-record
+components that are addressable storage slots; the META-HANDLER *reflects* those components OSGi-side;
+the FRONTIER *asks* (the meta-coordinate `sow`) and *executes* — routes each returned slot name under a
+Pulumi key = that NAME, transporting the rest opaque. This satisfies BOTH constraints at once: Pulumi
+never transpires into the domain (marker + reflection are OSGi-side), AND the host holds no wire-record
+class (true from this palier, since the frontier only asks). `SeedBrokerCatalog` + both `OUTPUT_KEY` die;
+the frontier names nothing in hard code. It is ONE mechanism (ask the broker), applied first here (the
+Pulumi frontier), then generalized to sowing — no throwaway local reflection. Rejected: the frontier
+reflecting locally (holds the class); the convention "a `List` component is a slot" (too implicit — a
+future non-output list would break it, against the determinism discipline); putting the marker on
+`SeedHandler` (re-introduces storage vocabulary into the domain contract — the handler stays
 `Document → Document`, backend-blind). Open at realization: the marker's name (storage-NEUTRAL —
-"addressable slot", never "pulumi output", so foundation carries no Pulumi word) and its home.
+"addressable slot", never "pulumi output", so foundation carries no Pulumi word) and its home; the
+meta-coordinate's name + who serves it (the broker, or a foundation handler reflecting each domain's
+markers).
 
 == The boot pipeline — GROUND / GATEWAY / APPLY
 
