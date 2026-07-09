@@ -7,7 +7,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
-import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
+import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
 import java.util.Map;
 import java.util.function.Consumer;
 

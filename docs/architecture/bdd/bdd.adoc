@@ -508,7 +508,7 @@ form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological g
 * link:../osgi/jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — jGiven already runs as an OSGi bundle
   (`pipeline-jgiven`) and the JUnit launcher already runs in-container (`InContainerJUnitRunner`); the
   substrate this spec puts the engine on.
-* link:../osgi/world-gateway-spec.adoc[World gateway] — the `Document` +
+* link:../osgi/seed-broker-spec.adoc[World gateway] — the `Document` +
   `consult(Document)` seam the cross-world scenario graft (E10) reuses.
 * link:../osgi/pulumi-edge-handoff.adoc[pulumi-edge] — the host edge where the output SPI, registry, and the
   Pulumi-bound preview trigger live.

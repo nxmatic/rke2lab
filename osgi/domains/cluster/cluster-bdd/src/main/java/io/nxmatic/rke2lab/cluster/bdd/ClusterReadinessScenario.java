@@ -13,14 +13,14 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
-import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
-import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Domain;
+import io.nxmatic.rke2lab.seed.broker.port.ObservationWire;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessCheckpoint;
+import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
@@ -64,7 +64,7 @@ public class ClusterReadinessScenario
   // The doctor consultations the run raised on a failing phase, harvested by the front-door into
   // the
   // envelope alongside the runbook. Empty when every phase passed (a healthy run consults no one).
-  private static final AtomicReference<List<io.nxmatic.rke2lab.world.gateway.port.Document>>
+  private static final AtomicReference<List<io.nxmatic.rke2lab.seed.broker.port.Document>>
       LAST_CONSULTATIONS = new AtomicReference<>(List.of());
 
   static ReportModel lastRunbook() {
@@ -72,7 +72,7 @@ public class ClusterReadinessScenario
         LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
   }
 
-  static List<io.nxmatic.rke2lab.world.gateway.port.Document> lastConsultations() {
+  static List<io.nxmatic.rke2lab.seed.broker.port.Document> lastConsultations() {
     return LAST_CONSULTATIONS.get();
   }
 

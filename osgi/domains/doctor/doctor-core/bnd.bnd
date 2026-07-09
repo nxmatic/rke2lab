@@ -21,7 +21,7 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=doctor
 # the @Component, so it is not hand-declared here.)
 Service-Component: OSGI-INF/*.xml
 # gateway-document-codec is a dual-realm library bundle (embed; type=library) — imported here like
-# jackson (bnd emits the Import-Package for io.nxmatic.rke2lab.world.gateway.codec from the bytecode
+# jackson (bnd emits the Import-Package for io.nxmatic.rke2lab.seed.broker.codec from the bytecode
 # that uses DocumentCodec). It is staged as its own bundle AND kept flat host-side; no longer nested.
 # JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
 # RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package

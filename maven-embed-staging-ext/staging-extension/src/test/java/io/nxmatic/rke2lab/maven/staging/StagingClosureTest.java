@@ -118,15 +118,15 @@ class StagingClosureTest {
             "io.nxmatic.rke2lab",
             "doctor-core",
             "model",
-            "io.nxmatic.rke2lab.world.gateway.port",
+            "io.nxmatic.rke2lab.seed.broker.port",
             "io.nxmatic.rke2lab.doctor");
     final ResolvedBundle seam =
         bundle(
             "io.nxmatic.rke2lab",
-            "world-gateway",
+            "seed-broker-port",
             "seam",
             null,
-            "io.nxmatic.rke2lab.world.gateway.port");
+            "io.nxmatic.rke2lab.seed.broker.port");
     final StagingClosure closure = StagingClosure.compute(List.of(model, seam));
     assertTrue(closure.realmLibraryGas().isEmpty(), "a seam is host-flat, never a realm library");
   }

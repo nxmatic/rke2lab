@@ -71,7 +71,7 @@
          bundles) at runtime. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>world-gateway</artifactId>
+      <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
@@ -79,7 +79,7 @@
          the fragment resolves it through the host at runtime — compile-only here, like the seam. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>gateway-document-codec</artifactId>
+      <artifactId>seed-broker-codec</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>

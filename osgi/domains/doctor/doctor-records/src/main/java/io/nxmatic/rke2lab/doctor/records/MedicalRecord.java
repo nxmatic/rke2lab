@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;

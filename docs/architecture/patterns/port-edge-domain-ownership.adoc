@@ -193,7 +193,7 @@ loading its own. That shared-export boundary is the *seam*.
 [NOTE]
 ====
 *Conceived evolution (seed-broker).* This "every port is a seam" law describes today. The
-link:../osgi/world-gateway-spec.adoc[seed-broker design] § "One seam only" reframes it: once the host
+link:../osgi/seed-broker-spec.adoc[seed-broker design] § "One seam only" reframes it: once the host
 speaks ONLY to the broker, the domain `-port`s stop being inter-WORLD seams and become inter-DOMAIN
 APIs (consumed inside OSGi, never host-side). In the conceived end-state the ONLY `type=seam` is
 `seed-broker`; a `-port` sheds `type=seam` when zero host files import it. The mechanics below are

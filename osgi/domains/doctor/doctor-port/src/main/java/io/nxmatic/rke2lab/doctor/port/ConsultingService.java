@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
 import java.util.Optional;
 
 /**

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.List;
 
 /**

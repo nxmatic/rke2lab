@@ -7,7 +7,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
  * SeedSystemdAdapterEndpointGate::ensureReachable}); tests inject a fake. It returns an {@link
  * ObservationView}: the host-flat captured snapshot, carrying a {@code status} ({@code "ok"} when
  * reachable), a human {@code summary}, and — on a non-ok result — the typed {@link
- * io.nxmatic.rke2lab.world.gateway.port.SymptomKind} the doctor routes on. The view's {@link
+ * io.nxmatic.rke2lab.seed.broker.port.SymptomKind} the doctor routes on. The view's {@link
  * ObservationView#toOutputMap()} flows downstream into {@code SystemdAdapterResource} and, at the
  * consult boundary, into the checkpoint Document.
  */

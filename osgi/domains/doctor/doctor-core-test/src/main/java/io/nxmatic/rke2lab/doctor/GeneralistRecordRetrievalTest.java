@@ -17,7 +17,7 @@ import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

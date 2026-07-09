@@ -7,7 +7,7 @@ import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.List;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;

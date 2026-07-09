@@ -6,7 +6,7 @@ import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.List;
 import java.util.function.Consumer;
 

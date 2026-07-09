@@ -117,11 +117,11 @@ The two-spaces seam is also a *vocabulary* seam. The same real-world thing is na
 each world, on purpose: the OSGi world speaks the *diagnostic* model, the host world speaks the
 *stack* model, and they never share a type. They meet only at a serialized `Document(domain,
 coordinate, payload)`. The stage column names where the host pipeline handles each pairing *today*
-(read from the code) — a maintenance map for the link:osgi/world-gateway-spec.adoc[seed-broker design].
+(read from the code) — a maintenance map for the link:osgi/seed-broker-spec.adoc[seed-broker design].
 
 [NOTE]
 ====
-The seam's CONCEIVED form (link:osgi/world-gateway-spec.adoc[seed-broker design]) reframes this
+The seam's CONCEIVED form (link:osgi/seed-broker-spec.adoc[seed-broker design]) reframes this
 vocabulary meeting as a broker: a client sows a seed (a request `Document`) and the seed-broker sows it
 at the right place, the host↔OSGi world-crossing being a broker-internal detail. Today the crossing is
 N shared `Document→Document` service interfaces (`ConsultingService`, `ReadinessAuthority`,
@@ -173,7 +173,7 @@ this design implies is drawn in the link:atlas/doctor.adoc[doctor L1] view.
 
 === Does it hold? — the seed-broker is additive (a foundation integrating worlds + domains)
 
-The seed-broker (link:osgi/world-gateway-spec.adoc[design]) is a NEW model of the frontier, so the
+The seed-broker (link:osgi/seed-broker-spec.adoc[design]) is a NEW model of the frontier, so the
 atlas owes it the additivity test — and it lands HERE, at L0, because the broker is not a subsystem: it
 is a `foundation` that INTEGRATES on two axes. (1) Between the two WORLDS — the host↔OSGi inter-space
 seam. (2) Between the DOMAINS — it routes by `coordinate`, and the coordinates span doctor + cluster +

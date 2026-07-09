@@ -1,13 +1,13 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
-import io.nxmatic.rke2lab.world.gateway.port.VisitWire;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Domain;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.SeedBrokerCatalog;
+import io.nxmatic.rke2lab.seed.broker.port.VisitWire;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -133,17 +133,17 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
    * The opaque {@code visit} Document for one history entry: the entry's version + when plus the
    * raw consultation-report and expectation output blobs, harvested by {@code
    * StackSnapshot.outputsNamed} (the Pulumi output KEYS the resources wrote under — a host-internal
-   * transport concern, hence still {@code WorldGatewayCatalog} names, not {@code VisitWire}
-   * fields). The blob lists keep their exact per-resource shape; the host never parses them — it
-   * renders the whole {@link VisitWire} through the codec.
+   * transport concern, hence still {@code SeedBrokerCatalog} names, not {@code VisitWire} fields).
+   * The blob lists keep their exact per-resource shape; the host never parses them — it renders the
+   * whole {@link VisitWire} through the codec.
    */
   private Document visitDocument(StackHistory.Entry entry, StackSnapshot snapshot) {
     final VisitWire visit =
         new VisitWire(
             entry.version(),
             entry.when(),
-            snapshot.outputsNamed(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT),
-            snapshot.outputsNamed(WorldGatewayCatalog.FIELD_EXPECTATIONS));
+            snapshot.outputsNamed(SeedBrokerCatalog.FIELD_CONSULTATION_REPORT),
+            snapshot.outputsNamed(SeedBrokerCatalog.FIELD_EXPECTATIONS));
     return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), codec.encode(visit));
   }
 }

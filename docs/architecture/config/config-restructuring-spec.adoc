@@ -800,7 +800,7 @@ extend their capabilities dynamically — contributing a domain as a bundle to a
 closed compiled enum cannot be extended by a peer, but a DS-collected roster of registrars
 (`@Reference(cardinality=MULTIPLE) List<InfraDomainRegistrar>`) can. This is the SAME open-vs-closed
 tension, with the same p2p driver, as the world-gateway egress roster (the "multiplexor") — see the
-link:../osgi/world-gateway-spec.adoc#open-extensibility-chantier[world-gateway planned evolution]. Both
+link:../osgi/seed-broker-spec.adoc#open-extensibility-chantier[world-gateway planned evolution]. Both
 open the contributor set; both are scheduled with the unitrepo peer-to-peer work, not before. The open
 registrar design in this spec is PRESERVED as that future direction.
 

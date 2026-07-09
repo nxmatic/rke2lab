@@ -9,7 +9,7 @@ import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;

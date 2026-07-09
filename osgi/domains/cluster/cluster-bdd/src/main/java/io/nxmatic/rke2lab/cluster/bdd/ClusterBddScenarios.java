@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.cluster.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
 import java.util.List;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;

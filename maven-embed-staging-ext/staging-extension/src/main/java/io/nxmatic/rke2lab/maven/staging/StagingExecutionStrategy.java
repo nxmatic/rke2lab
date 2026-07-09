@@ -291,19 +291,19 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
 
     // ---- SCHEMA_CONCORD: every Document coordinate has a wire-record whose projected schema is
     // meta-schema-valid (records-as-contract; the record's components ARE the schema) ----
-    // The world-gateway seam is system-exported (type=seam), so it is in `resolved` with the seam
+    // The seed-broker seam is system-exported (type=seam), so it is in `resolved` with the seam
     // marker — NOT in closure.staged(); find it by the export package it owns.
     ResolvedBundle worldGatewayBundle = null;
     for (ResolvedBundle b : resolved) {
       if (b.embed().map(EmbedCapability::isSeam).orElse(false)
-          && b.exports().names().contains("io.nxmatic.rke2lab.world.gateway.port")) {
+          && b.exports().names().contains("io.nxmatic.rke2lab.seed.broker.port")) {
         worldGatewayBundle = b;
         break;
       }
     }
 
     if (worldGatewayBundle != null) {
-      // The world-gateway seam carries both the Coordinate enum and the wire-records; index the
+      // The seed-broker seam carries both the Coordinate enum and the wire-records; index the
       // coordinate slugs and the @DocumentContract-carrying records from its class entries, and
       // resolve nested wire-record / seam-enum bytes by internal name over the same bundle.
       final Map<String, byte[]> gatewayBytes = new LinkedHashMap<>();

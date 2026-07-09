@@ -26,7 +26,7 @@
       <artifactId>osgi.core</artifactId>
     </dependency>
     <!-- provided: the fragment resolves these through the doctor-core host at runtime (this is the
-         compile-time view only). doctor-port for ConsultingService; world-gateway for the seam verbs
+         compile-time view only). doctor-port for ConsultingService; seed-broker-port for the seam verbs
          + value records (ReadinessAuthority, Document, Consultation, ReadinessVerdict); the codec to
          (de)serialize the Document payloads (nested in the doctor-core host bundle). -->
     <dependency>
@@ -37,13 +37,13 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>world-gateway</artifactId>
+      <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>gateway-document-codec</artifactId>
+      <artifactId>seed-broker-codec</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>

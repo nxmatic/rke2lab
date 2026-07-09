@@ -40,7 +40,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>world-gateway</artifactId>
+      <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The gateway document codec: a dual-realm library bundle (embed; type=library). doctor-core
@@ -49,7 +49,7 @@
          jackson — one source, two realm copies, jackson's own treatment. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>gateway-document-codec</artifactId>
+      <artifactId>seed-broker-codec</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- jackson as a real bundle dependency: the gateway seam carries a serialized JSON String, so

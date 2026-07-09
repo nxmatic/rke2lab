@@ -4,7 +4,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.incus.port.IncusExecRequest;
 import io.nxmatic.rke2lab.incus.port.IncusInstanceContact;
-import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
+import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;

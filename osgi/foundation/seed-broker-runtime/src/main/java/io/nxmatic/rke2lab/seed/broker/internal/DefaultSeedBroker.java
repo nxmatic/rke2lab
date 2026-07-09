@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.seed.broker.internal;
 
-import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.SeedBroker;
-import io.nxmatic.rke2lab.world.gateway.port.SeedHandler;
+import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
+import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;

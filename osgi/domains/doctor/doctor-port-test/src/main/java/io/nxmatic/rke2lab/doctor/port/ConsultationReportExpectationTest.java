@@ -16,7 +16,7 @@ import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

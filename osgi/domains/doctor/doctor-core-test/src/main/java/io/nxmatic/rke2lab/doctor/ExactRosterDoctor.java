@@ -13,7 +13,7 @@ import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

@@ -248,11 +248,11 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The world-gateway seam: Document + SeedBroker. The stage sows a checkpoint Document through
+    <!-- The seed-broker seam: Document + SeedBroker. The stage sows a checkpoint Document through
          the broker and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>world-gateway</artifactId>
+      <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The document codec: JSON (de)serialization + validation for Document payloads. Shaded flat
@@ -261,7 +261,7 @@
          realm-specific copies, no codec type crosses the seam. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>gateway-document-codec</artifactId>
+      <artifactId>seed-broker-codec</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The seed-broker mechanism (embed type=runtime): the DefaultSeedBroker @Component that

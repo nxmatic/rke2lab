@@ -8,7 +8,7 @@ import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

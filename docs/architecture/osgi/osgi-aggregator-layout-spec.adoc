@@ -440,7 +440,7 @@ dans le transport, pas dans le port.
 Empreinte du renommage (mesurée — c'est une spec, non exécutée) : au-delà du
 dossier, le package `io.nxmatic.rke2lab.gateway.port` → `…world.gateway.port`
 (8 types : `Document`, `Coordinate`, `Domain`, `Action`, `SymptomKind`,
-`ReadinessAuthority`, `GatewayCatalog`→`WorldGatewayCatalog`, `package-info`) et
+`ReadinessAuthority`, `GatewayCatalog`→`SeedBrokerCatalog`, `package-info`) et
 ~11 fichiers consommateurs (doctor-core/-port/-test, exec/seed-master) suivent le
 nom retenu. Le `<artifactId>` `gateway-port`→`world-gateway` (l'agrégateur
 `gateway` est supprimé, le bundle remonte d'un cran) ; ses consommateurs Maven

@@ -8,10 +8,10 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
-import io.nxmatic.rke2lab.world.gateway.port.Consultation;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.port.Consultation;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
-import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
+import io.nxmatic.rke2lab.seed.broker.port.ObservationWire;
+import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;

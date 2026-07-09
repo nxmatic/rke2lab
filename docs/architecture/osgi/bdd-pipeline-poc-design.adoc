@@ -374,7 +374,7 @@ link:../bdd/bdd.adoc[BDD-as-engine] (le modèle BDD-as-engine y est le contenu p
   POC a prouvé la viabilité (le modèle BDD-as-engine y est le contenu primaire).
 * link:../bdd/bdd.adoc#the-avant[Pipeline spec — l'avant] — la grammaire type-state `during`/`then`
   que ce POC a remplacée, repliée là comme référence de l'avant/après.
-* link:world-gateway-spec.adoc[World gateway] — le seam `Document` +
+* link:seed-broker-spec.adoc[World gateway] — le seam `Document` +
   `consult(Document)` que l'arête cross-monde réutilise.
 * link:jgiven-osgi-testkit-handoff.adoc[jGiven-OSGi testkit] — jgiven comme bundle + le pattern
   in-container qui rend le launcher embarqué possible.

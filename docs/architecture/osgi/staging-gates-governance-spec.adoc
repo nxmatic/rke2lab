@@ -49,7 +49,7 @@ collides with the project's two *runtime* gate senses (readiness gates like
 
 | `REALM_BOUNDARY`
 | A class may reference only types REACHABLE in its own classloader realm — the build-time guard of
-  the host↔OSGi boundary the link:world-gateway-spec.adoc[world gateway] defines. The two realms:
+  the host↔OSGi boundary the link:seed-broker-spec.adoc[world gateway] defines. The two realms:
   the *flat realm* (the host exec classes + the flat dependency tail + the system-exported `type=seam`
   ports — one classloader) sees everything flat but NOT a bundle-side export; a *bundle realm* (one
   per `isDomain()` bundle: `model`/`edge`/`record`) sees its own packages + its wired
@@ -259,6 +259,6 @@ migrated to Documents.
 
 == Related documentation
 
-* link:world-gateway-spec.adoc[World gateway] — the host↔OSGi seam these bundles stage into.
+* link:seed-broker-spec.adoc[World gateway] — the host↔OSGi seam these bundles stage into.
 * link:osgi-boot-single-source-handoff.adoc[OSGi boot single-source] — the staging closure the same
   extension derives.

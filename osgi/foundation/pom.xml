@@ -13,13 +13,13 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/foundation</name>
-  <description>Compile-time shared foundation the domains build against: domain annotations, the world-gateway seam, the fluent pipeline grammar, and the jGiven wrap.</description>
+  <description>Compile-time shared foundation the domains build against: domain annotations, the seed-broker seam, the fluent pipeline grammar, and the jGiven wrap.</description>
 
   <modules>
     <module>domain-annotations</module>
-    <module>world-gateway</module>
+    <module>seed-broker-port</module>
     <module>seed-broker-runtime</module>
     <module>pipeline</module>
-    <module>gateway-document-codec</module>
+    <module>seed-broker-codec</module>
   </modules>
 </project>

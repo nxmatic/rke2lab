@@ -18,7 +18,7 @@ import io.nxmatic.rke2lab.doctor.records.SymptomHistory;
 import io.nxmatic.rke2lab.doctor.records.TreatmentEfficacy;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

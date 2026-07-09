@@ -33,7 +33,7 @@ import org.objectweb.asm.RecordComponentVisitor;
  * </ul>
  *
  * <p>Type bytes are resolved by internal name through the supplied function (the staged
- * world-gateway bundle's class entries), so nested wire-records and seam enums resolve while JDK
+ * seed-broker-port bundle's class entries), so nested wire-records and seam enums resolve while JDK
  * and opaque types do not (and become open objects).
  */
 final class RecordSchemaProjector {

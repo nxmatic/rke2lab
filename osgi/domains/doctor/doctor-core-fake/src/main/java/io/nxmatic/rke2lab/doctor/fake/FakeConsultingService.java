@@ -1,12 +1,12 @@
 package io.nxmatic.rke2lab.doctor.fake;
 
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Consultation;
-import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Consultation;
+import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Domain;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessCheckpoint;
 import java.util.List;
 import java.util.Map;
 import org.osgi.service.component.annotations.Component;

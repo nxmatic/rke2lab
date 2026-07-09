@@ -14,12 +14,12 @@ import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
-import io.nxmatic.rke2lab.world.gateway.port.Consultation;
-import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.port.Consultation;
+import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Domain;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -61,14 +61,14 @@ class ClusterReadinessScenarioInContainerTest {
           // The three seams the scenario speaks are system-exported — the boot's own posture. A
           // seam (type=seam) is shared FLAT across realms from ONE exporter, never installed as a
           // bundle, so the in-container scenario and the host read the same class (no split, no
-          // ClassCastException): cluster.port (DSL + contact), world.gateway.port (the Document
+          // ClassCastException): cluster.port (DSL + contact), seed.broker.port (the Document
           // envelope + checkpoint/observation vocabulary), doctor.port (the ConsultingService the
           // domain consults). Hand-listed here, derived automatically in the live boot — the DX
           // debt
           // tracked in the seam-gate backlog; a `withSeamsFromDiscovery()` would erase this list.
           .systemPackages(
               "io.nxmatic.rke2lab.cluster.port;version=1.0.0",
-              "io.nxmatic.rke2lab.world.gateway.port;version=1.0.0",
+              "io.nxmatic.rke2lab.seed.broker.port;version=1.0.0",
               "io.nxmatic.rke2lab.doctor.port;version=1.0.0",
               "org.slf4j;version=2.0.0")
           // The JUnit-Platform runner world (launcher + engine) the front-door drives in-container.

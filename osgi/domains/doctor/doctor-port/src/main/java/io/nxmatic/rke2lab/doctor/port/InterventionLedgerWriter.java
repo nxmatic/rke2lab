@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
 
 /**
  * The write seam for the intervention ledger — the twin of the read seam {@link

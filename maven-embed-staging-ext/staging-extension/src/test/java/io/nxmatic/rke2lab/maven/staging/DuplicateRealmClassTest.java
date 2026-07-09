@@ -31,7 +31,7 @@ class DuplicateRealmClassTest {
     final DuplicateRealmClass gate =
         new DuplicateRealmClass(
             Set.of("com.fasterxml.jackson.databind"),
-            /*seamSurface*/ Set.of("io.nxmatic.rke2lab.world.gateway.port"));
+            /*seamSurface*/ Set.of("io.nxmatic.rke2lab.seed.broker.port"));
     assertTrue(
         gate.violations(exporting("com.fasterxml.jackson.databind;version=2.22.0")).isEmpty(),
         "flat∧staged is safe when the package is not on any seam");
@@ -56,9 +56,9 @@ class DuplicateRealmClassTest {
     final DuplicateRealmClass gate =
         new DuplicateRealmClass(
             Set.of("com.fasterxml.jackson.databind"),
-            Set.of("io.nxmatic.rke2lab.world.gateway.port"));
+            Set.of("io.nxmatic.rke2lab.seed.broker.port"));
     assertTrue(
-        gate.violations(exporting("io.nxmatic.rke2lab.world.gateway.port;version=1.0.0")).isEmpty(),
+        gate.violations(exporting("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")).isEmpty(),
         "a seam-only package that is not flat is the normal OSGi path, not a duplication");
   }
 }

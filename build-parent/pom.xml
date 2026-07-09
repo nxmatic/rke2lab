@@ -394,7 +394,7 @@
               <exclusion>**/pulumi-generated-sdks/**</exclusion>
               <exclusion>**/package-info.java</exclusion>
               <!-- These two hold a DELIBERATE FQN: `implements Topic.Checkpoint` shadows the simple
-                   name Checkpoint, so the domain enum io.nxmatic.rke2lab.world.gateway.port.Checkpoint
+                   name Checkpoint, so the domain enum io.nxmatic.rke2lab.seed.broker.port.Checkpoint
                    is named fully-qualified. The recipe misses this inner-type shadow and would
                    re-shorten it into an ambiguous reference (compile error). Their only other FQNs are
                    already proper imports, so excluding them loses no coverage. -->

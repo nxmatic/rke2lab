@@ -13,7 +13,7 @@
   <name>osgi/foundation/seed-broker-runtime</name>
   <description>The ONE broker door's mechanism: DefaultSeedBroker, the @Component that collects every
     SeedHandler by Declarative Services and dispatches a seed by the WANTED coordinate. The door
-    contract (SeedBroker, SeedHandler) is the neutral world-gateway seam; this module is the grower
+    contract (SeedBroker, SeedHandler) is the neutral seed-broker seam; this module is the grower
     behind it. A foundation because the broker serves ALL domains and BOTH worlds (the dual-axis
     integrator the atlas validated). Unlike the seam it serves (system-exported, never installed),
     this is a plain @Component installed AND activated in-container (embed type=runtime): a runtime
@@ -23,7 +23,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>world-gateway</artifactId>
+      <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
     </dependency>
 

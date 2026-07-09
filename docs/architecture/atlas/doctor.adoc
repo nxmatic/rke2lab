@@ -347,7 +347,7 @@ The contract-layer transition is *consumed*: the doctor seams speak `Document`, 
 OSGi-private, and the boundary is enforced at build by `REALM_BOUNDARY` + `SCHEMA_CONCORD` (both
 `ERROR`). So the "seam speaks records → seam speaks Documents" before/after has collapsed into the
 current state, below. The reasoning and the full type/coordinate detail are in
-link:../osgi/world-gateway-spec.adoc[the world-gateway spec].
+link:../osgi/seed-broker-spec.adoc[the world-gateway spec].
 
 The one transition still LIVE is the *host side*: the residual `Severity.parse()` / `== CRITICAL` /
 `toOutputMap` sites the host must shed, and the six `<coordinate>.schema.json` files not yet authored.
@@ -357,7 +357,7 @@ NOTE: the earlier `DomainDagMultiplexor` / `DomainDagMapper` / `DomainDagAdapter
 implemented (it appears in no commit's `.java`); it was a whiteboard design, and records-as-contract
 was built INSTEAD — not a transposition of it. Its former before/after diagrams described code that
 never existed, so they are gone; what actually crosses the seam is the `Document` + per-coordinate
-reader/codec detailed in link:../osgi/world-gateway-spec.adoc[the world-gateway spec].
+reader/codec detailed in link:../osgi/seed-broker-spec.adoc[the world-gateway spec].
 
 [mermaid]
 ....

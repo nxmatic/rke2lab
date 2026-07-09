@@ -39,12 +39,12 @@
          consult the doctor and to carry the verdict. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>world-gateway</artifactId>
+      <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>gateway-document-codec</artifactId>
+      <artifactId>seed-broker-codec</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to

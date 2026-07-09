@@ -55,7 +55,7 @@ FAILED and the host's downstream steps SKIPPED (the local fail-fast, reproduced 
 verdict (`executionStatus` → the propagation). This is proven *in isolation* on the bench (a
 `URLClassLoader` realm stand-in, an in-JVM JSON round-trip); wiring it to the real embedded Felix
 (`ClusterSeedTopic.seedCluster()`) is the migration increment, not re-proof. The conceived form of this
-seam — one broker door instead of N service verbs — is link:world-gateway-spec.adoc[the seed-broker
+seam — one broker door instead of N service verbs — is link:seed-broker-spec.adoc[the seed-broker
 design].
 
 == The OSGi world is detached by design — embedded exec is a special case
@@ -167,7 +167,7 @@ form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological g
 * link:../bdd/bdd.adoc[BDD-as-engine] — the engine pattern the seed is expressed on (transverse; the
   scenario tree, the founding constraint, RunMode/PreviewExecutor, the DAG gate, the placement rule).
 * link:../atlas/seed.adoc[Seed orchestration L1 (atlas)] — the figures + verdicts view of this design.
-* link:world-gateway-spec.adoc[The seed-broker] — the conceived form of the host↔OSGi seam this spec's
+* link:seed-broker-spec.adoc[The seed-broker] — the conceived form of the host↔OSGi seam this spec's
   ownership section describes (one broker door instead of N service verbs).
 * link:engine-lifecycle-spec.adoc[engine-lifecycle] — the shipped socle (launcher, connection, lever).
 * link:pulumi-edge-handoff.adoc[pulumi-edge] — the host edge where `RunMode` sources and the stack sink

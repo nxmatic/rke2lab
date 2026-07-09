@@ -11,7 +11,7 @@ import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;

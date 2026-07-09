@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
+import io.nxmatic.rke2lab.seed.broker.port.SymptomKind;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The live gate's failure contract. {@link io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe}
  * promises a non-ok {@link io.nxmatic.rke2lab.controlplane.bdd.ObservationView} carrying the typed
- * {@link io.nxmatic.rke2lab.world.gateway.port.SymptomKind} the doctor routes on — the simulate and
+ * {@link io.nxmatic.rke2lab.seed.broker.port.SymptomKind} the doctor routes on — the simulate and
  * fake probes honor it. These tests pin the <em>live</em> gate to the same contract at its two
  * deadlines, so a real {@code pulumi up} consults the doctor instead of aborting on a bare
  * exception (which bypasses the captured observation and silences the runbook).

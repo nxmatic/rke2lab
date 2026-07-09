@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.Patient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

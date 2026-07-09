@@ -4,7 +4,7 @@ import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.world.gateway.port.InterventionWire;
+import io.nxmatic.rke2lab.seed.broker.port.InterventionWire;
 import java.util.Optional;
 
 /**

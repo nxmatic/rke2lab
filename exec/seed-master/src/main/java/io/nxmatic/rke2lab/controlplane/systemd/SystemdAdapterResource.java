@@ -4,10 +4,10 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Consultation;
-import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Consultation;
+import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedBrokerCatalog;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,10 +70,10 @@ public final class SystemdAdapterResource extends ComponentResource {
     final Consultation decoded = CODEC.decode(consultation, Consultation.class);
     if (!decoded.consultationReport().isEmpty()) {
       outputs.put(
-          WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, Output.of(decoded.consultationReport()));
+          SeedBrokerCatalog.FIELD_CONSULTATION_REPORT, Output.of(decoded.consultationReport()));
     }
     if (!decoded.expectations().isEmpty()) {
-      outputs.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, Output.of(decoded.expectations()));
+      outputs.put(SeedBrokerCatalog.FIELD_EXPECTATIONS, Output.of(decoded.expectations()));
     }
   }
 

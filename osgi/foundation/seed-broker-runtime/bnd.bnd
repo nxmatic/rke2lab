@@ -1,5 +1,5 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.seed.broker.runtime
-# Exports NOTHING: the door contract (SeedBroker, SeedHandler) is the world-gateway seam; this
+# Exports NOTHING: the door contract (SeedBroker, SeedHandler) is the seed-broker seam; this
 # bundle only IMPLEMENTS it. io.nxmatic.rke2lab.seed.broker.internal (DefaultSeedBroker) is sealed —
 # reached only through the seam service the @Component publishes.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=runtime

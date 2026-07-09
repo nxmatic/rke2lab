@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.doctor.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import org.junit.jupiter.api.Test;
 
 /**

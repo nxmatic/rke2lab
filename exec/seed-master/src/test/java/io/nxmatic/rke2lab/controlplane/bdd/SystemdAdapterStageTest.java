@@ -42,7 +42,7 @@ class SystemdAdapterStageTest {
           .withScr()
           .systemPackages(
               "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
-              "io.nxmatic.rke2lab.world.gateway.port;version=1.0.0",
+              "io.nxmatic.rke2lab.seed.broker.port;version=1.0.0",
               "io.nxmatic.rke2lab.doctor.port;version=1.0.0",
               "org.slf4j;version=2.0.0")
           .build();
