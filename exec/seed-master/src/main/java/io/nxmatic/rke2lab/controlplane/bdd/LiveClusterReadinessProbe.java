@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.cluster.port.ReadinessInput;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
@@ -51,15 +52,25 @@ public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
 
   @Override
   public ObservationView probe(BootstrapConfig config, ClusterReadinessPhase phase) {
+    final ReadinessInput input = readinessInput(config);
     return switch (phase) {
       case KUBECONFIG_PUBLISHED ->
-          toObservation(phase, kubeconfigPublished(config), SymptomKind.KUBECONFIG_MISSING);
+          toObservation(phase, kubeconfigPublished(config, input), SymptomKind.KUBECONFIG_MISSING);
       case API_READY ->
-          toObservation(phase, verifier.checkApiReady(config), SymptomKind.API_NOT_READY);
+          toObservation(phase, verifier.checkApiReady(input), SymptomKind.API_NOT_READY);
       case CONTROLLERS_EFFECTIVE ->
           toObservation(
-              phase, verifier.checkControllersEffective(config), SymptomKind.CONTROLLER_NOT_READY);
+              phase, verifier.checkControllersEffective(input), SymptomKind.CONTROLLER_NOT_READY);
     };
+  }
+
+  /**
+   * Project the host's fat config into the minimal readiness input the cluster verifier reasons
+   * over.
+   */
+  private static ReadinessInput readinessInput(BootstrapConfig config) {
+    return new ReadinessInput(
+        config.kubeconfigRef().toAbsolutePath().normalize(), config.readinessTimeout());
   }
 
   /**
@@ -67,7 +78,7 @@ public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
    * can appear; only then does the cluster verifier poll for it. Two host concerns kept in order,
    * out of the cluster reasoning.
    */
-  private PhaseOutcome kubeconfigPublished(BootstrapConfig config) {
+  private PhaseOutcome kubeconfigPublished(BootstrapConfig config, ReadinessInput input) {
     if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
         config,
         runtimeStatus,
@@ -82,7 +93,7 @@ public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
               + " in project "
               + config.incusProject());
     }
-    return verifier.checkKubeconfigPublished(config);
+    return verifier.checkKubeconfigPublished(input);
   }
 
   private static ObservationView toObservation(

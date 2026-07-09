@@ -83,6 +83,13 @@ readiness vocabulary, the wrong direction).
   holds); the doctor stops depending on cluster vocabulary.
 * `ClusterSchemaRef` — a phase↔`SchemaRef` mapping enum (the `SystemdUnitId` move): the four
   `"cluster/*/v1"` literals become typed constants, single-sourced, no name drift.
+* `ControllerRef` — one required controller (kind/name/namespace), the projected unit the readiness
+  reasoning checks; the host projects the policy into a `List<ControllerRef>`, the reasoning never
+  sees the policy.
+* `ReadinessInput` — the minimal input a readiness run reasons over ({`kubeconfigPath`, `timeout`}).
+  The host derives it from its fat bootstrap config; the cluster reasoning depends on this port
+  alone, no host type — so the verifier's per-phase checks take a `ReadinessInput`, not a
+  `BootstrapConfig`.
 
 `cluster-port` depends only on `domain-annotations` + `doctor-records` (for `Observation`/`Symptom`/
 `SchemaRef`, the doctor's value vocabulary the probe speaks). It is `type=seam`: system-exported, one

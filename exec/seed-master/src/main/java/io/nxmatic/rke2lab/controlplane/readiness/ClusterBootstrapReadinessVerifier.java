@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.controlplane.readiness;
 
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ControllerRef;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.cluster.port.ReadinessInput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -61,9 +61,9 @@ public final class ClusterBootstrapReadinessVerifier {
    * precede it (phase-0) is a host, systemd-domain concern and lives in the caller, not here — so
    * this reasoning carries no systemd type and can descend to the cluster domain.
    */
-  public PhaseOutcome checkKubeconfigPublished(BootstrapConfig config) {
-    final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
-    final boolean ok = waitForKubeconfigPublished(kubeconfigPath, config.readinessTimeout());
+  public PhaseOutcome checkKubeconfigPublished(ReadinessInput input) {
+    final Path kubeconfigPath = input.kubeconfigPath();
+    final boolean ok = waitForKubeconfigPublished(kubeconfigPath, input.timeout());
     return new PhaseOutcome(
         ok,
         ok
@@ -71,17 +71,15 @@ public final class ClusterBootstrapReadinessVerifier {
             : "kubeconfig not published within timeout at " + kubeconfigPath);
   }
 
-  public PhaseOutcome checkApiReady(BootstrapConfig config) {
-    final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
-    final boolean ok = waitForApiReady(kubeconfigPath, config.readinessTimeout());
+  public PhaseOutcome checkApiReady(ReadinessInput input) {
+    final boolean ok = waitForApiReady(input.kubeconfigPath(), input.timeout());
     return new PhaseOutcome(
         ok, ok ? "kubernetes API reports readyz=ok" : "kubernetes API did not report readyz=ok");
   }
 
-  public PhaseOutcome checkControllersEffective(BootstrapConfig config) {
-    final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+  public PhaseOutcome checkControllersEffective(ReadinessInput input) {
     final ControllerVerification controllers =
-        verifyRequiredControllers(kubeconfigPath, config.readinessTimeout());
+        verifyRequiredControllers(input.kubeconfigPath(), input.timeout());
     return new PhaseOutcome(controllers.ready(), controllers.detail());
   }
 
