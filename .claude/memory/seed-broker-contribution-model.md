@@ -34,6 +34,36 @@ business content riding alongside (the consultations `List<Document>`) uses the 
 handler's own encode. So: foundation graft = domain-agnostic; domains are self-sufficient for their
 Documents.
 
+## The REST analogy, closed (user, 2026-07-09) — introspection was the missing verb
+
+Introspection was THE missing piece that left the model wobbling: everything said "one door, vocabulary
+stays in the domain", yet the client still had to know a document's SHAPE from somewhere — and while
+that shape lived in a shared compiled wire-record, the door was NOT the single source (a parallel
+channel: the compiled class = a 2nd source of truth). REST closed this long ago: a client does not
+compile the server's DTOs, it ASKS the server how to talk (`GET /` index/HATEOAS, `OPTIONS`/OpenAPI),
+over the SAME transport. Our broker gets the same verb as a META-coordinate (NOT a new method):
+`sow(available, ∅)` → coordinates actually served; `sow(shape, {coordinate:X})` → X's projected schema.
+The broker self-describes through its own door, as `OPTIONS` rides the same transport as `POST`.
+
+**Where the analogy ends — what REST does that we do not (and why it does not cost us):**
+
++ *Deferred to remote, by design* — content negotiation + schema VERSIONING. Embedded = one format, one
+  schema version (reactor guarantees the pairing); a semver mismatch only becomes possible at the remote
+  split, which the metaphor already dates. Not gaps — a dated frontier.
++ *Moot by construction, where we are SAFER than REST* — the GET-vs-POST (safe/read vs mutate)
+  distinction. Our one door `sow` does not carry it and does not need to (user, 2026-07-09): REST needs
+  the verb because over the wire NOTHING enforces a handler leaves the request untouched — `GET is safe`
+  is a CONVENTION the protocol cannot impose. Our `Document` is an IMMUTABLE record; introspection shares
+  the very same reference in-JVM, and immutability means sharing it produces no side effect — a `sow`
+  CANNOT mutate the seed it is handed, not by promise but because the TYPE forbids it. REST declares safe
+  and hopes; immutability makes violating it impossible. The read/mutate distinction REST carries in the
+  verb, we carry in the record's immutability — a STRONGER guarantee, not an absent one.
++ HATEOAS beyond index + per-coordinate schema (hypermedia state transitions) = where the metaphor
+  plateaus; YAGNI.
+
+Verdict: nothing essential is missing — REST's extras are either deferred-to-remote (planned) or
+replaced by a stronger guarantee. The analogy holds on the core; where it diverges, in our favour.
+
 ## What's missing — two builds, in dependency order
 
 **1. Coordinate → contributable (the socle, do FIRST).** Make `Coordinate` an INTERFACE (`slug()`),
