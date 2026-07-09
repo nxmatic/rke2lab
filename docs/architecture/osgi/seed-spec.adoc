@@ -20,7 +20,7 @@ figures + verdicts). This file is the seed's *design*; those are the *pattern* a
 `ScenarioModel`, grafted into the host runbook — the live jGiven object never crosses.*
 
 The pipeline is *owned by the OSGi world*; the host is a consumer. Two facts of the code already put it
-there: jGiven is already an OSGi bundle (`pipeline-jgiven`, with an in-container testkit), and the JUnit
+there: jGiven is already an OSGi bundle (`jgiven-wrap`, with an in-container testkit), and the JUnit
 launcher already runs inside embedded Felix (`InContainerJUnitRunner` drives `LauncherFactory` under
 the testkit). The bootstrap reasoning — the scenarios, the doctor consult, the readiness verification,
 the runbook — is *target-state OSGi*; it is only *stranded* in `exec/seed-master` today.
@@ -32,7 +32,7 @@ the runbook — is *target-state OSGi*; it is only *stranded* in `exec/seed-mast
 | holds | the scenarios, the jGiven session + engine, the launcher, the doctor, readiness, the
   `ReportModel` runbook | framework boot (already OSGi via `BootPipeline`), the *source* of `RunMode`,
   the stack *sink*
-| jGiven engine + launcher | *here* (`pipeline-jgiven` + `junit-testkit`) | —
+| jGiven engine + launcher | *here* (`jgiven-wrap` + `junit-testkit`) | —
 | the seam | *produces* the runbook + the output contributions | *injects* `RunMode` + Pulumi context,
   *renders* the runbook, *assembles + writes* the stack
 |===
@@ -186,10 +186,13 @@ class moved host→OSGi drops one `-port`'s host-import count toward 0.
   envelope machinery) falls out per domain.
 . *`consult` folds into the broker* — its real provider needs `HealthSystem.admit(patient)` host-side
   (a doctor-migration increment); until then it stays a `ConsultingService` verb (2 seams, not 1).
-. *kill `pipeline-port`* — LAST. The observability grammar (`Topic.Checkpoint`/`Pipeline`, `during/then`)
-  dies with the seed migration; `Topic.Execution` (manifests' value-threading synthesis, which does NOT
-  fit a scenario) survives, extracted to its own clean port. The three names — the host root, the
-  synthesis port, the surviving unit (`Topic`→`Step`?) — fix together on the extracted code.
+. *rename `pipeline-port`* — LAST. Its scenario natures `Topic.Checkpoint`/`Pipeline` are ALREADY
+  removed (2026-07-09: 0 prod implementors after the seed moved its scenarios to the broker), so
+  `Topic` is now `Topic.Execution` alone — pure value-threading, jGiven-free. What remains is a rename,
+  not a kill: `pipeline-port` IS the shared fluent DERIVATION grammar (manifests synthesis + incus
+  checksum fold — both survive, neither is a scenario). Only the fluent `during/then` orchestration of
+  the SEED dissolves, when the seed migrates. The names — the host root, the grammar port (working name
+  derivation/fold, on trial), the unit (`Topic`→`Step`?) — fix together on the stabilized code.
 
 The mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate) have their
 reference sketch pinned at tag `spike/bdd-pipeline-poc`: `DagGateSpikeTest` (the topological gate),

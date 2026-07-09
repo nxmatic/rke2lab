@@ -100,7 +100,7 @@ The contrast with the existing dispositions, all already keyed on the same `Embe
 |===
 | carrier kind | how it loads today | unchanged?
 
-| `type=seam` (world-gateway, doctor-port, manifests-port)
+| `type=seam` (seed-broker-port, doctor-port, manifests-port)
 | system-exported — ONE copy, shared host↔framework. Its reason to exist.
 | YES — seams stay shared. The seam is the membrane; sharing is its job.
 
@@ -164,7 +164,7 @@ package is exempt from `DUPLICATE_REALM_CLASS` if and only if it is absent from 
 `type=seam` bundles' exported packages.
 ____
 
-This turns the invariant "the library does not transpire into world-gateway" *into the gate's check*.
+This turns the invariant "the library does not transpire into seed-broker-port" *into the gate's check*.
 It is self-enforcing: the day someone makes a seam import jackson, that package enters the seam
 surface, loses the exemption, and the build breaks — surfacing the leak at build time, exactly as
 `REALM_BOUNDARY` surfaces a type leak. No hand-list; the exemption is *derived* from the seam
@@ -194,7 +194,7 @@ derived rule. Derivation first; hand-list only if the evidence forces it.
 * *Host side:* `seed-master` declares jackson compile-scope (shades flat — its own codec). The other
   two exec entrypoints (`netplan-cli`, `manifests-cli`) share the build-parent shade config;
   `manifests-cli` embeds `manifests-core` so the staged-bundle jackson must resolve for it too.
-* *Seam purity holds today:* none of world-gateway / doctor-port / manifests-port imports jackson —
+* *Seam purity holds today:* none of seed-broker-port / doctor-port / manifests-port imports jackson —
   the derived exemption is satisfied at the outset.
 
 == What "green" means

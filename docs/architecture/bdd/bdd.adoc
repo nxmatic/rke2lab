@@ -29,7 +29,7 @@ maintained in parallel — this is code hygiene applied to specs: one living mod
 history.
 
 *Ownership (unchanged by the turn):* the pipeline — scenarios, engine, AND the bootstrap *reasoning*
-— is owned by the *OSGi world*. jGiven is already an OSGi bundle (`pipeline-jgiven`), the JUnit launcher
+— is owned by the *OSGi world*. jGiven is already an OSGi bundle (`jgiven-wrap`), the JUnit launcher
 already runs inside embedded Felix (`InContainerJUnitRunner`). The *host* (`exec/seed-master` +
 `pulumi-edge`) is a *consumer*: it boots the framework, injects the launch context (the `RunMode`
 fact, the Pulumi output sink), and renders/writes what the OSGi world produces.
@@ -106,7 +106,7 @@ flowchart TB
     edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]:::hostc
   end
   subgraph osgi["OSGi world — describes + reasons (pure, no Pulumi/gRPC)"]
-    pipe["PIPELINE — the orchestration spine<br/>jGiven scenarios on the JUnit launcher<br/>(pipeline-jgiven embeds jGiven in its bundle)"]:::focus
+    pipe["PIPELINE — the orchestration spine<br/>jGiven scenarios on the JUnit launcher<br/>(jgiven-wrap carries jGiven)"]:::focus
     doctor["doctor<br/>consult → remediation"]:::sub
     manifests["manifests<br/>CDK8s synthesis"]:::sub
     netplan["netplan<br/>network synthesis"]:::sub
@@ -155,7 +155,7 @@ under-tested reinvention of exactly what these two already do (the "home-grown B
 alternatives were rejected for this reason — see link:../osgi/bdd-pipeline-poc-design.adoc[the POC record]).
 
 *The re-entrance / dogfooding rule.* We already run both frameworks — jGiven as an OSGi bundle
-(`pipeline-jgiven`), the JUnit launcher in-container (`InContainerJUnitRunner`) — to *test* rke2lab.
+(`jgiven-wrap`), the JUnit launcher in-container (`InContainerJUnitRunner`) — to *test* rke2lab.
 Promoting them from the test scope into the runtime scope is a *re-entrant* use of tools we already
 trust and maintain: the seeding engine is the same machinery that verifies the seeding. We eat our own
 dog food — the runtime consumes the very frameworks our testing depends on. That closes the loop
@@ -234,7 +234,7 @@ Five decisions, taken together (2026-07-04), fix the model:
 . *jGiven scenarios are the EXECUTION ENGINE of the seeding*, not a description layer. Each phase = a
   scenario. This is the founding constraint (above) promoted to the model: probes ARE steps because
   the whole seeding IS scenarios.
-. *Engine = jGiven* — already an OSGi bundle (`pipeline-jgiven`); its programmatic API is already used
+. *Engine = jGiven* — already an OSGi bundle (`jgiven-wrap`); its programmatic API is already used
   outside JUnit in `ClusterReadinessTopic`.
 . *Orchestration substrate = the JUnit Platform launcher, embedded at runtime.* Not a gamble:
   `InContainerJUnitRunner` (osgi/runtime/junit-testkit) *already* drives `LauncherFactory.create(...)`
@@ -299,7 +299,7 @@ flowchart TB
     ext["Jupiter extensions<br/>@PollUntilReady · ExecutionCondition · Store"]
   end
   subgraph osgi["OSGi world — OPENED BY the boot step (Felix)"]
-    jg["pipeline-jgiven<br/>ReportModel = runbook"]
+    jg["jgiven-wrap<br/>ReportModel = runbook"]
     doctor["doctor<br/>consult-on-failure → remediation"]
   end
   operator -->|understands + acts, via the runbook| phases
@@ -391,7 +391,7 @@ convention is on the class NAME, the unit of selection, not the method annotatio
 |===
 | the `+*Scenario+`… | lives in | why
 | needs a `-core`'s sealed internals | `-core` (the bundle itself) | white-box, same classloader realm — it must share the core's loader to reach package-private actors
-| touches only ports | `-bdd` (a dedicated production OSGi bundle) | it consumes contracts, is played in-container; imports the domain ports + `pipeline-jgiven`
+| touches only ports | `-bdd` (a dedicated production OSGi bundle) | it consumes contracts, is played in-container; imports the domain ports + `jgiven-wrap`
 | — (never `-port`) | NOT `-port` | a `-port` is PURE contract (interface/enum/record, zero impl, zero jGiven). Cross-world reachability is by the LAUNCHER (discovery) plus the `ScenarioModel` (Document) that crosses — the scenario CLASS never crosses, so it has no reason to sit in the port.
 |===
 
@@ -506,7 +506,7 @@ form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological g
   (`BootPlanner`/`FrameworkLauncher`) the launcher rests on; how the host boots the OSGi world the
   reasoning lives in.
 * link:../osgi/jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — jGiven already runs as an OSGi bundle
-  (`pipeline-jgiven`) and the JUnit launcher already runs in-container (`InContainerJUnitRunner`); the
+  (`jgiven-wrap`) and the JUnit launcher already runs in-container (`InContainerJUnitRunner`); the
   substrate this spec puts the engine on.
 * link:../osgi/seed-broker-spec.adoc[World gateway] — the `Document` +
   `consult(Document)` seam the cross-world scenario graft (E10) reuses.

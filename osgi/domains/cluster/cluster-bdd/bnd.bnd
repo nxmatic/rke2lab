@@ -2,7 +2,7 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.cluster.bdd
 
 # A type=model embeddable bundle (scanned + installed under META-INF/bundles by the
 # io.nxmatic.rke2lab.embed capability, like the other domain carriers). It is isDomain, so
-# StagingClosure stages its import closure — this is how pipeline-jgiven (com.tngtech.jgiven.*) and
+# StagingClosure stages its import closure — this is how jgiven-wrap (com.tngtech.jgiven.*) and
 # its tail enter the LIVE world: pulled by THIS bundle's imports, not by a hand-listed staging entry.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=cluster-bdd
 

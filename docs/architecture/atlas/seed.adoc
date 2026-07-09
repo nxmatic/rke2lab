@@ -300,7 +300,7 @@ connected scenario, green) rather than on the disposable bench.
 | Two spaces (`grep -ri pulumi osgi/` == 0) | ✓ | jGiven stays internal to each world; `RunMode` (the `isDryRun` fact) stays host, projected as an `ExecutionCondition`. No box changes space.
 | R4 boot seam (Felix in `Pulumi.run`) | ✓ reused | the launcher is one more consumer of the seam; `InContainerJUnitRunner` already drives a JUnit launcher *inside* Felix, and `JGivenTestkit.felix()` proves the jGiven runtime (byte-buddy proxy, `ScenarioExecutor`, `ValueInjector`) boots in-container — the coupling that gives the state-DAG + the execution nesting.
 | Two vocabularies (`Document` at the port) | ✓ + E10 | the cross-world edge grafts the remote `ScenarioModel` *serialized as String* (`addNestedStep`); the live class never crosses.
-| `DUPLICATE_REALM_CLASS` == 0 | ✓ | the rule fires only if a class transpires *through a port* — jGiven is never in a `type=seam`/`system.packages.extra`, so each world loading its own copy is legal by construction (the LOCAL claim in `pipeline-jgiven`'s bnd).
+| `DUPLICATE_REALM_CLASS` == 0 | ✓ | the rule fires only if a class transpires *through a port* — jGiven is never in a `type=seam`/`system.packages.extra`, so each world loading its own copy is legal by construction (the LOCAL claim in `jgiven-wrap`'s bnd).
 |===
 
 *Conclusion: additive-with-named-erasure.* The turn adds the launcher-substrate, the disciplines, the

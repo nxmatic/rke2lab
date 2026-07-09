@@ -24,17 +24,18 @@ confirmed.
    `io.nxmatic.rke2lab.osgi.runtime.framework`, and the 3 exec consumers (seed-master,
    manifests-cli, netplan-cli) depend on `framework-launcher`.
 
-2. **The jgiven→pipeline regroup WAS done (the SAFE half), export-fusion is STILL deferred**.
-   §5.4 prescribed "dissolve jgiven into pipeline"; §8 said "no fusion" (a contradiction).
-   What shipped: jgiven was REGROUPED under a `pipeline/` aggregator as pipeline-port (the
-   grammar seam, was `pipeline`), pipeline-jgiven (was jgiven-wrap), pipeline-testkit,
-   pipeline-probe, pipeline-probe-test — layout-only, NO export fusion. pipeline-port exports
-   ONLY `io.nxmatic.rke2lab.pipeline` (type=seam), pipeline-jgiven stays a separate bundle
-   exporting `com.tngtech.jgiven.*`. Packages and BSNs unchanged (jgiven name survives in
-   package/BSN; only Maven artifactIds renamed). The DANGEROUS part of §5.4 — making the
-   pipeline SEAM export com.tngtech.jgiven.* (which would put jGiven in two realms →
-   LinkageError) — is STILL deferred and remains the backlog (see memory file
-   [[jgiven-dissolution-is-a-realm-change-backlog]]).
+2. **jGiven lives in its OWN bundle `osgi/runtime/jgiven-wrap` — never folded into scenario-engine**.
+   The wrap (BSN `io.nxmatic.rke2lab.jgiven.wrap`) exports `com.tngtech.jgiven.*`; scenario-engine
+   depends on it, does NOT re-export it. Two rules this encodes:
+   * *Do not merge jGiven's export into scenario-engine.* scenario-engine is dual-realm (base package
+     host-flat, `.container` in-container). Re-exporting jGiven there forces jGiven's whole tail (guava,
+     gson, jakarta.annotation…) into the imports of EVERY world that installs scenario-engine — even a
+     runner-only world that never plays a scenario. A single-responsibility wrap, installed only where
+     jGiven is actually used, keeps those worlds clean.
+   * *The grammar seam never carries jGiven.* pipeline-port exports ONLY
+     `io.nxmatic.rke2lab.pipeline`; putting `com.tngtech.jgiven.*` on a seam would place jGiven in two
+     realms → LinkageError. Keeping jGiven a separate bundle is what makes that impossible by
+     construction.
 ====
 
 [abstract]

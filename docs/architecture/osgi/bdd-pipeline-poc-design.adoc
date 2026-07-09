@@ -43,7 +43,7 @@ On ne le décide pas sur le papier. On construit une maquette compilable, on la 
 . *Les scénarios BDD sont le MOTEUR D'EXÉCUTION du seeding*, pas une couche de description.
   Chaque phase = un scénario. Cohérent avec la contrainte fondatrice existante : « les probes
   SONT des steps jgiven, sinon pas de runbook ».
-. *Moteur = jgiven* (déjà bundle OSGi `pipeline-jgiven` ; API programmatique déjà utilisée hors-JUnit
+. *Moteur = jgiven* (déjà bundle OSGi `jgiven-wrap` ; API programmatique déjà utilisée hors-JUnit
   dans `ClusterReadinessTopic`).
 . *Substrat d'orchestration = le JUnit Platform Launcher*, embarqué au runtime. Ce n'est pas un
   pari : `InContainerJUnitRunner` (osgi/runtime/junit-testkit) pilote *déjà*

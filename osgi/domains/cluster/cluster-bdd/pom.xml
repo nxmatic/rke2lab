@@ -48,7 +48,7 @@
       <version>${project.version}</version>
     </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
-         the pipeline-jgiven bundle, pulled into the live world by this bundle's import closure
+         the jgiven-wrap bundle, pulled into the live world by this bundle's import closure
          (type=model isDomain → StagingClosure stages its imports). -->
     <dependency>
       <groupId>com.tngtech.jgiven</groupId>
@@ -97,7 +97,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-jgiven</artifactId>
+      <artifactId>jgiven-wrap</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

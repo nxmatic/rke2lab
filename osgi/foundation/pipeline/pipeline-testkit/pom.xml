@@ -46,7 +46,7 @@
     -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-jgiven</artifactId>
+      <artifactId>jgiven-wrap</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

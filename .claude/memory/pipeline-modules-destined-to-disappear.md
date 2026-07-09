@@ -9,21 +9,33 @@ metadata:
 declaration bug — it "sits around the pipeline migration, which is not finished. To term, the
 `pipeline` modules should disappear."
 
-**Why:** jGiven is reachable by TWO paths today, and that duplication is the root of mis-declared
-deps —
-- `osgi/foundation/pipeline/pipeline-jgiven` = the pure wrap (jgiven-core + jgiven-junit5 stamped
-  OSGi), **test-scope only** ("no production bundle imports jGiven").
-- `osgi/runtime/scenario-engine` = the launcher/engine home (`JUnitLauncherCore`,
-  `OutOfContainerFrameworkExtension`, `OsgiConnection`) that ALSO re-carries jGiven at
-  **runtime-scope** (the "dogfooding promotion" — the seeding IS jGiven scenarios played by an
-  embedded JUnit launcher, so that machinery is no longer test-only).
+## RESOLVED 2026-07-09 — jGiven single-path done, wrap relocated to runtime
 
-So a module wanting jGiven can pull it via `scenario-engine` (dragging the launcher) OR via
-`pipeline-jgiven`. The BDD-as-engine target ([[cluster-seed-execution-state]], `docs/.../bdd/bdd.adoc`)
-is that `scenario-engine` is the ONE runtime home; the `pipeline-*` path is the AVANT, destined to
-erase — exactly the fluent-grammar dissolution CLAUDE.md describes (`pipeline-port` still exports the
-fluent types only because live code still uses them; when the last pipeline migrates, those exports
-shrink and the modules go).
+The two-path jGiven mess is GONE. The wrap moved out of the `pipeline/` aggregator to
+`osgi/runtime/jgiven-wrap` (artifactId `jgiven-wrap`, BSN unchanged `io.nxmatic.rke2lab.jgiven.wrap`).
+It is the ONE jGiven carrier; scenario-engine and every BDD consumer depend on it. The `pipeline/`
+aggregator now holds only pipeline-port (the grammar) + pipeline-testkit/probe/probe-test (the
+in-container jGiven testkit + its guard).
+
+**LESSON — do NOT fold jGiven's export into scenario-engine (tried 2026-07-09, reverted).** The
+tempting move was "scenario-engine IS the world of the playable, so let it export
+com.tngtech.jgiven.* and delete the wrap entirely." It builds but breaks resolution: scenario-engine
+is DUAL-REALM (its base package host-flat, its `.container` package in-container), and it is installed
+in RUNNER-ONLY worlds too (e.g. DoctorPortInContainerTest installs it just for the `.container` runner
+package, via withJUnitRunner). Re-exporting jGiven drags jGiven's whole tail (guava, gson,
+jakarta.annotation, paranamer, jansi) into scenario-engine's Import-Package → those runner-only worlds,
+which never install the tail, fail to resolve. Making the tail `resolution:=optional` "fixes" it only
+by papering every import with optional — a smell that says the two concerns were wrongly merged. A
+single-responsibility wrap, installed ONLY in worlds that actually play jGiven, avoids all of it.
+Permanence of a dependency (jGiven is forever) justifies NOT decoupling the CHOICE, not merging the
+PACKAGING. The grammar SEAM (pipeline-port) likewise never exports jGiven — that would put it in two
+realms → LinkageError; separate bundles make it impossible by construction.
+
+**Still true — the `pipeline-*` grammar modules are transitional.** `pipeline-port` (now
+`Topic.Execution` only, jGiven-free after Checkpoint/Pipeline were killed) is the shared fluent
+DERIVATION grammar, destined to be renamed (working name derivation/fold, on trial — see
+[[pipeline-migration-strategy-revised]]). The testkit/probe modules are jGiven test assets, orthogonal
+to the grammar.
 
 **Measured state (2026-07-08), scenario-engine dependents:**
 - LEGITIMATE (use the launcher/harness, no jGiven import): `cluster-edge`, `dbus-systemd-edge` (both

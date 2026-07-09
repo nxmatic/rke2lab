@@ -13,11 +13,10 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/foundation/pipeline</name>
-  <description>The fluent pipeline grammar (the type-state workflow DSL seam) and the jGiven wrap that lets it express BDD scenarios in-container.</description>
+  <description>The fluent pipeline grammar (the type-state workflow DSL seam) plus the in-container jGiven testkit + its probe guard. jGiven itself is carried by osgi/runtime/jgiven-wrap now.</description>
 
   <modules>
     <module>pipeline-port</module>
-    <module>pipeline-jgiven</module>
     <module>pipeline-testkit</module>
     <module>pipeline-probe</module>
     <module>pipeline-probe-test</module>

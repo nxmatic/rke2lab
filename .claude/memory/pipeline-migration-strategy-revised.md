@@ -106,9 +106,27 @@ The user's discipline: name on stabilized content, not projection. All three fix
 synthesis port is extracted:
 1. **The host root** (composer + Pulumi stages + graft): `seed-bdd` vs `seed-broker-bdd` — pick after
    re-dispatch shows the exact host residue.
-2. **The surviving value-threading PORT** (Topic.Execution + Sink extracted from pipeline-port):
-   working name `synth-pipeline`/`synthesis-port` — its only users are synthesis (manifests-core,
-   manifests-cli, netplan-cli); `synthesize`/`Synthesis*` is already all over the tree.
+2. **The shared fluent DERIVATION grammar** (Topic.Execution + Sink, staying IN the renamed
+   pipeline-port — in-place rename, user-chosen 2026-07-09).
+
+   **ROOT MOTIVATION FIRST (user, 2026-07-09): this is NOT "the remnant of pipeline-port after we
+   killed observability" — it is a first-class thing the system wanted all along: ONE common fluent
+   API for expressing a DERIVATION, wherever a derivation occurs in the system.** Removing the scenario
+   natures did not CREATE this port, it REVEALED the root. So the naming question is not "what to call
+   what survives" but "what to call the system's shared fluent derivation grammar" — the port is merely
+   where that grammar lives. Frame everything (module name, unit name, docs) from that root, positively.
+
+   **LEANING `derivation`/`fold` (on trial), NOT `synthesis`.** Why not the product-name: the two real
+   users produce DIFFERENT natures of thing — manifests-core → `ManifestSynthesisResult` (a MATERIAL
+   artifact, `app.synth()` writes YAML + systemd unit files); incus `TargetChecksumPipeline` →
+   `Map<String,String>` (computed checksums, an in-memory VALUE, no artifact). "synthesis"/"assembly"
+   name the PRODUCT, which VARIES and breaks for incus ("assemble a checksum" is meaningless). What is
+   CONSTANT across every use is the ACT — the derivation itself: thread values through ordered fluent
+   steps, each pushing named contributions into an accumulator, deterministic, no narration/verdict.
+   The honest name is on the DERIVATION (constant, and it IS the root subject), not the product
+   (variable): `derivation` (module `derivation-port`, unit `DerivationStep`) or `fold` (shorter,
+   functional, the accumulator literally IS a fold — but more cryptic). ON TRIAL: grave it, see if it
+   holds over time. netplan is NOT a user (its `.during` is the boot preset, not this grammar).
 3. **The UNIT** (today `Topic`): `Topic` was a borrowed word — its impl is ALREADY called `Stage` in
    the code (`new Stage(input, sink)`, per Topic.java's Sink javadoc). Candidates: `Stage` (honest,
    but COLLIDES with jGiven `com.tngtech.jgiven.Stage` that the BDD scenarios extend — two Stages) or
