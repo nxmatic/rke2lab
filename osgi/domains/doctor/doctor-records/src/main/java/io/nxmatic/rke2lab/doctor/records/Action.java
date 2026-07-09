@@ -4,8 +4,8 @@ import io.nxmatic.rke2lab.seed.broker.port.WireEnum;
 import java.util.Optional;
 
 /**
- * The closed set of provisioning actions a {@code readiness-verdict} {@link Document} carries. The
- * host must not invent an action — this enum is the authority. {@code slug()} is the wire value
+ * The closed set of provisioning actions a {@code readiness-verdict} {@code SeedEnvelope} carries.
+ * The host must not invent an action — this enum is the authority. {@code slug()} is the wire value
  * placed in the verdict's {@code action} field; call sites reference this, never literals.
  */
 public enum Action implements WireEnum {

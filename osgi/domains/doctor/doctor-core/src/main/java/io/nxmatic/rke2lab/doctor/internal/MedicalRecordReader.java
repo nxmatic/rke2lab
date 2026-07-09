@@ -15,13 +15,13 @@ import java.util.Optional;
 
 /**
  * Reconstructs a {@link Patient}'s {@link MedicalRecord} by folding the host {@link
- * io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal}'s {@code visit} Documents into one {@link
- * Visit} per readable entry — INSIDE the bundle realm, where the {@code doctor.records} types are
- * legal. Each SeedEnvelope's payload is the opaque blob the host produced WITHOUT interpreting it:
- * {@code version} + {@code when} plus the raw consultation-report and expectation output blob
- * lists. This reader decodes the payload with doctor-core's OWN jackson (via {@link SeedCodec}, no
- * jackson type crosses the seam) and rebuilds the typed visit by decoding each opaque blob directly
- * into its record ({@link ConsultationReport} / {@link Expectation}).
+ * io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal}'s {@code visit} {@code SeedEnvelopes} into
+ * one {@link Visit} per readable entry — INSIDE the bundle realm, where the {@code doctor.records}
+ * types are legal. Each SeedEnvelope's payload is the opaque blob the host produced WITHOUT
+ * interpreting it: {@code version} + {@code when} plus the raw consultation-report and expectation
+ * graft blob lists. This reader decodes the payload with doctor-core's OWN jackson (via {@link
+ * SeedCodec}, no jackson type crosses the seam) and rebuilds the typed visit by decoding each
+ * opaque blob directly into its record ({@link ConsultationReport} / {@link Expectation}).
  *
  * <p>The aggregator does fail-AT-END, not fail-fast: an unreadable SeedEnvelope is collected
  * (identity-enriched) and the fold continues; if any entry failed it throws a {@link
@@ -65,7 +65,7 @@ public final class MedicalRecordReader {
       throw new EntryReadException(0, Optional.empty(), e);
     }
 
-    // The consultationReport blobs are one report map per resource: decode each directly via the
+    // The consultationReport blobs are one report map per rootstock: decode each directly via the
     // codec. A structurally-invalid blob throws (a record's compact-ctor guard) — caught here to
     // Optional.empty and dropped, so a malformed report degrades WITHOUT sinking the visit (the
     // additive-tolerance the hand-rolled readers had).
@@ -74,8 +74,8 @@ public final class MedicalRecordReader {
             .map(blob -> decodeBlob(blob, ConsultationReport.class))
             .flatMap(Optional::stream)
             .toList();
-    // The expectations output was registered as Output.of(List<Map>), so the harvested blob is a
-    // list-of-lists (one inner list per resource). Flatten the inner lists before decoding — the
+    // The expectations graft was filed as a list per rootstock, so the collected blob is a
+    // list-of-lists (one inner list per rootstock). Flatten the inner lists before decoding — the
     // same shape the SnapshotView fold consumed.
     final List<Expectation> expectations =
         visit.expectations().stream()

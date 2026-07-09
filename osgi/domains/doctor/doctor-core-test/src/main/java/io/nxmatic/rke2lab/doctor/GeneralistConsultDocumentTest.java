@@ -31,11 +31,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The Generalist's consult(SeedEnvelope) contract: map a checkpoint SeedEnvelope (carrying
- * recordedAt + an {@code observations} list, each in the flat {@code Observation.toOutputMap}
- * shape) to a consultation SeedEnvelope (narration + diagnosisAdoc + the structured reconstruction
- * sub-trees). The internal consult path (record-typed) is already tested; here we prove the
- * wire-crossing SeedEnvelope adapter — including that EVERY observation survives into the
- * reconstructed record (the cluster's N-phase case), so the seam loses no information.
+ * recordedAt + an {@code observations} list, each in the flat {@code SeedCodec.toMap} shape) to a
+ * consultation SeedEnvelope (narration + diagnosisAdoc + the structured reconstruction sub-trees).
+ * The internal consult path (record-typed) is already tested; here we prove the wire-crossing
+ * SeedEnvelope adapter — including that EVERY observation survives into the reconstructed record
+ * (the cluster's N-phase case), so the seam loses no information.
  */
 class GeneralistConsultDocumentTest {
 

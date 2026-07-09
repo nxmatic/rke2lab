@@ -5,7 +5,6 @@ import com.tngtech.jgiven.report.asciidoc.AsciiDocReportGenerator;
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
-import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import io.nxmatic.rke2lab.seed.broker.port.Consultation;

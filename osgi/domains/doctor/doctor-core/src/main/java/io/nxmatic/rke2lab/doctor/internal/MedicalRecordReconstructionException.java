@@ -37,10 +37,10 @@ public final class MedicalRecordReconstructionException extends Exception {
   }
 
   /**
-   * One unreadable {@code visit} Document, enriched with the doctor-level identity (version + when)
-   * carried in its envelope. The underlying parse/shape failure is the cause, so the human reads
-   * identity here and the offending content via {@code getCause()} — without reproducing the
-   * failure.
+   * One unreadable {@code visit} {@code SeedEnvelope}, enriched with the doctor-level identity
+   * (version + when) carried in its envelope. The underlying parse/shape failure is the cause, so
+   * the human reads identity here and the offending content via {@code getCause()} — without
+   * reproducing the failure.
    */
   public static final class EntryFailure extends Exception {
 

@@ -8,7 +8,7 @@ import java.util.List;
  * The Layer-1 host READ port for a patient's record timeline: the host walks the Pulumi stack
  * history and yields one opaque {@code visit} {@link SeedEnvelope} per readable entry, WITHOUT
  * interpreting its medical content. Each SeedEnvelope's payload carries the entry's {@code version}
- * + {@code when} and the RAW consultation-report and expectation output blobs harvested from that
+ * + {@code when} and the RAW consultation-report and expectation graft blobs collected from that
  * snapshot — the host is the producer of the wire shape, not a reader of doctor form.
  *
  * <p>OSGi rebuilds the {@code MedicalRecord} from these blobs INSIDE the bundle realm (the moved

@@ -17,14 +17,6 @@ import java.util.List;
 public record ConsultationReport(
     String checkpointId, List<Observation> observations, RemediationPlan plan) {
 
-  /**
-   * The Pulumi output key under which a checkpoint registers its report — the single source of
-   * truth shared by the writers ({@code SystemdAdapterResource}, {@code ClusterReadinessResource})
-   * and the reader ({@code MedicalRecordReader}), so a write/read drift cannot silently break
-   * reconstruction.
-   */
-  public static final String OUTPUT_KEY = "consultationReport";
-
   public ConsultationReport {
     if (checkpointId == null || checkpointId.isBlank()) {
       throw new IllegalArgumentException("checkpointId cannot be null or blank");

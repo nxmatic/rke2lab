@@ -7,7 +7,7 @@ import java.util.List;
  * The Layer-1 host READ port for the one fixed intervention-ledger stack: the host walks the
  * ledger's stack history and yields one opaque {@code intervention} {@link SeedEnvelope} per entry,
  * WITHOUT interpreting its content. Each SeedEnvelope's payload is the RAW {@code interventions}
- * output blob from that history entry.
+ * graft blob from that history entry.
  *
  * <p>OSGi rebuilds the {@code InterventionLedger} from these blobs INSIDE the bundle realm (the
  * moved {@code InterventionReader}); no {@code doctor.records} type crosses this seam — only {@link

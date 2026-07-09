@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * One captured observation inside a {@code readiness-checkpoint} {@link Document}: the gate's
+ * One captured observation inside a {@code readiness-checkpoint} {@code SeedEnvelope}: the gate's
  * {@code status} ({@code "ok"}, {@code "failed"}, {@code "degraded"}, {@code "deferred-preview"}),
  * a plain {@code summary}, an optional {@link SymptomKind} routing key (present only on a non-ok
  * result — held TYPED, the typing the loose {@code symptom} slug string lacked), and an open {@code

@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The wire contract for the {@code readiness-checkpoint} {@link Document}: what a checkpoint
+ * The wire contract for the {@code readiness-checkpoint} {@code SeedEnvelope}: what a checkpoint
  * reports about a scenario. Two producer concerns union into this one shape (both are the same
  * checkpoint object, so one coordinate, one schema):
  *

@@ -105,9 +105,9 @@ public class ClusterReadinessScenario
    * carrying a typed {@link SymptomKind}; if any is non-ok, resolve the doctor's {@link
    * ConsultingService} from THIS bundle's registry — the same way the contact is resolved — build
    * the {@code readiness-checkpoint} SeedEnvelope around the observations, and consult. The
-   * returned {@code consultation} Documents ride the envelope back to the host, which records them
-   * into its shared log (it no longer computes the diagnosis, only renders it). A healthy run
-   * raised no symptom, so it consults no one and returns an empty list.
+   * returned {@code consultation} {@code SeedEnvelope}s ride the envelope back to the host, which
+   * records them into its shared log (it no longer computes the diagnosis, only renders it). A
+   * healthy run raised no symptom, so it consults no one and returns an empty list.
    */
   private List<SeedEnvelope> consultOnFailure(
       Map<ClusterReadinessPhase, ObservationWire> observations) {

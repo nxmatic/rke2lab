@@ -4,8 +4,8 @@ import io.nxmatic.rke2lab.seed.broker.port.WireEnum;
 import java.util.Optional;
 
 /**
- * The closed set of symptom kinds the host may report in a {@code readiness-checkpoint} {@link
- * Document}. This is the host-flat twin of the doctor's internal {@code
+ * The closed set of symptom kinds the host may report in a {@code readiness-checkpoint} {@code
+ * SeedEnvelope}. This is the host-flat twin of the doctor's internal {@code
  * io.nxmatic.rke2lab.doctor.records.Symptom} enum — OSGi owns the real {@code Symptom} and maps
  * {@code SymptomKind}→{@code Symptom} internally (the seed-broker must not depend on
  * doctor-records). {@code slug()} is the wire value placed in the checkpoint's {@code symptomKind}

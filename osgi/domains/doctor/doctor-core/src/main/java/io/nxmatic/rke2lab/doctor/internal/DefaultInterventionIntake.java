@@ -21,9 +21,10 @@ import org.osgi.service.component.annotations.Component;
  * holds. Given an {@code intervention-request} SeedEnvelope (the operator's raw argv strings), it
  * parses each reference with the doctor vocabulary ({@link ProblemRef}, {@link Provenance}, {@link
  * RemediationProgramRef}), builds the {@link Intervention}, and returns the canonical {@code
- * intervention} SeedEnvelope carrying {@link Intervention#toOutputMap}. An unparseable reference
- * yields an error {@code readiness-verdict} SeedEnvelope ({@code action=stop} + {@code reason})
- * rather than a thrown exception across the seam — the doctor record types never leave this method.
+ * intervention} SeedEnvelope ({@code InterventionWriter} projects it onto its wire). An unparseable
+ * reference yields an error {@code readiness-verdict} SeedEnvelope ({@code action=stop} + {@code
+ * reason}) rather than a thrown exception across the seam — the doctor record types never leave
+ * this method.
  *
  * <p>Published as a {@link SeedHandler} serving {@code intervention} with NO references, so SCR
  * activates it on its own — the CLI sows an intervention-request through the broker without

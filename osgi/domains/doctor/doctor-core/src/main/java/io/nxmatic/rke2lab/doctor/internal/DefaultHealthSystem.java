@@ -29,13 +29,13 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
  *
  * <p>The EHR ({@link MedicalRecordRegistry}) is now an OSGi {@code @Component} ({@code
  * JournalMedicalRecordRegistry}) that folds the host {@link MedicalRecordJournal}'s opaque
- * Documents into records inside the bundle; the ledger writer ({@link InterventionLedgerWriter})
- * and the read journals ({@link MedicalRecordJournal}, {@link InterventionJournal}) are
- * host-published ports. Until the host publishes the two journals + the writer they stay
- * unsatisfied (so the internal registry and this institution do not activate); once published, SCR
- * activates the registry, then this institution, and the host admits the patient across the seam.
- * No record or ledger crosses back — {@link ConsultingService#reviewDrift()} rebuilds them
- * OSGi-side.
+ * SeedEnvelopes into records inside the bundle; the ledger writer ({@link
+ * InterventionLedgerWriter}) and the read journals ({@link MedicalRecordJournal}, {@link
+ * InterventionJournal}) are host-published ports. Until the host publishes the two journals + the
+ * writer they stay unsatisfied (so the internal registry and this institution do not activate);
+ * once published, SCR activates the registry, then this institution, and the host admits the
+ * patient across the seam. No record or ledger crosses back — {@link
+ * ConsultingService#reviewDrift()} rebuilds them OSGi-side.
  */
 @Component(service = HealthSystem.class)
 public final class DefaultHealthSystem implements HealthSystem {

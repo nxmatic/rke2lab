@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.Observation;
@@ -13,9 +12,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Type-level contracts of the doctor's data model — exhaustive mechanics that underpin the
  * behaviour scenarios in {@code DoctorScenarioTest}: symptom ids parse from their kebab form, and
- * an observation round-trips through its flat output-map view (the exact keys that flow to Pulumi
- * outputs). The dbus-tcp specialist's own contracts moved to {@code DbusTcpSpecialistTest} in
- * doctor-core-test when the specialist became a pure package-private actor.
+ * an observation exposes its typed fields (the flat output shape is the codec's concern, proven in
+ * {@code ConsultationReportCodecTest}). The dbus-tcp specialist's own contracts moved to {@code
+ * DbusTcpSpecialistTest} in doctor-core-test when the specialist became a pure package-private
+ * actor.
  */
 class DoctorTest {
 
@@ -27,19 +27,15 @@ class DoctorTest {
   }
 
   @Test
-  void observation_round_trips_through_its_output_map_view() {
+  void failed_observation_carries_the_typed_symptom() {
     final Observation observation =
         Observation.failed(
             Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "fault-simulation"));
 
-    final Map<String, Object> map = observation.toOutputMap();
-
-    // The flat view carries status + summary + the typed symptom id + details — the exact keys
-    // that flow downstream to Pulumi outputs, unchanged by the Map -> Observation retype.
-    assertEquals("failed", map.get("status"));
-    assertEquals("dbus refused", map.get("summary"));
-    assertEquals(Symptom.CONNECTION_REFUSED.id(), map.get(Symptom.ENVELOPE_KEY));
-    assertEquals("fault-simulation", map.get("source"));
+    assertEquals("failed", observation.status());
+    assertEquals("dbus refused", observation.summary());
+    assertEquals(Optional.of(Symptom.CONNECTION_REFUSED), observation.symptom());
+    assertEquals("fault-simulation", observation.details().get("source"));
   }
 
   @Test
@@ -47,6 +43,5 @@ class DoctorTest {
     final Observation observation = Observation.ok("reachable", Map.of());
     assertTrue(observation.isOk());
     assertTrue(observation.symptom().isEmpty());
-    assertFalse(observation.toOutputMap().containsKey(Symptom.ENVELOPE_KEY));
   }
 }

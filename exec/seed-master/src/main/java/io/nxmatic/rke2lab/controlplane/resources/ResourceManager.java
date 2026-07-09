@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
-import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import java.util.Map;
 import java.util.Optional;

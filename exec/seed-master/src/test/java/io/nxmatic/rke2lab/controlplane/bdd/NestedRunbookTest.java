@@ -20,7 +20,6 @@ import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
-import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveGate;

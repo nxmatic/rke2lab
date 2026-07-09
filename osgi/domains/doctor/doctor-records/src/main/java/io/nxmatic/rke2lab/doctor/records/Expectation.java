@@ -31,13 +31,6 @@ public record Expectation(
   }
 
   /**
-   * The Pulumi output key under which a list of expectations is persisted — mirrors {@link
-   * ConsultationReport#OUTPUT_KEY}. Each checkpoint that writes a prescription can append its
-   * expectation to this list, allowing the next visit to verify whether the intervention succeeded.
-   */
-  public static final String OUTPUT_KEY = "expectations";
-
-  /**
    * Convenience accessor for the symptom. An expectation's problem always names a symptom (it
    * opened from an observed one).
    */

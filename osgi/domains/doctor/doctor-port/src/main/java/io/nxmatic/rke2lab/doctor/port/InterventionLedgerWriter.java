@@ -22,7 +22,7 @@ public interface InterventionLedgerWriter {
    * ledger stack.
    *
    * @param intervention the canonical {@code intervention} SeedEnvelope to persist (its payload is
-   *     the flat {@code Intervention.toOutputMap} shape, serialized JSON)
+   *     the flat {@code InterventionWire} shape, serialized JSON)
    */
   void append(SeedEnvelope intervention);
 }

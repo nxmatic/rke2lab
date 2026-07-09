@@ -58,10 +58,7 @@ class MedicalRecordReaderTest {
     return SeedEnvelope.of(DoctorCoordinate.VISIT, CODEC.encode(visit));
   }
 
-  /**
-   * One consultationReport blob (the {@code ConsultationReport.toOutputMap} shape) for {@code
-   * symptom}.
-   */
+  /** One consultationReport blob (the {@code SeedCodec.toMap} shape) for {@code symptom}. */
   private static Map<String, Object> reportBlob(Symptom symptom) {
     final Map<String, Object> plan = new LinkedHashMap<>();
     plan.put(Symptom.ENVELOPE_KEY, symptom.id());

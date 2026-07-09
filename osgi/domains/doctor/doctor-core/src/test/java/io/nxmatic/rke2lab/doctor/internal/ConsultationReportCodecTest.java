@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The {@link SeedCodec} round-trip of a {@link ConsultationReport} through its opaque {@code Map}
- * blob (the shape a Document's open slot carries) — the direct-decode path that replaced the
+ * blob (the shape a SeedEnvelope's open slot carries) — the direct-decode path that replaced the
  * hand-rolled {@code ConsultationReportReader}. Proves the record graph (observations, plan,
  * replies, assessment, prescription) survives {@code toMap → fromMap} with kebab-cased enum ids,
  * that additive keys are tolerated ({@code FAIL_ON_UNKNOWN_PROPERTIES} off), and that a

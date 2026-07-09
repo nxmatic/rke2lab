@@ -9,7 +9,6 @@ import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;
 import io.nxmatic.rke2lab.seed.broker.port.Consultation;
