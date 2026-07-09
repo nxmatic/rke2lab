@@ -122,11 +122,39 @@ forward-compatible with a future remote split (same contract, a different transp
 | the client validates at its edge, blind to server logic | the host validates *structure, not meaning*
 | the server is authority over the resource | *OSGi holds the authority*
 | an `Accept` / version mismatch surfaces at runtime | a *semver mismatch* surfaces at runtime validation
+| *the client discovers HOW to talk by asking the server* (`GET /` index / HATEOAS, `OPTIONS` / OpenAPI) | *the client discovers a coordinate's shape by asking the broker* (introspection — a `sow` at a meta-coordinate)
 | in-process today, on the wire tomorrow — same contract | embedded today, remote tomorrow — forward-compat by construction
 |===
 
 The `coordinate` is the path, the `Document` is the body, the schema is the OpenAPI. The day Felix
 runs remote, it is the same contract with an HTTP transport instead of a method call.
+
+=== Introspection is the missing REST verb — the server describes itself
+
+This row was the model's missing piece, and its absence is what left the design wobbling. Everything
+else said "the client speaks to the broker by one door, the vocabulary stays in the domain" — yet the
+client still had to know a document's SHAPE (its fields) from SOMEWHERE. While that shape lived in a
+shared compiled type (the seam wire-record), the door was NOT the single source: there was a parallel,
+unspoken channel — the class the host compiled against. TWO sources of truth for "how we talk". That is
+the wobble.
+
+REST closed this long ago: a client does not compile the server's DTOs — it *asks the server how to
+talk*. `GET /` returns the resource index (HATEOAS); `OPTIONS /resource` (or `/openapi.json`) returns
+the resource's schema. The server describes ITSELF, over the SAME transport as real requests — not a
+compiled contract on the side. Our broker gets the exact same verb, and — the key already established —
+it is NOT a new method: it is a META-coordinate. `sow(available, ∅)` reaps the coordinates actually
+served (the published handlers — "for real", who has a grower); `sow(shape, {coordinate: X})` reaps
+X's projected schema. The broker describes itself through its own single door, exactly as `OPTIONS`
+rides the same HTTP transport as `POST`.
+
+This is why introspection is the LOAD-BEARING piece, not a convenience: the paper trial (§
+<<contribution-and-opacity>>) showed that de-typing the SOW sites without it would only trade "hold the
+class" (compiler-checked) for "hardcode the field names" (silent) — a worse hazard. Introspection is
+the CONDITION of opacity, so it removes the parallel channel: the client learns a document's shape FROM
+THE DOOR, and the shared wire-record class stops being a source of truth (it can then leave the seam,
+§ <<one-seam>>). The schema already exists build-time (`@DocumentContract` + `RecordSchemaProjector`,
+consumed by `SCHEMA_CONCORD`); the meta-coordinate is that same projection, offered at runtime through
+the door — the OpenAPI endpoint we had described but never served.
 
 == The claim
 
