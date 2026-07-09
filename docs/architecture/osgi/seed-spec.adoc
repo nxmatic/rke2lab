@@ -42,21 +42,21 @@ The seam keeps the discipline this spec is built on: *a domain never reaches for
 the OSGi world as a value; the OSGi world reasons; the host renders and writes. The founding constraint
 travels intact: probes-as-steps and the runbook are produced OSGi-side; the host only renders/exports.
 
-*The cross-world edge = a grafted `ScenarioModel` (E10).* A `@NestedSteps` composes within ONE world
-(one jGiven engine, one `ReportModel`). A dependency that crosses the world-gateway cannot be a nested
-step — two engines, two `ReportModel`s. It becomes a *gateway step*: the caller world sends a
-`Document`, the remote world plays its scenario in ITS `ReportModel`, and returns the *serialized
-`ScenarioModel`* (JSON String — the seam carries no live jackson type). The caller *grafts* the remote
-steps as the gateway step's `nestedSteps` (`StepModel.addNestedStep`) → the operator reads ONE
-continuous tree, from the seed down to the OSGi root. And the verdict travels IN the model:
-`remoteScenario.getExecutionStatus()` — if the remote is FAILED, the graft marks the gateway step
-FAILED and the host's downstream steps SKIPPED (the local fail-fast, reproduced across the frontier).
-*One Document suffices* — the `ScenarioModel` carries both the narration (steps → the sub-tree) and the
-verdict (`executionStatus` → the propagation). This is proven *in isolation* on the bench (a
-`URLClassLoader` realm stand-in, an in-JVM JSON round-trip); wiring it to the real embedded Felix
-(`ClusterSeedTopic.seedCluster()`) is the migration increment, not re-proof. The conceived form of this
-seam — one broker door instead of N service verbs — is link:seed-broker-spec.adoc[the seed-broker
-design].
+*The cross-world edge = a grafted scenario — SHIPPED as `ScenarioGraft`.* A `@NestedSteps` composes
+within ONE world (one jGiven engine, one `ReportModel`). A dependency that crosses the world boundary
+cannot be a nested step — two engines, two `ReportModel`s, and a live jGiven object would
+`ClassCastException` on the flat host loader. So it is a graft, in one horticultural register: the
+scenario played in the other world grows there into a *scion*, serializes to a JSON String (the only
+thing that crosses — no live jackson type), and the host `rebuild`s a model of its own realm and
+`graftUnder`s the scion's steps onto its *rootstock* step (the host step that stands for the crossing)
+→ the operator reads ONE continuous tree, from the seed down to the scion's root cause. The verdict
+travels IN the model: if the scion is FAILED, the graft marks the rootstock step FAILED and the host's
+downstream steps SKIPPED (the local fail-fast, reproduced across the frontier). *One serialized
+scenario suffices* — it carries both the narration (steps → the sub-tree) and the verdict
+(`executionStatus` → the propagation). The mechanism is DISSOCIATED from the worlds it grafts across:
+`ScenarioGraft` (`osgi/runtime/scenario-engine`) speaks only jGiven's report model, so the same graft
+serves any scion — OSGi in-container today, HTTP-remote tomorrow. Its execution twin — one broker door
+instead of N service verbs — is link:seed-broker-spec.adoc[the seed-broker design].
 
 == The OSGi world is detached by design — embedded exec is a special case
 
@@ -76,8 +76,8 @@ The thing that "starts OSGi" is the JUnit launcher + its `main()`, which run on 
 OUTSIDE Felix — so they do not run *inside* OSGi, and the paradox does not touch them. The launcher
 plays the seed scenario whose *first step* is the boot effect (launch Felix); every later step reasons
 within the framework that first step opened. "What starts OSGi" (host launcher) and "what runs inside
-OSGi" (the reasoning steps) are different threads/classpaths — the frontier is exactly the gateway
-(Figure 2).
+OSGi" (the reasoning steps) are different threads/classpaths — the frontier is exactly the seam the
+broker crosses and the graft narrates (Figure 2).
 
 The launcher does not change this — it is one more consumer of the R4 boot seam (Felix in `Pulumi.run`).
 `InContainerJUnitRunner` already drives a JUnit launcher *inside* Felix; `JGivenTestkit.felix()` proves
@@ -105,24 +105,24 @@ of the *bootstrap's embedded host*. The detached OSGi world knows nothing of Pul
 a second route, that the preview trigger and the stack sink live at the *host edge* (`pulumi-edge`),
 never in the OSGi reasoning.
 
-.Figure 2 — the thread/TCCL frontier IS the gateway (concern E, resolved)
+.Figure 2 — the thread/TCCL frontier IS the seam (concern E, resolved)
 [mermaid]
 ....
 flowchart TB
   subgraph host["host world — flat classpath, Pulumi.run lambda thread"]
     hs["host-world seeding scenarios<br/>launcher runs INLINE · export synchronous"]
-    gw["gateway step<br/>consult(Document) → Document"]
+    rs["rootstock step<br/>broker.sow(coordinate, Document)"]
   end
   subgraph osgi["OSGi world — embedded Felix, its OWN thread"]
-    os["OSGi-world scenarios<br/>ClusterSeedTopic.seedCluster()"]
+    os["OSGi-world scenarios (the scion)<br/>played in-container"]
   end
-  hs --> gw
-  gw -.->|"Document (JSON)"| os
-  os -.->|"ScenarioModel (JSON String)"| gw
-  gw -->|grafts sub-tree, exports on lambda thread| hs
+  hs --> rs
+  rs -.->|"Document (JSON) — sow"| os
+  os -.->|"scion runbook (JSON String)"| rs
+  rs -->|grafts the scion sub-tree, exports on lambda thread| hs
   classDef h fill:#8250df,color:#fff;
   classDef o fill:#0b7285,color:#fff;
-  class hs,gw h
+  class hs,rs h
   class os o
 ....
 
@@ -130,37 +130,71 @@ The concern was that `context.export` is synchronous on the `Pulumi.run` lambda 
 harness runs the launcher on a dedicated TCCL thread. It conflated the harness with the production
 path: host-world scenarios run on the lambda thread (no OSGi realm → launcher inline, export
 synchronous); OSGi-world scenarios run inside Felix on ITS own thread — the host never drives that
-thread, it consults via `consult(Document) → Document` and grafts the returned model. *The thread/TCCL
-frontier IS the gateway* — no live jGiven object ever sits on the export thread.
+thread, it `sow`s via the broker and `graftUnder`s the returned scion runbook. *The thread/TCCL
+frontier IS the seam* — no live jGiven object ever sits on the export thread.
 
 [[migration]]
-== Migration — legibility first, then ClusterSeed-vertical
+== Migration — the unit is a DOMAIN, not a pipeline
 
-*The method: the spec runs ahead (avant/après) with the atlas up to date; only then the plan and the
-worktree scheduling — integration obliges the worktrees, the spec does not.*
+*The method (revised 2026-07-09): the migration unit is a DOMAIN, not a pipeline. The old
+"one-pipeline-at-a-time, fold its phases into seed-master" plan was written before the seed-broker
+realization; two scans (controlplane + manifests-core) invalidated its hypotheses — the destination is
+the DOMAINS, not seed-master, and the seed's host pipeline does not fold, it DISSOLVES into a cascade
+of broker `sow` calls into per-domain sub-scenarios.*
 
-. *Legibility cleanup of the spec network — DONE.* The BDD-as-engine model is the primary readable
-  content across the network (link:../bdd/bdd.adoc[the pattern], this seed spec, the atlas satellites);
-  the former model is the avant reference in the pattern spec. (Closed before the socle landed.)
-. *Engine-lifecycle socle — increment 1, SHIPPED (2026-07-05).* The launcher, connection, lever and
-  disciplines are live in `osgi/runtime/scenario-engine`; see
-  link:engine-lifecycle-spec.adoc[engine-lifecycle-spec]. This is the substrate the vertical rests on —
-  no longer a bench stand-in.
-. *ClusterSeed-vertical migration — increment 2, one pipeline at a time.* Migrate ONLY
-  `ClusterSeedPipeline` first, end-to-end into `seed-master` on the shipped socle (real embedded Felix):
-  the phases become `@ScenarioStage`s, the two live jGiven islands (`SystemdAdapterTopic`,
-  `ClusterReadinessTopic`) fold in as phases, the value-DAG replaces `StateBuilder`, outputs return as
-  `SeedRun(runbook, outputs)`. The other six pipelines STAY on the former model meanwhile — assumed
-  coexistence, NOT a legacy variant to hide. Each subsequent pipeline is its own increment.
-. *Closing task — the `SCENARIO_STATE_DAG` gate.* Once the phases carry `@Provided/ExpectedScenarioState`,
-  add the sixth `StagingGate` (the topological check, on the existing ASM+`@GovernedBy` mould), born
-  WARN then flipped WARN→ERROR — the REALM_BOUNDARY ritual, the static safety the former type-state gave.
+=== Why the unit changed
 
-The three mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate, the
-cross-world `ScenarioModel` graft) have their reference sketch pinned at tag `spike/bdd-pipeline-poc`
-(`git show spike/bdd-pipeline-poc:<path>`): `PollUntilReadyExtension` (adaptive poll — though its live
-form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological gate), and
-`CrossWorldGraftSpikeTest` (the E10 graft). The rest shipped with the socle.
+The controlplane scan found seed-master holds ~10 classes of pure domain reasoning stranded host-side,
+whose real home is a domain's OSGi `-core` (e.g. `ClusterBootstrapReadinessVerifier`→cluster,
+`SeedSystemdAdapterEndpointGate`→systemd, `BboxReconciliationOrchestrator`→bbox). So "migrate a
+pipeline" is the wrong verb: there is nothing to re-host into seed-master. Per domain, the migration is
+a triptych:
+
+. *Re-dispatch* — its host-stranded reasoning descends to its `-core` (Pulumi-blind, so legal in OSGi).
+. *Scenario* — its scenario lives in its `-bdd`, played IN-CONTAINER (the bloom).
+. *Host* — seed-master keeps ONLY the Pulumi-irreducible (`*Resource`, the edge) + a broker `sow` and a
+  graft. The host stage becomes a *sowing post* toward the domain bloom, not a place the logic lives.
+
+The seed's root scenario stays host (Pulumi sows the first seed = launches it); its phases that need a
+domain OPEN a sub-scenario played in-container, whose `ScenarioModel` grafts back — the germination
+cascade (see link:seed-broker-spec.adoc[the seed-broker], § the cascade). E1 ("a `-port` sheds
+`type=seam` when 0 host files import it") is now a MEASURABLE CONSEQUENCE of the re-dispatch: each
+class moved host→OSGi drops one `-port`'s host-import count toward 0.
+
+=== What is shipped
+
+. *Engine-lifecycle socle — SHIPPED (2026-07-05).* Launcher, connection, lever, disciplines in
+  `osgi/runtime/scenario-engine`; see link:engine-lifecycle-spec.adoc[engine-lifecycle-spec].
+. *The seed-broker door — SHIPPED (2026-07).* One `SeedBroker.sow(Coordinate, Document)` dispatched to
+  `SeedHandler`s subsumes the former N crossing verbs; see link:seed-broker-spec.adoc[the seed-broker].
+. *The cross-world graft — SHIPPED (2026-07).* `ScenarioGraft` (`osgi/runtime/scenario-engine`, host
+  side) is the generic mechanism `rebuild(runbookJson)→ReportModel` + `graftUnder(hostTree,
+  rootstockStep, scion)` with FAILED→SKIPPED. Horticultural register, one throughout: the host sows a
+  seed, it grows into a `scion` (played in-container), the scion is grafted onto the host tree at its
+  `rootstock` step (the step that stands for the crossing). Proven in `ScenarioGraftTest` (was only the
+  pinned `CrossWorldGraftSpikeTest`). It is a FOUNDATION every per-domain migration reuses, not a
+  cluster detail — the observability twin of the broker.
+
+=== The per-domain worklist
+
+. *cluster FIRST* — its `-bdd` already exists (`cluster-bdd`, the in-container readiness scenario).
+  Re-dispatch `ClusterBootstrapReadinessVerifier`→`cluster-core`; the host `ClusterReadinessStage`
+  becomes a sowing post: `sow` the checkpoint, `graftUnder` the returned bloom. This is where the
+  graft's PROD wiring lands (the mechanism is generic; cluster is its first caller).
+. *the other domains* — systemd, bbox, incus, doctor, manifests-reasoning — each the same triptych,
+  each dropping its `-port`'s host-import count. Vocabulary hygiene (a domain scene stops importing the
+  envelope machinery) falls out per domain.
+. *`consult` folds into the broker* — its real provider needs `HealthSystem.admit(patient)` host-side
+  (a doctor-migration increment); until then it stays a `ConsultingService` verb (2 seams, not 1).
+. *kill `pipeline-port`* — LAST. The observability grammar (`Topic.Checkpoint`/`Pipeline`, `during/then`)
+  dies with the seed migration; `Topic.Execution` (manifests' value-threading synthesis, which does NOT
+  fit a scenario) survives, extracted to its own clean port. The three names — the host root, the
+  synthesis port, the surviving unit (`Topic`→`Step`?) — fix together on the extracted code.
+
+The mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate) have their
+reference sketch pinned at tag `spike/bdd-pipeline-poc`: `DagGateSpikeTest` (the topological gate),
+`PollUntilReadyExtension` (adaptive poll — live form `SeedSystemdAdapterEndpointGate`). The graft
+shipped; the rest shipped with the socle.
 
 == Related documentation
 

@@ -16,70 +16,71 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Proves {@link ScenarioGraft} — the cross-world graft — in production, not in the bench spike. Two
- * scenarios are played to yield real {@link ReportModel}s: a HOST runbook with a named gateway
- * step, and a REMOTE bloom. The remote's model crosses as a {@code ScenarioJsonWriter} String (the
- * only thing the seam carries), the graft {@link ScenarioGraft#rebuild rebuilds} it in this realm
- * and {@link ScenarioGraft#graftUnder grafts} it under the gateway. What is asserted is the spec's
- * E5 shape (one continuous tree) + the fail-fast across the frontier (P2).
+ * scenarios are played to yield real {@link ReportModel}s: a HOST runbook with a named rootstock
+ * step, and a REMOTE rootstock. The scion's model crosses as a {@code ScenarioJsonWriter} String
+ * (the only thing the seam carries), the graft {@link ScenarioGraft#rebuild rebuilds} it in this
+ * realm and {@link ScenarioGraft#graftUnder grafts} it under the rootstock. What is asserted is the
+ * spec's E5 shape (one continuous tree) + the fail-fast across the frontier (P2).
  */
 class ScenarioGraftTest {
 
-  private static final String GATEWAY = "the remote world is consulted";
+  private static final String ROOTSTOCK = "the scion world is consulted";
 
   private final ScenarioGraft graft = new ScenarioGraft();
 
   @Test
-  void a_healthy_remote_grafts_as_a_subtree_and_the_host_continues() {
-    final ReportModel remote = play(RemoteStage.class, r -> r.the_remote_scenario_runs_green());
+  void a_healthy_scion_grafts_as_a_subtree_and_the_host_continues() {
+    final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
     final ReportModel host = playHost();
 
     // What actually crosses is a String; rebuild it in this realm before grafting.
-    final String crossed = new ScenarioJsonWriter(remote).toString();
-    assertFalse(crossed.isBlank(), "the remote scenario serializes to cross the seam");
+    final String crossed = new ScenarioJsonWriter(scion).toString();
+    assertFalse(crossed.isBlank(), "the scion scenario serializes to cross the seam");
 
-    graft.graftUnder(host, GATEWAY, graft.rebuild(crossed));
+    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(crossed));
 
-    final StepModel gateway = stepNamed(host, GATEWAY);
-    assertFalse(gateway.getNestedSteps().isEmpty(), "the remote steps grafted under the gateway");
+    final StepModel rootstock = stepNamed(host, ROOTSTOCK);
+    assertFalse(
+        rootstock.getNestedSteps().isEmpty(), "the scion steps grafted under the rootstock");
     assertEquals(
-        StepStatus.PASSED, stepAfter(host, GATEWAY).getStatus(), "the host phase after ran");
+        StepStatus.PASSED, stepAfter(host, ROOTSTOCK).getStatus(), "the host phase after ran");
   }
 
   @Test
-  void a_failing_remote_fails_the_gateway_and_skips_the_host_downstream() {
-    final ReportModel remote = play(RemoteStage.class, r -> r.the_remote_scenario_fails());
+  void a_failing_scion_fails_the_rootstock_and_skips_the_host_downstream() {
+    final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_fails());
     final ReportModel host = playHost();
 
     assertEquals(
         ExecutionStatus.FAILED,
-        remote.getScenarios().get(0).getExecutionStatus(),
-        "the remote scenario failed");
+        scion.getScenarios().get(0).getExecutionStatus(),
+        "the scion scenario failed");
 
-    graft.graftUnder(host, GATEWAY, graft.rebuild(new ScenarioJsonWriter(remote).toString()));
+    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
     assertEquals(
-        StepStatus.FAILED, stepNamed(host, GATEWAY).getStatus(), "the remote failure propagates");
+        StepStatus.FAILED, stepNamed(host, ROOTSTOCK).getStatus(), "the scion failure propagates");
     assertEquals(
         StepStatus.SKIPPED,
-        stepAfter(host, GATEWAY).getStatus(),
-        "the host phase after a failed gateway is skipped (fail-fast across the frontier)");
+        stepAfter(host, ROOTSTOCK).getStatus(),
+        "the host phase after a failed rootstock is skipped (fail-fast across the frontier)");
   }
 
   @Test
-  void an_unknown_gateway_step_is_a_loud_wiring_bug() {
-    final ReportModel remote = play(RemoteStage.class, r -> r.the_remote_scenario_runs_green());
+  void an_unknown_rootstock_step_is_a_loud_wiring_bug() {
+    final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
     final ReportModel host = playHost();
-    final ReportModel rebuilt = graft.rebuild(new ScenarioJsonWriter(remote).toString());
+    final ReportModel rebuilt = graft.rebuild(new ScenarioJsonWriter(scion).toString());
 
     assertThrows(
         IllegalArgumentException.class,
         () -> graft.graftUnder(host, "no such step", rebuilt),
-        "grafting under a missing gateway step fails loudly, not silently");
+        "grafting under a missing rootstock step fails loudly, not silently");
   }
 
-  /** The host runbook: a gateway step (the crossing) followed by a downstream phase. */
+  /** The host runbook: a rootstock step (the crossing) followed by a downstream phase. */
   private static ReportModel playHost() {
-    return play(HostStage.class, h -> h.the_remote_world_is_consulted().the_host_finishes());
+    return play(HostStage.class, h -> h.the_scion_is_grafted().the_host_finishes());
   }
 
   /**
@@ -122,8 +123,8 @@ class ScenarioGraftTest {
 
   /** The host-world stages: a crossing step, then a downstream phase. */
   public static class HostStage extends Stage<HostStage> {
-    @As("the remote world is consulted")
-    public HostStage the_remote_world_is_consulted() {
+    @As("the scion world is consulted")
+    public HostStage the_scion_is_grafted() {
       return self();
     }
 
@@ -133,16 +134,16 @@ class ScenarioGraftTest {
     }
   }
 
-  /** The remote-world stage: the bloom, green or failing. */
-  public static class RemoteStage extends Stage<RemoteStage> {
-    @As("the remote scenario runs green")
-    public RemoteStage the_remote_scenario_runs_green() {
+  /** The scion-world stage: the rootstock, green or failing. */
+  public static class ScionStage extends Stage<ScionStage> {
+    @As("the scion scenario runs green")
+    public ScionStage the_scion_scenario_runs_green() {
       return self();
     }
 
-    @As("the remote scenario fails")
-    public RemoteStage the_remote_scenario_fails() {
-      throw new AssertionError("the remote bloom diagnosed a symptom");
+    @As("the scion scenario fails")
+    public ScionStage the_scion_scenario_fails() {
+      throw new AssertionError("the scion rootstock diagnosed a symptom");
     }
   }
 }
