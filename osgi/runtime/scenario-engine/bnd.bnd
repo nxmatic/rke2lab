@@ -13,6 +13,10 @@ Export-Package: \
 # The seam half (OutOfContainerFrameworkExtension) pulls the framework-launch API + felix + slf4j
 # (the resolution-failure diagnostic logger), needed only on the flat host classpath; marking them
 # optional lets the bundle still RESOLVE when installed in-container to provide the runner package.
+# jgiven.report.* is the same case: ScenarioGraft (base package, host-side only, never wired
+# in-container) rebuilds/grafts a ReportModel via ScenarioJsonReader — jGiven is on the flat host
+# classpath where the graft runs, but absent from an in-container world that only installs this
+# bundle for its runner package. Optional keeps that in-container resolution green.
 # boot.discovery is NOT optional: the IN-CONTAINER runner path (JUnitLauncherCore.wiringOf →
 # ClassRealm.of) loads it unconditionally, so a consumer must wire it or fail at resolution rather
 # than with a late NoClassDefFoundError — its package is system-exported by the in-container test
@@ -26,6 +30,7 @@ Import-Package: \
     io.nxmatic.rke2lab.osgi.runtime.framework;resolution:=optional, \
     io.nxmatic.rke2lab.osgi.bnd;resolution:=optional, \
     org.slf4j;resolution:=optional, \
+    com.tngtech.jgiven.report.*;resolution:=optional, \
     *
 
 -noimportjava: true

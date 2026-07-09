@@ -33,13 +33,13 @@ import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.engine.support.store.Namespace;
 
 /**
- * Cluster-seed topic — a {@link Topic.Pipeline}: its body boots the embedded framework and launches
- * {@link ClusterSeedScenario} on the JUnit-platform launcher (the seeding is jGiven scenarios now,
- * not the fluent pipeline). Its config/policy/options/onFailure inputs arrive as {@link Supplier}s
- * (the read-face dual of a sink) — forwarded from the parent's builder without materializing here.
+ * Cluster-seed topic: its body boots the embedded framework and launches {@link
+ * ClusterSeedScenario} on the JUnit-platform launcher (the seeding is jGiven scenarios now, not the
+ * fluent pipeline). Its config/policy/options/onFailure inputs arrive as {@link Supplier}s (the
+ * read-face dual of a sink) — forwarded from the parent's builder without materializing here.
  * Pushes the collected outputs through its {@link Sink}.
  */
-public final class ClusterSeedTopic implements Topic.Pipeline {
+public final class ClusterSeedTopic implements Topic.Execution {
 
   private final boolean pulumiMode;
   private final Supplier<BootstrapConfig> configSupplier;

@@ -69,7 +69,7 @@ public record EmbedCapability(Clause clause) {
    * ONLY, excluded from flat), a {@code library} is BOTH realms at once. Its exported package
    * legitimately lives in two realms — exempt from {@code DUPLICATE_REALM_CLASS} like jackson,
    * because it is NOT a seam surface (no type of it crosses the String-only seam; each realm holds
-   * its own copy bound to its own jackson). Exemplar: {@code gateway-document-codec} (the {@code
+   * its own copy bound to its own jackson). Exemplar: {@code seed-broker-codec} (the {@code
    * DocumentCodec}, one source, two realm-bound copies).
    */
   public static final String TYPE_LIBRARY = "library";

@@ -272,8 +272,40 @@ parcels IN PRINCIPLE (host/OSGi/remote), but seed-master's seed is not freely ro
 offspring bloom OSGi. Documented in world-gateway-spec.adoc § "The germination cascade". See
 [[cluster-seed-execution-state]] (the scenario→sub-scenario graft is fork B's 2b).
 
-Session state: fork B increment 2a committed (`953612b25`), tree clean; 2b (host graft) NOT started —
-deliberately parked to brainstorm this first.
+## ★ RESUME POINT (2026-07-08, post-compaction) — DESIGN done, CODE next
+
+The vision is fully DOCUMENTED and atlas-VALIDATED (7 commits this session, tree clean, on
+`feature/cluster-seed-scenario`): `87722d2d0`+`953612b25` (fork B increment 2a — cluster-readiness plays
+in-container + consults the doctor itself), then the doc arc `3fd85e6cb` (seed-broker vision in
+world-gateway-spec) → `e0945ec71` (specs re-cut BY NATURE: pipeline-spec→bdd/bdd.adoc,
+host-pipeline→atlas/seed.adoc) → `42ec9800a` (seed-orchestration prose → new osgi/seed-spec.adoc) →
+`9091746bc` (germination cascade, symmetry rejected) → `e38aa2251` (atlas L0 additivity verdict — the
+broker is a foundation integrating worlds + domains, additive-with-named-erasure).
+
+What is DONE = the conceived design + its atlas additivity certificate. What is NOT done = the CODE
+(the atlas verdict certifies the design is additive, NOT that it is built). The realization chantiers,
+each with a verifiable criterion already established this session — an ORDER still to be cadré with the
+user (we were about to when compaction was called):
+
+1. Finish fork B **2b** (the host graft) — the ONE piece of live code half-started: host plays the
+   sub-scenario in-container via the front-door, symmetric inbound envelope, grafts the ScenarioModel
+   (`addNestedStep` + FAILED→SKIPPED). BLOCKED in PROD by the frontier hole (jGiven flat, cluster-bdd
+   not staged); provable in the cluster-bdd TEST (real Felix). See [[cluster-seed-execution-state]].
+2. **seed-bdd** home for the composer `ClusterSeedScenario` (host `-bdd`); descend the 2 misplaced
+   host-side domain scenarios into their own `-bdd`. Criterion: every scenario in an `X-bdd`.
+3. The **broker door** — collapse the N `Document→Document` service interfaces (ConsultingService,
+   ReadinessAuthority, InterventionIntake) into one `handle(Document)→Document` dispatched by
+   coordinate; the verbs become OSGi-internal handlers. Closes the ConsultingService in-process knot.
+4. **`-port`s shed `type=seam`** — criterion: a `-port` leaves the seam when zero host files import it
+   (measured baseline: doctor 9, manifests 8, bbox 8, cluster 6, systemd/incus 4, netplan 2, auth 1).
+5. **Rename** `world-gateway → seed-broker` (+ `gateway-document-codec`) — atomic pass, ~10 bnd +
+   imports, no compat shim. Ride it on the door work.
+6. A scenario's vocabulary hygiene: a domain scene stops importing the envelope machinery
+   (`Document`/`ObservationWire`/`DocumentCodec`) once the broker exists — the 2a-consult code is the
+   debt this fixes.
+
+Also parked: the `pipeline-spec` re-cut is DONE, but [[pipeline-spec-recut-plan]] may hold residual
+notes. [[specs-decompose-like-modules]] = the doc-decomposition principle (by nature, not 1:1 modules).
 Dispatch owner: leaning multiplexor, MUST re-confront it to the Exchange needs (it predates them). See
 [[multiplexor-two-models-design]] [[cluster-seed-execution-state]] [[gateway-crossing-three-natures]]
 [[port-vocabulary-not-cross-domain-dup]] [[document-seam-cannot-expose-jackson-jsonnode]].

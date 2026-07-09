@@ -23,12 +23,32 @@ import org.objectweb.asm.Opcodes;
  */
 final class DocumentContractScan {
 
-  private static final String COORDINATE = "io/nxmatic/rke2lab/world/gateway/port/Coordinate";
-  private static final String CONTRACT_DESC =
-      "Lio/nxmatic/rke2lab/world/gateway/port/DocumentContract;";
+  /** ASM internal name of the {@code Coordinate} enum, e.g. {@code io/nxmatic/…/Coordinate}. */
+  private final String coordinate;
+
+  /**
+   * ASM type descriptor of {@code @DocumentContract}, e.g. {@code Lio/nxmatic/…/DocumentContract;}.
+   */
+  private final String contractDesc;
 
   private final Map<String, String> coordinateConstToSlug = new LinkedHashMap<>();
   private final Map<String, String> slugToRecordInternalName = new LinkedHashMap<>();
+
+  /**
+   * @param seamPackage the seed-broker seam's exported package, dotted (the SAME string the caller
+   *     selects the seam bundle by) — the single source both the bundle selection and this scan
+   *     derive from, so a rename cannot make one drift silently past the other.
+   */
+  DocumentContractScan(String seamPackage) {
+    final String seamInternal = seamPackage.replace('.', '/');
+    this.coordinate = seamInternal + "/Coordinate";
+    this.contractDesc = "L" + seamInternal + "/DocumentContract;";
+  }
+
+  /** ASM internal name of the {@code Coordinate} enum this scan indexes. */
+  String coordinateInternalName() {
+    return coordinate;
+  }
 
   /** Index the Coordinate enum's constant→slug map from its {@code <clinit>} LDC pairs. */
   void indexCoordinate(byte[] coordinateClass) {
@@ -59,8 +79,8 @@ final class DocumentContractScan {
                   @Override
                   public void visitFieldInsn(int opcode, String owner, String name, String desc) {
                     if (opcode == Opcodes.PUTSTATIC
-                        && COORDINATE.equals(owner)
-                        && ("L" + COORDINATE + ";").equals(desc)
+                        && coordinate.equals(owner)
+                        && ("L" + coordinate + ";").equals(desc)
                         && pendingName != null
                         && pendingSlug != null) {
                       coordinateConstToSlug.put(pendingName, pendingSlug);
@@ -85,7 +105,7 @@ final class DocumentContractScan {
             new ClassVisitor(Opcodes.ASM9) {
               @Override
               public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                if (!CONTRACT_DESC.equals(descriptor)) {
+                if (!contractDesc.equals(descriptor)) {
                   return null;
                 }
                 return new AnnotationVisitor(Opcodes.ASM9) {

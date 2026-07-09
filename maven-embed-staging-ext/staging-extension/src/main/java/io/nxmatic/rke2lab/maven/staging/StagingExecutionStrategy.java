@@ -293,41 +293,51 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     // meta-schema-valid (records-as-contract; the record's components ARE the schema) ----
     // The seed-broker seam is system-exported (type=seam), so it is in `resolved` with the seam
     // marker — NOT in closure.staged(); find it by the export package it owns.
-    ResolvedBundle worldGatewayBundle = null;
+    final String seamPackage = "io.nxmatic.rke2lab.seed.broker.port";
+    ResolvedBundle seedBrokerBundle = null;
     for (ResolvedBundle b : resolved) {
       if (b.embed().map(EmbedCapability::isSeam).orElse(false)
-          && b.exports().names().contains("io.nxmatic.rke2lab.seed.broker.port")) {
-        worldGatewayBundle = b;
+          && b.exports().names().contains(seamPackage)) {
+        seedBrokerBundle = b;
         break;
       }
     }
 
-    if (worldGatewayBundle != null) {
+    if (seedBrokerBundle != null) {
       // The seed-broker seam carries both the Coordinate enum and the wire-records; index the
       // coordinate slugs and the @DocumentContract-carrying records from its class entries, and
       // resolve nested wire-record / seam-enum bytes by internal name over the same bundle.
-      final Map<String, byte[]> gatewayBytes = new LinkedHashMap<>();
-      for (ResolvedBundle.ClassEntry c : worldGatewayBundle.classEntries()) {
-        gatewayBytes.put(c.binaryName(), c.bytes());
+      final Map<String, byte[]> seamBytes = new LinkedHashMap<>();
+      for (ResolvedBundle.ClassEntry c : seedBrokerBundle.classEntries()) {
+        seamBytes.put(c.binaryName(), c.bytes());
       }
 
-      final DocumentContractScan scan = new DocumentContractScan();
-      final byte[] coordinateClass =
-          gatewayBytes.get("io/nxmatic/rke2lab/world/gateway/port/Coordinate");
-      if (coordinateClass != null) {
-        scan.indexCoordinate(coordinateClass);
+      // Same string selected the bundle above and derives the internal names here — one source, so
+      // a
+      // rename cannot drift one past the other. If the seam bundle is present but its Coordinate is
+      // not, that is a broken seam, not an empty gate: fail loudly rather than validate nothing.
+      final DocumentContractScan scan = new DocumentContractScan(seamPackage);
+      final byte[] coordinateClass = seamBytes.get(scan.coordinateInternalName());
+      if (coordinateClass == null) {
+        throw new IllegalStateException(
+            "seed-broker seam bundle exports "
+                + seamPackage
+                + " but carries no "
+                + scan.coordinateInternalName()
+                + " — the SCHEMA_CONCORD scan would validate nothing");
       }
-      for (Map.Entry<String, byte[]> e : gatewayBytes.entrySet()) {
+      scan.indexCoordinate(coordinateClass);
+      for (Map.Entry<String, byte[]> e : seamBytes.entrySet()) {
         scan.scan(e.getKey(), e.getValue());
       }
 
       final SchemaConcord schemaConcord =
           new SchemaConcord(
-              scan.coordinateConstToSlug(), scan.slugToRecordInternalName(), gatewayBytes::get);
+              scan.coordinateConstToSlug(), scan.slugToRecordInternalName(), seamBytes::get);
       report.record(
           StagingGate.SCHEMA_CONCORD,
-          worldGatewayBundle.governance().levels(),
-          worldGatewayBundle,
+          seedBrokerBundle.governance().levels(),
+          seedBrokerBundle,
           schemaConcord.violations(),
           "Document coordinate without a wire-record, or a wire-record whose generated schema is"
               + " invalid against the JSON-Schema meta-schema");
