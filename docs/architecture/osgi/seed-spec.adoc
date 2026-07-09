@@ -58,6 +58,28 @@ scenario suffices* — it carries both the narration (steps → the sub-tree) an
 serves any scion — OSGi in-container today, HTTP-remote tomorrow. Its execution twin — one broker door
 instead of N service verbs — is link:seed-broker-spec.adoc[the seed-broker design].
 
+=== The horticultural register — the two twins, one cycle
+
+The crossing has ONE register, played by two twins. A client sows a *seed* (the request `Document`);
+it germinates into a *plant* (what grew — the response `Document`). The two twins see that same grown
+thing differently:
+
+[cols="1,2,2",options="header"]
+|===
+| | *execution twin* (the broker) | *observability twin* (the graft)
+
+| what grew | the *plant* — the response `Document` `sow` returns | the *scion* — the played scenario's `ScenarioModel` (a plant, narrated)
+| the verb on it | *harvest* (récolter) — read it, opaque, by key | *graft* — `graftUnder` its steps onto the *rootstock* step
+| currency | a `Document` (opaque JSON payload) | a jGiven `ReportModel` (agnostic narration)
+|===
+
+So *plant* and *scion* are the SAME object seen by the two twins — one harvested (data, the machine
+channel), one grafted (narration, the human channel). The full cycles: execution = *seed → sow → plant
+→ harvest*; observability = *seed → sow → scion → graft/rootstock*. The harvest is opaque: the host
+reads the plant BY KEY (never by holding a domain class) — when it needs to know the seed's or plant's
+shape, it ASKS the broker (introspection is itself a `sow` at a meta-coordinate; see
+link:seed-broker-spec.adoc[the seed-broker design]).
+
 == The OSGi world is detached by design — embedded exec is a special case
 
 *Lead: the general case is a detached OSGi world (remote); seed-master's embedded exec merely folds the

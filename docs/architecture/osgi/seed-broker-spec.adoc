@@ -19,6 +19,17 @@ dispatched to `SeedHandler`s by coordinate. Two of the three former verbs are no
 transitionally (its real provider needs `HealthSystem.admit(patient)`, a separate doctor-migration
 increment) and folds into the door when that lands — the one item on the broker unification worklist
 (§ <<open-extensibility-chantier>>). The host-side migration (§ <<remaining-migration>>) is the other.
+
+*Conceived next (2026-07-09, § <<contribution-and-opacity>>):* the contribution + opacity turn that
+makes a domain OWN its vocabulary and renders every `Document` truly opaque to the host. Four moves,
+staged: (1) `Coordinate` becomes an *interface* (`slug()`, like `WireEnum`), each domain contributes its
+own enum (`DoctorCoordinate implements Coordinate`); (2) `@DocumentContract` binds by `String slug`, not
+an enum reference (an interface cannot be an annotation element); (3) the host stops holding domain
+wire-record CLASSES — it sows/harvests via the codec's `toMap`/`fromMap` + the broker VOCABULARY, and
+when it needs a seed's shape it ASKS the broker (introspection = a `sow` at a meta-coordinate); (4) with
+no class crossing, the domain's wire-records leave the seam for a domain bundle. Staged as PALIERS: the
+opaque logic is PROVEN at the Pulumi frontier first (§ <<pulumi-frontier-decorrelation>>), then
+generalized into the broker — that generalization is what collapses the per-domain seam.
 ====
 
 == The keystone: crossing worlds is a detail; the client sows a seed
@@ -267,6 +278,7 @@ of `YamlMapper`), the host holds a plain instance (no DS); each realm carries it
 `String` payload ↔ record independently. The rejected symmetric alternative — a rich host-side mapper
 rebuilding doctor types — re-creates a doctor vocabulary on the host, the very leak this closes.
 
+[[the-seam-types]]
 == The seam types — what actually crosses
 
 The seam module `osgi/foundation/world-gateway` (`type=seam`, system-exported, one shared copy —
@@ -275,20 +287,36 @@ package `io.nxmatic.rke2lab.seed.broker.port`:
 
 * *The envelope* — `Document(String domain, String coordinate, String payload)`. The payload is a
   serialized `String`, NOT a `JsonNode` — so jackson never crosses the seam; each realm parses the
-  string with its own mapper. `SeedBrokerCatalog` is the single-source-of-truth for the shared field
-  names (the `FIELD_*` constants a producer and its reconstruction both key on).
-* *The closed vocabularies* — seam enums, not loose strings, so the compiler catches drift:
-  `Coordinate` (the six document types: `readiness-checkpoint`, `readiness-verdict`, `consultation`,
-  `intervention-request`, `intervention`, `visit`), `Domain`, `Action` (the provisioning control
-  vocabulary the host may name), `SymptomKind` (the routing key, `slug()` ↔ the doctor's `Symptom.id()`
-  in shared kebab-case). Each implements the `WireEnum` marker (wire form = a kebab-case `slug()`).
+  string with its own mapper.
++
+[NOTE]
+====
+`SeedBrokerCatalog` (the `FIELD_CONSULTATION_REPORT`/`FIELD_EXPECTATIONS` constants) was described here
+as a single-source-of-truth for shared field names. It is NOT a broker concern — it names PULUMI OUTPUT
+KEYS, the storage-frontier leak the § <<pulumi-frontier-decorrelation>> turn removes (the frontier
+derives its keys by introspecting the wire-record's components, so no field-name catalog survives in the
+seam). Slated for deletion; do not build on it.
+====
+* *The contributable vocabularies* — seam enums, not loose strings, so the compiler catches drift.
+  `Coordinate` is being opened to an *interface* (`slug()`, like `WireEnum`): the six document types
+  (`readiness-checkpoint`, `readiness-verdict`, `consultation`, `intervention-request`, `intervention`,
+  `visit`) are ALL doctor's today and move to a domain-owned `DoctorCoordinate implements Coordinate`, so
+  "publish a handler = publish its coordinates" holds end to end (§ <<contribution-and-opacity>>).
+  `Domain`, `Action` (the provisioning control vocabulary the host may name), and `SymptomKind` (the
+  routing key, `slug()` ↔ the doctor's `Symptom.id()` in shared kebab-case) each implement the `WireEnum`
+  marker (wire form = a kebab-case `slug()`). `WireEnum` is the proof the contributable pattern already
+  works — `Coordinate` is the lone type that had not yet followed it.
 * *The identity types* — `Checkpoint` (enum: `SYSTEMD_ADAPTER`, `CLUSTER_READINESS`, each carrying its
   slug, derived `resourceName`, and `scenarioTitle`) and `Patient(org, project, stack)` (a stack
   coordinate, not a medical one — `qualifiedName()`). Both worlds hold their own; the checkpoint
   identity is the join key, so the peer verbs pass identity, not payload
   (`reviewDrift(Checkpoint) : void`).
-* *The wire-records* — one flat seam record per `Coordinate`, carrying `@DocumentContract(Coordinate)`;
-  its `RecordComponents` ARE the contract (see the next section). The seven:
+* *The wire-records* — one flat record per `Coordinate`, carrying `@DocumentContract(slug)` (a `String`,
+  not an enum reference — an interface `Coordinate` cannot be an annotation element, and foundation must
+  not name a domain enum; the `SCHEMA_CONCORD` gate makes a slug that matches no coordinate a RED build,
+  so the duplication is gate-guarded, not the silent `clusterApi`-bug hazard). Its `RecordComponents` ARE
+  the contract (see the next section). As part of § <<contribution-and-opacity>> these move OUT of the
+  seam into a domain-owned `doctor-broker-port`, since the host stops holding their class. The seven:
 +
 [cols="1,2",options="header"]
 |===
@@ -323,12 +351,14 @@ those inner graphs (`ConsultationReportReader`, `ExpectationReader`, `Interventi
 == The contract: a wire-record per coordinate, the schema projected from it
 
 A `Document` payload is untyped text; without a contract we would trade a type leak for silent schema
-drift. The contract is the **wire-record per `Coordinate`** — a flat seam record (scalars, `List`,
-nested wire-records, seam enums; no jackson annotations) carrying `@DocumentContract(Coordinate)`. Its
+drift. The contract is the **wire-record per `Coordinate`** — a flat record (scalars, `List`, nested
+wire-records, seam enums; no jackson annotations) carrying `@DocumentContract(slug)`. Its
 `RecordComponents` ARE the contract: the JSON Schema is a **build-time projection** of them, never
-hand-written — no `FIELD_*` string catalog to keep in step. The wire-record *type* never crosses (it
-is a seam type); only the serialized `String` payload does, mapped record↔`String` by each realm's own
-`DocumentCodec`.
+hand-written — no `FIELD_*` string catalog to keep in step. The wire-record *type* never crosses; only
+the serialized `String` payload does, mapped record↔`String` by each realm's own `DocumentCodec`. The
+codec also exposes `toMap(record)` / `fromMap(map, type)` (record ↔ opaque `Map`) and
+`decode(String)→JsonNode` (opaque tree): these are how the HOST reads a plant BY KEY and assembles a
+seed WITHOUT the class — the opacity path § <<contribution-and-opacity>> generalizes.
 
 The codec (`osgi/foundation/gateway-document-codec`, package
 `io.nxmatic.rke2lab.seed.broker.codec`) registers its jackson modules EXPLICITLY (never
@@ -394,6 +424,91 @@ unit. They form a hierarchy matching `Document(domain, coordinate, payload)`.
 So `domain` = ownership, `coordinate` = type = schema key. A new domain plugs in additively: one more
 `@Component`, its own schemas, no gateway change.
 
+[[contribution-and-opacity]]
+== Contribution + opacity — a domain owns its vocabulary, the host holds none of it
+
+The shipped broker collects `SeedHandler` `@Component`s by DS and dispatches by coordinate — the domain
+already contributes its LOGIC and its own encode/decode (each handler holds a `DocumentCodec` and knows
+its own wire-records). Two things are NOT yet contributed, and closing them is what makes a `Document`
+truly opaque to the host:
+
+* *the coordinate* — `Coordinate` is a central enum; a domain declares which coordinate it serves but
+  cannot DEFINE one. It becomes an *interface* (`slug()`), exactly as `WireEnum` already is; each domain
+  ships its own (`DoctorCoordinate implements Coordinate`), and `@DocumentContract` binds by `String
+  slug` (§ <<the-seam-types>> / the contract section). Verified safe: no prod code needs the closed set
+  (no `values()`/`valueOf`/exhaustive `switch`); only a test used `Coordinate.parse`.
+* *the class the host holds* — today the host CONSTRUCTS wire-records to sow (`new ReadinessCheckpoint`,
+  `new ObservationWire`, `new InterventionRequest`) and DECODES them to harvest
+  (`decode(doc, Consultation.class)`). That is the last tie binding the host to a domain type.
+
+The cure is one mechanism, applied at the client: the host holds only the *vocabulary* (the coordinate
++ the field names), never the class. It sows by assembling a `Map` → `Document` (via `toMap`/the opaque
+tree) and harvests by reading the plant BY KEY (`v.path("action")`). The DOMAIN holds the class — inside
+its handler, `fromMap(seed)` / `toMap(plant)` — because it contributed the handler.
+
+=== Introspection is asking the broker — a `sow` at a meta-coordinate
+
+Assembling a seed as a raw `Map` would replace "hold the class" (compiler-checked) with "hardcode the
+field-name strings" (silent) — a WORSE hazard. The resolution (the keystone of the opacity turn): the
+host does not hardcode field names; when it must build or find something in an opaque `Document`, it
+ASKS THE BROKER. The domain — which knows the schema, contributed WITH the handler — answers. And since
+the door is already `sow(Coordinate wanted, Document seed)` routed by `wanted`, "what can you grow, and
+what is the seed's shape?" is ITSELF a `Document` sown at a META-coordinate — *no new interface method*.
+The broker becomes self-describing through its own single door.
+
+[mermaid]
+....
+flowchart TB
+  host["HOST — holds no class, no hardcoded keys"]
+  broker["SeedBroker.sow(wanted, seed) — the ONE door"]
+  meta["meta-coordinate handler (the seed's shape)<br/>knows the schema, contributed with the domain"]
+  dom["DOMAIN handler<br/>fromMap(seed) → logic → toMap(plant)"]
+  host -->|"sow(shape, {coordinate: 'readiness-checkpoint'})"| broker
+  broker -->|route by wanted=shape| meta
+  meta -->|"the seed's shape (a Document)"| host
+  host -->|"sow(readiness-verdict, the built seed)"| broker
+  broker -->|route by wanted| dom
+  dom -->|"plant Document (opaque)"| host
+  classDef good fill:#d4f4dd,stroke:#2e7d32;
+  class host,broker,meta,dom good;
+....
+
+This is why the per-domain seam can fall entirely (§ <<one-seam>>): the last thing tying the host to a
+domain — knowing a wire-record's fields — becomes a question answered through the door, by the domain
+that contributed the handler. The wire-records then leave the seam for a domain bundle
+(`doctor-broker-port` becomes a domain API, not a `type=seam`). Open at realization: the meta-coordinate's
+name + who serves it (the broker itself, or a foundation handler reflecting each domain's
+`@DocumentContract`).
+
+[[pulumi-frontier-decorrelation]]
+== The Pulumi-frontier decorrelation — the opacity proof ground
+
+The same opacity logic is PROVEN first at the easiest frontier — host↔Pulumi — because it is already
+half-opaque and pulls no new machinery. Today two sites LEAK: `SystemdAdapterResource` decodes a
+`Consultation` and re-routes `.consultationReport()`/`.expectations()` to two Pulumi keys (write), and
+`StackMedicalRecordJournal` reads those keys back into a `VisitWire` (read). The two leaked names —
+`SeedBrokerCatalog.FIELD_*` (foundation) and `ConsultationReport.OUTPUT_KEY`/`Expectation.OUTPUT_KEY`
+(doctor-records) — mean the DOMAIN carries the name of Pulumi storage slots. That is the constraint this
+turn removes: *Pulumi's storage shape must not transpire into a domain.*
+
+The finding: the "common contract" the frontier needs already EXISTS — it is doctor's own aggregate
+model. `Patient(org,project,stack)` = a stack; `Visit(version,when,…)` = a stack update; a
+`ConsultationReport` (one per checkpoint) = a resource; a sub-tree the `Visit` aggregates = an output.
+The two-key split is not a Pulumi need nor legacy — it is `Visit`'s own two lists (`reports` +
+`expectations`). Pulumi merely REALIZES that shape.
+
+So the frontier stops decoding-and-sorting and INTROSPECTS instead — the runtime twin of the build-time
+`RecordSchemaProjector` (which already projects a record's components → JSON Schema). Roles, decided
+deterministically: the DOMAIN *declares* a component-level marker (the field analogue of
+`@DocumentContract`) on the wire-record components that are addressable storage slots; the FRONTIER
+*executes* — reads the marked components reflectively and routes each under a Pulumi key = the component
+NAME, transporting the rest opaque. `SeedBrokerCatalog` + both `OUTPUT_KEY` die; the frontier names
+nothing in hard code. Rejected: the convention "a `List` component is a slot" (too implicit — a future
+non-output list would break it, against the determinism discipline); and putting the marker on
+`SeedHandler` (that re-introduces storage vocabulary into the domain contract — the handler stays
+`Document → Document`, backend-blind). Open at realization: the marker's name (storage-NEUTRAL —
+"addressable slot", never "pulumi output", so foundation carries no Pulumi word) and its home.
+
 == The boot pipeline — GROUND / GATEWAY / APPLY
 
 The decomposition follows the system's real capabilities. The framework lifecycle constrains the
@@ -452,7 +567,8 @@ Two coarse greps remain useful as quick eyeballs (the gate is the real check):
 
 * `grep -rl "import com.pulumi" osgi/` == 0 (holds at the type level).
 * `grep -rl "toOutputMap\|OUTPUT_KEY\|fromOutputMap" osgi/` — the egress-serialization sites the
-  remaining host migration still closes (see below).
+  remaining host migration still closes (see below). `OUTPUT_KEY` in `doctor-records` is also the
+  storage-frontier leak § <<pulumi-frontier-decorrelation>> removes.
 ====
 
 [[remaining-migration]]
@@ -496,10 +612,12 @@ work, done when we get to it — not invented here. (The config `InfraDomain` en
 closed-vs-open tension, same p2p driver — see the config-restructuring spec.)
 ====
 
-The shipped records-as-contract won a typed contract-of-form, but it does NOT yet have OPEN per-domain
-extensibility: `Coordinate` is a closed central enum and the egress assembles host-side, so a new
-contributing domain edits the CENTER (the enum, the host builder) rather than extending at the edge.
-Only one domain (doctor) contributes today, so N=1 hides the cost.
+The shipped records-as-contract won a typed contract-of-form. The § <<contribution-and-opacity>> turn
+supplies the OPEN per-domain extensibility on the REQUEST/response axis (coordinate → interface, the
+domain owns its enum + wire-records). What THIS chantier still adds is the same openness on the
+*data-egress* axis — the egress DAG assembles host-side today, so a new contributing domain still edits
+the host builder rather than extending at the edge. Only one domain (doctor) contributes today, so N=1
+hides the cost.
 
 The design is not new and not dead: it is the *per-domain roster* we already conceived (the
 "multiplexor"), still current — only its BOUNDARY moves. The key correction to the earlier picture:
