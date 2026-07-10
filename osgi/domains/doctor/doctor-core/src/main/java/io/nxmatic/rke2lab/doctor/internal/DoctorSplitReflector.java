@@ -63,9 +63,10 @@ public final class DoctorSplitReflector implements SeedHandler {
 
   /**
    * Group the populated {@code @Scion} components under the value of the single {@code @Rootstock}
-   * component: {@code { rootstockValue -> { scionName -> scionValue } } }. An empty scion is
-   * omitted (nothing to file); if every scion is empty the split is an empty map (the frontier
-   * nests nothing), so the rootstock key is not emitted for a symptomless consult.
+   * component, keyed by each scion's ROLE (its {@code @Scion.value()}, a neutral gardening part —
+   * {@code fruit}, {@code sowing}): {@code { rootstockValue -> { role -> scionValue } } }. An empty
+   * scion is omitted (nothing to file); if every scion is empty the split is an empty map (the
+   * frontier nests nothing), so the rootstock key is not emitted for a symptomless consult.
    */
   private Map<String, Object> splitByRootstock(Class<?> bearer, Object decoded) {
     final LinkedHashMap<String, Object> scions = new LinkedHashMap<>();
@@ -75,12 +76,13 @@ public final class DoctorSplitReflector implements SeedHandler {
         rootstock = String.valueOf(readComponent(component, decoded));
         continue;
       }
-      if (!component.isAnnotationPresent(Scion.class)) {
+      final Scion scion = component.getAnnotation(Scion.class);
+      if (scion == null) {
         continue;
       }
       final Object value = readComponent(component, decoded);
       if (!isEmpty(value)) {
-        scions.put(component.getName(), value);
+        scions.put(scion.value(), value);
       }
     }
     if (scions.isEmpty()) {

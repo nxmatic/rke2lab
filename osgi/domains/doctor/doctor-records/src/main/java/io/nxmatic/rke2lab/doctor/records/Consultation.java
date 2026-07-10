@@ -30,8 +30,8 @@ public record Consultation(
     @Rootstock String scenarioId,
     String narration,
     String diagnosisAdoc,
-    @Scion Map<String, Object> consultationReport,
-    @Scion List<Object> expectations) {
+    @Scion("fruit") Map<String, Object> consultationReport,
+    @Scion("sowing") List<Object> expectations) {
 
   public Consultation {
     consultationReport = consultationReport == null ? Map.of() : Map.copyOf(consultationReport);

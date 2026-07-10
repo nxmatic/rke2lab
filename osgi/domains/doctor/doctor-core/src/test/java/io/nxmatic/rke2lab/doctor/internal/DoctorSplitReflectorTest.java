@@ -44,20 +44,22 @@ class DoctorSplitReflectorTest {
 
     final Map<String, Object> split = split(consultation);
 
-    // One entry: the rootstock value (scenarioId), holding the scions by component name.
+    // One entry: the rootstock value (scenarioId), holding the scions keyed by ROLE (the neutral
+    // gardening part), never by the doctor's own field name.
     assertEquals(
         Map.of(
             "systemd-adapter",
             Map.of(
-                "consultationReport",
+                "fruit",
                 Map.of("checkpointId", "systemd-adapter"),
-                "expectations",
+                "sowing",
                 List.of(Map.of("symptom", "connection-refused")))),
         split);
-    // Never the flat fields the host reads directly (narration, diagnosisAdoc) nor scenarioId as a
-    // scion — it is the grouping KEY, not a scion.
-    assertFalse(split.containsKey("narration"));
-    assertFalse(split.containsKey("diagnosisAdoc"));
+    // Keyed by role, never by the doctor's own field name.
+    final Map<?, ?> scions = (Map<?, ?>) split.get("systemd-adapter");
+    assertFalse(
+        scions.containsKey("consultationReport"), "scions are keyed by role, not field name");
+    assertFalse(scions.containsKey("expectations"), "scions are keyed by role, not field name");
   }
 
   @Test
