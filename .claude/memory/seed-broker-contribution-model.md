@@ -149,14 +149,14 @@ resources, checked against the NEXT visit — the `MedicalRecord.efficacyOf` loo
 two keys. Pulumi is merely a BACKEND that realizes this shape (stack=record, update=visit, resource=report,
 output=aggregated visit sub-tree). No new common model to invent.
 
-**The cure = runtime INTROSPECTION of the wire-record, the twin of the build-time `RecordSchemaProjector`.**
-The wire-record (`VisitWire`, `Consultation`) is `type=seam` → the host holds a copy → at the frontier the
-host can `getRecordComponents()` and read the structure WITHOUT knowing the domain. The Pulumi key = the
-COMPONENT NAME (`consultationReport`, `expectations`), discovered reflectively. `SeedBrokerCatalog` and
-`OUTPUT_KEY` die; the frontier names nothing in hard code — it iterates components. This is exactly the
-runtime twin of `RecordSchemaProjector` (which already projects a record's components → JSON Schema at
-build time, gate-guarded): same "read the record's components", now to derive storage slots instead of
-schema. Not a new model — a build-time principle runtime-ified.
+**The cure = runtime INTROSPECTION, OSGi-side (NOT local reflection at the frontier).** An earlier draft
+said "the wire-record is `type=seam` → the host holds a copy → `getRecordComponents()` at the frontier":
+that is WRONG and was rejected same-day (see the roles paragraph) AND is now moot — the migration MOVED
+the wire-records into `doctor-records` (not `type=seam`), so the host holds NO copy to reflect on. The
+correct cure: the frontier ASKS the broker (a `sow` at a meta-coordinate); the REFLECTION of the marked
+components happens OSGi-side, where the class lives (`DoctorGraftReflector`, shipped — it serves
+`GraftCoordinate("doctor")` and reflects `@Graft` components of `Consultation`). The runtime twin of
+`RecordSchemaProjector`, but OSGi-side, never at the frontier.
 
 **Roles decided (user: "chacun son rôle", deterministic — 2026-07-09; CORRECTED same day — the frontier
 does NOT reflect locally, it ASKS the broker):** the user caught that reflecting AT the frontier would
@@ -213,3 +213,48 @@ neither opens nor writes it. Consequence for governance (two gates, OPPOSITE eff
 See [[gateway-is-rest-in-jvm-insight]] [[multiplexor-two-models-design]]
 [[world-gateway-lost-open-extensibility-debt]] (this is that debt's concrete resolution path)
 [[spec-coverage-gate-state]] (the gate whose seam-justification this retires).
+
+## SHIPPED since (state update 2026-07-10)
+
+Much of the "to build" above is now realised — do not re-plan it as open:
+
++ *Coordinate → interface: SHIPPED.* `SeedCoordinate` is an interface (`slug()` + `domain()`);
+  `@SeedContract(String slug)` binds by slug. The seam renamed `world-gateway → seed-broker-port` (+
+  `seed-broker-codec`); `Document → SeedEnvelope`, `DocumentCodec → SeedCodec`.
++ *Wire-records LEFT the seam: SHIPPED.* `Consultation`/`VisitWire`/`InterventionWire`/etc. now live in
+  `doctor-records` (not `type=seam`) — so the host holds NO copy, and any "reflect at the frontier" idea
+  is moot. `SeedBrokerCatalog` still exists but is slated for deletion (it names Pulumi output keys, the
+  leak the decorrelation removes).
++ *The graft path: SHIPPED OSGi-side.* `@Graft` marks a wire-record component; `DoctorGraftReflector`
+  (`@Component implements SeedHandler`) serves `GraftCoordinate("doctor")` and reflects the `@Graft`
+  components. The frontier "asks the broker" mechanism has a live answerer — only the HOST side that ASKS
+  is not written yet.
+
+## Host adaptation — the DSL grammar + the storage model (session 2026-07-10)
+
+The host-side design is settled (see [[seed-broker-host-adaptation]] for the full état des lieux):
+
++ *Getting a `SeedBroker` host-side is SOLVED* — `awaitService(SeedBroker.class)` in a stage;
+  `FrameworkLaunchPipeline.embedded().during(…, SeedBroker.class, …)` offline. Not the migration's
+  problem.
++ *HATEOAS is the second discovery idiom, ONE verb.* The spec listed both REST discovery idioms but only
+  developed `OPTIONS` (ask a meta-coordinate for a shape). The other is HATEOAS: a reaped PLANT advertises
+  the coordinates it can be sown at NEXT. Following one is a `sow` at that coordinate — NOT a new
+  `graft(...)` verb. The DSL is ONE door: `sow(coordinate, seed) → plant + graft coordinates`, then
+  `sow(graftCoordinate, plant)`. (User was learning the DSL and proposed a 2nd verb; corrected — one verb,
+  sow twice, exactly as REST HATEOAS follows links with the same GET/POST.)
++ *The stack is an envelope store; a stored envelope RE-SOWS.* `sow → plant → (stored in the Pulumi
+  stack) → seed` — the horticultural cycle closed. The read frontier reads envelopes back opaque and
+  transports/re-sows them; it never builds a `VisitWire`.
++ *CRUD addresses the SHELL, never the payload.* A `SeedEnvelope(domain, coordinate, payload)`: the shell
+  (neutral Strings) is what the frontier files/finds BY; the payload is sealed. The one mechanical change:
+  `StackSnapshot.outputsNamed(key)` stops being keyed on a domain FIELD (`consultationReport`) and starts
+  being keyed on a COORDINATE slug — that kills `SeedBrokerCatalog.FIELD_*` and both `OUTPUT_KEY`. Store
+  the sealed String, return the sealed String, the slot name comes from the plant (asked of the broker).
++ *`@Graft` vs the DSL "graft" — RESOLVED (2026-07-10): no collision.* `scion`/`rootstock` mean the same
+  on both channels → graft/scion/rootstock are ONE register, `graft` its verb. Settled renames (to apply
+  at coding): `@Graft` → `@Scion` (an annotation names a role, not a verb); add `@Rootstock` (the twin —
+  marks the receiver IDENTITY component, `scenarioId`); `GraftCoordinate` → `SplitCoordinate` (its role is
+  "split the envelope" = return `{rootstock → [scions]}`). The frontier then hardcodes NOTHING. Full
+  detail in [[seed-broker-host-adaptation]]; the `SeedEnvelope` type is NOT renamed (`végétal` is a lexicon
+  word, not a class name).

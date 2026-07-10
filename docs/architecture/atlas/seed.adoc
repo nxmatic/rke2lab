@@ -386,3 +386,19 @@ with the socle (§ <<the-bdd-as-engine-turn>>); its preview mechanism (`Executio
 `PreviewExecutor`) is the one piece still to design, and the whole flips playable when the
 ClusterSeed-vertical increment ships. Scenario 2 (the output registry) is orthogonal to the turn and
 flips playable when the registry ships.
+
+[NOTE]
+.The output gate and the broker-split compose — they are two distinct flows (2026-07-10)
+====
+The host-adaptation brainstorm's *broker-split + CRUD-by-shell* (see
+link:../osgi/seed-broker-spec.adoc[seed-broker spec] § the stack is an envelope store) is ADDITIVE to
+Scenario 2's `PulumiOutputRegistry`, not a replacement — they are two DISTINCT flows that both end as
+Pulumi outputs. The `PulumiOutputRegistry` assembles the HOST-NATIVE outputs the host itself produces
+(the systemd summary, etc.) — its unique-key + single-flatten guarantee stands unchanged. The
+broker-split places the DOCTOR-OWNED opaque content (the scions of a consultation), which the host never
+assembles by name — it asks the broker to split the envelope and nests the returned opaque groups by
+coordinate. So the registry owns "assemble what the host owns"; the split owns "place what the domain
+owns, opaque". The one precision the host-adaptation adds: the registry must NOT reach into doctor
+content (that path is the split's), which is exactly the `SeedBrokerCatalog.FIELD_*` / `OUTPUT_KEY`
+erasure the doctor atlas NEXT already carries. No box of Diagram P is erased or rewired.
+====

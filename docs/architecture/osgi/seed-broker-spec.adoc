@@ -62,6 +62,22 @@ resources (Pulumi / master); *sows it* = execution, of which the world-crossing 
 detail. This is REST's core promise — the client is blind to the server's implementation — and it is
 the remedy to the seam's difficulty: the crossing is HIDDEN behind one door, not made omnipresent.
 
+The horticultural register names the ACTORS too (settled 2026-07-10), and the full lexicon lives at
+link:seed-gardening-lexicon.adoc[the gardening lexicon]:
+
+* the *COMMISSIONER* (the *provisioner*) = Pulumi, via the edge — the real driving actor: it wants,
+  launches (`pulumi up`), and CONSERVES the reaped harvest at home (in a *pot* / *vase* / *fridge*, i.e.
+  a per-resource output / top-level export / stack history — the container follows the harvest's nature).
+* the *GARDENER* = the `SeedBroker` — it knows how to grow correctly on ALL plots, owns none, routes by
+  coordinate (`DefaultSeedBroker` collecting handlers by DS). The gardener is transversal know-how, not a
+  landowner; the client does not till, it asks the gardener to sow (REST: the client requests, the server
+  acts).
+* the *SOILS* / plots = the DOMAINS (doctor, cluster) — each grows what it owns.
+* the *TOOLS* + channel = the host (`pulumi-edge`, `seed-master`) — it carries the request in and the
+  harvest back, speaking only gardening, holding no plot's vocabulary. This is the load-bearing goal of
+  the host migration: *the host speaks only gardening; all logic that speaks a domain migrates into that
+  domain* (§ <<remaining-migration>>).
+
 === The germination cascade — why the crossing is NOT symmetric (seed-master)
 
 The client sees one door; the flow BEHIND it is directional, and worth naming because it settles a
@@ -122,7 +138,7 @@ forward-compatible with a future remote split (same contract, a different transp
 | the client validates at its edge, blind to server logic | the host validates *structure, not meaning*
 | the server is authority over the resource | *OSGi holds the authority*
 | an `Accept` / version mismatch surfaces at runtime | a *semver mismatch* surfaces at runtime validation
-| *the client discovers HOW to talk by asking the server* (`GET /` index / HATEOAS, `OPTIONS` / OpenAPI) | *the client discovers a coordinate's shape by asking the broker* (introspection — a `sow` at a meta-coordinate)
+| *the client discovers HOW to talk by asking the server* (`GET /` index / HATEOAS, `OPTIONS` / OpenAPI) | *the client discovers by asking the broker* — TWO idioms: (a) a coordinate's shape via a `sow` at a meta-coordinate (`OPTIONS`), and (b) HATEOAS — a reaped plant ADVERTISES the coordinates it can be sown at next (§ <<hateoas-the-plant-advertises>>)
 | in-process today, on the wire tomorrow — same contract | embedded today, remote tomorrow — forward-compat by construction
 |===
 
@@ -155,6 +171,43 @@ THE DOOR, and the shared wire-record class stops being a source of truth (it can
 § <<one-seam>>). The schema already exists build-time (`@DocumentContract` + `RecordSchemaProjector`,
 consumed by `SCHEMA_CONCORD`); the meta-coordinate is that same projection, offered at runtime through
 the door — the OpenAPI endpoint we had described but never served.
+
+[[hateoas-the-plant-advertises]]
+=== HATEOAS — the plant advertises what can be sown next (the second discovery idiom)
+
+`OPTIONS` (above) answers *"what is coordinate X's shape"* — but the client must already NAME X. The
+REST table lists a SECOND discovery idiom the design had not developed: HATEOAS — the server's response
+carries the links the client may follow next, IN the response. Our transposition (settled 2026-07-10):
+*a reaped plant carries the coordinates it can be sown at next.* The client holds an opaque plant and
+learns, FROM IT, what it may re-sow — the exact missing knowledge (*how do I know the coordinate to sow
+next?*). Crucially this needs NO new verb: following a link is a `sow` at the advertised coordinate,
+exactly as REST HATEOAS follows links with the same `GET`/`POST`, never a new HTTP method per resource.
+
+[mermaid]
+....
+sequenceDiagram
+  participant H as client
+  participant B as SeedBroker
+  participant D as domain handler
+  H->>B: sow(coordinate, seed)
+  B->>D: route by coordinate
+  D-->>B: plant + graft coordinates
+  B-->>H: plant + graft coordinates
+  Note over H: the plant tells me<br/>which coordinates I may sow next
+  H->>B: sow(graft coordinate, plant)
+  B->>D: route by that coordinate
+  D-->>B: grafted result
+  B-->>H: grafted result
+....
+
+Read the figure as the DSL grammar in three sentences, ONE verb throughout: *sow a seed* →
+`sow(coordinate, seed)`; *reap a plant AND the coordinates of the grafts realisable with it* — the plant
+is self-describing about what can be sown next; *realise the graft I want* → `sow(graftCoordinate,
+plant)`, the SAME verb at a coordinate the plant advertised. Not a `graft(...)` method — a second sow
+through the one door. The advertised coordinates are just slugs (`String`s): the client reads them, never
+a class, and the domain that published the plant published its links. This is why the two idioms cohere
+with the keystone — introspection (`OPTIONS`) and hypermedia (`HATEOAS`) are both a `sow`, so the door
+stays single and self-describing.
 
 == The claim
 
@@ -527,25 +580,175 @@ The two-key split is not a Pulumi need nor legacy — it is `Visit`'s own two li
 
 So the frontier stops decoding-and-sorting — but it does NOT reflect on the wire-record itself (that
 would make it HOLD the seam class, the tie § <<contribution-and-opacity>> removes). Introspection here
-is the SAME "ask the broker" mechanism: "what are the storage slots of coordinate X?" is a `sow` at a
+is the SAME "ask the broker" mechanism: "split this envelope into its addressable pieces" is a `sow` at a
 META-coordinate. The REFLECTION happens OSGi-side, in the meta-handler, where the wire-record's class is
-loaded (its own realm) and the marker is declared — the runtime twin of the build-time
-`RecordSchemaProjector`. Roles, decided deterministically (reflection lives where the class lives): the
-DOMAIN *declares* a component-level marker (the field analogue of `@DocumentContract`) on the wire-record
-components that are addressable storage slots; the META-HANDLER *reflects* those components OSGi-side;
-the FRONTIER *asks* (the meta-coordinate `sow`) and *executes* — routes each returned slot name under a
-Pulumi key = that NAME, transporting the rest opaque. This satisfies BOTH constraints at once: Pulumi
-never transpires into the domain (marker + reflection are OSGi-side), AND the host holds no wire-record
-class (true from this palier, since the frontier only asks). `SeedBrokerCatalog` + both `OUTPUT_KEY` die;
-the frontier names nothing in hard code. It is ONE mechanism (ask the broker), applied first here (the
-Pulumi frontier), then generalized to sowing — no throwaway local reflection. Rejected: the frontier
-reflecting locally (holds the class); the convention "a `List` component is a slot" (too implicit — a
-future non-output list would break it, against the determinism discipline); putting the marker on
-`SeedHandler` (re-introduces storage vocabulary into the domain contract — the handler stays
-`Document → Document`, backend-blind). Open at realization: the marker's name (storage-NEUTRAL —
-"addressable slot", never "pulumi output", so foundation carries no Pulumi word) and its home; the
-meta-coordinate's name + who serves it (the broker, or a foundation handler reflecting each domain's
-markers).
+loaded (its own realm) and the markers are declared — the runtime twin of the build-time
+`RecordSchemaProjector`.
+
+The markers, settled (2026-07-10) — TWO role annotations, named for what a component IS, not a verb (an
+annotation is a role, like `@Column` not `@Persist`):
+
+* *`@Scion`* (the rename of the former `@Graft`) — marks a wire-record component that is an addressable
+  sub-tree to be filed verbatim (the scion grafted onto the stored tree). It supplies the FIELD, so the
+  frontier hardcodes none.
+* *`@Rootstock`* (its twin) — marks the component that is the RECEIVER's identity (the join key, e.g.
+  `scenarioId`). It supplies the RECEIVER, so the frontier hardcodes no resource name either.
+
+Roles, decided deterministically (reflection lives where the class lives): the DOMAIN *declares* `@Scion`
++ `@Rootstock` on its wire-record; the META-HANDLER *reflects* them OSGi-side and returns the scions
+grouped under their rootstock (`{rootstock → [scions]}`, opaque Strings); the FRONTIER *asks* (a `sow` at
+the `SplitCoordinate` meta-verb — renamed from `GraftCoordinate`, since its role is "split the envelope",
+not "give me the grafts") and *executes* — nests each scion under its rootstock resource, transporting the
+payload opaque. This satisfies BOTH constraints at once: Pulumi never transpires into the domain (markers
++ reflection are OSGi-side), AND the host holds no wire-record class and hardcodes NO name — not a field
+(`@Scion` gives it), not a resource (`@Rootstock` gives it). `SeedBrokerCatalog` + both `OUTPUT_KEY` die.
+It is ONE mechanism (ask the broker to split), applied first here (the Pulumi frontier), then generalized
+to sowing — no throwaway local reflection. Rejected: the frontier reflecting locally (holds the class);
+the convention "a `List` component is a slot" (too implicit — a future non-output list would break it,
+against the determinism discipline); putting the markers on `SeedHandler` (re-introduces storage
+vocabulary into the domain contract — the handler stays `Document → Document`, backend-blind).
+
+The relation crosses ASYMMETRICALLY (settled): on WRITE the frontier NEEDS it — a Pulumi output is
+physically nested under a resource (`registerOutputs` is called on a `ComponentResource`), so the split
+returns `{rootstock → [scions]}` and the frontier nests correctly; on READ it does not — `outputsNamed`
+collects by coordinate across resources and flattens, and the DOMAIN re-associates by the rootstock VALUE
+(`scenarioId`) OSGi-side. And the container FOLLOWS the harvest's nature — a rooted plant → a per-resource
+output (a *pot*); a standalone value → a top-level `export` (a *vase*, which "trips on array-valued
+outputs", so the nature dictates the legal mechanism); an append-only timeline → stack history (a
+*fridge/cellar*). See link:seed-gardening-lexicon.adoc[the gardening lexicon] for the full register.
+
+=== The stack is an envelope store; a stored envelope re-sows; CRUD addresses the SHELL
+
+The frontier's job, stated at the storage level (settled 2026-07-10): *the Pulumi stack is a store of
+sealed envelopes.* The frontier writes a `SeedEnvelope` verbatim, later re-reads it, and a re-read
+envelope is a SEED again — `sow → plant → (stored in the stack) → seed`, the horticultural cycle closed.
+This is the SAME "ask the broker for the slot names, transport the payload opaque" mechanism, seen from
+the storage axis: the frontier does CRUD on envelopes it never opens.
+
+The precision that keeps it opaque — a `SeedEnvelope(domain, coordinate, payload)` has two parts, and
+CRUD touches only ONE. The SHELL (`domain`, `coordinate` — neutral `String`s) is what the frontier
+addresses BY; the PAYLOAD is sealed, never read. Today's leak is that storage addresses by a DOMAIN FIELD
+name (`consultationReport`, via `outputsNamed(key)`); the cure is that the storage key becomes the
+COORDINATE (the shell), so the frontier files and finds by shell, never by field.
+
+[mermaid]
+....
+flowchart TB
+  subgraph create["CREATE — file a plant"]
+    c["output named = coordinate slug<br/>value = the sealed envelope payload"]
+  end
+  subgraph read["READ — harvest by coordinate"]
+    r["collect by coordinate slug<br/>a list of opaque envelopes<br/>one per rootstock (cross-resource)"]
+  end
+  subgraph update["UPDATE — append a history entry"]
+    u["a new up() files a new envelope<br/>stable resource name<br/>the timeline IS the update log"]
+  end
+  subgraph delete["DELETE — n/a"]
+    d["append-only ledger / record<br/>nothing is ever removed"]
+  end
+....
+
+Read the four operations: *CREATE* files one envelope under its coordinate slug, payload verbatim — no
+`FIELD_*` split, the write frontier reads the graft coordinates the plant advertises (§
+<<hateoas-the-plant-advertises>>) and files each under its own coordinate. *READ* collects by coordinate,
+not by field — today's `outputsNamed("consultationReport")` becomes `outputsNamed(<coordinate-slug>)`;
+the cross-resource collection (one element per rootstock) is unchanged, returning a list of opaque
+envelopes. *UPDATE* is already opaque — a new `up()` appends a history entry under the stable resource
+name; the timeline is the update log. *DELETE* does not apply — both stores are append-only, so nothing
+is ever addressed for removal. The one mechanical change that makes CRUD opaque is that
+`StackSnapshot.outputsNamed` stops being keyed on a domain field and starts being keyed on a coordinate
+slug — that single reshape kills both leak names (`SeedBrokerCatalog.FIELD_*`, the `OUTPUT_KEY`
+constants). The stored unit is the sealed payload `String` under a slot name the broker supplied: store
+the sealed String, return the sealed String, the name comes from the plant.
+
+[[middle-speaks-gardening]]
+== pulumi ↔ seed ↔ doctor — the middle speaks gardening, each side projects onto it
+
+The whole host adaptation reduces to one shape: `pulumi ↔ seed ↔ doctor`. The MIDDLE (`seed`) speaks
+gardening — a neutral vocabulary that knows neither side. The mapping is TWO mirror adapters, and the
+direction is the point: each SIDE projects ONTO the neutral middle; the middle projects onto no one. That
+is what keeps it neutral — and it is the decorrelation stated structurally, because the two adapters never
+share a word.
+
+[mermaid]
+....
+flowchart LR
+  subgraph pulumi["PULUMI side (host)"]
+    p1["stack"]
+    p3["resource / output"]
+  end
+  subgraph seed["SEED — gardening (neutral middle)"]
+    s1["parcel — StackCoordinate(project, stack)"]
+    s3["a plant — SeedEnvelope under a coordinate"]
+  end
+  subgraph doctor["DOCTOR side (OSGi)"]
+    d1["Patient(org, project, stack)"]
+    d3["ConsultationReport"]
+  end
+  p1 -->|edge projects| s1
+  p3 -->|edge projects| s3
+  d1 -->|handler projects| s1
+  d3 -->|handler projects| s3
+
+  classDef mid fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef side fill:#eef,stroke:#446;
+  class seed,s1,s3 mid;
+  class pulumi,doctor,p1,p3,d1,d3 side;
+....
+
+Read the figure as ONE neutral column with TWO projections pointing INTO it. A `parcel` is a
+`StackCoordinate(project, stack)` (neutral, already in `pulumi-edge`); `a plant` is a `SeedEnvelope` under
+a coordinate. `Patient` is how the DOCTOR projects a stack; the Pulumi `stack` is how the EDGE realises
+one — neither word crosses to the other side, only the neutral parcel sits between them.
+
+* *Who maps on the PULUMI side — the EDGE (`pulumi-edge`, host).* Projects Pulumi's model onto the
+  neutral: a `parcel` becomes `createOrSelectStack(project, stack)`, a `plant` an output under the
+  coordinate slug (CRUD-by-shell, § above). Knows Pulumi + the neutral, never the doctor.
+* *Who maps on the DOCTOR side — the HANDLER (`doctor-core`, OSGi).* Projects the doctor's aggregate onto
+  the neutral: `Patient → parcel`, `Visit → a stack state`, `ConsultationReport → a plant`. Knows the
+  doctor + the neutral, never Pulumi.
+* *The two never meet.* Neither adapter imports the other's vocabulary; both import only the middle. Pulumi
+  cannot transpire into the doctor because there is no edge where their words touch.
+
+=== The neutral CRUD port lives in the middle (`seed-broker-port`)
+
+The interface that materialises the envelope CRUD must speak ONLY the broker vocabulary — never a doctor
+word. A port named `MedicalRecordJournal` means the FRONTIER knows the doctor: the leak moved from the
+payload to the interface NAME. So the neutral CRUD port lives in `seed-broker-port` (the middle), written
+in gardening terms — sow an envelope into a parcel, harvest a parcel's envelopes, addressed by
+`SeedCoordinate` / a parcel, never by `Patient`. The DOCTOR *consumes* it (`@Reference`) and projects its
+aggregate behind it; the host EDGE *provides* it (resolved by capability). (Nuance vs the port-ownership
+law "the port is the consumer's": the consumer is still the doctor, but the port's FACE is neutral by
+requirement, so it is homed with the vocabulary it speaks — the middle — not with the consumer's module.
+The doctor's `historyOf(Patient)`-shaped view sits BEHIND the neutral port, as its projection.)
+
+=== The migration criterion + sequencing: host speaks seed only, doctor logic migrates to the domain
+
+The governing criterion for the host worklist (user, 2026-07-10): **the host modules speak ONLY seed (the
+neutral gardening vocabulary); ALL logic that speaks doctor migrates into the doctor domain.** A binary
+test per site: *does this host code name a doctor type/field?* If yes → it moves OSGi-side; if it touches
+only `SeedEnvelope`/`SeedCoordinate`/a parcel → it stays, as legitimate transport.
+
+[cols="1,2,2",options="header"]
+|===
+| host site | speaks doctor → MIGRATES to the domain | stays host (pure seed)
+| `StackMedicalRecordJournal` | `new VisitWire`, `codec.encode`, `FIELD_*` | the stack-timeline walk, collect-by-coordinate → opaque `SeedEnvelope`s
+| `StackInterventionJournal` | `new Document(Domain.DOCTOR…)`, decode | the ledger-history walk, envelope transport
+| `SystemdAdapterResource` | `decode(Consultation.class)`, `.consultationReport()`/`.expectations()` | file the grafts the plant advertises, by coordinate
+| `MedicalRecordDump` | `decode(VisitWire)`, read `.consultationReport()`, render YAML (rendering IS doctor logic) | open Felix, `sow`, write the result
+|===
+
+The subtlety the criterion exposes: `MedicalRecordDump`'s YAML rendering is DOCTOR logic (it knows a
+record has "reports"), so *render-as-YAML* is not transport — it MIGRATES into the doctor as a coordinate
+one sows; the host keeps only "open Felix, sow, write". This matches the settled decision that the dump
+opens the framework.
+
+*Sequencing — OSGi first, host second.* Fix the `seed ↔ doctor` adapter in the OSGi modules first (the
+doctor is the consumer; it is furthest along — the graft path ships, the ports already speak
+`SeedEnvelope`; what remains is neutralising the port face and wiring the `Patient → parcel` projection),
+THEN the `seed ↔ pulumi` adapter in the host (the edge is furthest behind — the three sites no longer even
+compile against the renamed seam). The order is not preference but structure: the neutral middle port must
+be frozen before either projection is written, else the edge migrates against a moving target.
 
 == The boot pipeline — GROUND / GATEWAY / APPLY
 
@@ -615,6 +818,25 @@ Two coarse greps remain useful as quick eyeballs (the gate is the real check):
 The contract layer above is built and locked; the *host-side surface* that must speak it is not fully
 migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces:
 
+* *Getting a `SeedBroker` host-side is SOLVED (verified 2026-07-10).* `DefaultSeedBroker` is
+  `@Component(service = SeedBroker.class)` — a published OSGi service resolved through
+  `OsgiConnection.awaitService(SeedBroker.class, …)`. Two host contexts already do it: a pipeline stage
+  holding a connection (`SystemdAdapterStage` already sows a `readiness-verdict`), and an offline CLI via
+  `FrameworkLaunchPipeline.embedded().during(…, SeedBroker.class, …)` (`RecordInterventionCommand.main`).
+  So resolution is not the migration's problem — the migration is the sites below still speaking the
+  pre-rename seam vocabulary and still OPENING envelopes.
+* *The three `pulumi-edge` frontier sites, stale against the renamed seam.*
+  `StackMedicalRecordJournal` / `StackInterventionJournal` / `PulumiInterventionLedgerWriter` still import
+  `Document`/`Coordinate`/`Domain`/`SeedBrokerCatalog`/`VisitWire`/`DocumentCodec` — none of which the
+  renamed `seed-broker-port` exports (they are `SeedEnvelope`/`SeedCoordinate`/`SeedCodec` now), so the
+  module no longer compiles against the migrated seam. The doctor READ/WRITE ports they implement ALREADY
+  speak `SeedEnvelope` opaque; only the host impls lag. Nature of the fix: the read frontier reads stored
+  envelopes back as opaque SEEDS and transports them (no `VisitWire` built host-side); the write frontier
+  (`SystemdAdapterResource` in seed-master, which decodes `Consultation.class`) files the graft
+  coordinates the plant advertises (§ <<hateoas-the-plant-advertises>>), never decoding.
+* *The offline dump* (`MedicalRecordDump`) opens Felix when it needs the broker — booting OSGi for a dump
+  is acceptable (user, 2026-07-10), so it goes uniform with `RecordInterventionCommand`: no host-pure
+  transcoder exception. Rendering-as-YAML becomes a `sow`.
 * *The six `<slug>.schema.json` files* are not yet authored. `SCHEMA_CONCORD` is active and will bind
   each coordinate to its schema as the files land, one coordinate at a time.
 * *Residual host reasoning on records* — sites still calling `Severity.parse()` / branching
