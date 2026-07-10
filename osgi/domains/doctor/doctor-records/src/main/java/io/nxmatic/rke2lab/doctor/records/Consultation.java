@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import io.nxmatic.rke2lab.seed.broker.port.Graft;
+import io.nxmatic.rke2lab.seed.broker.port.Rootstock;
+import io.nxmatic.rke2lab.seed.broker.port.Scion;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.util.List;
 import java.util.Map;
@@ -17,18 +18,20 @@ import java.util.Map;
  * Expectation} record graph) owned OSGi-side, where {@code SeedCodec.fromMap} decodes it. Each
  * realm maps this record ↔ {@code String} via {@code SeedCodec}.
  *
- * <p>Both are marked {@link Graft}: they are the named sub-trees the write frontier files verbatim
- * (and the read frontier collects back). The graft's name is the component's own name, so doctor
- * names no storage slot — it declares WHICH components are grafts, and the frontier learns the
- * names by asking the broker (the {@code GraftCoordinate} reflector), never by holding a constant.
+ * <p>Both are marked {@link Scion}: they are the named sub-trees the write frontier files verbatim
+ * (and the read frontier collects back). {@code scenarioId} is the {@link Rootstock}: the identity
+ * of the receiver the scions graft onto (the checkpoint the report belongs to). The scion's name is
+ * the component's own name, so doctor names no storage slot — it declares WHICH components are
+ * scions and WHICH is the rootstock, and the frontier learns them by asking the broker (the {@code
+ * SplitCoordinate} reflector), never by holding a constant.
  */
 @SeedContract("consultation")
 public record Consultation(
-    String scenarioId,
+    @Rootstock String scenarioId,
     String narration,
     String diagnosisAdoc,
-    @Graft Map<String, Object> consultationReport,
-    @Graft List<Object> expectations) {
+    @Scion Map<String, Object> consultationReport,
+    @Scion List<Object> expectations) {
 
   public Consultation {
     consultationReport = consultationReport == null ? Map.of() : Map.copyOf(consultationReport);
