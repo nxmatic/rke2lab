@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.bbox.core;
 
-import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

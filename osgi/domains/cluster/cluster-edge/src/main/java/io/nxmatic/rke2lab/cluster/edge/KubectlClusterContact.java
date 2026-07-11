@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.cluster.edge;
 
-import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
-import io.nxmatic.rke2lab.cluster.port.ControllerRef;
+import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessContact;
+import io.nxmatic.rke2lab.cluster.contract.ControllerRef;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;

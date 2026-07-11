@@ -14,12 +14,12 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/domains/netplan</name>
-  <description>The netplan domain: the network blueprint contract (netplan-port) plus the
+  <description>The netplan domain: the network blueprint contract (netplan-contract) plus the
     addressing-derivation and synthesis impl (netplan-core) that implements it. Promoted from a flat
     bundle to a domain dir when the contract crossed back into osgi/ beside its impl facet.</description>
 
   <modules>
-    <module>netplan-port</module>
+    <module>netplan-contract</module>
     <module>netplan-core</module>
   </modules>
 </project>

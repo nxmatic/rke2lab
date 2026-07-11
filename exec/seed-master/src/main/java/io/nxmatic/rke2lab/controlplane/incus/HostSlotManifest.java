@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

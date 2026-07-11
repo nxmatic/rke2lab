@@ -23,7 +23,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>incus-port</artifactId>
+      <artifactId>incus-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

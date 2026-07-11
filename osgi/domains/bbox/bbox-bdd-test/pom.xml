@@ -39,7 +39,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
+      <artifactId>doctor-core</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>

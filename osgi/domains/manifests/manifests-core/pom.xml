@@ -75,12 +75,12 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests-port</artifactId>
+      <artifactId>manifests-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-port</artifactId>
+      <artifactId>netplan-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The passive fluent-pipeline grammar engine (FluentTopicRunner/OnFailure/TopicFailure),
@@ -103,7 +103,7 @@
          typed SystemdUnitId, not a literal — the import draws the producer edge in the graph. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

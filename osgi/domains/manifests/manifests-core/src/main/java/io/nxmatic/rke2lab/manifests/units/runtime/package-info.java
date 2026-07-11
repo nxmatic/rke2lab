@@ -8,7 +8,7 @@
  *   <li>{@code rke2} — {@code RuntimeRke2ConfigManifestsUnit}, the RKE2 server config (installed
  *       <b>before</b> rke2-server).
  *   <li>{@code env} — {@code RKE2LabEnvConfigManifestsUnit} and the runtime {@link
- *       io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor}.
+ *       io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor}.
  *   <li>{@code flox} — {@code FloxRuntimeManifestsUnit} and the NRI plugin archive assets.
  *   <li>{@code daemonset} — the daemonset script-policy unit that trampolines host assets.
  *   <li>{@code cloudinit} — {@code CloudConfigManifestsUnit} for cloud-init delivery.

@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.contract.Intervention;
+import io.nxmatic.rke2lab.doctor.contract.InterventionLedger;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;

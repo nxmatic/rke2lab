@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.InterventionWire;
+import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.contract.Intervention;
+import io.nxmatic.rke2lab.doctor.contract.InterventionWire;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 

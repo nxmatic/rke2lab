@@ -55,6 +55,12 @@ public final class JGivenTestkit {
    */
   public static OutOfContainerFrameworkExtension.Builder felix() {
     return OutOfContainerFrameworkExtension.builder()
+        // SCR runs by default (inherited from the builder): a -bdd scion's Felix matches the live
+        // boot posture, where the DS extender is present and the domain @Components activate.
+        // felix.scr
+        // is on every -test module's classpath via bundle-test-parent. The rare jGiven test whose
+        // module lacks felix.scr (the JGivenTestkitGuardTest in pipeline-testkit) opts out with
+        // .withoutScr() at its own call site.
         .bootDelegation("sun.misc")
         .systemPackages(
             "org.slf4j;version=2.0.17",

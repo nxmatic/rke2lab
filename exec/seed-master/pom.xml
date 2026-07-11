@@ -74,20 +74,12 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests-port</artifactId>
+      <artifactId>manifests-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- The passive fluent-pipeline grammar engine, consumed FLAT on the host classpath (JCL) —
-         the same class manifests-core consumes in-bundle. Replaces seed-master's local
-         TopicRunner/OnFailure/PipelineStageFailure triplet. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -185,62 +177,12 @@
          flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
          the launch-secrets updater resolves AuthTokenContact from the registry (singleSpiProvider).
          The edge MUST be embedded or the token contact never publishes. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>auth-edge</artifactId>
-      <version>${project.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- The cluster domain's seam: the readiness phase vocabulary the bdd scenario + pipeline stage
-         name directly, the typed schema refs, and the ClusterReadinessContact the host composes for
-         the kubectl-backed phases. COMPILE scope like the other -port membranes — seed-master's
-         staying code references these types directly; the boot system-exports the package (type=seam)
-         so the host reads them back TYPED across the embedded-framework boundary. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>cluster-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- The incus domain's seam, both contacts: IncusInstanceContact (the instance-reachability
-         contact the readiness gate composes) and ImageBuilder + the flat ImageBuildRequest (the
-         image-build contact PulumiIncusImageProvider composes — it projects the build coordinates out
-         of its config and folds the edge's recipeDigest into its image-cache key; no build mechanism
-         lives host-side). COMPILE scope like the other -port membranes; type=seam so the host reads
-         them back typed. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>incus-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- The bbox domain's data + contract (DEFERRED host use — bbox-port was de-seamed into
-         bbox-core; this host reconciler path migrates into the bbox-bdd scion). -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>bbox-core</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- The auth domain's seam: AuthTokenContact + the AuthTokenSource enum. The host launch-secrets
-         updater keeps the env-var precedence and the YAML upsert, and composes this contact from the
-         registry only when the environment yielded nothing (the auth-edge shells `gh auth token` /
-         `flox auth token`). COMPILE scope like the other -port membranes; type=seam so the host reads
-         the token back typed. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>auth-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
+    <!-- Domain contracts/edges are GONE from the host: seed-master speaks ONLY seed (the broker
+         membrane below). The staging code that still names cluster/systemd/incus/netplan/auth/doctor
+         types is migrating onto the broker in the scenario-rewrite chantier; until then it does not
+         compile against these — by design, the host no longer imports a domain vocabulary. -->
     <!-- Governance annotations: the controlplane package-info poses REALM_BOUNDARY=WARN so the
-         staging gate lists the flat-realm doctor.records references during the Plan 2 migration
+         staging gate lists the flat-realm doctor.contract references during the Plan 2 migration
          (build-time only, not runtime behaviour). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
@@ -273,45 +215,6 @@
       <artifactId>seed-broker-runtime</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
-    </dependency>
-    <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not
-         runtime like manifests-core): seed-master's staying code — the live registry, the reader,
-         the scenarios and pipeline stages — references the model types directly, so it is a shared
-         library, not an embedded bundle. Both edges declared explicitly because both are imported in
-         code: doctor-port for the value vocabulary + contracts (the membrane), doctor-core for the
-         hidden actors still referenced directly (Generalist, HealthSystem, the readers) until Move B
-         hides them behind DoctorConsultingService. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- test-only: the host tests that build replies/specialists (LiveMedicalRecordRegistry,
-         MedicalRecordDump, RealGraphInjection, …) use the shared fixtures ReferralReplies /
-         FakeSpecialist. These now live in package io.nxmatic.rke2lab.doctor.testkit inside the
-         doctor-port-test fragment (the old doctor-testkit module dissolved into it); on seed-master's
-         flat classpath that fragment jar is just the carrier of those fixture classes. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port-test</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <!-- test-only: ExactRosterDoctor (the host tests' exact-roster fixture) lives in the
-         doctor-core-test fragment now — it reaches doctor-core's sealed internal graph white-box
-         (same package, shared host loader), the access a host module cannot have. On seed-master's
-         flat classpath the fragment jar is just the carrier of that fixture class; the Fragment-Host
-         header is inert out of container. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-core-test</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic</groupId>

@@ -28,7 +28,7 @@
          own seam. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>cluster-port</artifactId>
+      <artifactId>cluster-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The doctor's inter-domain SPI (Specialist + ClinicianProperties) and its record vocabulary:
@@ -40,7 +40,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-records</artifactId>
+      <artifactId>doctor-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- bnd-consumed DS annotations: @Component declares the SCR descriptor bnd generates. -->
@@ -53,7 +53,7 @@
          Referral comes from the one testkit factory, not re-spelled boilerplate. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port-test</artifactId>
+      <artifactId>doctor-contract-test</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

@@ -1,16 +1,16 @@
 package io.nxmatic.rke2lab.systemd.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
-import io.nxmatic.rke2lab.doctor.records.Specialty;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.contract.Assessment;
+import io.nxmatic.rke2lab.doctor.contract.Observation;
+import io.nxmatic.rke2lab.doctor.contract.Prescription;
+import io.nxmatic.rke2lab.doctor.contract.Referral;
+import io.nxmatic.rke2lab.doctor.contract.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.contract.SchemaRef;
+import io.nxmatic.rke2lab.doctor.contract.Specialty;
+import io.nxmatic.rke2lab.doctor.contract.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
-import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
+import io.nxmatic.rke2lab.systemd.contract.SystemdUnitId;
 import java.util.Map;
 import java.util.Optional;
 import org.osgi.service.component.annotations.Component;

@@ -1,13 +1,13 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Action;
-import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.InterventionRequest;
-import io.nxmatic.rke2lab.doctor.records.ProblemRef;
-import io.nxmatic.rke2lab.doctor.records.Provenance;
-import io.nxmatic.rke2lab.doctor.records.ReadinessVerdict;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.contract.Action;
+import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.contract.Intervention;
+import io.nxmatic.rke2lab.doctor.contract.InterventionRequest;
+import io.nxmatic.rke2lab.doctor.contract.ProblemRef;
+import io.nxmatic.rke2lab.doctor.contract.Provenance;
+import io.nxmatic.rke2lab.doctor.contract.ReadinessVerdict;
+import io.nxmatic.rke2lab.doctor.contract.RemediationProgramRef;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;

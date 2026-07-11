@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.doctor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.doctor.contract.ClinicianId;
 import io.nxmatic.rke2lab.doctor.internal.Generalist;
-import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import org.junit.jupiter.api.Test;

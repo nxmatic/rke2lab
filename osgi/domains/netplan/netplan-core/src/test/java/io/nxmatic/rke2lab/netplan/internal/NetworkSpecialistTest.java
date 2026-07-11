@@ -3,10 +3,10 @@ package io.nxmatic.rke2lab.netplan.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.contract.Assessment;
+import io.nxmatic.rke2lab.doctor.contract.Observation;
+import io.nxmatic.rke2lab.doctor.contract.Referral;
+import io.nxmatic.rke2lab.doctor.contract.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.TestReferrals;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

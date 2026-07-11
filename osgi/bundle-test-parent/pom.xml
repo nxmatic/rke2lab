@@ -13,7 +13,7 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/bundle-test-parent</name>
-  <description>Parent of the OSGi -test FRAGMENTS (doctor-core-test, doctor-port-test,
+  <description>Parent of the OSGi -test FRAGMENTS (doctor-core-test, doctor-contract-test,
     jgiven-probe-test, …). A fragment carries its tests in src/main so they land in the fragment
     and run white-box through the host classloader; that bytecode therefore needs the JUnit + jGiven
     recipe at PROVIDED scope (build-parent gives it only at test scope, which a fragment's src/main

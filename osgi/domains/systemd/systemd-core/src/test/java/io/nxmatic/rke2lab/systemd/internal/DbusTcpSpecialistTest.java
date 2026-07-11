@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.contract.Assessment;
+import io.nxmatic.rke2lab.doctor.contract.Observation;
+import io.nxmatic.rke2lab.doctor.contract.Prescription;
+import io.nxmatic.rke2lab.doctor.contract.Referral;
+import io.nxmatic.rke2lab.doctor.contract.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.contract.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.TestReferrals;
 import java.util.Map;
 import java.util.Optional;

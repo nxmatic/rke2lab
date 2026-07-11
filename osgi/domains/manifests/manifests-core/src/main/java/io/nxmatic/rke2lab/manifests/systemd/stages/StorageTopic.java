@@ -6,7 +6,7 @@ import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
-import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
+import io.nxmatic.rke2lab.systemd.contract.SystemdUnitId;
 import java.util.function.Supplier;
 
 /**

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.spi;
 
-import io.nxmatic.rke2lab.doctor.records.ClinicianId;
+import io.nxmatic.rke2lab.doctor.contract.ClinicianId;
 
 /**
  * An employed actor in the HealthSystem: a {@link Generalist} or a {@link Specialist}, each

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
-import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
+import io.nxmatic.rke2lab.manifests.contract.FloxRuntimeAssetService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

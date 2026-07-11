@@ -1,18 +1,17 @@
 package io.nxmatic.rke2lab.doctor;
 
+import io.nxmatic.rke2lab.doctor.contract.Assessment;
+import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
+import io.nxmatic.rke2lab.doctor.contract.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.contract.Patient;
+import io.nxmatic.rke2lab.doctor.contract.Prescription;
+import io.nxmatic.rke2lab.doctor.contract.Referral;
+import io.nxmatic.rke2lab.doctor.contract.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.contract.SchemaRef;
+import io.nxmatic.rke2lab.doctor.contract.Specialty;
 import io.nxmatic.rke2lab.doctor.internal.ConsultationDag;
 import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerRegistry;
 import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.port.HealthSystem;
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.records.Patient;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
-import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +49,12 @@ public final class ExactRosterDoctor {
   private static InterventionLedgerRegistry emptyLedger() {
     return new InterventionLedgerRegistry() {
       @Override
-      public io.nxmatic.rke2lab.doctor.records.InterventionLedger ledger() {
-        return io.nxmatic.rke2lab.doctor.records.InterventionLedger.empty();
+      public io.nxmatic.rke2lab.doctor.contract.InterventionLedger ledger() {
+        return io.nxmatic.rke2lab.doctor.contract.InterventionLedger.empty();
       }
 
       @Override
-      public void record(io.nxmatic.rke2lab.doctor.records.Intervention intervention) {}
+      public void record(io.nxmatic.rke2lab.doctor.contract.Intervention intervention) {}
     };
   }
 

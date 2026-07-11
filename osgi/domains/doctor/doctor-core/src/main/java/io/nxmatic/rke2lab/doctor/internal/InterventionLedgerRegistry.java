@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.contract.Intervention;
+import io.nxmatic.rke2lab.doctor.contract.InterventionLedger;
 
 /**
  * The institution's standing access to its intervention ledger — the doctor-vocabulary twin of

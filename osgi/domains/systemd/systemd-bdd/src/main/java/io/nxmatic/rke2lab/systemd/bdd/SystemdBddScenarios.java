@@ -40,9 +40,9 @@ public final class SystemdBddScenarios {
   /**
    * Play {@link SystemdAdapterScenario} in-container and return its {@link RunbookEnvelope}
    * serialized to JSON (the realm-crossing currency). The collaborators (the {@link
-   * io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe}, the doctor's {@code ConsultingService} on
-   * a failing facet) are resolved by the scenario from this bundle's registry — a caller seeds a
-   * mock before invoking, or the live edge published one.
+   * io.nxmatic.rke2lab.systemd.contract.SystemdRuntimeProbe}, the doctor's {@code
+   * ConsultingService} on a failing facet) are resolved by the scenario from this bundle's registry
+   * — a caller seeds a mock before invoking, or the live edge published one.
    */
   public static String run() throws InterruptedException {
     final SeedCodec codec = new SeedCodec();

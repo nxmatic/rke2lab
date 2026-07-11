@@ -14,13 +14,13 @@
   <description>The doctor inter-domain Service Provider Interface: the contracts another OSGi domain
     implements to plug into the diagnostic model — Specialist (a domain expert the Generalist routes
     to, contributed by e.g. cluster) and Clinician (the employed-actor identity). References only the
-    data (doctor-records); never seen by the host (not a -port seam). DIP: the domain provides, the
+    data (doctor-contract); never seen by the host (not a -port seam). DIP: the domain provides, the
     core consumes.</description>
 
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-records</artifactId>
+      <artifactId>doctor-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>

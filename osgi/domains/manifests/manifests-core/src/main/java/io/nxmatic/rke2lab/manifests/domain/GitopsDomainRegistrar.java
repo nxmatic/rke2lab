@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.manifests.domain;
 
 import io.nxmatic.rke2lab.manifests.ManifestsDomain;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.units.gitops.FluxInstanceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.gitops.FluxOperatorManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.gitops.FluxRootManifestsUnit;

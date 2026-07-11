@@ -13,9 +13,9 @@
   <name>osgi/domains/systemd/systemd-bdd</name>
   <description>The systemd domain's adapter-readiness SCENARIO — a production jGiven scenario played
     IN-CONTAINER by the seeding engine, not a test. It reads the systemd runtime through
-    SystemdRuntimeProbe (systemd-port) — a single-shot probe returning a SystemdStatusSnapshot whose
+    SystemdRuntimeProbe (systemd-contract) — a single-shot probe returning a SystemdStatusSnapshot whose
     fields it asserts (runtime precheck, mandatory target, failed units) — and consults the doctor
-    (ConsultingService, doctor-port) on a failing read, all domain vocabulary, zero host/Pulumi type.
+    (ConsultingService, doctor-contract) on a failing read, all domain vocabulary, zero host/Pulumi type.
     The systemd twin of cluster-bdd: it lives here (only ports, no sealed internal), not a -test
     fragment (it is live seeding logic). A type=model embeddable bundle whose scenario class is
     non-exported: the launcher plays it by class-selection, the host grafts its ScenarioModel — the
@@ -26,21 +26,21 @@
          scenario's DSL speaks. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a failing read (fork B
          — the checkpoint owns its consult, the same way cluster-bdd does). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
+      <artifactId>doctor-core</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The doctor's wire records: the readiness-checkpoint/observation/consultation the scenario
+    <!-- The doctor's wire contract: the readiness-checkpoint/observation/consultation the scenario
          builds to consult the doctor and carries back. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-records</artifactId>
+      <artifactId>doctor-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The neutral envelope + codec: the scenario speaks SeedEnvelope, not a doctor class. -->

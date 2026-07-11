@@ -30,11 +30,11 @@ import org.osgi.framework.Bundle;
 class DoctorCoreInContainerTest {
 
   // The doctor suite's two fixtures, selected by what they declare. role=core is the host under
-  // test (its actors); role=port contributes the shared doctor.testkit fixtures package its sibling
-  // imports. Each fragment names its own host (doctor-core / doctor-port) via Fragment-Host, so no
-  // host is named by a literal here.
+  // test (its actors); role=contract contributes the shared doctor.testkit fixtures package its
+  // sibling imports. Each fragment names its own host (doctor-core / doctor-contract) via
+  // Fragment-Host, so no host is named by a literal here.
   private static final String CORE_FIXTURE = "(&(type=fixture)(suite=doctor)(role=core))";
-  private static final String PORT_FIXTURE = "(&(type=fixture)(suite=doctor)(role=port))";
+  private static final String CONTRACT_FIXTURE = "(&(type=fixture)(suite=doctor)(role=contract))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.doctor.DoctorCoreTests";
 
   @RegisterExtension
@@ -44,14 +44,12 @@ class DoctorCoreInContainerTest {
           // DS
           // extender (osgi.extender=osgi.component); felix.scr must run for doctor-core to resolve.
           .withScr()
-          // doctor-core's dbus-tcp specialist names the unit via the typed SystemdUnitId, so the
-          // host imports the systemd domain's port; system-export it (a seam) so the host resolves.
           // doctor-core's DefaultReadinessAuthority @Component (a SeedHandler) crosses the
-          // seed-broker boundary, so the host imports the gateway port (Document + SeedHandler);
-          // it too is a seam.
-          .systemPackages(
-              "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
-              "io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
+          // seed-broker boundary, so the host imports the seed-broker port (SeedEnvelope +
+          // SeedHandler); it is the one true membrane seam. systemd-contract is DE-SEAMED (an
+          // installed bundle) — doctor-core's dbus-tcp specialist names SystemdUnitId, pulled
+          // bundle-to-bundle by installImportClosureOf below, not system-exported here.
+          .systemPackages("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
           // The JUnit runner world (launcher + engine + this testkit) — the proxy's own
           // infrastructure, the single shared declaration. Everything the HOST declares it needs
           // (doctor.records, doctor.spi, jackson) is derived from its manifest in the test body via
@@ -61,19 +59,24 @@ class DoctorCoreInContainerTest {
 
   @TestFactory
   Stream<DynamicTest> actorTests() throws Exception {
-    // doctor-port carries the value vocabulary + the exported doctor.testkit fixtures (via its own
-    // -test fragment); doctor-core depends on it. Each fixture installs its host + fragment,
-    // located
-    // through the fragment's declared Fragment-Host — no host named by a literal. Attach both
-    // fragments, then let OSGi pull the hosts' own import closure (their sibling domain bundles +
-    // the third-party libraries they import, jackson among them) instead of a hand-kept list.
+    // doctor-contract carries the value vocabulary + the exported doctor.testkit fixtures (via its
+    // own -test fragment); doctor-core depends on it. Each fixture installs its host + fragment,
+    // located through the fragment's declared Fragment-Host — no host named by a literal. Attach
+    // both fragments, then let OSGi pull the hosts' own import closure (their sibling domain
+    // bundles
+    // + the third-party libraries they import, jackson among them) instead of a hand-kept list.
     // Resolve hosts + the derived closure together, in one pass.
-    Bundle port = felix.installFixtureWithHost(PORT_FIXTURE).host();
-    Bundle host = felix.installFixtureWithHost(CORE_FIXTURE).host();
-    final List<Bundle> toResolve = new ArrayList<>(List.of(port, host));
-    toResolve.addAll(felix.installImportClosureOf(port, host));
+    Bundle contract = felix.installFixtureWithHost(CONTRACT_FIXTURE).host();
+    final OutOfContainerFrameworkExtension.FixtureWithHost core =
+        felix.installFixtureWithHost(CORE_FIXTURE);
+    Bundle host = core.host();
+    final List<Bundle> toResolve = new ArrayList<>(List.of(contract, host));
+    // Walk the CORE fragment too: its passenger imports systemd.contract (the dbus-tcp specialist's
+    // typed unit id), now a DE-SEAMED installed bundle — so the closure must see the fragment's
+    // imports to pull it, else the host resolves without the fragment attaching.
+    toResolve.addAll(felix.installImportClosureOf(contract, host, core.fragment()));
     if (!felix.resolve(toResolve)) {
-      fail("doctor-port + doctor-core (with their -test fragments) must resolve");
+      fail("doctor-contract + doctor-core (with their -test fragments) must resolve");
     }
     host.start();
 

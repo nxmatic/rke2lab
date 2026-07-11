@@ -14,16 +14,16 @@
   <description>The bbox domain's reconciliation SCENARIO — a production jGiven scenario played
     IN-CONTAINER by the seeding engine, not a test. It reconciles the run's desired DHCP reservations
     (enumerated from the netplan blueprint) through BboxReconciler (bbox-core), consulting the ambient
-    RunGate to decide live-apply vs dry-run, and consults the doctor (ConsultingService, doctor-port)
+    RunGate to decide live-apply vs dry-run, and consults the doctor (ConsultingService, doctor-contract)
     on a refused row — all domain vocabulary, zero host/Pulumi type. It lives here, not in a bbox-core,
     because it needs no sealed internal (only ports); its BlueprintRowEnumerator is pure and its one
     consumer. A type=model embeddable bundle whose scenario class is non-exported: the launcher plays
     it by class-selection, the host grafts its ScenarioModel — the class never crosses a realm.</description>
 
   <dependencies>
-    <!-- The bbox domain's data + contract: the reservation/outcome/action records and the
+    <!-- The bbox domain's data + contract: the reservation/outcome/action contract and the
          BboxReconciler the scenario's DSL speaks, plus the BlueprintRowEnumerator (in core) that
-         derives the canonical reservations. netplan-port comes transitively through bbox-core. -->
+         derives the canonical reservations. netplan-contract comes transitively through bbox-core. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-core</artifactId>
@@ -32,7 +32,7 @@
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a refused row. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
+      <artifactId>doctor-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The frontier vocabulary: the RunGate the scion consults, the SeedEnvelope it consults the

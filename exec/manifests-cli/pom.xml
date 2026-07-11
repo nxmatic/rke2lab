@@ -33,7 +33,7 @@
          bundle so the embedded manifests-core resolves against this one copy — typed access. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests-port</artifactId>
+      <artifactId>manifests-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and

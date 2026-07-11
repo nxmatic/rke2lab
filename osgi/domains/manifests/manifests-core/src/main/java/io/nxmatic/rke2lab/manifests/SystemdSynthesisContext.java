@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdTarget;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;

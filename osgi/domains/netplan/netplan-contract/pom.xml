@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>netplan-contract</artifactId>
+  <name>osgi/domains/netplan/netplan-contract</name>
+  <description>The netplan contract — the network blueprint vocabulary the netplan-core bundle and
+    its consumers depend on. Carries ClusterNetworkBlueprint and its value-type collaborators (Cidr,
+    MacAddress) plus the synthesis service interface + its request/result (formerly the netplan.api
+    package, fused into one contract package). type=contract: installed bundle-side and wired
+    bundle-to-bundle, not system-exported — the host speaks only to the broker. Versioned
+    independently of the reactor GAV via per-package @Version (starts 1.0.0).</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.seancfoley</groupId>
+      <artifactId>ipaddress</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

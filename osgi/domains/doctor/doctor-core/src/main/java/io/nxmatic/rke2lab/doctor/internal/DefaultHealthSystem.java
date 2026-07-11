@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.port.HealthSystem;
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
+import io.nxmatic.rke2lab.doctor.contract.HealthSystem;
+import io.nxmatic.rke2lab.doctor.contract.Patient;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.List;

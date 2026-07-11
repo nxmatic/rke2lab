@@ -14,7 +14,7 @@
   <packaging>pom</packaging>
   <name>osgi/domains/incus</name>
   <description>The incus domain: the external contacts toward an Incus host — one bundle pair, two
-    contacts, because an Incus instance needs an Incus image (they are the same concern). incus-port
+    contacts, because an Incus instance needs an Incus image (they are the same concern). incus-contract
     declares both verbs: the instance-reachability contact (IncusInstanceContact, shelled by incus-edge
     as `ssh … incus exec`, extracted from the host SeedSystemdAdapterEndpointGate) and the image-build
     contact (ImageBuilder, shelled by incus-edge as `distrobuilder build-incus` locally or its ssh
@@ -24,7 +24,7 @@
     edges.</description>
 
   <modules>
-    <module>incus-port</module>
+    <module>incus-contract</module>
     <module>incus-edge</module>
   </modules>
 </project>

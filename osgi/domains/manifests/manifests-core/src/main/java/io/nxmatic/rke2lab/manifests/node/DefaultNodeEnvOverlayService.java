@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.manifests.node;
 
 import io.nxmatic.rke2lab.manifests.YamlMapper;
-import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor;
-import io.nxmatic.rke2lab.manifests.port.node.NodeEnvOverlayService;
+import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvOverlayService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

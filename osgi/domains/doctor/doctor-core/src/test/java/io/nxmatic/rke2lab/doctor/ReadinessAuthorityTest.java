@@ -2,11 +2,11 @@ package io.nxmatic.rke2lab.doctor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.doctor.contract.Action;
+import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
+import io.nxmatic.rke2lab.doctor.contract.ReadinessVerdict;
 import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
-import io.nxmatic.rke2lab.doctor.records.Action;
-import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
-import io.nxmatic.rke2lab.doctor.records.ReadinessCheckpoint;
-import io.nxmatic.rke2lab.doctor.records.ReadinessVerdict;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;

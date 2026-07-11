@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.sshtoage.edge;
 
-import io.nxmatic.rke2lab.manifests.port.SshToAgeConversionException;
-import io.nxmatic.rke2lab.manifests.port.SshToAgeConverter;
+import io.nxmatic.rke2lab.manifests.contract.SshToAgeConversionException;
+import io.nxmatic.rke2lab.manifests.contract.SshToAgeConverter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.osgi.service.component.annotations.Component;

@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.controlplane.policy;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
-import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;

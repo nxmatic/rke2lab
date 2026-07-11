@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.manifests.units.runtime.flox;
 
-import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
+import io.nxmatic.rke2lab.manifests.contract.FloxRuntimeAssetService;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;

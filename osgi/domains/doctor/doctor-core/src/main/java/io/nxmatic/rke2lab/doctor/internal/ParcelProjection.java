@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.doctor.contract.Patient;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 
 /**

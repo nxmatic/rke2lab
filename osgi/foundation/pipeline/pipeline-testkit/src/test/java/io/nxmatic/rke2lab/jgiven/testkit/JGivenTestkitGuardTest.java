@@ -39,8 +39,11 @@ class JGivenTestkitGuardTest {
   private static final String FIXTURE_FILTER = "(&(type=fixture)(suite=jgiven)(role=probe))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.jgiven.probe.VaultScenarioRunner";
 
+  // withoutScr: this guard lives in pipeline-testkit, whose classpath has no felix.scr (unlike the
+  // -test modules that inherit it from bundle-test-parent), and the wrap-bundle ACTIVE proof needs
+  // no DS extender anyway.
   @RegisterExtension
-  static final OutOfContainerFrameworkExtension felix = JGivenTestkit.felix().build();
+  static final OutOfContainerFrameworkExtension felix = JGivenTestkit.felix().withoutScr().build();
 
   /** Palier 2 — the wrap bundle's import closure resolves and it reaches ACTIVE. */
   @Test

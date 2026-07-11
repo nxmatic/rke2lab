@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.netplan.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
-import io.nxmatic.rke2lab.doctor.records.Specialty;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.contract.Assessment;
+import io.nxmatic.rke2lab.doctor.contract.Prescription;
+import io.nxmatic.rke2lab.doctor.contract.Referral;
+import io.nxmatic.rke2lab.doctor.contract.SchemaRef;
+import io.nxmatic.rke2lab.doctor.contract.Specialty;
+import io.nxmatic.rke2lab.doctor.contract.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.Map;

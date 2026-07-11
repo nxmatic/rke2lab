@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.doctor.spi;
 
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.contract.Observation;
+import io.nxmatic.rke2lab.doctor.contract.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.contract.Symptom;
 
 /**
  * The doctor's INTERNAL reasoning surface — the record-typed routing/narration the {@code

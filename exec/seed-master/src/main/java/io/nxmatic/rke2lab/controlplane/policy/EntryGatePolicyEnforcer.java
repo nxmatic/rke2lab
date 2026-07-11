@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
-import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
+import io.nxmatic.rke2lab.manifests.contract.ManifestUpdateGate;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;

@@ -14,7 +14,7 @@
   <description>The systemd domain's in-world model facet: it contributes the systemd diagnostician
     (DbusTcpSpecialist) to the doctor as a Declarative Services @Component over the doctor's
     Specialist SPI. The specialist owns the systemd unit it remediates (the typed SystemdUnitId from
-    systemd-port), so it lives here, in its domain — not in doctor-core. A type=model embeddable
+    systemd-contract), so it lives here, in its domain — not in doctor-core. A type=model embeddable
     bundle; its impl package is non-exported (the specialist crosses as the Specialist service).</description>
 
   <dependencies>
@@ -32,14 +32,14 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-records</artifactId>
+      <artifactId>doctor-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The systemd domain's own unit vocabulary: the specialist names the unit it remediates via
          the typed SystemdUnitId, not a literal. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- bnd-consumed DS annotations: @Component declares the SCR descriptor bnd generates. -->
@@ -49,12 +49,12 @@
       <scope>provided</scope>
     </dependency>
     <!-- The shared doctor test fixtures (TestReferrals) — the specialist unit test builds its
-         Referral from the one testkit factory, not re-spelled boilerplate. doctor-port-test carries
+         Referral from the one testkit factory, not re-spelled boilerplate. doctor-contract-test carries
          the io.nxmatic.rke2lab.doctor.testkit package (the old doctor-testkit module dissolved into
          it); consumed here as a plain test jar (this is a JVM unit test, no OSGi boot). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port-test</artifactId>
+      <artifactId>doctor-contract-test</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

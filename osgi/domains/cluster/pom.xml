@@ -18,9 +18,11 @@
     to the doctor (cluster-core); the domain grows here as the cluster-edge chantier proceeds.</description>
 
   <modules>
-    <module>cluster-port</module>
+    <module>cluster-contract</module>
     <module>cluster-core</module>
     <module>cluster-edge</module>
+    <module>cluster-edge-test</module>
     <module>cluster-bdd</module>
+    <module>cluster-bdd-test</module>
   </modules>
 </project>

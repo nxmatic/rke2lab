@@ -45,7 +45,7 @@ public final class ClusterBddScenarios {
   /**
    * Play {@link ClusterReadinessScenario} in-container and return its {@link RunbookEnvelope}
    * serialized to JSON (the realm-crossing currency). The collaborators (the {@link
-   * io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact}, the doctor's {@code
+   * io.nxmatic.rke2lab.cluster.contract.ClusterReadinessContact}, the doctor's {@code
    * ConsultingService} on a failing phase) are resolved by the scenario from this bundle's registry
    * — a caller seeds a mock before invoking, or the live edge published one.
    */

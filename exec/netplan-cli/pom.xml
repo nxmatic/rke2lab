@@ -28,16 +28,6 @@
       <artifactId>framework-launcher</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The seam contract the CLI consumes (netplan.api) + the value types (netplan.port), kept
-         flat on the host classpath as the SINGLE exporter: netplan-port now owns BOTH packages
-         (netplan.api moved here from netplan-core so the consumed service contract lives in a module
-         the bundle imports-but-does-not-export — the single-exporter rule). OsgiRuntime mirrors them
-         onto the system bundle so the embedded netplan-core resolves against this one copy. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
          installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade) so it
          stays the single exporter of its own io.nxmatic.rke2lab.netplan package. runtime scope

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDocumentService;
 import java.nio.file.Path;
 import java.util.Map;
 import org.osgi.service.component.annotations.Activate;

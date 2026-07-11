@@ -14,7 +14,7 @@
   <name>osgi/domains/systemd/dbus-systemd-edge</name>
   <description>The dbus-systemd external edge: the single door toward the systemd dbus-on-TCP endpoint
     of the running master node. It @Component-provides the systemd domain's SystemdRuntimeProbe seam
-    (systemd-port) by speaking dbus over TCP. TCP is playable in OSGi, so this edge lives in the OSGi
+    (systemd-contract) by speaking dbus over TCP. TCP is playable in OSGi, so this edge lives in the OSGi
     world (the first edge both extracted and migrated). It EMBEDS dbus-java-core + transport-tcp +
     java-systemd on its private classpath so the transport ServiceLoader resolves inside one bundle
     classloader, with no SPI-Fly and no leak onto the system bundle.</description>
@@ -22,7 +22,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

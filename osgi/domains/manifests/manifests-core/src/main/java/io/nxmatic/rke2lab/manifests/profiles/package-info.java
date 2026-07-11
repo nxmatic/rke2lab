@@ -6,15 +6,15 @@
  * <h2>Context slices</h2>
  *
  * <ul>
- *   <li>{@link io.nxmatic.rke2lab.manifests.port.profiles.BootstrapIdentity} — cluster + node
+ *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity} — cluster + node
  *       identity (clusterName, clusterId, clusterToken, incusRemoteName, …).
- *   <li>{@link io.nxmatic.rke2lab.manifests.port.profiles.ComponentVersions} — version pins
+ *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.ComponentVersions} — version pins
  *       (cilium, flux, cluster-api operators, …).
- *   <li>{@link io.nxmatic.rke2lab.manifests.port.profiles.NetworkTopology} — CIDRs, interface
+ *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology} — CIDRs, interface
  *       names, gateway addresses.
- *   <li>{@link io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy} — per-domain flox NRI
- *       debug toggle.
- *   <li>{@link io.nxmatic.rke2lab.manifests.port.profiles.ImageState} — Stage A → Stage B
+ *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy} — per-domain flox
+ *       NRI debug toggle.
+ *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.ImageState} — Stage A → Stage B
  *       control-node image identity (alias, fingerprint, checksum, remote).
  * </ul>
  *

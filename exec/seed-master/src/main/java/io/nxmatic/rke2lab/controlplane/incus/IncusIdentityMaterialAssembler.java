@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
+import io.nxmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * world — the client cert ships as a seed-master application resource, the client key in the
  * worktree {@code .secrets}, the server cert + remote address in {@code ~/.config/incus/} — so this
  * reads them here and hands the material across the frontier via {@link
- * io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest}. The OSGi synthesis unit never
+ * io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest}. The OSGi synthesis unit never
  * reaches back across the world boundary to read a host file or classpath resource.
  *
  * <p>Values are returned RAW (PEM text, plain URI); the manifest unit base64-encodes them when it

@@ -88,6 +88,13 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
 
   private OutOfContainerFrameworkExtension(Builder builder) {
     Set<String> exports = new LinkedHashSet<>(builder.systemPackages);
+    // org.slf4j is universal: every domain bundle logs through it, and no slf4j provider is staged
+    // in-container, so it is system-exported by default from the test classpath — one place, not
+    // repeated per proxy. Only when the test did not already declare its own slf4j export (a second
+    // version would split the package): JGivenTestkit, e.g., exports 2.0.17 itself.
+    if (exports.stream().noneMatch(p -> p.startsWith("org.slf4j;") || p.equals("org.slf4j"))) {
+      exports.add("org.slf4j;version=2.0.0");
+    }
     for (String symbolicName : builder.exportImportsOf) {
       exports.addAll(classpath.exportsForImportsOf(symbolicName));
     }
@@ -130,7 +137,10 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
 
     private final List<String> systemPackages = new ArrayList<>();
     private final List<String> bootDelegation = new ArrayList<>();
-    private boolean startScr;
+    // SCR runs by default: nearly every test installs @Component-carrying bundles that need the DS
+    // extender to activate. The rare test that must prove behaviour WITHOUT the extender present
+    // opts out via withoutScr().
+    private boolean startScr = true;
     private final List<String> classpathBundles = new ArrayList<>();
     private final List<String> reactorBundles = new ArrayList<>();
     private final List<String> exportImportsOf = new ArrayList<>();
@@ -169,12 +179,24 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     }
 
     /**
-     * Install+start felix.scr before the reactor bundles. The DS-runtime API it imports
-     * (org.osgi.service.component / util.promise / util.function) is no longer system-exported: the
-     * staged spec-jar bundles provide it, so felix.scr wires to them bundle-to-bundle.
+     * Install+start felix.scr before the reactor bundles (the DEFAULT — see {@link #startScr}). The
+     * DS-runtime API it imports (org.osgi.service.component / util.promise / util.function) is no
+     * longer system-exported: the staged spec-jar bundles provide it, so felix.scr wires to them
+     * bundle-to-bundle. Kept as an explicit no-op for tests that document the dependency at the
+     * call site; new tests need not call it.
      */
     public Builder withScr() {
       this.startScr = true;
+      return this;
+    }
+
+    /**
+     * Opt OUT of the default felix.scr install — for a test that must prove behaviour with the DS
+     * extender ABSENT (e.g. that a bundle Requiring osgi.extender=osgi.component stays unresolved,
+     * or that a component stays inactive). The exception to the SCR-by-default rule.
+     */
+    public Builder withoutScr() {
+      this.startScr = false;
       return this;
     }
 

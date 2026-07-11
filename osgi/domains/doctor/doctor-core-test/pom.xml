@@ -18,7 +18,7 @@
     accident and a black-box bundle could never have. It carries, in src/main so they land in the
     fragment: the 8 plain @Test actor tests + the 2 jGiven scenarios (DoctorScenario(Test)). The
     shared fixtures (ReferralReplies, FakeSpecialist) it imports through the doctor-core host, which
-    in turn imports io.nxmatic.rke2lab.doctor.testkit exported by the doctor-port-test fragment —
+    in turn imports io.nxmatic.rke2lab.doctor.testkit exported by the doctor-contract-test fragment —
     one copy, no separate module. jGiven runs in-container via the shared jgiven-fragment.bnd
     include; the JUnit lifecycle via the generic in-container runner (junit-testkit).</description>
 
@@ -35,12 +35,18 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- the shared fixtures live in the doctor-port-test fragment (package doctor.testkit, exported);
+    <!-- the shared fixtures live in the doctor-contract-test fragment (package doctor.testkit, exported);
          provided so the actor tests compile against ReferralReplies/FakeSpecialist. At runtime they
          resolve through the doctor-core host, which imports doctor.testkit. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port-test</artifactId>
+      <artifactId>doctor-contract</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-contract-test</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
@@ -48,7 +54,7 @@
     <!-- the value vocabulary the tests speak (Symptom, RemediationPlan, …) -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
+      <artifactId>doctor-core</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
@@ -64,6 +70,17 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- doctor-core's dbus-tcp specialist names the systemd unit via the typed SystemdUnitId.
+         systemd-contract is DE-SEAMED (an installed bundle), so the proxy pulls it through the host's
+         import closure — it must be on the test classpath for installImportClosureOf to find it.
+         provided: resolved against the doctor-core host at runtime. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-contract</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- GeneralistConsultDocumentTest builds checkpoint Documents (the gateway seam) and reads
          consultations with its own jackson (the seam payload is a serialized JSON String). Direct,
          not transitive — every imported class must come from a direct dependency. provided: the
@@ -75,7 +92,7 @@
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
-    <!-- The codec that (de)serializes wire-records; nested in the doctor-core host bundle (T2), so
+    <!-- The codec that (de)serializes wire-contract; nested in the doctor-core host bundle (T2), so
          the fragment resolves it through the host at runtime — compile-only here, like the seam. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

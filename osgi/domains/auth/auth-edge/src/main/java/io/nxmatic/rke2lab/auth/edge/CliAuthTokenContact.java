@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.auth.edge;
 
-import io.nxmatic.rke2lab.auth.port.AuthTokenContact;
-import io.nxmatic.rke2lab.auth.port.AuthTokenSource;
+import io.nxmatic.rke2lab.auth.contract.AuthTokenContact;
+import io.nxmatic.rke2lab.auth.contract.AuthTokenSource;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

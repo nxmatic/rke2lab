@@ -32,7 +32,7 @@
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jdk8</artifactId>
     </dependency>
-    <!-- The wire-records + WireEnum the codec (de)serializes. provided: the seed-broker seam is
+    <!-- The wire-contract + WireEnum the codec (de)serializes. provided: the seed-broker seam is
          system-exported OSGi-side and flat host-side in BOTH realms, so the codec compiles against
          it and bnd emits an Import-Package for it, but it must NOT be embedded (that would duplicate
          the seam class → a realm collision). -->

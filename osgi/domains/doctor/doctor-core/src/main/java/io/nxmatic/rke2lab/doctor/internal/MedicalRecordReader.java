@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.Expectation;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.records.Patient;
-import io.nxmatic.rke2lab.doctor.records.Visit;
-import io.nxmatic.rke2lab.doctor.records.VisitWire;
+import io.nxmatic.rke2lab.doctor.contract.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.contract.Expectation;
+import io.nxmatic.rke2lab.doctor.contract.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.contract.Patient;
+import io.nxmatic.rke2lab.doctor.contract.Visit;
+import io.nxmatic.rke2lab.doctor.contract.VisitWire;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;

@@ -16,11 +16,11 @@
   <description>The manifests domain — the rke2lab view on cdk8s: it owns the cdk8s synthesis runtime
     (manifests-cdk8s, the carrier that embeds the flat cdk8s closure and exports it to the OSGi
     world) and the model/synthesis logic that puts cdk8s back into the rke2lab context
-    (manifests-core), over the contract both worlds share (manifests-port). Other domains contribute
+    (manifests-core), over the contract both worlds share (manifests-contract). Other domains contribute
     their own cdk8s rendering as fragments of the carrier (e.g. systemd-cdk8s-manifests).</description>
 
   <modules>
-    <module>manifests-port</module>
+    <module>manifests-contract</module>
     <module>manifests-cdk8s</module>
     <module>manifests-core</module>
     <module>manifests-core-test</module>

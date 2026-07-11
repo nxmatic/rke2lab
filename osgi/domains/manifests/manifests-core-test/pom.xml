@@ -37,7 +37,7 @@
     <!-- the value vocabulary the tests speak (ManifestExplodeRequest/Result, ManifestAnnotations) -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests-port</artifactId>
+      <artifactId>manifests-contract</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
@@ -92,13 +92,13 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-port</artifactId>
+      <artifactId>netplan-contract</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
@@ -144,7 +144,7 @@
       <artifactId>commons-compress</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- netplan-port imports inet.ipaddr; installed in-container as its sole exporter bundle. -->
+    <!-- netplan-contract imports inet.ipaddr; installed in-container as its sole exporter bundle. -->
     <dependency>
       <groupId>com.github.seancfoley</groupId>
       <artifactId>ipaddress</artifactId>

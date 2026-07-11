@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
-import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
+import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
 import org.junit.jupiter.api.AfterAll;

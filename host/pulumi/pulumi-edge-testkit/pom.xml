@@ -42,25 +42,5 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
     </dependency>
-    <!-- test-only: StackHandleSnapshotSourceTest, relocated here with the adapter's host home, reads
-         the consultationReport output key from the doctor model. Only the port (SnapshotSource + the
-         value vocabulary, incl. ConsultationReport since Move A) is imported — never a hidden actor —
-         so doctor-port alone. doctor-port is built before the host in the reactor (osgi→host) and
-         never depends back, so this is no cycle. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <!-- test-only: LiveMedicalRecordRegistryTest seeds reconstruction inputs with the doctor
-         testkit's ReferralReplies (main-scope fixtures in doctor-port-test). Test scope keeps the
-         fixture off the edge's runtime classpath. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port-test</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 </project>

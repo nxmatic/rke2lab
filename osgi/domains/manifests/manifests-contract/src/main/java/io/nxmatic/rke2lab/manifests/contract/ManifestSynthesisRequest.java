@@ -1,0 +1,256 @@
+package io.nxmatic.rke2lab.manifests.contract;
+
+import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.contract.profiles.ComponentVersions;
+import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
+import io.nxmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Request contract for canonical manifest synthesis. */
+public record ManifestSynthesisRequest(
+    Path synthOutdir,
+    Path synthManifestFile,
+    Optional<ManifestDomainPolicy> manifestDomainPolicy,
+    FloxDebugPolicy floxDebugPolicy,
+    BootstrapIdentity bootstrapIdentity,
+    NetworkTopology networkTopology,
+    ComponentVersions componentVersions,
+    ImageState imageState,
+    IncusIdentityMaterial incusIdentity)
+    implements ManifestDomainPolicyAware {
+
+  private static final String ENABLED_DOMAINS_PROPERTY = "rke2lab.manifests.policy.enabledDomains";
+
+  private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+
+  public ManifestSynthesisRequest {
+    synthOutdir = synthOutdir.toAbsolutePath().normalize();
+    synthManifestFile = synthManifestFile.toAbsolutePath().normalize();
+    manifestDomainPolicy =
+        manifestDomainPolicy == null
+            ? Optional.empty()
+            : manifestDomainPolicy.map(policy -> policy);
+    floxDebugPolicy = floxDebugPolicy == null ? FloxDebugPolicy.disabled() : floxDebugPolicy;
+    bootstrapIdentity = bootstrapIdentity == null ? BootstrapIdentity.unknown() : bootstrapIdentity;
+    networkTopology = networkTopology == null ? NetworkTopology.empty() : networkTopology;
+    // No blank-version fallback: an absent ComponentVersions is incomplete state, not a valid empty
+    // default — a blank version renders an unresolvable upstream path (e.g. release-.yaml). The
+    // builder supplies ComponentVersions.defaults(); the engine (seed-master) overlays Pulumi
+    // config
+    // on top. Required by construction, so a version-less request cannot exist.
+    componentVersions =
+        Objects.requireNonNull(
+            componentVersions, "componentVersions is required (no blank-version default)");
+    imageState = imageState == null ? ImageState.unknown() : imageState;
+    incusIdentity = incusIdentity == null ? IncusIdentityMaterial.unknown() : incusIdentity;
+  }
+
+  public static Builder builder(Path synthOutdir, Path synthManifestFile) {
+    return new Builder(synthOutdir, synthManifestFile);
+  }
+
+  /** A builder pre-loaded with this request's values, for immutable transformation. */
+  public Builder toBuilder() {
+    return new Builder(synthOutdir, synthManifestFile)
+        .manifestDomainPolicy(manifestDomainPolicy)
+        .floxDebugPolicy(floxDebugPolicy)
+        .bootstrapIdentity(bootstrapIdentity)
+        .networkTopology(networkTopology)
+        .componentVersions(componentVersions)
+        .imageState(imageState)
+        .incusIdentity(incusIdentity);
+  }
+
+  // Immutable transformations: each returns a new request with one slice replaced. They delegate to
+  // toBuilder() so the field list lives in exactly one place (the Builder) — adding a slice never
+  // touches these.
+  public ManifestSynthesisRequest withManifestDomainPolicy(ManifestDomainPolicy policy) {
+    return toBuilder().manifestDomainPolicy(Optional.of(policy)).build();
+  }
+
+  public ManifestSynthesisRequest withFloxDebugPolicy(FloxDebugPolicy policy) {
+    return toBuilder().floxDebugPolicy(policy).build();
+  }
+
+  public ManifestSynthesisRequest withBootstrapIdentity(BootstrapIdentity identity) {
+    return toBuilder().bootstrapIdentity(identity).build();
+  }
+
+  public ManifestSynthesisRequest withNetworkTopology(NetworkTopology topology) {
+    return toBuilder().networkTopology(topology).build();
+  }
+
+  public ManifestSynthesisRequest withComponentVersions(ComponentVersions versions) {
+    return toBuilder().componentVersions(versions).build();
+  }
+
+  public ManifestSynthesisRequest withImageState(ImageState state) {
+    return toBuilder().imageState(state).build();
+  }
+
+  public ManifestSynthesisRequest withIncusIdentity(IncusIdentityMaterial material) {
+    return toBuilder().incusIdentity(material).build();
+  }
+
+  public static ManifestSynthesisRequest fromSystemProperties() {
+    final String outdirProperty = System.getProperty("rke2lab.manifests.outdir");
+    final String fileProperty = System.getProperty("rke2lab.manifests.file");
+    final Optional<ManifestDomainPolicy> manifestDomainPolicy = policyFromSystemProperties();
+    final FloxDebugPolicy floxDebugPolicy = floxDebugPolicyFromSystemProperties();
+
+    if (outdirProperty == null && fileProperty == null) {
+      return ephemeral(manifestDomainPolicy, floxDebugPolicy);
+    }
+
+    final Path outdir;
+    final Path manifestFile;
+    if (outdirProperty != null && fileProperty != null) {
+      outdir = Paths.get(outdirProperty);
+      manifestFile = Paths.get(fileProperty);
+    } else if (outdirProperty != null) {
+      outdir = Paths.get(outdirProperty);
+      manifestFile = outdir.resolve("manifests.yaml");
+    } else {
+      manifestFile = Paths.get(fileProperty);
+      outdir = manifestFile.getParent() == null ? Paths.get(".") : manifestFile.getParent();
+    }
+    return builder(outdir, manifestFile)
+        .manifestDomainPolicy(manifestDomainPolicy)
+        .floxDebugPolicy(floxDebugPolicy)
+        .build();
+  }
+
+  public static ManifestSynthesisRequest ephemeral() {
+    return ephemeral(Optional.empty(), FloxDebugPolicy.disabled());
+  }
+
+  public static ManifestSynthesisRequest ephemeral(ManifestDomainPolicy manifestDomainPolicy) {
+    return ephemeral(Optional.of(manifestDomainPolicy), FloxDebugPolicy.disabled());
+  }
+
+  private static ManifestSynthesisRequest ephemeral(
+      Optional<ManifestDomainPolicy> manifestDomainPolicy, FloxDebugPolicy floxDebugPolicy) {
+    try {
+      final Path outdir =
+          Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
+      final Path manifestFile = outdir.resolve("manifests.yaml");
+      return builder(outdir, manifestFile)
+          .manifestDomainPolicy(manifestDomainPolicy)
+          .floxDebugPolicy(floxDebugPolicy)
+          .build();
+    } catch (IOException ex) {
+      throw new UncheckedIOException("Failed to create temporary synthesis directory", ex);
+    }
+  }
+
+  /** The single construction path: the two output paths are required, every slice optional. */
+  public static final class Builder {
+    private final Path synthOutdir;
+    private final Path synthManifestFile;
+    private Optional<ManifestDomainPolicy> manifestDomainPolicy = Optional.empty();
+    private FloxDebugPolicy floxDebugPolicy = FloxDebugPolicy.disabled();
+    private BootstrapIdentity bootstrapIdentity = BootstrapIdentity.unknown();
+    private NetworkTopology networkTopology = NetworkTopology.empty();
+    private ComponentVersions componentVersions = ComponentVersions.defaults();
+    private ImageState imageState = ImageState.unknown();
+    private IncusIdentityMaterial incusIdentity = IncusIdentityMaterial.unknown();
+
+    private Builder(Path synthOutdir, Path synthManifestFile) {
+      this.synthOutdir = synthOutdir;
+      this.synthManifestFile = synthManifestFile;
+    }
+
+    public Builder manifestDomainPolicy(final Optional<ManifestDomainPolicy> v) {
+      this.manifestDomainPolicy = v;
+      return this;
+    }
+
+    public Builder floxDebugPolicy(final FloxDebugPolicy v) {
+      this.floxDebugPolicy = v;
+      return this;
+    }
+
+    public Builder bootstrapIdentity(final BootstrapIdentity v) {
+      this.bootstrapIdentity = v;
+      return this;
+    }
+
+    public Builder networkTopology(final NetworkTopology v) {
+      this.networkTopology = v;
+      return this;
+    }
+
+    public Builder componentVersions(final ComponentVersions v) {
+      this.componentVersions = v;
+      return this;
+    }
+
+    public Builder imageState(final ImageState v) {
+      this.imageState = v;
+      return this;
+    }
+
+    public Builder incusIdentity(final IncusIdentityMaterial v) {
+      this.incusIdentity = v;
+      return this;
+    }
+
+    public ManifestSynthesisRequest build() {
+      return new ManifestSynthesisRequest(
+          synthOutdir,
+          synthManifestFile,
+          manifestDomainPolicy,
+          floxDebugPolicy,
+          bootstrapIdentity,
+          networkTopology,
+          componentVersions,
+          imageState,
+          incusIdentity);
+    }
+  }
+
+  private static FloxDebugPolicy floxDebugPolicyFromSystemProperties() {
+    return new FloxDebugPolicy(
+        boolSystemProperty("rke2lab.manifests.policy.debug.mesh.enabled"),
+        boolSystemProperty("rke2lab.manifests.policy.debug.networking.enabled"),
+        boolSystemProperty("rke2lab.manifests.policy.debug.nriPlugins.flox.enabled"));
+  }
+
+  private static boolean boolSystemProperty(final String key) {
+    final String value = System.getProperty(key);
+    if (value == null || value.isBlank()) {
+      return false;
+    }
+    return switch (value.trim().toLowerCase()) {
+      case "1", "true", "yes", "on" -> true;
+      default -> false;
+    };
+  }
+
+  private static Optional<ManifestDomainPolicy> policyFromSystemProperties() {
+    final String enabledDomainsProperty = System.getProperty(ENABLED_DOMAINS_PROPERTY);
+    if (enabledDomainsProperty == null || enabledDomainsProperty.isBlank()) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        ManifestDomainPolicy.builder()
+            .domainCatalog(MANIFEST_DOMAIN_CATALOG)
+            .enableOnly(
+                Arrays.stream(enabledDomainsProperty.split(","))
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList())
+            .build());
+  }
+}

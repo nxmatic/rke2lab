@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.incus.edge;
 
-import io.nxmatic.rke2lab.incus.port.ImageBuildException;
-import io.nxmatic.rke2lab.incus.port.ImageBuildRequest;
-import io.nxmatic.rke2lab.incus.port.ImageBuilder;
+import io.nxmatic.rke2lab.incus.contract.ImageBuildException;
+import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
+import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;

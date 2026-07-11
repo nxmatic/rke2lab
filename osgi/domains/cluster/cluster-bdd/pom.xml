@@ -13,8 +13,8 @@
   <name>osgi/domains/cluster/cluster-bdd</name>
   <description>The cluster domain's readiness SCENARIO — a production jGiven scenario played
     IN-CONTAINER by the seeding engine, not a test. It reads the cluster's readiness through
-    ClusterReadinessContact (cluster-port) across its canonical phases and consults the doctor
-    (ConsultingService, doctor-port) on a failing phase — all domain vocabulary, zero host/Pulumi
+    ClusterReadinessContact (cluster-contract) across its canonical phases and consults the doctor
+    (ConsultingService, doctor-contract) on a failing phase — all domain vocabulary, zero host/Pulumi
     type. It lives here, not in cluster-core, because it needs no sealed internal (only ports), and
     not in a -test fragment, because it is live seeding logic. A type=model embeddable bundle whose
     scenario class is non-exported: the launcher plays it by class-selection, the host grafts its
@@ -25,14 +25,14 @@
          scenario's DSL speaks. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>cluster-port</artifactId>
+      <artifactId>cluster-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a failing phase (Q2 —
          the cluster domain already knows the doctor, it publishes ClusterSpecialist). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
+      <artifactId>doctor-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The frontier vocabulary: the checkpoint/observation/verdict Documents the scenario builds to

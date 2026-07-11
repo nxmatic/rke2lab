@@ -41,17 +41,14 @@ class BboxBddInContainerTest {
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
       JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
-          // bbox is DE-SEAMED: bbox-record + bbox-core are installed bundles (type=record/model),
-          // wired bundle-to-bundle by installImportClosureOf — no bbox seam to system-export. What
-          // REMAINS system-exported here is the ports still declared type=seam that this scion
-          // imports: netplan.port (bbox-core derives the blueprint through it), doctor.port (the
-          // scion consults the doctor) and seed.broker.port (RunGate + SeedEnvelope — the one true
-          // host↔OSGi membrane, published by the host in prod). netplan.port + doctor.port are the
-          // NEXT de-seam targets (same reason bbox was); seed.broker.port stays a seam.
-          .systemPackages(
-              "io.nxmatic.rke2lab.netplan.port;version=1.0.0",
-              "io.nxmatic.rke2lab.doctor.port;version=1.0.0",
-              "io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
+          // bbox, netplan and doctor are all DE-SEAMED: their contracts are installed bundles
+          // (type=contract/record/model), wired bundle-to-bundle by installImportClosureOf — no
+          // domain seam to system-export. The ONE package still system-exported is seed.broker.port
+          // (RunGate + SeedEnvelope — the one true host↔OSGi membrane, published by the host in
+          // prod). netplan.contract (bbox-core derives the blueprint through it) and
+          // doctor.contract
+          // (the scion consults the doctor) are pulled through the host's import closure.
+          .systemPackages("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
           // The JUnit-Platform runner world (launcher + engine) the front-door drives in-container.
           // Everything else (bbox-record, bbox-core, seed-broker-codec, jackson, jGiven) is derived
           // from the host bundle's manifest in the test body via installImportClosureOf.

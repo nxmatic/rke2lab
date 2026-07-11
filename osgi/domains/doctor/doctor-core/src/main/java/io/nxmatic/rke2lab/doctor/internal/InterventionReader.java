@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.InterventionWire;
-import io.nxmatic.rke2lab.doctor.records.ProblemRef;
-import io.nxmatic.rke2lab.doctor.records.Provenance;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.contract.Intervention;
+import io.nxmatic.rke2lab.doctor.contract.InterventionWire;
+import io.nxmatic.rke2lab.doctor.contract.ProblemRef;
+import io.nxmatic.rke2lab.doctor.contract.Provenance;
+import io.nxmatic.rke2lab.doctor.contract.RemediationProgramRef;
 import java.util.Optional;
 
 /**

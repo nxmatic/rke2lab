@@ -13,7 +13,7 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.controlplane.readiness.RequiredControllers;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
-import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Checkpoint;

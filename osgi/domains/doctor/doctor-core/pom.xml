@@ -14,7 +14,7 @@
   <description>The doctor diagnostic model: the pure operator-runbook types (symptom, observation,
     assessment, prescription, remediation plan, medical record, health system, the specialists and
     the clinical-access model) lifted from exec/seed-master into the OSGi world. Consumes the
-    doctor-port observation seam; the host implements it (DIP). Zero pulumi — the rendering engine and
+    doctor-contract observation seam; the host implements it (DIP). Zero pulumi — the rendering engine and
     the live-observation adapters stay host.</description>
 
   <dependencies>
@@ -30,12 +30,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-records</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
+      <artifactId>doctor-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -69,7 +64,7 @@
          via the typed SystemdUnitId, not a literal — the import draws the consumer edge in the graph. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-port</artifactId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- bnd-consumed construction annotations: DefaultHealthSystem (@Component) collects the

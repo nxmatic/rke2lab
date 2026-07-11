@@ -3,9 +3,9 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.contract.ClinicianId;
+import io.nxmatic.rke2lab.doctor.contract.Patient;
 import io.nxmatic.rke2lab.doctor.internal.GrantPolicy;
-import io.nxmatic.rke2lab.doctor.records.ClinicianId;
-import io.nxmatic.rke2lab.doctor.records.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

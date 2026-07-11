@@ -1,14 +1,14 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
-import io.nxmatic.rke2lab.manifests.port.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.port.profiles.ComponentVersions;
-import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
-import io.nxmatic.rke2lab.manifests.port.profiles.ImageState;
-import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
-import io.nxmatic.rke2lab.manifests.port.profiles.NetworkTopology;
-import io.nxmatic.rke2lab.manifests.port.profiles.SopsAgeMaterial;
+import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.contract.profiles.ComponentVersions;
+import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
+import io.nxmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import java.nio.file.Path;
 import java.util.Objects;
 

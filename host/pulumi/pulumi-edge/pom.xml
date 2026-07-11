@@ -21,23 +21,16 @@
     the ports and never depend on this module directly.</description>
 
   <dependencies>
-    <!-- DIP: the host implements the doctor observation port. Reactor order is osgi→host→exec, so
-         doctor-port is already built when this module compiles. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <!-- The journals carry seed-broker seam types directly (Document, Patient, Coordinate, Domain,
          SeedBrokerCatalog): the host produces opaque visit/intervention Documents that only OSGi
          deserializes. Declared explicitly since pulumi-edge names these types itself, not just
-         transitively through doctor-port. -->
+         transitively through doctor-contract. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The document codec: the journals build/read seam Documents through the typed wire-records
+    <!-- The document codec: the journals build/read seam Documents through the typed wire-contract
          (VisitWire, …) rather than hand-rolled jackson trees. Shaded flat into the host classpath,
          binding to the host's flat jackson (the same source is nested OSGi-side). -->
     <dependency>

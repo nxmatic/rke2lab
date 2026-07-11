@@ -2,10 +2,10 @@
 package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.port.ManifestExplodeRequest;
-import io.nxmatic.rke2lab.manifests.port.ManifestExplodeResult;
-import io.nxmatic.rke2lab.manifests.port.ManifestExplodeService;
+import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
+import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeResult;
+import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

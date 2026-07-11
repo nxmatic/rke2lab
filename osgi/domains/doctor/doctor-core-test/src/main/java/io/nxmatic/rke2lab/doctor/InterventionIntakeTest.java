@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
-import io.nxmatic.rke2lab.doctor.records.InterventionRequest;
-import io.nxmatic.rke2lab.doctor.records.ReadinessVerdict;
+import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.contract.InterventionRequest;
+import io.nxmatic.rke2lab.doctor.contract.ReadinessVerdict;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;

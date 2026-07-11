@@ -8,7 +8,7 @@ import java.util.Optional;
 
 /**
  * The host-flat snapshot a readiness probe produces — the host-side twin of the doctor's {@code
- * io.nxmatic.rke2lab.doctor.records.Observation}, carrying the same {@code status}/{@code
+ * io.nxmatic.rke2lab.doctor.contract.Observation}, carrying the same {@code status}/{@code
  * summary}/{@code symptom}/{@code details} but typed against the seam's {@link SymptomKind} rather
  * than the bundle-only doctor {@code Symptom}. The host reasons on the typed fields; it renders in
  * two distinct places, at two distinct boundaries:

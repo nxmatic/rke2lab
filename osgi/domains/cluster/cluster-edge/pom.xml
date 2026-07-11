@@ -13,7 +13,7 @@
   <artifactId>cluster-edge</artifactId>
   <name>osgi/domains/cluster/cluster-edge</name>
   <description>The cluster external edge: the single door toward the live RKE2 cluster's kube-apiserver.
-    It @Component-provides the cluster domain's ClusterReadinessContact seam (cluster-port) by shelling
+    It @Component-provides the cluster domain's ClusterReadinessContact seam (cluster-contract) by shelling
     kubectl over a published kubeconfig. Pure ProcessBuilder — zero embedded jars (simpler than the
     dbus-systemd edge, which embedded three for ServiceLoader transport discovery). Stateless, single
     contact: the host owns the retry loop, the timeout policy, and the Observation projection.</description>
@@ -21,7 +21,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>cluster-port</artifactId>
+      <artifactId>cluster-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

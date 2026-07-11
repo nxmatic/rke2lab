@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.records.ClinicianId;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.doctor.contract.ClinicianId;
+import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
+import io.nxmatic.rke2lab.doctor.contract.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.contract.Patient;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.List;
 import java.util.function.Consumer;

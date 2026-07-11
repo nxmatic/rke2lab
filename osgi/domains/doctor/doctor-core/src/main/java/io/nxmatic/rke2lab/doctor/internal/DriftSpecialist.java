@@ -1,14 +1,14 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.Expectation;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.ProblemReview;
-import io.nxmatic.rke2lab.doctor.records.Provenance;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
+import io.nxmatic.rke2lab.doctor.contract.Assessment;
+import io.nxmatic.rke2lab.doctor.contract.Expectation;
+import io.nxmatic.rke2lab.doctor.contract.Intervention;
+import io.nxmatic.rke2lab.doctor.contract.Prescription;
+import io.nxmatic.rke2lab.doctor.contract.ProblemReview;
+import io.nxmatic.rke2lab.doctor.contract.Provenance;
+import io.nxmatic.rke2lab.doctor.contract.Referral;
+import io.nxmatic.rke2lab.doctor.contract.ReferralReply;
+import io.nxmatic.rke2lab.doctor.contract.SchemaRef;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import java.util.List;
 import java.util.Map;

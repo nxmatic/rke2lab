@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.runtime.daemonset;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.RuntimeRefs;
 import java.util.List;

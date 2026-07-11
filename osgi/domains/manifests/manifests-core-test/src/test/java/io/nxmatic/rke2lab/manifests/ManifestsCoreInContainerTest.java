@@ -52,21 +52,15 @@ class ManifestsCoreInContainerTest {
           .withScr()
           // The JUnit runner world — the proxy's own infrastructure, the single shared declaration.
           .withJUnitRunner()
-          // The sibling domain PORTS manifests-core imports are seams (type=seam): host-flat,
-          // system-exported here exactly as in prod, never installed as bundles. The closure walk
-          // skips seam exporters, so these would never be pulled — they belong here, not in the
-          // derived set. Everything else manifests-core's runtime graph needs (the cdk8s carrier
-          // and
-          // its systemd fragment, unitrepo-core, jackson, ipaddress, snakeyaml, commons-compress)
-          // is
+          // pipeline is the last remaining seam (type=seam): host-flat, system-exported here
+          // exactly
+          // as in prod, never installed as a bundle. The closure walk skips seam exporters, so it
+          // belongs here, not in the derived set. Everything else manifests-core's runtime graph
+          // needs
+          // — manifests-contract (now DE-SEAMED, an installed bundle), the cdk8s carrier and its
+          // systemd fragment, unitrepo-core, jackson, ipaddress, snakeyaml, commons-compress — is
           // derived from the host's manifest in the test body via installImportClosureOf.
-          .systemPackages(
-              "io.nxmatic.rke2lab.manifests.port;version=1.0.0",
-              "io.nxmatic.rke2lab.manifests.port.node;version=1.0.0",
-              "io.nxmatic.rke2lab.manifests.port.profiles;version=1.0.0",
-              "io.nxmatic.rke2lab.netplan.port;version=1.0.0",
-              "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
-              "io.nxmatic.rke2lab.pipeline;version=1.0.0")
+          .systemPackages("io.nxmatic.rke2lab.pipeline;version=1.0.0")
           .build();
 
   @TestFactory

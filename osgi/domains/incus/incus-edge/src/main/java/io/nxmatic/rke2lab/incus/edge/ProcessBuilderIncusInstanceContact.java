@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.incus.edge;
 
-import io.nxmatic.rke2lab.incus.port.IncusExecRequest;
-import io.nxmatic.rke2lab.incus.port.IncusInstanceContact;
+import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
+import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
