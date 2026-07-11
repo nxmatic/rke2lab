@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>systemd-bdd</artifactId>
+  <name>osgi/domains/systemd/systemd-bdd</name>
+  <description>The systemd domain's adapter-readiness SCENARIO — a production jGiven scenario played
+    IN-CONTAINER by the seeding engine, not a test. It reads the systemd runtime through
+    SystemdRuntimeProbe (systemd-port) — a single-shot probe returning a SystemdStatusSnapshot whose
+    fields it asserts (runtime precheck, mandatory target, failed units) — and consults the doctor
+    (ConsultingService, doctor-port) on a failing read, all domain vocabulary, zero host/Pulumi type.
+    The systemd twin of cluster-bdd: it lives here (only ports, no sealed internal), not a -test
+    fragment (it is live seeding logic). A type=model embeddable bundle whose scenario class is
+    non-exported: the launcher plays it by class-selection, the host grafts its ScenarioModel — the
+    class never crosses a realm.</description>
+
+  <dependencies>
+    <!-- The systemd domain's own port: the runtime probe + its snapshot/request vocabulary the
+         scenario's DSL speaks. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The doctor's consult seam: the scenario consults the doctor itself on a failing read (fork B
+         — the checkpoint owns its consult, the same way cluster-bdd does). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The doctor's wire records: the readiness-checkpoint/observation/consultation the scenario
+         builds to consult the doctor and carries back. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-records</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The neutral envelope + codec: the scenario speaks SeedEnvelope, not a doctor class. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
+         the jgiven-wrap bundle, pulled into the live world by this bundle's import closure
+         (type=model isDomain → StagingClosure stages its imports). -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+    </dependency>
+    <!-- The neutral in-container runner (JUnitLauncherCore) the front-door calls to play the
+         scenario inside Felix. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The launcher engine the front-door hands to the runner. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
+
+    <!-- osgi.core: the scenario resolves its collaborators from the BundleContext (the probe +
+         the doctor), the connection carrying the registry. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- The out-of-container proof: OutOfContainerFrameworkExtension boots a real Felix (test scope),
+         installs this bundle + its closure, and plays the scenario — the mock SystemdRuntimeProbe is
+         seeded into the registry by the test. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- JGivenTestkit.felix() — the jGiven boot closure the out-of-container proof installs. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pipeline-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>jgiven-wrap</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.scr</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.promise</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.function</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
