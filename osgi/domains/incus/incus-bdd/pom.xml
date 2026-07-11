@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>incus-bdd</artifactId>
+  <name>osgi/domains/incus/incus-bdd</name>
+  <description>The incus domain's provisioning SCENARIO — a production jGiven scenario played
+    IN-CONTAINER by the seeding engine, not a test. It builds the seed image (ImageBuilder) — or, under
+    a closed RunGate, plans it inert — then probes the launched instance's reachability
+    (IncusInstanceContact), and consults the doctor (ConsultingService, doctor-contract) on a build or
+    exec failure — all domain vocabulary, zero host/Pulumi type. It lives here, not in an incus-core
+    (there is none: the heavy Pulumi-bound provisioning stays host-side), because it needs only the
+    incus-contract seam. A type=model embeddable bundle whose scenario class is non-exported: the
+    launcher plays it by class-selection, the host grafts its ScenarioModel — the class never crosses a
+    realm.</description>
+
+  <dependencies>
+    <!-- The incus domain's contract: the ImageBuilder + IncusInstanceContact verbs the scenario's DSL
+         speaks, plus the flat request records it addresses them with. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-contract</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The doctor's consult seam: the scenario consults the doctor itself on a build/exec failure. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The frontier vocabulary: the RunGate the scion consults, the SeedEnvelope it consults the
+         doctor with and carries the consultation back on. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
+         the jgiven-wrap bundle, pulled into the live world by this bundle's import closure. -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+    </dependency>
+    <!-- The neutral in-container runner the front-door calls to play the scenario inside Felix. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The launcher engine the front-door hands to InContainerJUnitRunner. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
+
+    <!-- osgi.core: the scenario resolves its collaborators from the BundleContext (both contacts,
+         the RunGate, the doctor). -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

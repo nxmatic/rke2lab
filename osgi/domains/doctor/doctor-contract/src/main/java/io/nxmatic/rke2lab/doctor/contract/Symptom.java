@@ -18,7 +18,9 @@ public enum Symptom {
   KUBECONFIG_MISSING("kubeconfig-missing"),
   API_NOT_READY("api-not-ready"),
   CONTROLLER_NOT_READY("controller-not-ready"),
-  RESERVATION_REFUSED("reservation-refused");
+  RESERVATION_REFUSED("reservation-refused"),
+  IMAGE_BUILD_FAILED("image-build-failed"),
+  INSTANCE_UNREACHABLE("instance-unreachable");
 
   /** Envelope key under which a probe records its symptom on a non-ok result. */
   public static final String ENVELOPE_KEY = "symptom";

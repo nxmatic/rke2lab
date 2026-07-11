@@ -17,7 +17,9 @@ public enum SymptomKind implements WireEnum {
   KUBECONFIG_MISSING("kubeconfig-missing"),
   API_NOT_READY("api-not-ready"),
   CONTROLLER_NOT_READY("controller-not-ready"),
-  RESERVATION_REFUSED("reservation-refused");
+  RESERVATION_REFUSED("reservation-refused"),
+  IMAGE_BUILD_FAILED("image-build-failed"),
+  INSTANCE_UNREACHABLE("instance-unreachable");
 
   private final String slug;
 

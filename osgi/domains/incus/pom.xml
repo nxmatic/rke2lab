@@ -26,5 +26,7 @@
   <modules>
     <module>incus-contract</module>
     <module>incus-edge</module>
+    <module>incus-bdd</module>
+    <module>incus-bdd-test</module>
   </modules>
 </project>

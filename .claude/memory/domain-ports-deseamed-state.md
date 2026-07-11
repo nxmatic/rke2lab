@@ -1,6 +1,6 @@
 ---
 name: domain-ports-deseamed-state
-description: "The de-seam sweep (2026-07-11): all 6 domain -port modules (auth/cluster/systemd/incus/netplan/manifests) fused into -contract (type=seam→type=contract, system-export dropped, installed bundle-to-bundle). Doctor was already done (doctor-contract, the template). OSGi side FULLY GREEN. Only TWO seams remain in osgi/: pipeline (shared engine, next to de-seam via BDD-scenarios migration) and seed-broker-port (the one true host↔OSGi membrane, stays a seam). host/exec Java intentionally broken (deferred to the scenario-rewrite-from-specs chantier)."
+description: "The de-seam sweep (2026-07-11, COMMITTED 58cc01b4b): all 6 domain -port modules (auth/cluster/systemd/incus/netplan/manifests) fused into -contract (type=seam→type=contract, system-export dropped, installed bundle-to-bundle). Doctor was already done (doctor-contract, the template). cluster/systemd -bdd retrofitted onto the bbox scion; cluster-edge + dbus-systemd-edge boot tests retrofitted to in-container passengers. Testkit gained slf4j-default-export + SCR-default-on (withoutScr opt-out). OSGi side FULLY GREEN. Only TWO seams remain in osgi/: pipeline (shared engine, next to de-seam via BDD-scenarios migration) and seed-broker-port (the one true host↔OSGi membrane, stays a seam). host/exec Java intentionally broken (deferred to the scenario-rewrite-from-specs chantier)."
 metadata:
   type: project
 ---
@@ -70,6 +70,22 @@ wirings résolvent" — no domain systemPackages needed.
   the system-export as sole provider. dbus-edge still passes (installs just the edge); the CLI boot tests
   break (host reads manifests/netplan typed) — deferred with the rest of exec/host.
 
-**NEXT:** commit the OSGi-green state, then align the OSGi modules on the scenarios vision from the specs
+**Edge boot tests retrofitted (user: "si on en laisse, on risque de faire pareil en life").** The
+principle: a test that system-exports a de-seamed contract to observe a service TYPED out-of-container
+LEGITIMIZES the host doing the same in the live boot. So `ClusterEdgeBootTest` + `DbusSystemdEdgeBootTest`
+became in-container passengers ({edge}-test fragment: `{Edge}Tests` runner + `{...}InContainerTest`
+passenger resolving via `FrameworkUtil.getBundle` + `@OsgiWorld` proxy). The dbus ServiceLoader-transport
+proof (the `no dbus-java-transport found` guard) SURVIVES — calling `probe()` in-container runs the
+ServiceLoader inside the edge's own Bundle-ClassPath. Two @Test kept each (SCR-publishes + behavioural).
+
+**Testkit defaults (user: "installer scr et exporter slf4j par defaut", "tout nos tests s'attendent a
+scr et slf4j").** `OutOfContainerFrameworkExtension`: (1) system-exports `org.slf4j;version=2.0.0` by
+default (skipped if the test already declares its own slf4j export — JGivenTestkit keeps 2.0.17, no
+split); (2) `startScr` defaults TRUE + new `withoutScr()` opt-out. `JGivenTestkit.felix()` keeps
+SCR-default (a scion's Felix matches live posture; felix.scr is on every -test module via
+bundle-test-parent) — only `JGivenTestkitGuardTest` (module pipeline-testkit, no felix.scr) opts out.
+So a new edge/scion proxy declares only `.withJUnitRunner()` — SCR + slf4j are ambient.
+
+**NEXT:** align the OSGi PRODUCTION scenarios ({Domain}Scenario classes, NOT test files) on the specs
 (the user thought this was already done). THEN the host/exec Java rewrite onto the broker. See
 [[mock-service-substitution-pattern]] [[seed-broker-host-adaptation]] [[world-gateway-frontier-discipline]].

@@ -388,6 +388,9 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       // specialist treats it yet, so the plan is empty until one is added: symptom seen, no
       // treatment offered — the same shape as the cluster-readiness symptoms above).
       case RESERVATION_REFUSED -> List.of(Specialty.NETWORK);
+      // Incus provisioning symptoms route to the INCUS domain (no incus specialist treats them yet,
+      // so the plan is empty until one is added — symptom seen, no treatment offered).
+      case IMAGE_BUILD_FAILED, INSTANCE_UNREACHABLE -> List.of(Specialty.INCUS);
     };
   }
 }
