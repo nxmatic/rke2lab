@@ -1,8 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
-import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Patient;
@@ -24,12 +22,14 @@ public final class ConsultationDag {
 
   private ConsultationDag() {}
 
-  /** Admit the patient over the EXACT roster + ledger writer and return the consulting contract. */
+  /**
+   * Admit the patient over the EXACT roster + the intervention-ledger cellar and return the
+   * contract.
+   */
   public static ConsultingService assemble(
       Patient patient,
       MedicalRecordRegistry registry,
-      InterventionLedgerWriter ledgerWriter,
-      InterventionJournal interventionJournal,
+      InterventionLedgerRegistry ledgerRegistry,
       List<Specialist> roster,
       Consumer<String> logger) {
     final ClinicianId generalistId = Generalist.GENERALIST_ID;
@@ -44,8 +44,8 @@ public final class ConsultationDag {
     return Generalist.builder()
         .specialists(roster)
         .access(access)
-        .driftSpecialist(new DriftSpecialist(ledgerWriter))
-        .interventionJournal(interventionJournal)
+        .driftSpecialist(new DriftSpecialist(ledgerRegistry))
+        .ledgerRegistry(ledgerRegistry)
         .build();
   }
 }

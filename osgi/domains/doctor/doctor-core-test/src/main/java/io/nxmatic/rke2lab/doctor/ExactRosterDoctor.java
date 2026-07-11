@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.doctor;
 
 import io.nxmatic.rke2lab.doctor.internal.ConsultationDag;
+import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerRegistry;
 import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.HealthSystem;
-import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Patient;
@@ -38,10 +38,23 @@ public final class ExactRosterDoctor {
   public static ConsultingService over(
       Patient patient,
       MedicalRecordRegistry registry,
-      InterventionLedgerWriter ledgerWriter,
+      InterventionLedgerRegistry ledgerRegistry,
       List<Specialist> exactRoster,
       Consumer<String> logger) {
-    return ConsultationDag.assemble(patient, registry, ledgerWriter, null, exactRoster, logger);
+    return ConsultationDag.assemble(patient, registry, ledgerRegistry, exactRoster, logger);
+  }
+
+  /** An empty intervention-ledger registry — no ledger to fold, records nowhere (the test degrade). */
+  private static InterventionLedgerRegistry emptyLedger() {
+    return new InterventionLedgerRegistry() {
+      @Override
+      public io.nxmatic.rke2lab.doctor.records.InterventionLedger ledger() {
+        return io.nxmatic.rke2lab.doctor.records.InterventionLedger.empty();
+      }
+
+      @Override
+      public void record(io.nxmatic.rke2lab.doctor.records.Intervention intervention) {}
+    };
   }
 
   /**
@@ -51,7 +64,7 @@ public final class ExactRosterDoctor {
    */
   public static ConsultingService readyGeneralist(Patient patient) {
     return over(
-        patient, p -> new MedicalRecord(p, List.of()), intervention -> {}, List.of(), msg -> {});
+        patient, p -> new MedicalRecord(p, List.of()), emptyLedger(), List.of(), msg -> {});
   }
 
   /**
@@ -63,7 +76,7 @@ public final class ExactRosterDoctor {
     return over(
         patient,
         p -> new MedicalRecord(p, List.of()),
-        intervention -> {},
+        emptyLedger(),
         List.of(new FakeNetworkSpecialist()),
         msg -> {});
   }

@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Folds the host {@link io.nxmatic.rke2lab.doctor.port.InterventionJournal}'s {@code intervention}
- * {@link SeedEnvelope}s into an {@link InterventionLedger} INSIDE the bundle realm, via {@link
+ * Folds the host {@link io.nxmatic.rke2lab.seed.broker.port.Cellar}'s {@code intervention} {@link
+ * SeedEnvelope}s into an {@link InterventionLedger} INSIDE the bundle realm, via {@link
  * InterventionReader} — the twin of {@link MedicalRecordReader}. Each SeedEnvelope carries ONE
  * {@link InterventionWire} (one ledger history entry = one intervention); this reader decodes it
  * with the realm's {@link SeedCodec} and rebuilds one {@link Intervention}. A malformed entry

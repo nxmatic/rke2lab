@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
@@ -40,10 +39,10 @@ import java.util.Optional;
     spec = "efficacy-and-medecin-conseil-design.adoc")
 public final class DriftSpecialist {
 
-  private final InterventionLedgerWriter writer;
+  private final InterventionLedgerRegistry ledger;
 
-  public DriftSpecialist(InterventionLedgerWriter writer) {
-    this.writer = Objects.requireNonNull(writer, "writer");
+  public DriftSpecialist(InterventionLedgerRegistry ledger) {
+    this.ledger = Objects.requireNonNull(ledger, "ledger");
   }
 
   public ReferralReply review(ProblemReview review) {
@@ -75,22 +74,21 @@ public final class DriftSpecialist {
       return confoundedInferred(review);
     }
 
-    writer.append(
-        InterventionWriter.of(
-            new Intervention(
-                Provenance.EXTERNAL_CHANGE_DETECTED,
-                review.nextVisit().when(),
-                "unexplained resolution of "
-                    + review.problem().toRef()
-                    + " between v"
-                    + review.priorVisit().version()
-                    + " and v"
-                    + review.nextVisit().version(),
-                review.problem(),
-                Optional.empty(),
-                Map.of(
-                    "windowFrom", review.priorVisit().when().toString(),
-                    "windowTo", review.nextVisit().when().toString()))));
+    ledger.record(
+        new Intervention(
+            Provenance.EXTERNAL_CHANGE_DETECTED,
+            review.nextVisit().when(),
+            "unexplained resolution of "
+                + review.problem().toRef()
+                + " between v"
+                + review.priorVisit().version()
+                + " and v"
+                + review.nextVisit().version(),
+            review.problem(),
+            Optional.empty(),
+            Map.of(
+                "windowFrom", review.priorVisit().when().toString(),
+                "windowTo", review.nextVisit().when().toString())));
     return confoundedInferred(review);
   }
 

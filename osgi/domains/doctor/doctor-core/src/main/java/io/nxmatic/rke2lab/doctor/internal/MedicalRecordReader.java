@@ -15,13 +15,13 @@ import java.util.Optional;
 
 /**
  * Reconstructs a {@link Patient}'s {@link MedicalRecord} by folding the host {@link
- * io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal}'s {@code visit} {@code SeedEnvelopes} into
- * one {@link Visit} per readable entry — INSIDE the bundle realm, where the {@code doctor.records}
- * types are legal. Each SeedEnvelope's payload is the opaque blob the host produced WITHOUT
- * interpreting it: {@code version} + {@code when} plus the raw consultation-report and expectation
- * graft blob lists. This reader decodes the payload with doctor-core's OWN jackson (via {@link
- * SeedCodec}, no jackson type crosses the seam) and rebuilds the typed visit by decoding each
- * opaque blob directly into its record ({@link ConsultationReport} / {@link Expectation}).
+ * io.nxmatic.rke2lab.seed.broker.port.Cellar}'s {@code visit} {@code SeedEnvelopes} into one {@link
+ * Visit} per readable entry — INSIDE the bundle realm, where the {@code doctor.records} types are
+ * legal. Each SeedEnvelope's payload is the opaque blob the host produced WITHOUT interpreting it:
+ * {@code version} + {@code when} plus the raw consultation-report and expectation graft blob lists.
+ * This reader decodes the payload with doctor-core's OWN jackson (via {@link SeedCodec}, no jackson
+ * type crosses the seam) and rebuilds the typed visit by decoding each opaque blob directly into
+ * its record ({@link ConsultationReport} / {@link Expectation}).
  *
  * <p>The aggregator does fail-AT-END, not fail-fast: an unreadable SeedEnvelope is collected
  * (identity-enriched) and the fold continues; if any entry failed it throws a {@link

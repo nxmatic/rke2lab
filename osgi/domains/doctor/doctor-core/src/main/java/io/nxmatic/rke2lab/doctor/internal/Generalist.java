@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.Consultation;
@@ -62,19 +61,18 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   private final List<Specialist> specialists;
   private final ClinicalAccess access;
   private final DriftSpecialist driftSpecialist;
-  private final Optional<InterventionJournal> interventionJournal;
-  private final InterventionLedgerReader ledgerReader = new InterventionLedgerReader();
+  private final Optional<InterventionLedgerRegistry> ledgerRegistry;
   private final SeedCodec codec = new SeedCodec();
 
   private Generalist(
       List<Specialist> specialists,
       ClinicalAccess access,
       DriftSpecialist driftSpecialist,
-      Optional<InterventionJournal> interventionJournal) {
+      Optional<InterventionLedgerRegistry> ledgerRegistry) {
     this.specialists = List.copyOf(specialists);
     this.access = access;
     this.driftSpecialist = driftSpecialist;
-    this.interventionJournal = interventionJournal;
+    this.ledgerRegistry = ledgerRegistry;
   }
 
   public static Builder builder() {
@@ -86,7 +84,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     private List<Specialist> specialists = List.of();
     private @Nullable ClinicalAccess access;
     private @Nullable DriftSpecialist driftSpecialist;
-    private @Nullable InterventionJournal interventionJournal;
+    private @Nullable InterventionLedgerRegistry ledgerRegistry;
 
     public Builder specialists(List<Specialist> specialists) {
       this.specialists = specialists;
@@ -104,11 +102,12 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     }
 
     /**
-     * The host intervention journal {@link #reviewDrift()} rebuilds the ledger from. Absent → the
-     * review folds the empty ledger (coherent with the registry's no-backend degrade).
+     * The intervention-ledger registry {@link #reviewDrift()} reads the ledger from. Absent → the
+     * review folds the empty ledger (coherent with the medical-record registry's no-backend
+     * degrade).
      */
-    public Builder interventionJournal(InterventionJournal interventionJournal) {
-      this.interventionJournal = interventionJournal;
+    public Builder ledgerRegistry(InterventionLedgerRegistry ledgerRegistry) {
+      this.ledgerRegistry = ledgerRegistry;
       return this;
     }
 
@@ -118,12 +117,13 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
         throw new IllegalStateException("access is required");
       }
       // No ledger wired → the drift inference is computed and returned but not persisted, coherent
-      // with the registry's no-backend degrade. The real writer is wired at the reconstruction
-      // site.
+      // with the registry's no-backend degrade. A no-op registry keeps an empty ledger, records
+      // nowhere.
       final DriftSpecialist drift =
-          driftSpecialist != null ? driftSpecialist : new DriftSpecialist(intervention -> {});
-      return new Generalist(
-          specialists, boundAccess, drift, Optional.ofNullable(interventionJournal));
+          driftSpecialist != null
+              ? driftSpecialist
+              : new DriftSpecialist(NoOpInterventionLedgerRegistry.INSTANCE);
+      return new Generalist(specialists, boundAccess, drift, Optional.ofNullable(ledgerRegistry));
     }
   }
 
@@ -325,20 +325,18 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
 
   /**
    * The follow-up coordination, the ONLY record-path verb on the seam — no-arg by design: the
-   * patient comes from the held {@link ClinicalAccess} (so the record is rebuilt OSGi-side from the
-   * host medical-record journal, behind the registry) and the ledger from the held {@link
-   * InterventionJournal} (rebuilt OSGi-side via {@link InterventionLedgerReader}). Nothing is read
-   * from a caller and nothing crosses back: the host triggers {@code reviewDrift()} and the
-   * inferred drift is persisted through the drift specialist's writer. With no journal wired the
-   * ledger is empty (the no-backend degrade).
+   * patient comes from the held {@link ClinicalAccess} (so the record is rebuilt OSGi-side behind
+   * the {@link MedicalRecordRegistry}) and the ledger from the held {@link
+   * InterventionLedgerRegistry} (both Cellar-backed at their frontier). Nothing is read from a
+   * caller and nothing crosses back: the host triggers {@code reviewDrift()} and the inferred drift
+   * is persisted through the drift specialist. With no ledger registry wired the ledger is empty
+   * (the no-backend degrade).
    */
   @Override
   public void reviewDrift() {
     final MedicalRecord record = access.record();
     final InterventionLedger ledger =
-        interventionJournal
-            .map(journal -> ledgerReader.read(journal.entries()))
-            .orElseGet(InterventionLedger::empty);
+        ledgerRegistry.map(InterventionLedgerRegistry::ledger).orElseGet(InterventionLedger::empty);
     reviewOpenProblems(record, ledger);
   }
 
