@@ -17,10 +17,14 @@ governance note.
 
 [NOTE]
 ====
-This view is the *avant* for the control-plane→OSGi domain migration. The host logic drawn here (config,
-policy, readiness, incus, bbox) is being lifted into OSGi domain services the host calls; see
-link:../osgi/controlplane-to-osgi-migration-spec.adoc[control-plane → OSGi — migrating the domains] for
-the après (the 87 Pulumi-free files migrated, only the 17 `com.pulumi` edge staying host).
+The host logic drawn here (config, policy, readiness, incus, bbox) is being lifted into OSGi domain
+services the host calls; see link:../osgi/controlplane-to-osgi-migration-spec.adoc[control-plane → OSGi
+— migrating the domains] (the 87 Pulumi-free files migrated, only the 17 `com.pulumi` edge staying
+host). The seeding itself is expressed as BDD-as-engine — jGiven scenarios on the JUnit launcher
+(link:../bdd/bdd.adoc[design of record], GO 2026-07-04); the fluent `during/then` grammar it was first
+built on is gone (its engine dissolved into manifests-core's internal synthesis, the boot into
+`FrameworkLaunch`). What remains is wiring seed-master's own live pipeline onto the shipped socle — the
+ClusterSeed vertical, tracked below as the residue, not an avant→après evolution.
 ====
 
 === The thesis — the pipeline owns two gates; nothing else decides a crossing
@@ -44,7 +48,7 @@ action (`through(live, deferred)`) and drives the write once (`registry.add(...)
 [NOTE]
 .The living gate half is re-posed by the BDD-as-engine turn
 ====
-The *living gate* framing below (`LiveGate` as a preview/up state) is *avant*: the BDD-as-engine turn
+The *living gate* framing below (`LiveGate` as a preview/up state) is superseded: BDD-as-engine
 (§ <<the-bdd-as-engine-turn>>) erases `LiveGate` and re-poses preview as an `ExecutionCondition`
 selecting a `PreviewExecutor` (rendering decoupled from execution, E9). What survives from Diagram P is
 the *named erasure of the seven scattered `isDryRun()` reads* and the whole *output gate* half
@@ -110,143 +114,67 @@ Conclusion: *additive-with-named-erasure; the pipeline gains one clear responsib
 and loses four scattered anti-patterns.* Status: DESIGN — the living gate is the first horizon
 (it fixes the hang), then the systemd report, then the output registry.
 
-=== The role map — every pipeline role, where it lives, who touches it (the AVANT)
-
-[IMPORTANT]
-.This role map is the AVANT — superseded by the BDD-as-engine turn below
-====
-The Topic / `State<I,B>` / fluent-grammar role map in this section is the model *as shipped* (the
-212-commit pipeline-port arc). It is kept here as the *avant* of the evolution figure — read it to
-understand where Diagram Q (below) starts from. The *current* model is the BDD-as-engine turn (§
-<<the-bdd-as-engine-turn>>) and its spec is link:../bdd/bdd.adoc[BDD-as-engine]. The former
-grammar convention doc was folded into pipeline-spec's avant section and deleted.
-====
-
-The pattern behind every fluent pipeline (`ClusterSeedPipeline`, `IncusResourceBootstrap`,
-`ApplicationPipeline`, the manifest/systemd synthesizers…) is one set of named roles. The realization
-(2026-07-03) was that the codebase already HAD each role — locally, unnamed, non-uniform (one pipeline
-used a `Sink`, another a registry, a third `Supplier`s, a fourth direct field writes). The refactor
-does not invent; it NAMES the roles and makes them uniform. This map is the transversal view of the
-avant; the BDD-turn section below maps each role to its après.
-
-[mermaid]
-....
-flowchart TB
-  subgraph PORT["pipeline-port — shared, pure (what is common)"]
-    R["FluentTopicRunner<br/>runDuring(S extends Topic)"]:::port
-    OF["OnFailure / TopicFailure"]:::port
-    PC["PipelineContext<br/>ambient Class→record registry"]:::port
-    TP["Topic (identification)<br/>role() + nested Topic.Sink<br/>+ Topic.{Execution,Checkpoint,Pipeline}"]:::port
-  end
-  subgraph PIPE["each pipeline — inner, per-pipeline (what is its own)"]
-    ST["State&lt;I,O,B&gt; = inputs I + accumulator B + context + runner"]:::pipe
-    TS["type-state Awaiting/Done (the ordering)"]:::pipe
-    SK["&lt;Topic&gt;.Sink per topic (the write-face)"]:::pipe
-    TO["topics = fluent multi-verb builders (stages/)"]:::pipe
-  end
-  PORT --> PIPE
-  classDef port fill:#1f6feb,color:#fff;
-  classDef pipe fill:#6f42c1,color:#fff;
-....
-
-[cols="1,1,2",options="header"]
-|===
-| Role | Lives | Touched by
-| `FluentTopicRunner` | port | the transition (`runDuring`)
-| `PipelineContext` (ambient, READ, static) | port type / instanced per pipeline | the transition (`require`) — NEVER a topic
-| `Topic` (identification: `role` + nested natures) | port | the runner's bound; governance + retrofit read it
-| `Topic.Sink` (write-face, per topic) | nested in each topic | the topic (pushes) + the transition (wires it → `B`)
-| `Topic.{Execution,Checkpoint,Pipeline}` (nature = type) | port (nested in `Topic`) | identification (`instanceof`)
-| `State<I,B>` (I + B + context + runner) | inner to each pipeline | the transition
-| input record `I` (flux + ambient, fused) | inner (per topic) | the transition (composes) + the topic (reads)
-| accumulator `B` (all outputs so far) | inner | the transition (folds sinks in, reads for next `I`)
-| type-state `Awaiting/Done` | inner | the author (ordering)
-| topics (fluent builders) | inner (`stages/`) | the transition
-|===
-
-Two axes make the roles fall out cleanly. *Direction × time:* `PipelineContext` is a READ source that is
-STATIC (frozen before the first topic, an input of the pipeline itself); a `Topic.Sink` is a WRITE
-channel that is FLOWING (one per topic, wired at the transition, it is how an output enters `B` and
-becomes the next topic's flux). *API vs implementation:* the topic's API is its fluent verbs +
-its `role()` and its nature type; its `(input, sink)` construction is implementation the transition wires — the sink
-is never on the API, which is why `Topic.Sink` is nested, not a top-level type. A topic sees only its
-frozen `I` and its `Sink` — never `B`, never the context — so it is deterministic and testable in
-isolation. Writing an output by directly assigning an accumulator field (topic holding a state
-reference) is a DERIVATION the `PIPELINE_PATTERN` governance gate is meant to catch.
-
 [[the-bdd-as-engine-turn]]
-== The BDD-as-engine turn — the seeding as jGiven scenarios (the APRÈS, GO 2026-07-04)
+== The seeding as jGiven scenarios (BDD-as-engine, GO 2026-07-04)
 
-The role map above is the *avant*. This section is the *après* — the current model: express the whole
-seeding as *jGiven scenarios orchestrated by the JUnit Platform launcher*, the fluent grammar
-dissolved, the missing dynamics contributed as Jupiter extensions. Its spec is
-link:../bdd/bdd.adoc[BDD-as-engine]; the discovery record is
-link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC] (ten measured learnings E1–E10). *GO
-was reached 2026-07-04* (a bench transposed the entire ClusterSeed pipeline and rendered a real
-runbook), and *increment 1 — the engine-lifecycle socle — then SHIPPED* (2026-07-05,
+The seeding is expressed as *jGiven scenarios orchestrated by the JUnit Platform launcher*, the missing
+dynamics contributed as Jupiter extensions. Its spec is link:../bdd/bdd.adoc[BDD-as-engine]; the
+discovery record is link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC] (ten measured
+learnings E1–E10). The engine-lifecycle socle SHIPPED (2026-07-05,
 link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec]): the launcher, connection, lever,
-disciplines and a green connected `BulletproofPipeline` are now live in `osgi/runtime/scenario-engine`.
-So the turn is no longer "proven viable on a bench" — its substrate is BUILT. What remains is the
-ClusterSeed vertical (increment 2) that expresses the seeding on that socle. This view is where the
-*additivity proof* — the evolution figure — lives.
+disciplines and a green connected `BulletproofPipeline` are live in `osgi/runtime/scenario-engine`. What
+remains is the ClusterSeed vertical (increment 2) that wires seed-master's own live pipeline onto that
+socle.
 
-=== The concept correspondence — avant → après (anchored on the shipped socle + the vertical)
+The fluent `during/then` grammar the seeding was first built on is gone from the codebase — its engine
+dissolved into manifests-core's un-exported internal synthesis (`Phase`/`PhaseRunner`) and the boot
+de-grammatised into `FrameworkLaunch`. The former text is in git (`pipeline-spec.adoc` @ `39fe4d8a`)
+for anyone tracing the history; it is not described here.
 
-Every role of the former model maps to a jGiven concept. The *Realized in* column names where each
-lives now: the socle types are SHIPPED (increment 1, `osgi/runtime/scenario-engine`); the vertical
-rows are what the ClusterSeed increment builds. Nothing is erased silently — the *Sort* column names
-each move. (The bench that first proved these — `SeedPhases.java`, `DagGateSpikeTest`, `SeedLauncherMain`
-— survives only at tag `spike/bdd-pipeline-poc`; it is no longer the reference, the shipped socle is.)
+=== How the seeding concepts map onto jGiven
 
-[cols="2,2,2,1",options="header"]
+The seeding phases are jGiven `Stage`s; the value-DAG is carried by scenario-state annotations. The
+*Realized in* column names where each lives: the socle types are SHIPPED (increment 1,
+`osgi/runtime/scenario-engine`); the vertical rows are what the ClusterSeed increment builds.
+
+[cols="2,2,1",options="header"]
 |===
-| Avant (Topic/State, superseded) | Après (the current model) | Realized in | Sort
-| `Topic` (identification iface) | a jGiven `Stage<T>` (one phase) | vertical: `SeedScenario` phases | replaced
-| nature `Topic.Execution` | a flat-step `Stage` | vertical: `PreflightPhase`, `IncusPhase` | replaced
-| nature `Topic.Checkpoint` | a `Stage` opening a nested G/W/T | vertical: the two live islands (`SystemdAdapterTopic`, `ClusterReadinessTopic`) become phases | replaced
-| `Topic.Sink` (write-face) | `@ProvidedScenarioState` (out-edge) | vertical: each phase's provided state | replaced
-| flux input `I` | `@ExpectedScenarioState` (in-edge) | vertical: each phase's expected state | replaced
-| `State<I,B>` / `StateBuilder` | scenario-state runtime **+ a build-time DAG gate** | vertical: the value-DAG; gate = the closing task | transformed
-| fluent `during`/`then` | intro-words + `@NestedSteps` | vertical: the composing When stage | replaced
-| topic label | `@As("…")` (the runbook node) | vertical: per-phase `@As` | replaced
-| `FluentTopicRunner` | the embedded JUnit Platform launcher | *socle SHIPPED:* `JUnitLauncherCore` | replaced
-| host-side boot (`FrameworkLaunchPipeline.embedded` in `ClusterSeedTopic`) | `@SeedRuntime` self-boots via `OsgiConnection.embedded` | *socle SHIPPED:* `SeedRuntime` + `OsgiConnection` | replaced
-| `PipelineContext` (Class→record) | `ExtensionContext.Store` (host-facts + connection) | *socle SHIPPED:* `BaseWorldExtension` Store; vertical seeds host-facts | replaced
-| gate `PIPELINE_PATTERN` (ASM) | `SCENARIO_STATE_DAG` (`provided`/`required` topological) | vertical closing task (6th `StagingGate`, existing ASM+`@GovernedBy` mould) | re-tooled
-| `LiveGate` | an `ExecutionCondition` + `PreviewExecutor` | vertical (Q3, not yet designed) | re-posed
-| test crutch: `LaunchedPipelineExchange` (socle) | — | — (jGiven's `ScenarioHolder` holds the model; `@SeedRuntime` self-boots) | erased
-| runbook (`ReportModel`, host) | same, single source; outputs a projection of the value-DAG | vertical: `SeedRun(runbook, outputs)` harvest return | kept+extended
+| Seeding concept | jGiven mechanism | Realized in
+| a seeding phase | a jGiven `Stage<T>` | vertical: `SeedScenario` phases
+| a flat effect phase | a flat-step `Stage` | vertical: `PreflightPhase`, `IncusPhase`
+| a checkpoint phase | a `Stage` opening a nested G/W/T | vertical: the two live islands become phases
+| a phase's out-edge | `@ProvidedScenarioState` | vertical: each phase's provided state
+| a phase's in-edge | `@ExpectedScenarioState` | vertical: each phase's expected state
+| the value-DAG | scenario-state runtime **+ a build-time DAG gate** | vertical: the value-DAG; gate = the closing task
+| phase composition | intro-words + `@NestedSteps` | vertical: the composing When stage
+| the runbook node label | `@As("…")` | vertical: per-phase `@As`
+| the launcher | the embedded JUnit Platform launcher | *socle SHIPPED:* `JUnitLauncherCore`
+| the boot | `@SeedRuntime` self-boots via `OsgiConnection.embedded` (`FrameworkLaunch.embedded().launch()` under the hood) | *socle SHIPPED:* `SeedRuntime` + `OsgiConnection`
+| ambient host-facts | `ExtensionContext.Store` | *socle SHIPPED:* `BaseWorldExtension` Store; vertical seeds host-facts
+| the DAG safety gate | `SCENARIO_STATE_DAG` (`provided`/`required` topological) | vertical closing task (a `StagingGate`, existing ASM+`@GovernedBy` mould)
+| preview | an `ExecutionCondition` + `PreviewExecutor` | vertical (Q3, not yet designed)
+| the runbook | `ReportModel`, single source; outputs a projection of the value-DAG | vertical: `SeedRun(runbook, outputs)` harvest return
 |===
 
-The one true change of *guarantee* is `State<I,B>`: the DAG moves from compile-time (type-state) to
-runtime (scenario-state) *plus* a build-time gate that reads the `@Provided/ExpectedScenarioState`
-annotations and checks every `required` has a `guaranteed` upstream — the compile-time safety kept, as
-a `SCENARIO_STATE_DAG` sibling of the retired `PIPELINE_PATTERN`. That gate is the CLOSING task of the
-vertical (it has nothing to check until the phases carry those annotations), born WARN then flipped
-WARN→ERROR — the REALM_BOUNDARY ritual. Everything else is a 1:1 vocabulary replacement over the
-shipped socle.
+The one load-bearing change is the value-DAG: it moves from compile-time type-state to runtime
+scenario-state *plus* a build-time gate that reads the `@Provided/ExpectedScenarioState` annotations and
+checks every `required` has a `guaranteed` upstream — the compile-time safety kept, as a
+`SCENARIO_STATE_DAG` gate (a sibling of `SYNTHESIS_PATTERN`, the manifests-synthesis `Phase` law). That
+gate is the CLOSING task of the vertical (nothing to check until the phases carry those annotations),
+born WARN then flipped WARN→ERROR — the REALM_BOUNDARY ritual.
 
-=== Diagram Q — the seeding orchestration: BEFORE vs AFTER (named erasure)
+=== Diagram Q — the seeding orchestration
 
-Blue = shipped/unchanged: the atlas invariants AND the engine-lifecycle socle (increment 1, shipped
-2026-07-05 — it was green "to build" here until it landed; now it is the acquired floor the vertical
-rests on, the same green→blue move as runtime.adoc's I→J→K). Green = added by this increment (the
-ClusterSeed vertical). Red-dashed = erased, each named in the correspondence table above.
+The seeding is one `SeedScenario` played by the launcher over the shipped socle. Blue = shipped: the
+atlas invariants AND the engine-lifecycle socle (increment 1, 2026-07-05 — the acquired floor the
+vertical rests on). Green = the ClusterSeed vertical (increment 2, what remains).
 
 [mermaid]
 ....
 flowchart LR
-  subgraph B["before — fluent Topic/State + TWO hand-driven jGiven islands"]
-    b_gram["during/then fluent grammar<br/>Topic / Topic.Sink / State&lt;I,B&gt; / StateBuilder"]
-    b_run["FluentTopicRunner"]
-    b_ctx["PipelineContext (Class→record)"]
-    b_boot["ClusterSeedTopic.seedCluster<br/>FrameworkLaunchPipeline.embedded (boot HOST-side)"]
-    b_isl1["SystemdAdapterTopic<br/>Scenario.create + DeferringScenarioExecutor (manual)"]
-    b_isl2["ClusterReadinessTopic<br/>Scenario.create + setModel (manual)"]
-  end
-  subgraph A["after — one SeedScenario, launcher-orchestrated"]
+  subgraph A["the seeding — one SeedScenario, launcher-orchestrated"]
     a_scn["SeedScenario extends ScenarioTest<br/>7 phases @ScenarioStage + @NestedSteps"]:::new
-    a_state["value-DAG = @Provided/ExpectedScenarioState<br/>(replaces StateBuilder, jGiven-native)"]:::new
+    a_state["value-DAG = @Provided/ExpectedScenarioState<br/>(jGiven-native)"]:::new
     a_seed["host-facts seeded via ExtensionContext.Store<br/>(the ConnectionSeeder pattern)"]:::new
     a_out["SeedRun(runbook, outputs) = harvest return<br/>OutputsPhase reads the DAG → OutputBuilder"]:::new
     a_dag["SCENARIO_STATE_DAG gate (build-time, ASM)<br/>required ⇒ guaranteed upstream — closing task"]:::new
@@ -255,13 +183,13 @@ flowchart LR
     a_scn --> a_out
     a_state -.enforced by.- a_dag
   end
-  subgraph SOCLE["engine-lifecycle socle — increment 1, SHIPPED (now invariant)"]
+  subgraph SOCLE["engine-lifecycle socle — increment 1, SHIPPED (invariant)"]
     s_launch["JUnitLauncherCore<br/>(dedicated thread, 3 OSGi crossings)"]:::inv
-    s_conn["OsgiConnection.embedded<br/>(@SeedRuntime self-boots)"]:::inv
+    s_conn["OsgiConnection.embedded<br/>(@SeedRuntime self-boots via FrameworkLaunch.launch())"]:::inv
     s_lever["StartLevelLever"]:::inv
     s_disc["@SeedRuntime / @IsolatedWorld"]:::inv
   end
-  subgraph INV["atlas invariants — unchanged (the turn rests on these)"]
+  subgraph INV["atlas invariants (the seeding rests on these)"]
     i_r4["R4 boot seam<br/>Felix in Pulumi.run"]:::inv
     i_gw["world-gateway → seed-broker<br/>Document(String) at the port<br/>(N verbs today → one broker door, conceived)"]:::inv
     i_jg["jGiven bundle-only per world<br/>never system-exported"]:::inv
@@ -272,9 +200,7 @@ flowchart LR
   a_scn -->|resolves 4 services from the connection| i_gw
   a_scn -->|each world its own copy| i_jg
   classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
-  classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
   classDef inv fill:#eef,stroke:#88a,stroke-width:1px;
-  class b_gram,b_run,b_ctx,b_boot,b_isl1,b_isl2 gone;
 ....
 
 The membrane detail settled during the vertical's design: the socle's `LaunchedPipelineExchange` (a
@@ -303,14 +229,14 @@ connected scenario, green) rather than on the disposable bench.
 | `DUPLICATE_REALM_CLASS` == 0 | ✓ | the rule fires only if a class transpires *through a port* — jGiven is never in a `type=seam`/`system.packages.extra`, so each world loading its own copy is legal by construction (the LOCAL claim in `jgiven-wrap`'s bnd).
 |===
 
-*Conclusion: additive-with-named-erasure.* The turn adds the launcher-substrate, the disciplines, the
-value-DAG and (later) the `PreviewExecutor`; it erases the fluent grammar, `Topic`/`Sink`/
-`State<I,B>`, `PipelineContext`, `LiveGate`, `FluentTopicRunner`, the host-side boot, and re-tools
-`PIPELINE_PATTERN` into `SCENARIO_STATE_DAG`. It rests on four unchanged invariants. The orchestration
-substrate is no longer "proven in principle" — increment 1 SHIPPED it (`osgi/runtime/scenario-engine`,
-green). The residue is wiring seed-master's own live pipeline onto it: the *ClusterSeed-vertical-first*
-increment; the six other pipelines stay on the former model meanwhile (assumed coexistence, not a
-legacy variant to hide).
+*Conclusion.* The seeding rests on the launcher-substrate, the disciplines, and the value-DAG (with the
+`PreviewExecutor` still to design). The fluent grammar, `Topic`/`Sink`/`State<I,B>`, `PipelineContext`,
+`LiveGate`, `FluentTopicRunner` and the host-side boot are gone — the grammar engine dissolved into
+manifests-core's internal synthesis, the boot into `FrameworkLaunch`; the `SCENARIO_STATE_DAG` gate is
+the value-DAG's build-time safety. It rests on four invariants (above). The orchestration substrate
+SHIPPED (increment 1, `osgi/runtime/scenario-engine`, green). What remains is wiring seed-master's own
+live pipeline onto it: the *ClusterSeed-vertical-first* increment; the six other pipelines stay on the
+former Topic/State model meanwhile (assumed coexistence, not a legacy variant to hide).
 
 === The go/no-go gate — closed; the socle shipped
 
@@ -385,11 +311,10 @@ source.
    same outputs cross, the hub + the re-parse helpers are the named erasure.
 
 *Coverage of this view:* 2 capabilities, 2 scenarios — complete per <<scenario-completeness>>. Both
-narrated-green. Scenario 1 is the *après* — its substrate (launcher, disciplines, connection) SHIPPED
-with the socle (§ <<the-bdd-as-engine-turn>>); its preview mechanism (`ExecutionCondition` +
-`PreviewExecutor`) is the one piece still to design, and the whole flips playable when the
-ClusterSeed-vertical increment ships. Scenario 2 (the output registry) is orthogonal to the turn and
-flips playable when the registry ships.
+narrated-green. Scenario 1's substrate (launcher, disciplines, connection) SHIPPED with the socle
+(§ <<the-bdd-as-engine-turn>>); its preview mechanism (`ExecutionCondition` + `PreviewExecutor`) is the
+one piece still to design, and the whole flips playable when the ClusterSeed-vertical increment ships.
+Scenario 2 (the output registry) is orthogonal and flips playable when the registry ships.
 
 NOTE: *The full TARGET scenario map — the 6-step root runbook, which step grafts which domain scion, and
 the per-domain G/W/T distribution — lives at link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed

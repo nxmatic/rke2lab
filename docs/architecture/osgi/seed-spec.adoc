@@ -88,7 +88,7 @@ embedded/bootstrap host only, not the world.*
 
 The general case is a standalone OSGi world running as a service — it *amorces itself*, and the host is
 a *remote client* that connects, injects `RunMode` + the Pulumi context, and pulls back the runbook and
-the output contributions across the remote frontier. The embedded exec (`FrameworkLaunchPipeline.
+the output contributions across the remote frontier. The embedded exec (`FrameworkLaunch.
 embedded()`) is *one particular case* — the degenerate one where the host co-locates and boots OSGi
 in-process. The chicken-and-egg amorce ("what starts OSGi cannot run inside OSGi") is *real only in the
 embedded case*; detached, the OSGi world has its own internal amorce.
@@ -208,13 +208,16 @@ class moved host→OSGi drops one `-port`'s host-import count toward 0.
   envelope machinery) falls out per domain.
 . *`consult` folds into the broker* — its real provider needs `HealthSystem.admit(patient)` host-side
   (a doctor-migration increment); until then it stays a `ConsultingService` verb (2 seams, not 1).
-. *rename `pipeline-port`* — LAST. Its scenario natures `Topic.Checkpoint`/`Pipeline` are ALREADY
-  removed (2026-07-09: 0 prod implementors after the seed moved its scenarios to the broker), so
-  `Topic` is now `Topic.Execution` alone — pure value-threading, jGiven-free. What remains is a rename,
-  not a kill: `pipeline-port` IS the shared fluent DERIVATION grammar (manifests synthesis + incus
-  checksum fold — both survive, neither is a scenario). Only the fluent `during/then` orchestration of
-  the SEED dissolves, when the seed migrates. The names — the host root, the grammar port (working name
-  derivation/fold, on trial), the unit (`Topic`→`Step`?) — fix together on the stabilized code.
+. *`pipeline-port` dissolved* — DONE. Its scenario natures `Topic.Checkpoint`/`Pipeline` were removed
+  first (2026-07-09: 0 prod implementors after the seed moved its scenarios to the broker), leaving
+  `Topic.Execution` alone — pure value-threading, jGiven-free. With the seed's fluent `during/then`
+  gone, the grammar's only surviving OSGi consumer was manifests-core, so the shared seam had no
+  reason to stand: the engine relocated INTO manifests-core as
+  `io.nxmatic.rke2lab.manifests.internal.synthesis` (`Phase`/`PhaseRunner`/`PhaseFailure`, un-exported),
+  the unit `Topic`→`Phase` (neither the pipeline word nor jGiven's `Stage`). The boot ceased to be a
+  `Topic` too: `FrameworkLaunch.embedded().launch()` is invoked as a scenario's first jGiven step, not
+  a pipeline verb. `PipelineContext` died with the host. The gate `PIPELINE_PATTERN` became
+  `SYNTHESIS_PATTERN`.
 
 The mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate) have their
 reference sketch pinned at tag `spike/bdd-pipeline-poc`: `DagGateSpikeTest` (the topological gate),
