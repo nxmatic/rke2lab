@@ -4,13 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.internal.DriftSpecialist;
-import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerRegistry;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
@@ -22,13 +18,11 @@ import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class DriftSpecialistTest {
@@ -47,7 +41,7 @@ class DriftSpecialistTest {
     final ProblemReview review =
         reviewFor(problem, new InterventionLedger(List.of(declared)), 0, 1);
 
-    final CapturingWriter writer = new CapturingWriter();
+    final CapturingLedger writer = new CapturingLedger();
     final ReferralReply reply = new DriftSpecialist(writer).review(review);
 
     assertFalse(reply.hasPrescription());
@@ -64,7 +58,7 @@ class DriftSpecialistTest {
         ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED);
     final ProblemReview review = reviewFor(problem, InterventionLedger.empty(), 0, 1);
 
-    final CapturingWriter writer = new CapturingWriter();
+    final CapturingLedger writer = new CapturingLedger();
     final ReferralReply reply = new DriftSpecialist(writer).review(review);
 
     assertTrue(reply.prescription().isEmpty());
@@ -72,10 +66,10 @@ class DriftSpecialistTest {
     assertEquals("drift/confounded-inferred/v1", reply.assessment().schemaRef().id());
 
     assertEquals(1, writer.captured.size());
-    final Map<String, Object> inferred = writer.payloadOf(0);
-    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED.id(), inferred.get("provenance"));
-    assertEquals(problem.toRef(), inferred.get("problem"));
-    assertEquals(T2.toString(), inferred.get("when"));
+    final Intervention inferred = writer.captured.get(0);
+    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED, inferred.provenance());
+    assertEquals(problem, inferred.problem());
+    assertEquals(T2, inferred.when());
   }
 
   @Test
@@ -93,7 +87,7 @@ class DriftSpecialistTest {
     final ProblemReview review =
         reviewFor(problem, new InterventionLedger(List.of(priorInference)), 0, 1);
 
-    final CapturingWriter writer = new CapturingWriter();
+    final CapturingLedger writer = new CapturingLedger();
     final ReferralReply reply = new DriftSpecialist(writer).review(review);
 
     assertEquals("drift/confounded-inferred/v1", reply.assessment().schemaRef().id());
@@ -117,7 +111,7 @@ class DriftSpecialistTest {
     final ProblemReview review =
         reviewFor(reviewProblem, new InterventionLedger(List.of(declared)), 0, 1);
 
-    final CapturingWriter writer = new CapturingWriter();
+    final CapturingLedger writer = new CapturingLedger();
     final ReferralReply reply = new DriftSpecialist(writer).review(review);
 
     assertTrue(reply.assessment().summary().contains("declared"));
@@ -138,26 +132,23 @@ class DriftSpecialistTest {
     return new ProblemReview(problem, expectation, prior, next, ledger);
   }
 
-  private static final class CapturingWriter implements InterventionLedgerWriter {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
-
-    private final List<SeedEnvelope> captured = new ArrayList<>();
+  /**
+   * A capturing {@link InterventionLedgerRegistry} — the mock the test injects into the drift
+   * specialist. The core records a typed {@link Intervention} (the register switch to a
+   * SeedEnvelope happens at the Cellar frontier, not here), so the test asserts on the record's own
+   * fields.
+   */
+  private static final class CapturingLedger implements InterventionLedgerRegistry {
+    private final List<Intervention> captured = new ArrayList<>();
 
     @Override
-    public void append(SeedEnvelope intervention) {
-      // Only the canonical intervention SeedEnvelope crosses the seam now.
-      Assertions.assertEquals(DoctorCoordinate.INTERVENTION.slug(), intervention.coordinate());
-      captured.add(intervention);
+    public InterventionLedger ledger() {
+      return new InterventionLedger(List.copyOf(captured));
     }
 
-    /** The flat output-map shape carried by the captured SeedEnvelope at {@code index}. */
-    Map<String, Object> payloadOf(int index) {
-      try {
-        return MAPPER.readValue(captured.get(index).payload(), MAP);
-      } catch (JsonProcessingException e) {
-        throw new IllegalStateException(e);
-      }
+    @Override
+    public void record(Intervention intervention) {
+      captured.add(intervention);
     }
   }
 }

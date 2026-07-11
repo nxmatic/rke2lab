@@ -44,7 +44,9 @@ public final class ExactRosterDoctor {
     return ConsultationDag.assemble(patient, registry, ledgerRegistry, exactRoster, logger);
   }
 
-  /** An empty intervention-ledger registry — no ledger to fold, records nowhere (the test degrade). */
+  /**
+   * An empty intervention-ledger registry — no ledger to fold, records nowhere (the test degrade).
+   */
   private static InterventionLedgerRegistry emptyLedger() {
     return new InterventionLedgerRegistry() {
       @Override
@@ -63,8 +65,7 @@ public final class ExactRosterDoctor {
    * ConsultingService} seam and the neutral {@link Patient} cross.
    */
   public static ConsultingService readyGeneralist(Patient patient) {
-    return over(
-        patient, p -> new MedicalRecord(p, List.of()), emptyLedger(), List.of(), msg -> {});
+    return over(patient, p -> new MedicalRecord(p, List.of()), emptyLedger(), List.of(), msg -> {});
   }
 
   /**

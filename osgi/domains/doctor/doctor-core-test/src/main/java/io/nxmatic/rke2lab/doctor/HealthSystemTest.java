@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.internal.ConsultationDag;
 import io.nxmatic.rke2lab.doctor.internal.Generalist;
+import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerRegistry;
 import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Patient;
@@ -38,17 +40,24 @@ class HealthSystemTest {
     return List.of(new FakeSpecialist());
   }
 
-  private static InterventionLedgerWriter noopLedger() {
-    return intervention -> {};
+  private static InterventionLedgerRegistry noopLedger() {
+    return new InterventionLedgerRegistry() {
+      @Override
+      public InterventionLedger ledger() {
+        return InterventionLedger.empty();
+      }
+
+      @Override
+      public void record(Intervention intervention) {}
+    };
   }
 
-  // The single construction path returns the ConsultingService seam; the white-box actor tests
-  // reach
+  // The single construction path returns the ConsultingService seam; the white-box actor tests reach
   // the bundle-internal Generalist (recordForCurrentPatient is OFF the seam now — no record crosses
   // to the host) by casting, since this fragment shares doctor-core's loader.
   private static Generalist admit(Patient patient, MedicalRecordRegistry registry) {
     return (Generalist)
-        ConsultationDag.assemble(patient, registry, noopLedger(), null, roster(), msg -> {});
+        ConsultationDag.assemble(patient, registry, noopLedger(), roster(), msg -> {});
   }
 
   @Test
