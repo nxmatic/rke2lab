@@ -365,13 +365,14 @@ source.
    readiness probe waits a full minute for a kubeconfig a dry-run never publishes
 .. WHEN two ORTHOGONAL levers separate (decision 2026-07-11b): (RENDER) `PendingMarkingScenarioExecutor`
    (E9) decouples rendering from execution — the tree builds, the reaching mode is rewritten
-   NORMAL→PENDING; (TOUCH) the ambient `RunGate` service (from `RunMode`), published once in Felix, is
-   consulted by each edge, which stays inert under a closed gate — the REAL edge inert, not a fabricated
+   NORMAL→PENDING; (TOUCH) the ambient `RunGate` service (from `RunMode`), published once in Felix by the
+   host, is consulted by the SCION (which resolves it from its own registry alongside its contact + the
+   doctor, then asks the edge for the inert crossing when closed) — the REAL edge inert, not a fabricated
    fake (the static mock pattern is retired)
 .. THEN no live probe or wait fires in preview (the one-minute hang is gone), and the runbook renders a
    RICH plan — every phase PENDING, the nested G/W/T present — not the empty shell a naive dry-run
    would give (named erasure of the seven reads + the false `JGIVEN_DRY_RUN`; `LiveGate` collapses to the
-   one `RunGate` publish + edge-side consumption, no longer read across the core).
+   one `RunGate` publish + scion-side consumption, no longer read across the core).
 
 . *The pipeline decides the stack outputs through one guarded assembler* — `[narrated]` green +
 .. GIVEN an omniscient `OutputBuilder` pulling each summary by name over raw maps, systemd flattening

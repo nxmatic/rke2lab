@@ -775,12 +775,21 @@ Felix, resolved by the bundle because `Cellar` is a `type=seam` interface (host 
 
 Whether a run TOUCHES the world (kubectl, dbus, the Pulumi backend) or only PLANS is a fact of the whole
 run, not a property of any seed — so it is published ONCE as a neutral ambient service, `RunGate` (derived
-from `RunMode`/`LiveGate`), into Felix at boot. Each edge `@References` it and, when it is closed, stays
-inert (touches nothing, answers "not reached / empty") — the REAL edge inert, never a fabricated fake.
-This is decisive and structural, not preference: the edges are resolved by `context.getServiceReference(...)`
-(a registry lookup, verified in `SystemdAdapterScenario`/`ClusterReadinessScenario`), never off a sown
-seed — so a seed-borne gate could never reach them; the gate must live in the registry, where the
-collaborator lives.
+from `RunMode`/`LiveGate`), into Felix at boot. Its VALUE depends on `pulumi-edge` (projected from
+`RunMode.detect()` → Pulumi's `isDryRun`), so the HOST publishes it live; but because it is a `type=seam`
+resolved from the registry, a test `registerService`s its own — mockable exactly where a contact is.
+
+*The SCION consults it, not the edge (decided 2026-07-11).* The scion resolves `RunGate` from its own
+`BundleContext` alongside its contact and the doctor, and derives its touch decision — for bbox, `dryRun =
+!gate.cultivating()`, passed to the existing `reconcile(…, dryRun, …)` the edge already honours natively.
+This keeps the gate a TESTED OSGi citizen now (the in-container test registers a mock `RunGate` and a mock
+contact; a `cultivating()=false` case proves preview inertness without touching the world), whereas an
+edge-side check would leave the gate unexercised until the host wiring — a deferral we refuse. It touches
+neither the port nor the edge. Structural, not preference: collaborators are resolved by
+`context.getServiceReference(...)` (a registry lookup, verified in `SystemdAdapterScenario`/
+`ClusterReadinessScenario`), never off a sown seed — so a seed-borne gate could never reach them; the gate
+must live in the registry, where the scion looks its collaborators up. When it is closed the scion asks
+the edge for the inert crossing (a dry-run / synthetic observation) — the REAL edge inert, never a fake.
 
 Two orthogonal axes the earlier "mock pattern" wrongly conflated:
 
