@@ -1,7 +1,7 @@
-package io.nxmatic.rke2lab.manifests.systemd.stages;
+package io.nxmatic.rke2lab.manifests.systemd.phases;
 
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
-import io.nxmatic.rke2lab.pipeline.Topic;
+import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
@@ -11,14 +11,14 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Bootstrap stage: environment setup, config installation, RKE2 installation, and systemd linking.
- * Reads the tools topic's flox-install service through a {@code Supplier} read-face (never by
- * holding the tools topic); pushes its own bootstrap-env and install services through its {@link
+ * Bootstrap phase: environment setup, config installation, RKE2 installation, and systemd linking.
+ * Reads the tools phase's flox-install service through a {@code Supplier} read-face (never by
+ * holding the tools phase); pushes its own bootstrap-env and install services through its {@link
  * Sink}.
  *
- * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
+ * <p>Package-private phase builder for the synthesis pipeline.
  */
-public final class Rke2InstallTopic implements Topic.Execution {
+public final class Rke2InstallPhase implements Phase.Execution {
 
   private final Supplier<SystemdChart> systemdChart;
   private final Supplier<SystemdSynthesisContext> context;
@@ -26,12 +26,12 @@ public final class Rke2InstallTopic implements Topic.Execution {
   private final Supplier<SystemdService> floxInstall;
   private final Sink sink;
 
-  // bootstrapEnv/install are read back by later verbs of THIS topic (same-topic dependency), so
+  // bootstrapEnv/install are read back by later verbs of THIS phase (same-phase dependency), so
   // they are kept as local working fields in addition to being pushed through the sink.
   private @Nullable SystemdService bootstrapEnvService;
   private @Nullable SystemdService installService;
 
-  public Rke2InstallTopic(
+  public Rke2InstallPhase(
       Supplier<SystemdChart> systemdChart,
       Supplier<SystemdSynthesisContext> context,
       Supplier<SystemdService> nixInstall,
@@ -44,8 +44,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
     this.sink = sink;
   }
 
-  /** The write-face of the rke2-install topic — the services later topics depend on. */
-  public interface Sink extends Topic.Sink {
+  /** The write-face of the rke2-install phase — the services later phases depend on. */
+  public interface Sink extends Phase.Sink {
     void bootstrapEnv(SystemdService service);
 
     void install(SystemdService service);
@@ -56,7 +56,7 @@ public final class Rke2InstallTopic implements Topic.Execution {
     return "rke2 install";
   }
 
-  public Rke2InstallTopic bootstrapEnv() {
+  public Rke2InstallPhase bootstrapEnv() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     bootstrapEnvService =
@@ -96,7 +96,7 @@ public final class Rke2InstallTopic implements Topic.Execution {
     return this;
   }
 
-  public Rke2InstallTopic configInstall() {
+  public Rke2InstallPhase configInstall() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     final SystemdService bootstrapEnv = getBootstrapEnvService();
@@ -117,7 +117,7 @@ public final class Rke2InstallTopic implements Topic.Execution {
     return this;
   }
 
-  public Rke2InstallTopic install() {
+  public Rke2InstallPhase install() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     installService =
@@ -156,7 +156,7 @@ public final class Rke2InstallTopic implements Topic.Execution {
     return this;
   }
 
-  public Rke2InstallTopic systemdLink() {
+  public Rke2InstallPhase systemdLink() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-systemd-link")
@@ -178,7 +178,7 @@ public final class Rke2InstallTopic implements Topic.Execution {
     return this;
   }
 
-  public Rke2InstallTopic cachixWatchStore() {
+  public Rke2InstallPhase cachixWatchStore() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     final SystemdService install = getInstallService();
@@ -196,12 +196,12 @@ public final class Rke2InstallTopic implements Topic.Execution {
     return this;
   }
 
-  /** Same-topic accessor: later verbs of this topic read the bootstrap-env service. */
+  /** Same-phase accessor: later verbs of this phase read the bootstrap-env service. */
   private SystemdService getBootstrapEnvService() {
     return Objects.requireNonNull(bootstrapEnvService, "bootstrapEnv() not yet run");
   }
 
-  /** Same-topic accessor: {@code cachixWatchStore()} reads the install service. */
+  /** Same-phase accessor: {@code cachixWatchStore()} reads the install service. */
   private SystemdService getInstallService() {
     return Objects.requireNonNull(installService, "install() not yet run");
   }

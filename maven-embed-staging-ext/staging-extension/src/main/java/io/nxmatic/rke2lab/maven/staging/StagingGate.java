@@ -13,7 +13,7 @@ enum StagingGate {
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
   DUPLICATE_REALM_CLASS,
-  PIPELINE_PATTERN;
+  SYNTHESIS_PATTERN;
 
   /** Map an ASM enum-constant name to a gate, or {@code null} for an unknown name (ignored). */
   static StagingGate fromName(String name) {

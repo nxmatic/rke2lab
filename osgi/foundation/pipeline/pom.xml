@@ -16,7 +16,6 @@
   <description>The fluent pipeline grammar (the type-state workflow DSL seam) plus the in-container jGiven testkit + its probe guard. jGiven itself is carried by osgi/runtime/jgiven-wrap now.</description>
 
   <modules>
-    <module>pipeline-port</module>
     <module>pipeline-testkit</module>
     <module>pipeline-probe</module>
     <module>pipeline-probe-test</module>

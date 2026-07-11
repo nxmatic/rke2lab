@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
-import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunch;
 import java.util.Optional;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;
@@ -115,11 +115,11 @@ public interface OsgiConnection extends AutoCloseable {
   /**
    * Bootstrap Felix in-process and own its lifecycle — the prod boot (spec Figure 3, REALISED).
    * Boots from the bundles staged under {@code META-INF/bundles/} that a deployed exec-jar carries
-   * (via {@link FrameworkLaunchPipeline#embedded()}), so it runs in the seed's own artifact, not in
-   * a bare library module. {@code close()} stops the world.
+   * (via {@link FrameworkLaunch#embedded()}), so it runs in the seed's own artifact, not in a bare
+   * library module. {@code close()} stops the world.
    */
   static OsgiConnection embedded() {
-    final BootedFramework booted = FrameworkLaunchPipeline.embedded().launch();
+    final BootedFramework booted = FrameworkLaunch.embedded().launch();
     return over(booted.context(), true, booted::close);
   }
 

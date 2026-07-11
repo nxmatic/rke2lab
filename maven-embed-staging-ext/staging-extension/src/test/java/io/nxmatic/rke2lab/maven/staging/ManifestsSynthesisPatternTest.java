@@ -11,19 +11,20 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 /**
- * Exercises both increments of {@link PipelinePattern} over hand-forged bytecode: the nature check
- * (A) and the read-face / one-source-of-truth check (C). The classes are written with ASM so a case
- * is exactly one bytecode shape — a bare {@code invokevirtual} on the accumulator (the drift), a
- * read off an immutable inputs holder (fine), a topic with/without a nature.
+ * Exercises both increments of {@link ManifestsSynthesisPattern} over hand-forged bytecode: the
+ * nature check (A) and the read-face / one-source-of-truth check (C). The classes are written with
+ * ASM so a case is exactly one bytecode shape — a bare {@code invokevirtual} on the accumulator
+ * (the drift), a read off an immutable inputs holder (fine), a phase with/without a nature.
  */
-class PipelinePatternTest {
+class ManifestsSynthesisPatternTest {
 
-  private static final String TOPIC = "io/nxmatic/rke2lab/pipeline/Topic";
-  private static final String EXECUTION = "io/nxmatic/rke2lab/pipeline/Topic$Execution";
+  private static final String PHASE = "io/nxmatic/rke2lab/manifests/internal/synthesis/Phase";
+  private static final String EXECUTION =
+      "io/nxmatic/rke2lab/manifests/internal/synthesis/Phase$Execution";
   private static final String ACC =
       "io/nxmatic/rke2lab/x/Builder"; // written externally → accumulator
   private static final String INPUTS = "io/nxmatic/rke2lab/x/Inputs"; // never externally written
-  private static final String TOPIC_IMPL = "io/nxmatic/rke2lab/x/MyTopic";
+  private static final String PHASE_IMPL = "io/nxmatic/rke2lab/x/MyPhase";
   private static final String OWNER = "io/nxmatic/rke2lab/x/Pipeline";
 
   // ---- forges ---------------------------------------------------------------------------------
@@ -82,10 +83,10 @@ class PipelinePatternTest {
     return cw.toByteArray();
   }
 
-  /** A topic with a single-arg (Object) constructor. */
-  private static byte[] topicImpl(String... interfaces) {
+  /** A phase with a single-arg (Object) constructor. */
+  private static byte[] phaseImpl(String... interfaces) {
     final ClassWriter cw = new ClassWriter(0);
-    cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, TOPIC_IMPL, null, "java/lang/Object", interfaces);
+    cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, PHASE_IMPL, null, "java/lang/Object", interfaces);
     final MethodVisitor mv =
         cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "(Ljava/lang/Object;)V", null, null);
     mv.visitCode();
@@ -99,7 +100,7 @@ class PipelinePatternTest {
   }
 
   /**
-   * An owner method {@code build(holder)} that does {@code new MyTopic(holder.slot())} — a bare
+   * An owner method {@code build(holder)} that does {@code new MyPhase(holder.slot())} — a bare
    * read of the argument off {@code holderInternal}. When {@code holderInternal} is the accumulator
    * this is the drift; when it is the immutable inputs holder it is fine.
    */
@@ -109,12 +110,12 @@ class PipelinePatternTest {
     final MethodVisitor mv =
         cw.visitMethod(Opcodes.ACC_PUBLIC, "build", "(L" + holderInternal + ";)V", null, null);
     mv.visitCode();
-    mv.visitTypeInsn(Opcodes.NEW, TOPIC_IMPL);
+    mv.visitTypeInsn(Opcodes.NEW, PHASE_IMPL);
     mv.visitInsn(Opcodes.DUP);
     mv.visitVarInsn(Opcodes.ALOAD, 1);
     mv.visitMethodInsn(
         Opcodes.INVOKEVIRTUAL, holderInternal, "slot", "()Ljava/lang/Object;", false);
-    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, TOPIC_IMPL, "<init>", "(Ljava/lang/Object;)V", false);
+    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, PHASE_IMPL, "<init>", "(Ljava/lang/Object;)V", false);
     mv.visitInsn(Opcodes.POP);
     mv.visitInsn(Opcodes.RETURN);
     mv.visitMaxs(3, 2);
@@ -130,19 +131,19 @@ class PipelinePatternTest {
   // ---- nature (A) -----------------------------------------------------------------------------
 
   @Test
-  void aTopicWithNoNatureIsFlagged() {
+  void aPhaseWithNoNatureIsFlagged() {
     final List<String> v =
-        PipelinePattern.violations(
-            List.of(entry(TOPIC_IMPL, classImplementing(TOPIC_IMPL, TOPIC))));
+        ManifestsSynthesisPattern.violations(
+            List.of(entry(PHASE_IMPL, classImplementing(PHASE_IMPL, PHASE))));
     assertEquals(1, v.size());
-    assertTrue(v.get(0).contains("MyTopic") && v.get(0).contains("no nature"), v.toString());
+    assertTrue(v.get(0).contains("MyPhase") && v.get(0).contains("no nature"), v.toString());
   }
 
   @Test
-  void aTopicWithOneNatureIsClean() {
+  void aPhaseWithOneNatureIsClean() {
     final List<String> v =
-        PipelinePattern.violations(
-            List.of(entry(TOPIC_IMPL, classImplementing(TOPIC_IMPL, EXECUTION))));
+        ManifestsSynthesisPattern.violations(
+            List.of(entry(PHASE_IMPL, classImplementing(PHASE_IMPL, EXECUTION))));
     assertTrue(v.isEmpty(), v.toString());
   }
 
@@ -153,14 +154,14 @@ class PipelinePatternTest {
     final List<ResolvedBundle.ClassEntry> surface = new ArrayList<>();
     surface.add(entry("io/nxmatic/rke2lab/x/Sink", externalWriterOf(ACC))); // marks ACC accumulator
     surface.add(entry(ACC, holder(ACC)));
-    surface.add(entry(TOPIC_IMPL, topicImpl(EXECUTION)));
+    surface.add(entry(PHASE_IMPL, phaseImpl(EXECUTION)));
     surface.add(entry(OWNER, ownerConstructing(ACC)));
 
-    final List<String> v = PipelinePattern.violations(surface);
+    final List<String> v = ManifestsSynthesisPattern.violations(surface);
     assertEquals(1, v.size(), v.toString());
     assertTrue(
         v.get(0).contains("Pipeline")
-            && v.get(0).contains("MyTopic")
+            && v.get(0).contains("MyPhase")
             && v.get(0).contains("Supplier read-face"),
         v.toString());
   }
@@ -175,10 +176,10 @@ class PipelinePatternTest {
         entry("io/nxmatic/rke2lab/x/Sink", externalWriterOf(ACC))); // ACC is the accumulator
     surface.add(entry(ACC, holder(ACC)));
     surface.add(entry(INPUTS, holder(INPUTS)));
-    surface.add(entry(TOPIC_IMPL, topicImpl(EXECUTION)));
+    surface.add(entry(PHASE_IMPL, phaseImpl(EXECUTION)));
     surface.add(entry(OWNER, ownerConstructing(INPUTS))); // reads off INPUTS, not the accumulator
 
-    final List<String> v = PipelinePattern.violations(surface);
+    final List<String> v = ManifestsSynthesisPattern.violations(surface);
     assertTrue(v.isEmpty(), v.toString());
   }
 }

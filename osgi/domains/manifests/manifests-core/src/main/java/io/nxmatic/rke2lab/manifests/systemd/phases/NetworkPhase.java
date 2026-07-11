@@ -1,7 +1,7 @@
-package io.nxmatic.rke2lab.manifests.systemd.stages;
+package io.nxmatic.rke2lab.manifests.systemd.phases;
 
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
-import io.nxmatic.rke2lab.pipeline.Topic;
+import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
@@ -9,19 +9,19 @@ import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
 import java.util.function.Supplier;
 
 /**
- * Network infrastructure stage: network configuration, waiting, debugging, and route cleanup. An
- * EFFECT topic — it mutates the chart, produces no output for the accumulator, so it has no sink.
+ * Network infrastructure phase: network configuration, waiting, debugging, and route cleanup. An
+ * EFFECT phase — it mutates the chart, produces no output for the accumulator, so it has no sink.
  * Reads the rke2-install service through a {@code Supplier} read-face.
  *
- * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
+ * <p>Package-private phase builder for the synthesis pipeline.
  */
-public final class NetworkTopic implements Topic.Execution {
+public final class NetworkPhase implements Phase.Execution {
 
   private final Supplier<SystemdChart> systemdChart;
   private final Supplier<SystemdSynthesisContext> context;
   private final Supplier<SystemdService> install;
 
-  public NetworkTopic(
+  public NetworkPhase(
       Supplier<SystemdChart> systemdChart,
       Supplier<SystemdSynthesisContext> context,
       Supplier<SystemdService> install) {
@@ -35,7 +35,7 @@ public final class NetworkTopic implements Topic.Execution {
     return "network infrastructure";
   }
 
-  public NetworkTopic routeCleanup() {
+  public NetworkPhase routeCleanup() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-route-cleanup")
@@ -52,7 +52,7 @@ public final class NetworkTopic implements Topic.Execution {
     return this;
   }
 
-  public NetworkTopic networkConfig() {
+  public NetworkPhase networkConfig() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-network-config")
@@ -70,7 +70,7 @@ public final class NetworkTopic implements Topic.Execution {
     return this;
   }
 
-  public NetworkTopic networkWait() {
+  public NetworkPhase networkWait() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-network-wait")
@@ -87,7 +87,7 @@ public final class NetworkTopic implements Topic.Execution {
     return this;
   }
 
-  public NetworkTopic networkDebug() {
+  public NetworkPhase networkDebug() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-network-debug")

@@ -22,11 +22,10 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       package a staged bundle exports must not ALSO be present flat in the assembled host. Two
  *       copies of a class — one loaded flat, one by a bundle classloader — is the loader-constraint
  *       collision that surfaces as a {@code LinkageError} when an instance crosses the seam.
- *   <li>{@link #PIPELINE_PATTERN} — a synthesis topic follows the documented shape: it {@code
- *       implements Topic.Execution} and pushes its output through its {@code Sink}. The read-face
- *       invariant (a topic reads a produced slot through a {@code Supplier}, never a copied
- *       reference) is a later increment of this gate. See
- *       docs/architecture/patterns/fluent-pipeline-grammar.adoc.
+ *   <li>{@link #SYNTHESIS_PATTERN} — a manifests synthesis phase follows the documented shape: it
+ *       {@code implements Phase.Execution} and pushes its output through its {@code Sink}. The
+ *       read-face invariant (a phase reads a produced slot through a {@code Supplier}, never a
+ *       copied reference) is a later increment of this gate.
  * </ul>
  */
 public enum StagingGate {
@@ -35,5 +34,5 @@ public enum StagingGate {
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
   DUPLICATE_REALM_CLASS,
-  PIPELINE_PATTERN
+  SYNTHESIS_PATTERN
 }

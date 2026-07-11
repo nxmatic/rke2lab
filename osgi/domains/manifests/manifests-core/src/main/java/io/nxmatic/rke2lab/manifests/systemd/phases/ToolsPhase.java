@@ -1,7 +1,7 @@
-package io.nxmatic.rke2lab.manifests.systemd.stages;
+package io.nxmatic.rke2lab.manifests.systemd.phases;
 
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
-import io.nxmatic.rke2lab.pipeline.Topic;
+import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
@@ -11,31 +11,31 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tools installation stage: Nix and Flox package managers. Pushes the two installed services
- * through its {@link Sink}; downstream topics read them as {@code Supplier}s (the read-face), never
- * by holding this topic.
+ * Tools installation phase: Nix and Flox package managers. Pushes the two installed services
+ * through its {@link Sink}; downstream phases read them as {@code Supplier}s (the read-face), never
+ * by holding this phase.
  *
- * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
+ * <p>Package-private phase builder for the synthesis pipeline.
  */
-public final class ToolsTopic implements Topic.Execution {
+public final class ToolsPhase implements Phase.Execution {
 
   private final Supplier<SystemdChart> systemdChart;
   private final Supplier<SystemdSynthesisContext> context;
   private final Sink sink;
 
-  // The nix-install service is read back by floxInstall() within this topic (a same-topic verb
+  // The nix-install service is read back by floxInstall() within this phase (a same-phase verb
   // dependency), so it is kept as a local working field; both services are pushed through the sink.
   private @Nullable SystemdService nixInstallService;
 
-  public ToolsTopic(
+  public ToolsPhase(
       Supplier<SystemdChart> systemdChart, Supplier<SystemdSynthesisContext> context, Sink sink) {
     this.systemdChart = systemdChart;
     this.context = context;
     this.sink = sink;
   }
 
-  /** The write-face of the tools topic — the two package-manager install services. */
-  public interface Sink extends Topic.Sink {
+  /** The write-face of the tools phase — the two package-manager install services. */
+  public interface Sink extends Phase.Sink {
     void nixInstall(SystemdService service);
 
     void floxInstall(SystemdService service);
@@ -46,7 +46,7 @@ public final class ToolsTopic implements Topic.Execution {
     return "tools installation";
   }
 
-  public ToolsTopic nixInstall() {
+  public ToolsPhase nixInstall() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     nixInstallService =
@@ -65,7 +65,7 @@ public final class ToolsTopic implements Topic.Execution {
     return this;
   }
 
-  public ToolsTopic floxInstall() {
+  public ToolsPhase floxInstall() {
     final SystemdChart systemdChart = this.systemdChart.get();
     final SystemdSynthesisContext context = this.context.get();
     final SystemdService nixInstall =

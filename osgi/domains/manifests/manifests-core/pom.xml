@@ -83,14 +83,6 @@
       <artifactId>netplan-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The passive fluent-pipeline grammar engine (FluentTopicRunner/OnFailure/TopicFailure),
-         consumed in-bundle by BootstrapInfrastructureSynthesizer. Replaces the local Synthesis*
-         triplet. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <!-- systemd's cdk8s rendering of its units (io.nxmatic.rke2lab.systemd.cdk8s), contributed as a
          fragment of the manifests-cdk8s carrier. manifests-core imports that package to drive the
          systemd-unit synthesis. -->

@@ -2,12 +2,12 @@
 package io.nxmatic.rke2lab.manifests.systemd;
 
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
-import io.nxmatic.rke2lab.manifests.systemd.stages.NetworkTopic;
-import io.nxmatic.rke2lab.manifests.systemd.stages.Rke2InstallTopic;
-import io.nxmatic.rke2lab.manifests.systemd.stages.StorageTopic;
-import io.nxmatic.rke2lab.manifests.systemd.stages.ToolsTopic;
-import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
-import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.manifests.internal.synthesis.OnFailure;
+import io.nxmatic.rke2lab.manifests.internal.synthesis.PhaseRunner;
+import io.nxmatic.rke2lab.manifests.systemd.phases.NetworkPhase;
+import io.nxmatic.rke2lab.manifests.systemd.phases.Rke2InstallPhase;
+import io.nxmatic.rke2lab.manifests.systemd.phases.StoragePhase;
+import io.nxmatic.rke2lab.manifests.systemd.phases.ToolsPhase;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import java.util.Objects;
@@ -23,10 +23,8 @@ import org.slf4j.LoggerFactory;
  * install, systemd linking), network setup, storage/system configuration. They apply to both node
  * roles (rke2-server and rke2-agent).
  *
- * <p>Uses the fluent pipeline grammar to enforce ordering across four topics: tools, rke2-install,
+ * <p>Uses the fluent pipeline grammar to enforce ordering across four phases: tools, rke2-install,
  * network, and storage/system.
- *
- * <p>See docs/fluent-pipeline-grammar.adoc for the pattern this follows.
  */
 public final class SystemdInfrastructureSynthesizer {
 
@@ -47,24 +45,23 @@ public final class SystemdInfrastructureSynthesizer {
    * <p>Enforces ordering: tools → rke2-install → network → storage/system.
    */
   public void synthesizeAll() {
-    // Local pipeline for node systemd infrastructure units (fluent grammar, see
-    // docs/fluent-pipeline-grammar.adoc).
+    // Local pipeline for node systemd infrastructure units (fluent synthesis grammar).
     // Structure: tools → rke2-install → network → storage/system
     final class SynthesisPipeline {
       final State state = new State();
 
-      final FluentTopicRunner runner = new FluentTopicRunner("synthesis");
+      final PhaseRunner runner = new PhaseRunner("synthesis");
 
       final class State {
         @Nullable OnFailure onFailure;
         // Ambient inherited from the enclosing synthesizer, held by the owner (the State) so every
-        // topic reads it through the SAME read-face as the flux: state::systemdChart /
+        // phase reads it through the SAME read-face as the flux: state::systemdChart /
         // state::context.
-        // The State is the single source of truth a topic stays wired to — never the outer fields.
+        // The State is the single source of truth a phase stays wired to — never the outer fields.
         final SystemdChart systemdChart = SystemdInfrastructureSynthesizer.this.systemdChart;
         final SystemdSynthesisContext context = SystemdInfrastructureSynthesizer.this.context;
-        // Service outputs, set once by each producing topic's sink, read by later topics through
-        // Supplier read-faces (state::nixInstall, …) — never by holding the producing topic.
+        // Service outputs, set once by each producing phase's sink, read by later phases through
+        // Supplier read-faces (state::nixInstall, …) — never by holding the producing phase.
         @Nullable SystemdService nixInstall;
         @Nullable SystemdService floxInstall;
         @Nullable SystemdService bootstrapEnv;
@@ -105,12 +102,12 @@ public final class SystemdInfrastructureSynthesizer {
       }
 
       final class AwaitingTools {
-        ToolsDone during(String topic, Function<ToolsTopic, ToolsTopic> body) {
-          final ToolsTopic toolsTopic =
-              new ToolsTopic(
+        ToolsDone during(String phase, Function<ToolsPhase, ToolsPhase> body) {
+          final ToolsPhase toolsPhase =
+              new ToolsPhase(
                   state::systemdChart,
                   state::context,
-                  new ToolsTopic.Sink() {
+                  new ToolsPhase.Sink() {
                     @Override
                     public void nixInstall(SystemdService service) {
                       state.nixInstall = service;
@@ -121,7 +118,7 @@ public final class SystemdInfrastructureSynthesizer {
                       state.floxInstall = service;
                     }
                   });
-          runner.runDuring(topic, toolsTopic, body, state.onFailure());
+          runner.runDuring(phase, toolsPhase, body, state.onFailure());
           return new ToolsDone();
         }
       }
@@ -133,14 +130,14 @@ public final class SystemdInfrastructureSynthesizer {
       }
 
       final class AwaitingRke2Install {
-        Rke2InstallDone during(String topic, Function<Rke2InstallTopic, Rke2InstallTopic> body) {
-          final Rke2InstallTopic rke2InstallTopic =
-              new Rke2InstallTopic(
+        Rke2InstallDone during(String phase, Function<Rke2InstallPhase, Rke2InstallPhase> body) {
+          final Rke2InstallPhase rke2InstallPhase =
+              new Rke2InstallPhase(
                   state::systemdChart,
                   state::context,
                   state::nixInstall,
                   state::floxInstall,
-                  new Rke2InstallTopic.Sink() {
+                  new Rke2InstallPhase.Sink() {
                     @Override
                     public void bootstrapEnv(SystemdService service) {
                       state.bootstrapEnv = service;
@@ -151,7 +148,7 @@ public final class SystemdInfrastructureSynthesizer {
                       state.install = service;
                     }
                   });
-          runner.runDuring(topic, rke2InstallTopic, body, state.onFailure());
+          runner.runDuring(phase, rke2InstallPhase, body, state.onFailure());
           return new Rke2InstallDone();
         }
       }
@@ -163,10 +160,10 @@ public final class SystemdInfrastructureSynthesizer {
       }
 
       final class AwaitingNetwork {
-        NetworkDone during(String topic, Function<NetworkTopic, NetworkTopic> body) {
-          final NetworkTopic networkTopic =
-              new NetworkTopic(state::systemdChart, state::context, state::install);
-          runner.runDuring(topic, networkTopic, body, state.onFailure());
+        NetworkDone during(String phase, Function<NetworkPhase, NetworkPhase> body) {
+          final NetworkPhase networkPhase =
+              new NetworkPhase(state::systemdChart, state::context, state::install);
+          runner.runDuring(phase, networkPhase, body, state.onFailure());
           return new NetworkDone();
         }
       }
@@ -178,15 +175,15 @@ public final class SystemdInfrastructureSynthesizer {
       }
 
       final class AwaitingStorage {
-        StorageDone during(String topic, Function<StorageTopic, StorageTopic> body) {
-          final StorageTopic storageTopic =
-              new StorageTopic(
+        StorageDone during(String phase, Function<StoragePhase, StoragePhase> body) {
+          final StoragePhase storagePhase =
+              new StoragePhase(
                   state::systemdChart,
                   state::context,
                   state::floxInstall,
                   state::bootstrapEnv,
                   state::install);
-          runner.runDuring(topic, storageTopic, body, state.onFailure());
+          runner.runDuring(phase, storagePhase, body, state.onFailure());
           return new StorageDone();
         }
       }
@@ -194,13 +191,13 @@ public final class SystemdInfrastructureSynthesizer {
       final class StorageDone {
         // Terminal verb: complete the synthesis pipeline with no return value.
         void complete() {
-          // Pipeline complete, all topics executed.
+          // Pipeline complete, all phases executed.
         }
       }
     }
 
     new SynthesisPipeline()
-        .onFailure((topic, cause) -> LOG.error("Synthesis failed at topic: {}", topic, cause))
+        .onFailure((phase, cause) -> LOG.error("Synthesis failed at phase: {}", phase, cause))
         .during("tools installation", tools -> tools.nixInstall().floxInstall())
         .then()
         .during(

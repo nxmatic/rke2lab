@@ -52,15 +52,12 @@ class ManifestsCoreInContainerTest {
           .withScr()
           // The JUnit runner world — the proxy's own infrastructure, the single shared declaration.
           .withJUnitRunner()
-          // pipeline is the last remaining seam (type=seam): host-flat, system-exported here
-          // exactly
-          // as in prod, never installed as a bundle. The closure walk skips seam exporters, so it
-          // belongs here, not in the derived set. Everything else manifests-core's runtime graph
-          // needs
-          // — manifests-contract (now DE-SEAMED, an installed bundle), the cdk8s carrier and its
-          // systemd fragment, unitrepo-core, jackson, ipaddress, snakeyaml, commons-compress — is
-          // derived from the host's manifest in the test body via installImportClosureOf.
-          .systemPackages("io.nxmatic.rke2lab.pipeline;version=1.0.0")
+          // No systemPackages: the synthesis grammar is now internal to manifests-core (package
+          // io.nxmatic.rke2lab.manifests.internal.synthesis, un-exported), not a seam. Everything
+          // manifests-core's runtime graph needs — manifests-contract (a DE-SEAMED installed
+          // bundle), the cdk8s carrier and its systemd fragment, unitrepo-core, jackson, ipaddress,
+          // snakeyaml, commons-compress — is derived from the host's manifest in the test body via
+          // installImportClosureOf.
           .build();
 
   @TestFactory

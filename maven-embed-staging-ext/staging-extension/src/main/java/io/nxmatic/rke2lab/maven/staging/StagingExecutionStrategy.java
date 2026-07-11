@@ -288,32 +288,29 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         "staged bundles export packages that ALSO live flat in this assembly (one class in two"
             + " realms → LinkageError)");
 
-    // ---- PIPELINE_PATTERN: a fluent-pipeline topic implements Topic + exactly one nature ----
-    // Topics live BOTH in bundle jars (manifests's internal *Topic classes) and in the exec's own
-    // host classes (seed-master's stages), so the scan spans both surfaces exactly as
-    // REALM_BOUNDARY
-    // does. Exec-side violations attribute to the exec's package-info; bundle-side to the bundle.
+    // ---- SYNTHESIS_PATTERN: a synthesis phase implements Phase.Execution and pushes via its Sink.
+    // Phases live in the manifests-core bundle (its internal.synthesis *Phase classes); the scan
+    // still spans the exec's target/classes too (the dual-surface scan REALM_BOUNDARY also uses),
+    // so a stray phase in host code would attribute to the exec's package-info.
     report.record(
-        StagingGate.PIPELINE_PATTERN,
+        StagingGate.SYNTHESIS_PATTERN,
         execGovernance(session),
         execPseudoBundle(session),
-        PipelinePattern.violations(
+        ManifestsSynthesisPattern.violations(
             ResolvedBundle.classEntriesOf(
                 java.nio.file.Path.of(
                     session.getCurrentProject().getBuild().getOutputDirectory()))),
-        "fluent-pipeline topics that implement Topic without exactly one nature"
-            + " (Execution/Checkpoint/Pipeline)");
+        "synthesis phases that implement Phase without a nature (Execution)");
     for (ResolvedBundle b : resolved) {
       if (b.launcher()) {
-        continue; // the framework carrier holds no topics.
+        continue; // the framework carrier holds no phases.
       }
       report.record(
-          StagingGate.PIPELINE_PATTERN,
+          StagingGate.SYNTHESIS_PATTERN,
           b.governance().levels(),
           b,
-          PipelinePattern.violations(b.classEntries()),
-          "fluent-pipeline topics that implement Topic without exactly one nature"
-              + " (Execution/Checkpoint/Pipeline)");
+          ManifestsSynthesisPattern.violations(b.classEntries()),
+          "synthesis phases that implement Phase without a nature (Execution)");
     }
 
     report.flush();
