@@ -21,7 +21,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>bbox-port</artifactId>
+      <artifactId>bbox-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The bbox client + gson are real OSGi bundles: this edge compiles against them and IMPORTS

@@ -46,6 +46,7 @@ class DoctorVocabularyTest {
     assertEquals("kubeconfig-missing", SymptomKind.KUBECONFIG_MISSING.slug());
     assertEquals("api-not-ready", SymptomKind.API_NOT_READY.slug());
     assertEquals("controller-not-ready", SymptomKind.CONTROLLER_NOT_READY.slug());
+    assertEquals("reservation-refused", SymptomKind.RESERVATION_REFUSED.slug());
     assertEquals(Optional.of(SymptomKind.TIMEOUT), SymptomKind.parse("timeout"));
     assertEquals(Optional.of(SymptomKind.API_NOT_READY), SymptomKind.parse("api-not-ready"));
     assertEquals(Optional.empty(), SymptomKind.parse("nope"));

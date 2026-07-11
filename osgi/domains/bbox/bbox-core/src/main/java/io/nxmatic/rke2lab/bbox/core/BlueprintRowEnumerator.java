@@ -1,6 +1,5 @@
-package io.nxmatic.rke2lab.controlplane.bbox;
+package io.nxmatic.rke2lab.bbox.core;
 
-import io.nxmatic.rke2lab.bbox.core.BboxReservationRequest;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,9 +9,11 @@ import java.util.Locale;
  * Enumerates the canonical RKE2 reservation requests from {@link ClusterNetworkBlueprint}.
  *
  * <p>Owns the canonical clusters/nodes lists and the MAC-prefix safety check. Knows nothing about
- * the bbox API — it produces flat {@link BboxReservationRequest}s (the bbox-port home vocabulary)
+ * the bbox API — it produces flat {@link BboxReservationRequest}s (the bbox-record vocabulary)
  * carrying the {@code (cluster, node)} identity alongside the MAC/IP/hostname triple; the bbox-edge
- * turns each into the library's reservation behind the seam.
+ * turns each into the library's reservation behind the contact. Pure (bbox-record + netplan-port,
+ * no Pulumi), it is the bbox scion's collaborator that is not a resolved service — so it lives here
+ * in the domain core, wired bundle-to-bundle to the scion that drives it.
  */
 public final class BlueprintRowEnumerator {
 

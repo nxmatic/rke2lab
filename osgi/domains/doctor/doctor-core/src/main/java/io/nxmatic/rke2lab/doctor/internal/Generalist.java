@@ -384,6 +384,10 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       // (symptom seen, no treatment offered) until a cluster specialist is added.
       case KUBECONFIG_MISSING, CONTROLLER_NOT_READY -> List.of(Specialty.CLUSTER);
       case API_NOT_READY -> List.of(Specialty.CLUSTER, Specialty.NETWORK);
+      // A refused DHCP reservation is a network fault — routes to the NETWORK domain (no bbox
+      // specialist treats it yet, so the plan is empty until one is added: symptom seen, no
+      // treatment offered — the same shape as the cluster-readiness symptoms above).
+      case RESERVATION_REFUSED -> List.of(Specialty.NETWORK);
     };
   }
 }

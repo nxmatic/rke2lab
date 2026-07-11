@@ -15,7 +15,8 @@ import java.util.Optional;
  */
 public enum Checkpoint {
   SYSTEMD_ADAPTER("systemd-adapter", "systemd adapter becomes reachable"),
-  CLUSTER_READINESS("cluster-readiness", "cluster becomes ready");
+  CLUSTER_READINESS("cluster-readiness", "cluster becomes ready"),
+  BBOX_RESERVATIONS("bbox-reservations", "network reservations are settled");
 
   private final String slug;
   private final String scenarioTitle;

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>bbox-core</artifactId>
+  <name>osgi/domains/bbox/bbox-core</name>
+  <description>The bbox domain's data + contract + logic: the flat reservation vocabulary
+    (BboxReservationRequest / BboxRowOutcome / BboxAction), the BboxReconciler service interface
+    (reconcile a set of desired DHCP reservations against the router, dry-run or apply), and the pure
+    BlueprintRowEnumerator that derives the canonical RKE2 reservations from the netplan blueprint.
+    type=model — installed as a bundle and wired bundle-to-bundle to the edge (which provides the
+    reconciler @Component) and the scion (which resolves + drives it), both in-container. No
+    java-bbox-api-client type crosses; no seam (the reconciler no longer crosses to the host — that
+    was bbox-port's vestige from the host-side reconciler).</description>
+
+  <dependencies>
+    <!-- BlueprintRowEnumerator derives each reservation from the netplan blueprint. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -30,8 +30,8 @@ public interface RunGate {
 
   /**
    * Cross the boundary: run {@code touch} when cultivating (live), {@code inert} when surveying
-   * (preview). The scion supplies both branches; the gate chooses. Neither branch is evaluated until
-   * chosen.
+   * (preview). The scion supplies both branches; the gate chooses. Neither branch is evaluated
+   * until chosen.
    */
   default <T> T through(Supplier<T> touch, Supplier<T> inert) {
     return cultivating() ? touch.get() : inert.get();

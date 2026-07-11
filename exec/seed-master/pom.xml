@@ -222,12 +222,11 @@
       <artifactId>incus-port</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The bbox domain's seam: BboxReconciler + its home vocabulary. The host builds
-         BboxReservationRequests from the blueprint and reads BboxRowOutcomes back; no
-         io.nxmatic.bbox.* library type lives host-side. type=seam. -->
+    <!-- The bbox domain's data + contract (DEFERRED host use — bbox-port was de-seamed into
+         bbox-core; this host reconciler path migrates into the bbox-bdd scion). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>bbox-port</artifactId>
+      <artifactId>bbox-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The auth domain's seam: AuthTokenContact + the AuthTokenSource enum. The host launch-secrets

@@ -20,7 +20,9 @@
     (blueprint enumeration, the Pulumi resource graph) and composes the contact from the registry.</description>
 
   <modules>
-    <module>bbox-port</module>
+    <module>bbox-core</module>
     <module>bbox-edge</module>
+    <module>bbox-bdd</module>
+    <module>bbox-bdd-test</module>
   </modules>
 </project>

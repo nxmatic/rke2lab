@@ -1,0 +1,13 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.bbox.core
+
+Export-Package: io.nxmatic.rke2lab.bbox.core
+# type=model — the bbox domain's contract + logic, installed as a bundle (NOT a seam): the reconcile
+# verb (BboxReconciler, the service interface the edge @Component provides and the scion resolves)
+# and the pure BlueprintRowEnumerator (canonical RKE2 reservations from the netplan blueprint). Both
+# live IN-CONTAINER — the edge fills the contact, the scion drives it — so nothing crosses to the
+# host and this is wired bundle-to-bundle, no system-export. This replaces the former bbox-port seam,
+# whose seam face was a vestige of the host-side reconciler (now deferred).
+Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=bbox-core
+# JSpecify annotations are compile-only null-safety metadata, runtime-retained → drop from imports.
+Import-Package: !org.jspecify.annotations, *
+-noimportjava: true
