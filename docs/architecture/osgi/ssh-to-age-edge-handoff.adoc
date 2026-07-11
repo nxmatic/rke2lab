@@ -50,7 +50,7 @@ link:../patterns/port-edge-domain-ownership.adoc[the ownership rule] — there i
 
 | The seam (`-port`, owned by the consumer)
 | `SshToAgeConverter` (`String toAgeKey(String sshPrivateKey)`) + `SshToAgeConversionException`, in
-  `manifests-port`. Pure passive type, exported. NOT named after the edge. The gateway profile
+  `manifests-contract`. Pure passive type, exported. NOT named after the edge. The gateway profile
   `SopsAgeMaterial` (the age key) lives beside the other profiles.
 
 | The edge (`<target>-edge`, OSGi world)
@@ -161,7 +161,7 @@ registry, not loose constants), and the pom faces (one declaration, not two hand
 == Files
 
 New: `osgi/ssh-to-age-edge/` (pom, bnd, package-info, `ProcessBuilderSshToAgeConverter`);
-`manifests-port` `SshToAgeConverter`, `SshToAgeConversionException`, `profiles/SopsAgeMaterial`;
+`manifests-contract` `SshToAgeConverter`, `SshToAgeConversionException`, `profiles/SopsAgeMaterial`;
 `manifests-core` `SopsAgeMaterialResolver`.
 Changed: `DefaultManifestSynthesisService` (mandatory `@Reference` + pre-synthesis step),
 `ManifestSynthesisContext` (carries `SopsAgeMaterial`), `SopsAgeSecretManifestsUnit` (pure render;

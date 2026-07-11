@@ -119,7 +119,7 @@ package "systemd-adapter" {
   rectangle "SystemdAdapterProperties\nmandatoryTarget + timeout" as props
 }
 
-package "systemd-port (seam)" {
+package "systemd-contract" {
   rectangle "SystemdAdapterApiPaths\nSTATUS_SYSTEMD + HEALTHZ_SYSTEMD" as apiPaths
   rectangle "SystemdProbeRequest\ndbusHost/Port + nodeName + imageBuilderHost" as probeReq
 }
@@ -169,12 +169,12 @@ Controller --> Caller : 200 + JSON snapshot
 @enduml
 ----
 
-=== 5) Port contract — the seam types
+=== 5) Port contract — the contract types
 
 Review question: what crosses the host↔OSGi frontier, and does it stay free of host types?
 
-The adapter's normalized surface is published to the flat host as two `systemd-port` seam types
-(loaded by the system bundle, so neither side leaks its own config type across):
+The adapter's normalized surface is declared as two `systemd-contract` types (an installed bundle
+wired bundle-to-bundle inside the OSGi world, so neither side leaks its own config type across):
 
 [cols="2,3",options="header"]
 |===

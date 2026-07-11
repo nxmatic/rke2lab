@@ -51,7 +51,7 @@ collides with the project's two *runtime* gate senses (readiness gates like
 | A class may reference only types REACHABLE in its own classloader realm — the build-time guard of
   the host↔OSGi boundary the link:seed-broker-spec.adoc[world gateway] defines. The two realms:
   the *flat realm* (the host exec classes + the flat dependency tail + the system-exported `type=seam`
-  ports — one classloader) sees everything flat but NOT a bundle-side export; a *bundle realm* (one
+  seed-broker port — one classloader) sees everything flat but NOT a bundle-side export; a *bundle realm* (one
   per `isDomain()` bundle: `model`/`edge`/`record`) sees its own packages + its wired
   `Import-Package` + the system packages. A reference that leaves the realm is a leak. Read by
   `RealmBoundary` (see below). (Target zero; the gate the `doctor.records`-into-the-host drift would
@@ -132,7 +132,7 @@ is the standing guarantee; a package opts a single gate down to `WARN`/`IGNORE` 
 ----
 @GovernedBy(StagingGate.SPEC_COVERAGE, EnforcementLevel.WARN)         // listed, build green
 @GovernedBy(StagingGate.INSTANCE_DISCIPLINE, EnforcementLevel.ERROR)  // breaks the build
-package io.nxmatic.rke2lab.netplan.port;
+package io.nxmatic.rke2lab.netplan.contract;
 ----
 
 The annotations live in `osgi/domain-annotations` — a dependency-free bundle common to ALL domains,

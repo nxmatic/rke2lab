@@ -100,12 +100,14 @@ The contrast with the existing dispositions, all already keyed on the same `Embe
 |===
 | carrier kind | how it loads today | unchanged?
 
-| `type=seam` (seed-broker-port, doctor-port, manifests-port)
+| `type=seam` (seed-broker-port — the sole surviving seam)
 | system-exported — ONE copy, shared host↔framework. Its reason to exist.
-| YES — seams stay shared. The seam is the membrane; sharing is its job.
+| YES — the one seam stays shared. The seam is the membrane; sharing is its job.
 
-| `type=model` / `edge` / `record` (doctor-core, manifests-core, …)
-| installed as a bundle, exports never mirrored (the leak guard already removes them).
+| `type=model` / `edge` / `record` / `contract` (doctor-core, manifests-core, doctor-contract, manifests-contract, …)
+| installed as a bundle, exports never mirrored (the leak guard already removes them). The domain
+  contracts (former `-port`s, now `type=contract`) are here too: installed and wired bundle-to-bundle
+  inside the OSGi world, never system-exported.
 | YES — already isolated bundle-side.
 
 | third-party library a model imports (jackson, snakeyaml; networknt with 2D)
@@ -194,8 +196,10 @@ derived rule. Derivation first; hand-list only if the evidence forces it.
 * *Host side:* `seed-master` declares jackson compile-scope (shades flat — its own codec). The other
   two exec entrypoints (`netplan-cli`, `manifests-cli`) share the build-parent shade config;
   `manifests-cli` embeds `manifests-core` so the staged-bundle jackson must resolve for it too.
-* *Seam purity holds today:* none of seed-broker-port / doctor-port / manifests-port imports jackson —
-  the derived exemption is satisfied at the outset.
+* *Seam purity holds today:* the sole seam, seed-broker-port, does not import jackson — the derived
+  exemption is satisfied at the outset. (The domain contracts doctor-contract / manifests-contract are
+  no longer seams — they are installed `type=contract` bundles, wired bundle-to-bundle — so they do not
+  enter the seam surface even where they touch jackson.)
 
 == What "green" means
 

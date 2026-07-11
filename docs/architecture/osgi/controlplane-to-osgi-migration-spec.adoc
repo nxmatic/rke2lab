@@ -20,7 +20,7 @@ below.
 
 A type moves into an OSGi bundle *if and only if* a bundle `@Component` **contacts an external
 system** (→ it belongs in an `-edge`) or **rides that contact's verb** as a parameter/return (→ it
-belongs in a `-port`). Nothing else moves.
+belongs in a `-contract`). Nothing else moves.
 
 "Pulumi-free" is NOT the criterion. Being reachable on `{JDK ∪ ports}` (a closed dependency DAG) is
 *necessary* but not *sufficient*: a class can be perfectly placeable and still have no reason to
@@ -36,8 +36,8 @@ extracted atomically.
 
 Every extraction is one change that ships together:
 
-. `-port` declares the verb (a `type=seam` interface) + its flat request/result records. One shared
-  class across the host↔bundle boundary; no host config type crosses.
+. `-contract` declares the verb (a `type=contract` interface) + its flat request/result records — an
+  installed bundle, wired bundle-to-bundle inside the OSGi world; no host config type crosses.
 . `-edge` provides it (`@Component`, `type=edge`) — the single door to that external system, and
   nothing else.
 . the host CONSUMER is re-wired in the SAME change to compose the edge from the registry
@@ -95,7 +95,7 @@ existing gateway suffices; the sweep added no new machinery.
 |===
 
 One domain, one bundle pair, one or more `@Component`s: incus carries TWO contacts (reachability and
-image-build) in a single `incus-port`/`incus-edge` pair, because an Incus instance needs an Incus
+image-build) in a single `incus-contract`/`incus-edge` pair, because an Incus instance needs an Incus
 image — the same concern, not a reason to split the module.
 
 == What stays host — and why it is NOT a dead-end

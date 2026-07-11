@@ -91,7 +91,7 @@ flowchart TB
 Zoom inside rke2lab. It is split into *two spaces* (the invariant `grep -ri pulumi osgi/` == 0): the
 *OSGi world* — pure, it *describes* and *reasons*, no `com.pulumi`/`io.grpc` — and the *host* — it
 *actualises* over Pulumi. The pipeline is the spine of the OSGi world; the other subsystems are the
-capabilities it orchestrates (doctor, manifests, netplan, systemd-port…); the host boots the world and
+capabilities it orchestrates (doctor, manifests, netplan, systemd-contract…); the host boots the world and
 carries the Pulumi edge. This spec is about the OSGi-world spine; the host edge is
 link:../atlas/seed.adoc[seed orchestration L1].
 
@@ -108,7 +108,7 @@ flowchart TB
     doctor["doctor<br/>consult → remediation"]:::sub
     manifests["manifests<br/>CDK8s synthesis"]:::sub
     netplan["netplan<br/>network synthesis"]:::sub
-    systemd["systemd-port<br/>unit contracts + adapter"]:::sub
+    systemd["systemd-contract<br/>unit contracts + adapter"]:::sub
   end
   op -->|launches| seed
   seed -->|amorces, injects ctx| pipe

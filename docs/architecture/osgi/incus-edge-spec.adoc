@@ -10,7 +10,7 @@ link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge], link:cluster-edge-spec.adoc
 link:bbox-edge-spec.adoc[bbox-edge] and link:auth-edge-spec.adoc[auth-edge].
 
 *One domain, one bundle pair, two contacts.* An Incus instance needs an Incus image — reachability
-and image-build are the same concern (talking to an Incus host), so they share `incus-port` /
+and image-build are the same concern (talking to an Incus host), so they share `incus-contract` /
 `incus-edge` rather than splitting into a second module pair. The instance-reachability contact was
 the *first* sweep extraction (it validated the working unit); the image-build contact was the *last*
 and heaviest. Both landed here.
@@ -34,9 +34,9 @@ projection are host orchestration that genuinely stays.
 
 === Resolution
 
-* *incus-port* declares `IncusInstanceContact` — the verb `isReachable(IncusExecRequest) →
+* *incus-contract* declares `IncusInstanceContact` — the verb `isReachable(IncusExecRequest) →
   Optional<String>` (empty = reachable, else the failure summary); and `IncusExecRequest`, the flat
-  seam record (`sshHost`, `incusProject`, `nodeName`) the host projects out of its config at the call
+  contract record (`sshHost`, `incusProject`, `nodeName`) the host projects out of its config at the call
   site.
 * *incus-edge* provides `ProcessBuilderIncusInstanceContact` (`@Component`) — shells `ssh … incus
   exec` and nothing else.
@@ -60,9 +60,9 @@ recipe script as a classpath resource.
 
 === Resolution
 
-* *incus-port* declares `ImageBuilder` — `build(ImageBuildRequest)` (produce the artifacts, throwing
+* *incus-contract* declares `ImageBuilder` — `build(ImageBuildRequest)` (produce the artifacts, throwing
   `ImageBuildException` on failure) and `recipeDigest()` (a stable digest of the edge-owned recipe).
-  `ImageBuildRequest` is the flat seam record: the builder binary, and two path families — `local*`
+  `ImageBuildRequest` is the flat contract record: the builder binary, and two path families — `local*`
   (drive a local build) and `remote*` (NixOS-translated by the host, drive the ssh recipe).
 * *incus-edge* provides `DistrobuilderImageBuilder` (`@Component`) — owns the local-vs-remote decision
   (`tryResolveExecutable`), the local `distrobuilder build-incus` (+ sudo), and the ssh recipe stream.
@@ -87,7 +87,7 @@ checksum exactly where the script bytes used to go. Behaviour is preserved; the 
 flowchart LR
   world["EXTERNAL<br/>Incus host: ssh incus exec · distrobuilder / ssh builder"]
   edge["incus domain — EDGE (incus-edge)<br/>@Component ProcessBuilderIncusInstanceContact<br/>@Component DistrobuilderImageBuilder"]
-  iport["incus domain — PORT (incus-port)<br/>IncusInstanceContact, IncusExecRequest<br/>ImageBuilder, ImageBuildRequest, ImageBuildException"]
+  iport["incus domain — PORT (incus-contract)<br/>IncusInstanceContact, IncusExecRequest<br/>ImageBuilder, ImageBuildRequest, ImageBuildException"]
   gate["control-plane — HOST<br/>SeedSystemdAdapterEndpointGate (retry + ObservationView)<br/>PulumiIncusImageProvider (Pulumi Image + cache + path xlat)"]
   gate -->|composes each contact| iport
   gate -->|folds recipeDigest into cache key| iport

@@ -127,7 +127,7 @@ flowchart TB
   vérifié, aucun module ne le déclare en dépendance. Les autres edges
   (`cluster-edge`, `dbus-systemd-edge`) vivent DÉJÀ proprement DANS leur domaine.
 * **Les `-test` sont déjà bien placés** : `doctor-core-test`,
-  `doctor-port-test`, `manifests-core-test`, `jgiven-probe-test` sont
+  `doctor-contract-test`, `manifests-core-test`, `jgiven-probe-test` sont
   co-localisés avec leur cible. *Le layout cible préserve cela strictement.*
 
 == 2. La taxonomie des natures (la grille de tri)
@@ -274,10 +274,10 @@ flowchart LR
     direction TB
     core["doctor-core  (bundle)"]:::domain
     coretest["doctor-core-test  (Fragment-Host → doctor-core)"]:::test
-    port["doctor-port  (seam)"]:::seam
-    porttest["doctor-port-test  (Fragment-Host → doctor-port)"]:::test
+    contract["doctor-contract  (bundle)"]:::domain
+    contracttest["doctor-contract-test  (Fragment-Host → doctor-contract)"]:::test
     coretest -. atteste .-> core
-    porttest -. atteste .-> port
+    contracttest -. atteste .-> contract
   end
   tk["un TESTKIT suit la même règle (généralisation §5.6) :\nil vit avec le bundle dont il sert la logique de test —\npipeline-testkit→pipeline/ ; junit-testkit (sert le\nframework lui-même)→runtime/. Aucun groupe 'testing/'."]:::test
 

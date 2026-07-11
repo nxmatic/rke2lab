@@ -6,6 +6,15 @@ A review report for the master-branch space. Move A (commit `1fef4cb1`) relocate
 types into `doctor-port` and reconciled the poms. This report surfaces two coupled decisions that
 must be made *before* Move B is implemented, because Move A revealed a debt it did not itself close.
 
+[IMPORTANT]
+====
+*Frozen point-in-time report.* The module names below are those of this session. The doctor boundary
+was later *de-seamed*: `doctor-port` is now the installed, bundle-to-bundle-wired `doctor-contract`
+bundle (`type=contract`), its package root `io.nxmatic.rke2lab.doctor.port` →
+`io.nxmatic.rke2lab.doctor.contract`, and the `doctor-testkit` module weighed here was subsequently
+deleted. Read the historical names below through that map.
+====
+
 The headline: **we moved 38 production types and left 100% of their tests behind.** The tests are
 not "resisting" the refactor — they are *orphaned from their subject*. The right cut is not the one
 the original plan drew.

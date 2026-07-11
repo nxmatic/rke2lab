@@ -38,7 +38,7 @@ flowchart TB
 
 Deux processus. Le daemon porte tout le raisonnement et VIT entre les commandes. Le host garde un
 framework OSGi mais reduit a UNE fonction : realiser l'edge vers le monde distant. Les bundles lourds
-(doctor-records, cluster-core...) ne sont meme plus PRESENTS dans la JVM host -- la frontiere
+(doctor-contract, cluster-core...) ne sont meme plus PRESENTS dans la JVM host -- la frontiere
 REALM_BOUNDARY devient physique, la fuite de classloader passe de *lintee* a *impossible*.
 
 [mermaid]

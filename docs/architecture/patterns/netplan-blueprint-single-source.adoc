@@ -22,7 +22,7 @@ and runs the netplan jar to produce the blueprint and exposes it as
 == The synthesis port contract
 
 The `ClusterNetworkBlueprint` above is not reached directly by callers — it is the
-`blueprint` field of a `NetplanSynthesisResult`, produced by the `netplan-port` SPI. That
+`blueprint` field of a `NetplanSynthesisResult`, produced by the `netplan-contract` SPI. That
 port is the exported surface of the domain: a request/response pair over the SPI, plus two
 strongly-typed value objects the addressing model is built from.
 

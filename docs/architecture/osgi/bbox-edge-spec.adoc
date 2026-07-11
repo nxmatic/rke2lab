@@ -8,7 +8,7 @@
 control-plane→OSGi sweep (after link:incus-edge-spec.adoc[incus-edge]). Unlike incus (a bare
 `ProcessBuilder`), the bbox contact rides an external library, `java-bbox-api-client` — so this edge
 also proves the *library-backed* edge shape: the library is made an OSGi bundle and IMPORTED (not
-embedded), and no library type crosses the seam.
+embedded), and no library type crosses the contract boundary.
 ====
 
 == The contact today — inlined, duplicated, library types on the host
@@ -20,16 +20,16 @@ mode)`. Five host files imported `io.nxmatic.bbox.*` — the library's `Action`/
 `DesiredReservation` types were spread across the host, including into the Pulumi resource graph
 (`BboxReservationResource` built its `Output`s from a library `RowOutcome`).
 
-== Resolution — a `bbox-edge` `@Component` and a home-vocabulary `bbox-port`
+== Resolution — a `bbox-edge` `@Component` and a home-vocabulary `bbox-core`
 
 * *java-bbox-api-client* becomes an OSGi bundle (bnd manifest, `0.2.1`): `Bundle-SymbolicName
   io.nxmatic.bbox.api.client`, exports its two API packages, imports `com.google.gson` (itself a
   bundle). No embedding — the edge imports it, and the staging closure stages it (and gson) as
   carriers because an edge imports their packages.
-* *bbox-port* (`type=seam`): `BboxReconciler` — `reconcile(baseUri, password, dryRun,
+* *bbox-core* (`type=model`): `BboxReconciler` — `reconcile(baseUri, password, dryRun,
   List<BboxReservationRequest>) → List<BboxRowOutcome>` — over a HOME vocabulary
   (`BboxReservationRequest`, `BboxRowOutcome`, `BboxAction` mirroring the library enum). No
-  `io.nxmatic.bbox.*` type crosses the seam.
+  `io.nxmatic.bbox.*` type crosses the contract boundary.
 * *bbox-edge* (`type=edge`, `@Component`): `LiveBboxReconciler` opens the session, rebuilds the
   library `DesiredReservation` from each request, applies, and maps the library `RowOutcome`/`Action`
   back to the home records. The single door — the library resolves only in this bundle's realm.
@@ -42,7 +42,7 @@ mode)`. Five host files imported `io.nxmatic.bbox.*` — the library's `Action`/
 flowchart LR
   world["EXTERNAL<br/>the Bbox router (HTTP API)"]
   edge["bbox domain — EDGE<br/>bbox-edge: @Component BboxReconciler<br/>(imports java-bbox-api-client)"]
-  bport["bbox domain — PORT<br/>bbox-port: BboxReconciler, Bbox{ReservationRequest,RowOutcome,Action}"]
+  bport["bbox domain — PORT<br/>bbox-core: BboxReconciler, Bbox{ReservationRequest,RowOutcome,Action}"]
   host["control-plane — HOST<br/>blueprint enumeration + Pulumi resource graph<br/>(home vocabulary only)"]
   edge -->|BboxApiClient session| world
   edge -.->|implements| bport
@@ -67,8 +67,8 @@ outcome). It is the `bbox-bdd` bundle (first extraction of the two host-side sci
 `cluster-bdd` reference shape: a `BboxReconciliationScenario` (jGiven `Given/When/Then`) + a
 `BboxBddScenarios.run()` front-door the launcher plays in-container, and a
 `BboxReconciliationScenarioInContainerTest` (`@OsgiWorld`) that boots Felix and registers the mock
-collaborators. `BlueprintRowEnumerator` (pure — `bbox-port` + `netplan-port`, zero Pulumi) moved into the
-bundle; no `bbox-core` (one consumer, the scion). The host `BboxStage` +
+collaborators. `BlueprintRowEnumerator` (pure — `bbox-core` + `netplan-contract`, zero Pulumi) lives in
+`bbox-core` (its home vocabulary), consumed by the scion. The host `BboxStage` +
 `BboxReconciliationOrchestrator` are the DEFERRED "avant", deleted when the host runbook grafts this scion.
 
 [listing]

@@ -358,7 +358,7 @@ just `new ApiObject(this, …)` and let `app.synth()` walk the tree.
 === C4 L2b: The manifests-world port (host↔OSGi seam)
 
 The construct tree above is the synthesis _internals_. What the flat host actually calls across the
-OSGi frontier is a set of Service-Provider Interfaces published by the `manifests-port` bundle and
+OSGi frontier is a set of Service-Provider Interfaces published by the `manifests-contract` bundle and
 implemented OSGi-side (see xref:#manifests-core-impl[the implementation inventory]). Each SPI owns a
 manifests-world guarantee the host must NOT re-implement: the host asks for the operation and
 consumes the result, never serialising YAML nor reaching into the synthesis internals itself.
@@ -369,7 +369,7 @@ graph LR
     subgraph host["flat host (seed-master)"]
       H["bootstrap / resource stages"]
     end
-    subgraph port["manifests-port (SPIs + value types)"]
+    subgraph port["manifests-contract (SPIs + value types)"]
       EXPL["ManifestExplodeService<br/>explode(request) → result"]
       DOC["ManifestDocumentService<br/>deterministic YAML read"]
       FLOX["FloxRuntimeAssetService<br/>materialise installer assets"]

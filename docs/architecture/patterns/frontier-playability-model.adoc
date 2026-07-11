@@ -76,7 +76,7 @@ There is never a second path ("direct host access" plus "a port for OSGi"); ther
 flowchart LR
   core["doctor-core<br/>(osgi-world)"]
   hostcode["host-world code"]
-  port["doctor-port<br/>the membrane (pure records)"]
+  port["doctor-contract<br/>the membrane (pure records)"]
   edge["pulumi-edge<br/>the impl (today host;<br/>osgi the day its lib is playable)"]
   world["Pulumi state backend"]
   core -->|through| port
@@ -128,7 +128,7 @@ close "which direction". Three closed questions = three judgements removed.
 == Worked example — the doctor domain
 
 * `doctor-core` (osgi-world) — the ~48 pure diagnostic types; in-domain, never leaves.
-* `doctor-port` — the membrane: `SnapshotSource` plus the pure gateway records `SnapshotEntry` /
+* `doctor-contract` — the membrane: `SnapshotSource` plus the pure gateway records `SnapshotEntry` /
   `SnapshotView` that replace the host `StackSnapshot` / `StackHistory` at the boundary.
 * `pulumi-edge` (host today) — the realised egress/ingress: `StackHandleSnapshotSource` (ingress, reads
   the timeline) and `PulumiInterventionLedgerWriter` (egress, writes the ledger). Mutualised: any other
@@ -139,7 +139,7 @@ functional interfaces), not edges — only their PRODUCTION impls that fetch the
 non-playable and belong to a `cluster-edge` / `systemd-edge`.
 
 The doctor extraction (branch `refactor/doctor-model-to-osgi`) is the FIRST realisation of this whole
-model end-to-end: it splits `doctor-core` (in-domain) / `doctor-port` (membrane) / `pulumi-edge` (the
+model end-to-end: it splits `doctor-core` (in-domain) / `doctor-contract` (membrane) / `pulumi-edge` (the
 realised contact). Crucially, the edge it builds is `pulumi-edge` MUTUALISED BY TARGET — not a
 `doctor-pulumi` private adapter. The two Pulumi contacts (state read + ledger write) are two faces of
 ONE shared edge that every Pulumi-touching domain uses.
@@ -161,10 +161,10 @@ An edge is any *boundary crossing*; there are two species, by WHICH boundary it 
   cluster, incus, ssh-to-age). Mutualised by target as `<target>-edge`. Often non-playable.
 * *internal edge* — the face of a DOMAIN turned toward the rest of OUR system; crossed by other
   domains/orchestration through a pure port. This dissolves the earlier "transitive port" category:
-  `manifests-port`/`netplan-port` do not "trace to no edge" — their consumer-facing side IS an internal
+  `manifests-contract`/`netplan-contract` do not "trace to no edge" — their consumer-facing side IS an internal
   edge. So *every port traces to an edge* holds with no orphan, no "transitive" exception.
 
-A single domain can carry BOTH faces. Doctor is the proof: `doctor-port`'s `SnapshotSource` is its
+A single domain can carry BOTH faces. Doctor is the proof: `doctor-contract`'s `SnapshotSource` is its
 external edge (→ pulumi), and its consumer-facing side is an internal edge (→ the orchestration).
 
 *Internal edge is PRESCRIPTIVE, not just descriptive.* It is not satisfied by "the domain has a port
@@ -173,13 +173,13 @@ neighbors import the core's IMPL types instead of calling a contract. Measured o
 
 * *manifests / netplan — CLEAN internal edge.* Consumers (`IncusResourceBootstrap`, the CLIs) import
   ONLY `-port` service types; zero `-core` impl leakage. The reference shape.
-* *doctor — internal edge MISSING (the smoking gun).* `doctor-port` carries only the external face
+* *doctor — internal edge MISSING (the smoking gun).* `doctor-contract` carries only the external face
   (`SnapshotSource`); the internal face is absent, so 40+ files in `controlplane` import `doctor-core`
   impl types directly (`Generalist`, `ConsultationLog`, `MedicalRecord`, `Symptom`, `Checkpoint`),
   passing them as constructor params. Changing `MedicalRecord`'s shape ripples through 20-40 files.
 
 The prescribed fix (first internal-edge increment): add a `ConsultingService` internal edge to
-`doctor-port` (`consult(symptom, observation) → RemediationPlan`, record/history queries), hide the
+`doctor-contract` (`consult(symptom, observation) → RemediationPlan`, record/history queries), hide the
 impl types behind it, rewire the consumers — making doctor symmetric with manifests/netplan. The doctor
 extraction merged so far closed the EXTERNAL face only; this closes the internal one.
 

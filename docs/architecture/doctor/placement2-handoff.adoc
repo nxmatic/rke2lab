@@ -6,6 +6,16 @@ Self-contained state of the `refactor/doctor-internal-edge` branch for review in
 Companion to `move-b-and-test-fixture-debt-report.adoc` (the decisions + the commit-1 breakdown);
 this file is the *where we are now + what to decide next*.
 
+[IMPORTANT]
+====
+*Frozen point-in-time record.* The module names below are those of this branch's session. The doctor
+boundary was later *de-seamed*: `doctor-port` is now the installed, bundle-to-bundle-wired
+`doctor-contract` bundle (`type=contract`), its package root `io.nxmatic.rke2lab.doctor.port` →
+`io.nxmatic.rke2lab.doctor.contract`. The `-test` fragment `doctor-port-test` is now
+`doctor-contract-test`, and the `doctor-testkit` module discussed here was subsequently deleted (its
+fixtures fused into the `-test` fragment). Read the historical names below through that map.
+====
+
 == Branch state (commits off `origin/main`)
 
 [cols="1,4",options="header"]

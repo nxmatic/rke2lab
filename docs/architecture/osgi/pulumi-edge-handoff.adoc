@@ -9,7 +9,7 @@ The first concrete realisation of an *external edge* per the
 link:../patterns/frontier-playability-model.adoc[frontier-playability model]. Build GREEN on the
 full reactor (`./mvnw -pl :seed-master -am clean package -Dmaven.build.cache.skipCache=true
 -DskipTests=false`): `pulumi-edge` 29 tests, `pulumi-edge-testkit` 10, `seed-master` 68 (1 skipped =
-`@Tag` excluded `*LiveTest`), `doctor-port-test` 34 — 0 failures, 0 errors.
+`@Tag` excluded `*LiveTest`), `doctor-contract-test` 34 — 0 failures, 0 errors.
 
 This doc is the *reference template* the five remaining edges (dbus-systemd, incus, cluster,
 host-filesystem, ssh-to-age) replicate. Read it as "how to extract a `<target>-edge`", not just "what
@@ -54,7 +54,7 @@ world-of-residence differs.
 | `doctor-core` — the pure diagnostic model. Never imports the edge; never imports `com.pulumi`.
 
 | The port (`-port`, the membrane)
-| `doctor-port` — `SnapshotSource` (the read seam) + `InterventionLedgerWriter` (the write seam) plus
+| `doctor-contract` — `SnapshotSource` (the read seam) + `InterventionLedgerWriter` (the write seam) plus
   the pure gateway records (`SnapshotEntry`, `SnapshotView`, `Intervention`, `StackCoordinate`, …).
   Reached *identically* from the OSGi world and the host world. Pure: zero `com.pulumi` imports — the
   only Pulumi mention is a `{@link}` in Javadoc.
@@ -93,7 +93,7 @@ The cut is "does this type *touch the Pulumi target*, or merely *consume the por
 * The `controlplane.bdd` doctor types (`ClusterReadinessProbe`, `DbusTcpSpecialist`, the scenarios)
   never reach Pulumi — they stay.
 
-Consumers depend on `doctor-port` only; *nothing in seed-master imports `pulumi-edge` types except as
+Consumers depend on `doctor-contract` only; *nothing in seed-master imports `pulumi-edge` types except as
 explicit wiring in `DoctorAssembly`/`RecordInterventionCommand`/`MedicalRecordDump`*. The membrane held:
 no caller changed behaviour, only its `import` line moved from `controlplane.bdd.*` to
 `pulumi.edge.*`.
@@ -118,7 +118,7 @@ fixture must therefore live *in the testkit's own `src/test`*, not the edge's. T
 
 `GrpcChannelNoiseCapture` is a JUnit `Extension`, so the testkit declares `junit-jupiter-api` in
 *compile* scope (not test) — the same rationale as `StackHistoryFixture` being main-scope. For the
-doctor reconstruction fixtures it adds `doctor-port-test` in test scope (`ReferralReplies`).
+doctor reconstruction fixtures it adds `doctor-contract-test` in test scope (`ReferralReplies`).
 
 [TIP]
 ====

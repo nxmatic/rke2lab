@@ -14,6 +14,16 @@ link:../osgi/jgiven-osgi-testkit-handoff.adoc[the jGiven-in-OSGi testkit handoff
 work is the first real client of).
 ====
 
+[IMPORTANT]
+====
+*Frozen point-in-time handoff.* The module names below are those of this branch's session. The doctor
+boundary was later *de-seamed*: `doctor-port` is now the installed, bundle-to-bundle-wired
+`doctor-contract` bundle (`type=contract`), its package root `io.nxmatic.rke2lab.doctor.port` →
+`io.nxmatic.rke2lab.doctor.contract`. The `-test` fragment `doctor-port-test` described here is now
+`doctor-contract-test` (`Fragment-Host: io.nxmatic.rke2lab.doctor.contract`). Read the historical
+names below through that map.
+====
+
 == What this closes
 
 Placement 2 moved doctor's cross-boundary value types into `doctor-port` and sealed the actors

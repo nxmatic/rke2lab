@@ -29,11 +29,11 @@ Only that CLI call is an edge. The environment-variable precedence, the YAML ups
 comments, and the dry-run guard are host orchestration that genuinely stays — reading `System.getenv`
 crosses no frontier.
 
-== Resolution — an `auth-edge` `@Component` and an `auth-port` seam
+== Resolution — an `auth-edge` `@Component` and an `auth-contract`
 
-* *auth-port* (`type=seam`): `AuthTokenContact` — the verb `tokenFor(AuthTokenSource) →
+* *auth-contract* (`type=contract`): `AuthTokenContact` — the verb `tokenFor(AuthTokenSource) →
   Optional<String>` (empty = the CLI is absent/unauthenticated/non-zero, a present value is trimmed and
-  non-blank); and `AuthTokenSource`, the flat seam enum (`GITHUB`, `FLOXHUB`). No host config type
+  non-blank); and `AuthTokenSource`, the flat contract enum (`GITHUB`, `FLOXHUB`). No host config type
   crosses; the host maps its own env-var precedence and only asks the contact when the environment
   yielded nothing.
 * *auth-edge* (`type=edge`, `@Component`): `CliAuthTokenContact` — maps `GITHUB → gh auth token`,
@@ -49,7 +49,7 @@ crosses no frontier.
 flowchart LR
   world["EXTERNAL<br/>gh / flox CLIs (auth token)"]
   edge["auth domain — EDGE<br/>auth-edge: @Component AuthTokenContact<br/>(gh auth token / flox auth token)"]
-  aport["auth domain — PORT<br/>auth-port: AuthTokenContact, AuthTokenSource"]
+  aport["auth domain — PORT<br/>auth-contract: AuthTokenContact, AuthTokenSource"]
   host["control-plane — HOST<br/>LaunchSecretsUpdater<br/>(env-var precedence + YAML upsert)"]
   host -->|env var first| host
   host -->|composes the contact when env empty| aport

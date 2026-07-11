@@ -102,20 +102,19 @@ because the ritual requires every changed collaborator to be called out, not sil
   launched (R4), SCR publishes `@Component` services and consumers bind by `@Reference` (in-bundle) or
   `getServiceReference` (at the host seam).
 * The typed boundary splits by NATURE — the name follows the relation the module holds with whoever
-  depends on it (the `-port`/`-spi`/`-api` taxonomy). Note this is NOT the *bundle/host contract* of the
-  config view (`Require osgi.extender`, a capability seam) — that keeps the word "contract"; what used to
-  be loosely called "the contract" as a typed model crossing the frontier is now the *port*:
-  ** *port* — a boundary the HOST calls and an OSGi bundle implements. It is a PURE model (interfaces +
-     records, zero engine imports), so by the purity axis its nature is osgi/ and it lives in
-     `osgi/<domain>/<domain>-port` (e.g. `manifests-port`, `netplan-port`, `systemd-port`). The name is
-     reduced to bare `-port`, not `osgi-port`, because the osgi/ belonging is already carried by the
-     space. In hexagonal terms the port belongs to the DOMAIN, not the adapter — BOTH the host (adapter)
-     and the impl bundle depend on it (DIP), neither world depends on the other's impl. It is a versioned
-     bundle at BUILD time but is NOT installed into Felix: at runtime it is system-exported FLAT via
-     `system.packages.extra` and host-loaded (osgi port ← system-exported ← host-loaded), so host and
-     bundle share one copy of the interface — the same typed-access trick the config view's P2 proved for
-     Metatype. (A port is BOTH api and spi at once — the host calls it, the impl implements it — so it is
-     named by concern, never `.api`/`.spi`.)
+  depends on it (the `-contract`/`-spi` taxonomy). Note this is NOT the *bundle/host contract* of the
+  config view (`Require osgi.extender`, a capability seam) — that is the extender capability; what used to
+  be loosely called "the contract" as a typed model crossing the frontier is now the domain *contract*:
+  ** *contract* — a boundary a consuming bundle calls and an OSGi bundle implements. It is a PURE model
+     (interfaces + records, zero engine imports), so by the purity axis its nature is osgi/ and it lives in
+     `osgi/<domain>/<domain>-contract` (e.g. `manifests-contract`, `netplan-contract`, `systemd-contract`).
+     In hexagonal terms the contract belongs to the DOMAIN, not the adapter — the impl bundle depends on it
+     and the consumers depend on it (DIP), neither depends on the other's impl. It is a versioned bundle
+     INSTALLED into Felix (`type=contract`) and wired bundle-to-bundle: its consumers inside the OSGi world
+     import it and share one copy of the interface, nothing system-exported to the host (the host speaks
+     only to the seed-broker seam). This is the DE-SEAMED state — the contracts used to be `-port` seams
+     system-exported flat; they are now installed bundles, one per domain. (A contract is BOTH api and spi
+     at once — a consumer calls it, the impl implements it — so it is named by concern, never `.api`/`.spi`.)
   ** *intra-OSGi spi* — a boundary resolved ONLY inside the OSGi world (e.g. `unitrepo-handler-spi`, an
      extender SPI) → stays an spi bundle in the OSGi world, never crosses the host↔osgi frontier.
 

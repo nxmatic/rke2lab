@@ -10,8 +10,8 @@ link:pulumi-edge-handoff.adoc[pulumi-edge], link:ssh-to-age-edge-handoff.adoc[ss
 link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge]. It mirrors the dbus-systemd-edge shape: a single
 class shells the external tool; everything else consumes a port.
 
-Built in four green steps (Option B): `cluster-port` seam (`ClusterReadinessPhase` rapatriated from
-doctor-records, `ClusterSchemaRef`, `ControllerRef`, the `ClusterReadinessContact` seam); `cluster-core`
+Built in four green steps (Option B): `cluster-contract` (`ClusterReadinessPhase` rapatriated from
+doctor-contract, `ClusterSchemaRef`, `ControllerRef`, the `ClusterReadinessContact` contract); `cluster-core`
 swaps loose literals for `ClusterSchemaRef`; `cluster-edge` = `KubectlClusterContact` `@Component`
 (pure ProcessBuilder, zero embedded jars); `seed-master` injects the contact from the registry and
 thins `ClusterBootstrapReadinessVerifier` to its host orchestration (gate, kubeconfig poll,
@@ -40,7 +40,7 @@ flowchart LR
   verifier["control-plane — HOST<br/>ClusterBootstrapReadinessVerifier<br/>(shells kubectl inline)"]
   prodprobe["control-plane — HOST<br/>ProductionClusterReadinessProbe"]
   stage["control-plane — HOST<br/>ClusterReadinessStage (orchestration)"]
-  dport["doctor domain — PORT<br/>doctor-records: ClusterReadinessPhase squats here"]
+  dport["doctor domain — PORT<br/>doctor-contract: ClusterReadinessPhase squats here"]
   ccore["cluster domain — CORE<br/>cluster-core: ClusterSpecialist, loose SchemaRef literals"]
   verifier -->|kubectl get/wait/rollout| world
   prodprobe -->|calls| verifier
@@ -59,9 +59,9 @@ flowchart LR
 
 Four problems, each a section below:
 
-* *No cluster port.* The `ClusterReadinessProbe` seam lives in `exec/seed-master/.../controlplane/bdd/`
+* *No cluster port.* The `ClusterReadinessProbe` contract lives in `exec/seed-master/.../controlplane/bdd/`
   — a contract stranded in the host, not a domain membrane.
-* *The phase enum squats the doctor.* `ClusterReadinessPhase` lives in `doctor-records`, coupling the
+* *The phase enum squats the doctor.* `ClusterReadinessPhase` lives in `doctor-contract`, coupling the
   doctor domain to cluster readiness vocabulary it has no business owning.
 * *The kubectl contact is trapped in the host.* `ClusterBootstrapReadinessVerifier` shells kubectl
   inline in `seed-master`, mixed with host orchestration that genuinely belongs there.
@@ -70,16 +70,16 @@ Four problems, each a section below:
 
 == Problem 1 + 2 — the port does not exist, and its phase enum squats the doctor
 
-`ClusterReadinessProbe` (the seam) sits in `seed-master/controlplane/bdd/`; `ClusterReadinessPhase`
-(its vocabulary) sits in `doctor-records`. Neither is where a domain's contract belongs — and the
+`ClusterReadinessProbe` (the contract) sits in `seed-master/controlplane/bdd/`; `ClusterReadinessPhase`
+(its vocabulary) sits in `doctor-contract`. Neither is where a domain's contract belongs — and the
 doctor should not carry another domain's phase enum (it is latent debt: the doctor depends on cluster
 readiness vocabulary, the wrong direction).
 
-*Resolution — a real `cluster-port` seam (`type=seam`), mirroring `systemd-port`.* It carries:
+*Resolution — a real `cluster-contract` (`type=contract`), mirroring `systemd-contract`.* It carries:
 
-* `ClusterReadinessProbe` — the seam interface (moved from the host `bdd/` package).
-* `ClusterReadinessPhase` — moved out of `doctor-records` into its owning domain. Blast radius: 5
-  `seed-master` files re-import (no `osgi/` file outside doctor-records references it — the sealing
+* `ClusterReadinessProbe` — the contract interface (moved from the host `bdd/` package).
+* `ClusterReadinessPhase` — moved out of `doctor-contract` into its owning domain. Blast radius: 5
+  `seed-master` files re-import (no `osgi/` file outside doctor-contract references it — the sealing
   holds); the doctor stops depending on cluster vocabulary.
 * `ClusterSchemaRef` — a phase↔`SchemaRef` mapping enum (the `SystemdUnitId` move): the four
   `"cluster/*/v1"` literals become typed constants, single-sourced, no name drift.
@@ -91,15 +91,15 @@ readiness vocabulary, the wrong direction).
   alone, no host type — so the verifier's per-phase checks take a `ReadinessInput`, not a
   `BootstrapConfig`.
 
-`cluster-port` depends only on `domain-annotations` + `doctor-records` (for `Observation`/`Symptom`/
-`SchemaRef`, the doctor's value vocabulary the probe speaks). It is `type=seam`: system-exported, one
-shared copy host↔bundles, like every `-port`.
+`cluster-contract` depends only on `domain-annotations` + `doctor-contract` (for `Observation`/`Symptom`/
+`SchemaRef`, the doctor's value vocabulary the probe speaks). It is `type=contract`: an installed bundle,
+wired bundle-to-bundle inside the OSGi world, like every domain `-contract`.
 
 [mermaid]
 ....
 flowchart LR
-  cport["cluster domain — PORT<br/>cluster-port (type=seam)<br/>ClusterReadinessProbe, ClusterReadinessPhase, ClusterSchemaRef"]
-  dport["doctor domain — PORT<br/>doctor-records: Observation, Symptom, SchemaRef"]
+  cport["cluster domain — PORT<br/>cluster-contract (type=contract)<br/>ClusterReadinessProbe, ClusterReadinessPhase, ClusterSchemaRef"]
+  dport["doctor domain — PORT<br/>doctor-contract: Observation, Symptom, SchemaRef"]
   cport -.->|speaks the doctor's value vocab| dport
   classDef p fill:#fde,stroke:#a58,stroke-width:2px;
   class cport,dport p;
@@ -125,7 +125,7 @@ transport discovery).
 nothing else.* The host keeps the bootstrap gates, the policy projection, the kubeconfig poll, the
 `VerificationResult` — it *composes* the edge in for the two kubectl phases.
 
-The one design choice this extraction forces is *the grain of the seam the edge implements*. Two
+The one design choice this extraction forces is *the grain of the contract the edge implements*. Two
 shapes, figured below.
 
 [IMPORTANT]
@@ -134,7 +134,7 @@ shapes, figured below.
 `Observation`. Option A is kept below only as the rejected alternative and the reasoning.
 ====
 
-=== Option A — edge implements the phase-probe seam (coarse, minimal refactor)
+=== Option A — edge implements the phase-probe contract (coarse, minimal refactor)
 
 `cluster-edge` implements the existing `ClusterReadinessProbe` (`probe(config, phase) → Observation`),
 but only answers the two kubectl phases; the host composes KUBECONFIG_PUBLISHED (NIO poll + systemd
@@ -145,7 +145,7 @@ gate) itself and delegates the other two to the injected edge.
 flowchart LR
   world["EXTERNAL<br/>kube-apiserver"]
   edge["cluster domain — EDGE<br/>cluster-edge: @Component ClusterReadinessProbe<br/>(API_READY, CONTROLLERS_EFFECTIVE)"]
-  cport["cluster domain — PORT<br/>cluster-port: ClusterReadinessProbe seam"]
+  cport["cluster domain — PORT<br/>cluster-contract: ClusterReadinessProbe contract"]
   host["control-plane — HOST<br/>ProductionClusterReadinessProbe<br/>(kubeconfig poll + systemd gate + policy proj)"]
   edge -->|kubectl get/wait/rollout| world
   edge -.->|implements| cport
@@ -161,7 +161,7 @@ flowchart LR
   class world w;
 ....
 
-*For:* the seam already exists; the edge speaks `Observation` (the doctor vocabulary) directly; the
+*For:* the contract already exists; the edge speaks `Observation` (the doctor vocabulary) directly; the
 host change is smallest. *Against:* the edge knows the `ClusterReadinessPhase`→`Observation` projection
 (a sliver of doctor-fact translation lives in the edge, not purely "make the contact"); the edge only
 honours 2 of the 3 phases, an asymmetry a reader must learn.
@@ -175,13 +175,13 @@ phases, calling the edge for the two kubectl ones and projecting the results int
 
 [IMPORTANT]
 ====
-*Seam shape decided (2026-06-26): the edge receives already-projected `ControllerRef`s — it never
+*Contract shape decided (2026-06-26): the edge receives already-projected `ControllerRef`s — it never
 sees `ControlplanePolicy`.* The current `verifyRequiredControllers(kubeconfig, ControlplanePolicy,
 timeout)` mixes two concerns: deriving the required controllers from the host policy
 (`requiredControllers(policy)` reads HA/networking/storage/… enabled flags) AND shelling
 `kubectl wait`/`rollout`. Only the second is the contact. So the *host* keeps the policy→refs
 projection and passes the resulting `List<ControllerRef>` to the edge; the edge does pure kubectl over
-refs it is given. `ControllerRef` (kind/name/namespace) becomes a neutral record of `cluster-port` —
+refs it is given. `ControllerRef` (kind/name/namespace) becomes a neutral record of `cluster-contract` —
 the contact vocabulary, free of any policy type. `isApiReady` needs only the kubeconfig path. This is
 the clean single-door edge: it imports one port, contacts one target, and carries no host type.
 ====
@@ -191,7 +191,7 @@ the clean single-door edge: it imports one port, contacts one target, and carrie
 flowchart LR
   world["EXTERNAL<br/>kube-apiserver"]
   edge["cluster domain — EDGE<br/>cluster-edge: @Component KubectlClusterContact<br/>isApiReady / areControllersEffective"]
-  cport["cluster domain — PORT<br/>cluster-port: KubectlClusterContact seam"]
+  cport["cluster domain — PORT<br/>cluster-contract: KubectlClusterContact contract"]
   host["control-plane — HOST<br/>ProductionClusterReadinessProbe<br/>(orchestrates 3 phases, projects Observation)"]
   edge -->|kubectl get/wait/rollout| world
   edge -.->|implements| cport
@@ -209,8 +209,8 @@ flowchart LR
 
 *For:* the edge is purely "make the contact" — it never touches a doctor fact, the cleanest single-door
 edge (matches the coupling signature: an edge sees ONE port + contacts ONE external target); the
-phase→`Observation` projection stays whole, in one host place. *Against:* a wider seam surface
-(two-plus contact methods vs one `probe`); the existing `ClusterReadinessProbe` seam is reshaped, more
+phase→`Observation` projection stays whole, in one host place. *Against:* a wider contract surface
+(two-plus contact methods vs one `probe`); the existing `ClusterReadinessProbe` contract is reshaped, more
 call-site churn.
 
 [NOTE]
@@ -219,7 +219,7 @@ call-site churn.
 contact and returns a raw fact; the *translation into a doctor fact* is the host's job, not the edge's
 ("doctors do not open doors", and edges do not diagnose). The asymmetry of Option A (edge honours 2 of
 3 phases, edge knows the `Observation` projection) is the smell B removes. The cost (a slightly wider
-seam) is the honest shape.
+contract) is the honest shape.
 ====
 
 == Problem 4 — SchemaRef literals are loose strings
@@ -227,8 +227,8 @@ seam) is the honest shape.
 `ClusterSpecialist` spells `SchemaRef.of("cluster/kubeconfig/v1")`, `"cluster/api/v1"`,
 `"cluster/controller/v1"`, `"cluster/other/v1"` inline — the exact loose-literal hazard
 `ManifestDomainCatalog` and `SystemdUnitId` exist to prevent. *Resolution:* the `ClusterSchemaRef` enum
-in `cluster-port` single-sources them; `ClusterSpecialist` references the typed constant. cluster-core
-gains a dependency on cluster-port (its own domain's port — the natural direction).
+in `cluster-contract` single-sources them; `ClusterSpecialist` references the typed constant. cluster-core
+gains a dependency on cluster-contract (its own domain's port — the natural direction).
 
 == What moves where — the inventory
 
@@ -236,19 +236,19 @@ gains a dependency on cluster-port (its own domain's port — the natural direct
 |===
 | Destination | Content
 
-| *cluster-port* (new, `type=seam`)
-| `ClusterReadinessProbe` (or the Option-B contact seam) moved from seed-master `bdd/`;
-  `ClusterReadinessPhase` moved from doctor-records; `ClusterSchemaRef` (new, phase↔SchemaRef).
-  Deps: domain-annotations + doctor-records.
+| *cluster-contract* (new, `type=contract`)
+| `ClusterReadinessProbe` (or the Option-B contact) moved from seed-master `bdd/`;
+  `ClusterReadinessPhase` moved from doctor-contract; `ClusterSchemaRef` (new, phase↔SchemaRef).
+  Deps: domain-annotations + doctor-contract.
 
 | *cluster-edge* (new, `type=edge`, `@Component`)
 | The kubectl contact extracted from `ClusterBootstrapReadinessVerifier` (`runCommand` +
   `checkApiReady` + `checkControllersEffective`). Pure ProcessBuilder, *no embedded jars*. Deps:
-  cluster-port + DS annotations.
+  cluster-contract + DS annotations.
 
 | *cluster-core* (exists)
 | `ClusterSpecialist` keeps its place; swaps loose SchemaRef literals for `ClusterSchemaRef`; gains a
-  cluster-port dependency.
+  cluster-contract dependency.
 
 | *seed-master* (stays host)
 | `SeedNodeBootstrapWatcher` (systemd/bootstrap gates), the kubeconfig NIO poll,
@@ -256,7 +256,7 @@ gains a dependency on cluster-port (its own domain's port — the natural direct
   `ClusterReadinessStage` orchestration. `ProductionClusterReadinessProbe` is refactored to inject and
   compose the edge.
 
-| *doctor-records* (loses)
+| *doctor-contract* (loses)
 | `ClusterReadinessPhase` leaves — the doctor stops carrying cluster vocabulary.
 |===
 
@@ -267,10 +267,10 @@ gains a dependency on cluster-port (its own domain's port — the natural direct
 flowchart LR
   world["EXTERNAL<br/>kube-apiserver"]
   edge["cluster domain — EDGE<br/>cluster-edge (OSGi @Component)"]
-  cport["cluster domain — PORT<br/>cluster-port (type=seam)"]
+  cport["cluster domain — PORT<br/>cluster-contract (type=contract)"]
   ccore["cluster domain — CORE<br/>cluster-core: ClusterSpecialist"]
   host["control-plane — HOST<br/>seed-master: gates, poll, policy, projection, orchestration"]
-  dport["doctor domain — PORT<br/>doctor-records: Observation, Symptom"]
+  dport["doctor domain — PORT<br/>doctor-contract: Observation, Symptom"]
   doctor["doctor domain — CORE<br/>HealthSystem, roster by DS"]
   edge -->|kubectl| world
   edge -.->|implements| cport
@@ -292,9 +292,9 @@ flowchart LR
 
 == Build order (each step green before the next)
 
-1. *cluster-port* — create the seam module; move `ClusterReadinessPhase` from doctor-records (re-import
-   the 5 seed-master files); add `ClusterSchemaRef`; move the probe/contact seam from `bdd/`. Build green.
-2. *cluster-core* — swap the loose literals for `ClusterSchemaRef`; add the cluster-port dep. Green.
+1. *cluster-contract* — create the contract module; move `ClusterReadinessPhase` from doctor-contract (re-import
+   the 5 seed-master files); add `ClusterSchemaRef`; move the probe/contact interface from `bdd/`. Build green.
+2. *cluster-core* — swap the loose literals for `ClusterSchemaRef`; add the cluster-contract dep. Green.
 3. *cluster-edge* — create the `@Component` edge, extract the kubectl contact from the verifier (the
    chosen grain). Mirror `dbus-systemd-edge` (pom + bnd `type=edge`, no embedded jars). Green.
 4. *seed-master* — refactor `ProductionClusterReadinessProbe` to inject the edge from the registry;

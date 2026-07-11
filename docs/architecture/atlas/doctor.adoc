@@ -363,8 +363,8 @@ reader/codec detailed in link:../osgi/seed-broker-spec.adoc[the world-gateway sp
 ....
 flowchart LR
     subgraph NOW[current — the seam is Document, the host is mid-migration]
-        n_port["doctor-port / cluster-port<br/>consult Document returns Document"]
-        n_rec["doctor.records — OSGi-private"]
+        n_port["doctor-contract / cluster-contract<br/>consult Document returns Document"]
+        n_rec["doctor.contract records — OSGi-private"]
         n_gate["REALM_BOUNDARY + SCHEMA_CONCORD — ERROR"]
         n_host["host — still parses Severity, still toOutputMap<br/>(~51 sites, worklist)"]
         n_port -->|reads OSGi-side| n_rec
@@ -407,7 +407,7 @@ gardening lexicon].
 
 Run against the ritual (prove monotone; name honest edits):
 
-* *Monotone.* Every NOW box survives (`doctor-port` speaks `Document`, records OSGi-private, the two gates
+* *Monotone.* Every NOW box survives (`doctor-contract` speaks `Document`, records OSGi-private, the two gates
   ERROR, the host mid-migration). The host-adaptation only fills in what NEXT already promised — "the host
   transports only" — with a mechanism (broker split + CRUD-by-shell). Nothing erased, nothing rewired.
 * *One honest rename, gate-guarded.* `@Graft` → `@Scion`, add `@Rootstock`, `GraftCoordinate` →
