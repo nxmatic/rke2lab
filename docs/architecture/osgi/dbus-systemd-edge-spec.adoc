@@ -383,8 +383,36 @@ role; nobody but seed-master readiness imports it today.)
   `osgi/systemd/dbus-systemd-edge`, beside the port it implements), and whether to reconcile the
   existing edges' shapes, is held open.
 
+== The systemd SCION scenario (the metier definition — SHIPS today)
+
+In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) systemd is a
+graft-caller: the host step "the systemd adapter is launched" sows THIS scenario in-container and grafts
+its scion. This one SHIPS — `SystemdAdapterScenario` in the `systemd-bdd` bundle, front-door
+`SystemdBddScenarios.run()`. The host speaks gardening; this scenario speaks the systemd metier (adapter ·
+endpoint · symptom).
+
+[listing]
+----
+SCENARIO: the systemd adapter reaches its runtime
+  GIVEN the SystemdRuntimeProbe (edge) — resolved from the registry, inert if the RunGate is closed
+  WHEN the runtime precheck is read
+    AND the mandatory target's health is read
+    AND the failed-unit count is read
+  THEN the adapter is healthy — precheck ready, mandatory target active, zero failed units
+    AND on a symptom the domain CONSULTS the doctor ITSELF (not the host), transversally
+----
+
+The probe is resolved by `context.getServiceReference(SystemdRuntimeProbe.class)` — the live
+`DbusSystemdProbe` bundle when the `RunGate` is open, inert when closed (the real edge stays home, the
+scion renders PENDING via E9 — NOT a host-side fake; see
+link:seed-broker-spec.adoc#live-preview-rungate[the RunGate section]). On a symptom the scenario consults
+the doctor via `ConsultingService`, producing a consultation whose `@Scion("fruit")`/`@Scion("sowing")`
+roles project through the neutral port. The host reaps only a coarse verdict + the grafted scion.
+
 == Related documentation
 
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] — where this scion is
+  graft-called (the "systemd adapter is launched" host step).
 * link:../patterns/frontier-playability-model.adoc[Frontier-playability model] — the dbus row this spec corrects.
 * link:../patterns/port-edge-domain-ownership.adoc[Port/edge/domain ownership] — the three roles, no port named after the edge.
 * link:pulumi-edge-handoff.adoc[pulumi-edge handoff] — the extraction template (produce vs own).

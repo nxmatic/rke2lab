@@ -366,6 +366,100 @@ the broken step and everything not reached), and the halt signal MUST be read of
 `@Hidden @NestedSteps` relay a fail-fast-skipped consumer node does not even materialize
 (`FanInStatusSpikeTest`, refinement 1).
 
+[[clusterseed-scenario-map]]
+== THE ClusterSeed scenario map — the target vision (articulation; definitions live per-domain)
+
+The sections above describe the MODEL (phase = scenario, the tree, fan-in, fail-fast). This section is
+the concrete INSTANCE for the seed: the map of the ClusterSeed scenarios AS THEY SHOULD BE PLAYED, and how
+they articulate. Per the distribution rule (a domain owns its vocabulary), *this map holds only the
+ARTICULATION*; the full `Given/When/Then` of each domain scion lives in that domain's own spec, linked
+below. Settled 2026-07-11c (whiteboard reversed here).
+
+*The regularity (user decision, uniformity):* every root step is EITHER pure-host gardening (no domain to
+consult) OR a *graft-caller* (sows a domain scenario in-container, grafts its scion). No host step speaks
+metier — it sows a scenario and reaps a verdict + a grafted scion. The two registers (host gardening on
+top, domain metier in the grafted scion) meet at the neutral port — the language switch.
+
+[mermaid]
+....
+flowchart TB
+  subgraph root["ClusterSeedScenario — HOST runbook (gardening register)"]
+    r0["the seed is prepared (preflight) — pure host"]
+    r1["the network reservations are settled (bbox) — graft-caller"]
+    r2["the instance is provisioned (incus) — graft-caller"]
+    r3["the systemd adapter is launched — graft-caller"]
+    r4["the cluster becomes ready (resources) — graft-caller"]
+    r5["the harvest is stored (outputs) — pure host, Cellar.store"]
+    r0 --> r1 --> r2 --> r3 --> r4 --> r5
+  end
+  subgraph scions["DOMAIN scions (in-container, metier register)"]
+    s1["bbox: reservation·diff·outcome"]
+    s2["incus: image·instance·exec"]
+    s3["systemd: adapter·endpoint·symptom"]
+    s4["cluster: readiness·phase·observation"]
+  end
+  doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
+  r1 -.grafts.-> s1
+  r2 -.grafts.-> s2
+  r3 -.grafts.-> s3
+  r4 -.grafts.-> s4
+  s3 -.consults.-> doctor
+  s4 -.consults.-> doctor
+
+  classDef host fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef dom fill:#def,stroke:#25a,stroke-width:2px;
+  classDef doc fill:#fef,stroke:#a2a,stroke-width:2px;
+  class root,r0,r1,r2,r3,r4,r5 host;
+  class scions,s1,s2,s3,s4 dom;
+  class doctor doc;
+....
+
+*The host runbook, read top to bottom (gardening register — the full sentences):*
+
+[listing]
+----
+SCENARIO: the cluster seed grows to a ready cluster
+  GIVEN a commissioner's request (the run's facts) and an open framework
+    AND a RunGate that says whether we cultivate or only survey (live vs preview)
+  WHEN the seed is prepared               THEN the ground is read, the parcel is chosen   [preflight, pure host]
+  WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]
+  WHEN the instance is provisioned           THEN sow incus's scenario, graft its scion    [incus, graft-caller]
+  WHEN the systemd adapter is launched       THEN sow systemd's scenario, graft its scion  [systemd, graft-caller]
+  WHEN the cluster becomes ready             THEN sow cluster's scenario, graft its scion  [cluster, graft-caller]
+  WHEN the harvest is stored               THEN each reaped végétal is stored to its parcel's cellar  [outputs, pure host]
+----
+
+*The graft-caller shape is UNIFORM — one pattern, four times:*
+
+[listing]
+----
+  WHEN <the host wants outcome X>
+  THEN I sow <domain>'s scenario through the neutral port (in-container)
+   AND under a closed RunGate the real edge stays inert, the plan renders PENDING (E9, see § runmode-preview)
+   AND I reap a coarse verdict (grew / did not)
+   AND I graft the returned scion under this step (its metier detail shows in the runbook tree)
+----
+
+The host holds only: a `Parcel`, a `RunGate`, a verdict, an opaque scion runbook — nothing metier. The
+neutral transport (Cellar `store`/`fetch`, RunGate, the graft/split) is specified in
+link:../osgi/seed-broker-spec.adoc[the seed-broker spec].
+
+*Where each scion's definition lives (the distribution — a domain owns its scenario's G/W/T):*
+
+[cols="1,2,1",options="header"]
+|===
+| scion (host step) | full G/W/T defined in | status
+| bbox (network reservations) | link:../osgi/bbox-edge-spec.adoc[bbox-edge-spec] | needs `bbox-bdd` (metier is host-side today)
+| incus (instance provisioned) | link:../osgi/incus-edge-spec.adoc[incus-edge-spec] | needs `incus-bdd` (metier is host-side today)
+| systemd (adapter launched) | link:../osgi/dbus-systemd-edge-spec.adoc[dbus-systemd-edge-spec] | ships today (`systemd-bdd`)
+| cluster (readiness) | link:../osgi/cluster-edge-spec.adoc[cluster-edge-spec] | ships today (`cluster-bdd`)
+| doctor (consulted sub-step) | link:bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern] | consulted, not a root step
+|===
+
+*Deferred scoping question (honest gap):* manifests / auth / netplan / unitrepo have `-port`/`-core` but
+no step here. Whether they become more steps of THIS runbook or a separate pipeline is NOT decided — the
+ClusterSeed path above is fully mapped and ready; these are the residue to scope in a later pass.
+
 == Where a scenario lives — the placement & naming rule
 
 If OSGi owns the scenarios, *which module* holds each one, and how is it told apart from a domain's own

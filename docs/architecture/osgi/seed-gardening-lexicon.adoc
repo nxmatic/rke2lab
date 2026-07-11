@@ -196,10 +196,16 @@ re-traversée. Le contenant SUIT la nature de ce que le jardinier rapporte (ce n
 
 | pot | pot | **output per-resource** (niché sous sa resource) — pour une plante enracinée
 | vase | vase | **export top-level** — pour des fleurs coupées (une valeur autonome)
-| frigidaire | fridge | **historique de stack** (append-only) — pour des fruits conservés
-| cellier | cellar | idem — conservation longue, append-only
-| conserver | to keep / store | **conserver** — le commanditaire range la récolte selon sa nature
+| frigidaire | fridge | **un fruit conservé** — une conserve précise (une entrée d'historique)
+| cellier | cellar | **le port neutre `Cellar`** (`seed-broker-port`) — le DÉPÔT du commanditaire, adressé par parcelle. Un dépôt NEUTRE : il range indifféremment des produits (végétaux récoltés) ET des outils ; il n'est pas typé par son contenu (l'enveloppe reste scellée). `pulumi-edge` TIENT le cellier (backend Pulumi) ; il ne jardine pas.
+| ranger | to store | **`Cellar.store(Parcel, SeedEnvelope)`** — déposer au cellier, append-only (on n'écrase rien)
+| aller chercher | to fetch | **`Cellar.fetch(Parcel)`** — reprendre ce qui est rangé au cellier (relecture par clé). PAS « récolter » : récolter est le geste du champ (hand-over), aller chercher est le geste du cellier
+| celliers voisins | neighbouring cellars | **`Cellar.neighbours(Parcel)`** — les parcelles voisines sous le même sol (ex-`cohort`)
 |===
+
+CAUTION: `récolter`/harvest reste un verbe de JARDINAGE (voir Potager, l.récolte) — le geste du grower au
+champ. Ce n'est PAS une opération de cellier : on ne récolte pas un cellier, on y RANGE (`store`) et on y
+VA CHERCHER (`fetch`). Les deux registres ne partagent aucun verbe.
 
 == Acteurs (hors lexique de jardinage standard — nommés par le modèle)
 
@@ -208,8 +214,28 @@ re-traversée. Le contenant SUIT la nature de ce que le jardinier rapporte (ce n
 
 | commanditaire / provisioner | Pulumi (via l'edge) | l'acteur réel : veut, lance (`pulumi up`), CONSERVE la récolte
 | jardinier | le broker | sait faire pousser sur TOUS les terrains ; ne possède aucun ; route par coordonnée (`DefaultSeedBroker`)
-| parcelle | une stack | `StackCoordinate(project, stack)` — coordonnée neutre (le docteur y projette `Patient`)
+| parcelle | une stack | **`Parcel(org, project, stack)`** — coordonnée neutre en fondation (`seed-broker-port`) ; le docteur y projette `Patient`, l'edge y projette `StackCoordinate` (l'étagère du cellier)
+| outil posé au cellier | un collaborateur host (`Cellar`) enregistré dans Felix | l'edge host ne peut pas être un bundle (il lit le backend) : le host POSE l'outil dans la main du grower via `registerService` au boot (le grower le résout par `@Reference`). Le broker ne voit jamais l'outil — il route des graines, pas des outils
 |===
+
+== Live vs preview — arpenter le jardin plutôt que le cultiver
+
+Un fait AMBIANT du run entier (pas une propriété d'une graine) : le commanditaire veut-il un vrai
+travail, ou seulement un PLAN ? Publié comme un service neutre unique dans Felix (`RunGate`, dérivé de
+`RunMode`/`LiveGate`) ; chaque outil le consulte et s'abstient quand il est fermé.
+
+|===
+| Français | English | Terme modèle seed
+
+| cultiver | to cultivate | **run live** — l'outil touche le vrai sol (kubectl, dbus, le backend Pulumi)
+| arpenter | to survey / walk | **preview / dry-run** — le jardinier planifie sans cultiver ; l'outil reste à l'abri, rien n'est touché
+| l'abri | the shed | **la gate fermée** — sous une gate fermée l'outil ne touche rien et répond « pas atteint / vide » (l'outil RÉEL inerte, jamais un faux outil)
+| RunGate | RunGate | le fait ambiant publié dans Felix ; le rendu du plan (runbook PENDING) est un souci ORTHOGONAL, porté par `PendingMarkingScenarioExecutor` (E9)
+|===
+
+CAUTION: arpenter (preview) ≠ fabriquer une fausse récolte. La gate fermée = on N'UTILISE PAS l'outil ;
+ce n'est pas « on utilise un faux outil qui invente une récolte verte ». Les fakes/mocks statiques sont
+écartés (décision 2026-07-11b) : le collaborateur sous gate fermée est l'outil réel, inerte.
 
 == Related documentation
 

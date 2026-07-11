@@ -104,8 +104,36 @@ flowchart LR
   class world w;
 ....
 
+== The incus SCION scenario (target — the metier definition)
+
+In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) incus is a
+graft-caller: the host step "the instance is provisioned" sows THIS scenario in-container and grafts its
+scion. The host speaks gardening; this scenario speaks the incus metier (image · instance · exec). NOT YET
+an `incus-bdd` bundle — provisioning runs host-side today (`IncusStage` + `IncusResourceBootstrap`, the
+biggest host module); the move is to lift its provisioning narrative into a domain scenario, graft-called
+like systemd/cluster.
+
+[listing]
+----
+SCENARIO: the rke2 instance is provisioned on incus
+  GIVEN the image build request (recipe + digest) and the instance contact (edge)
+    AND both edges resolved from the registry — inert if the RunGate is closed
+  WHEN the image is built, or found current by its recipe-digest cache key (ImageBuilder)
+    AND the instance is created from that image (IncusInstanceContact)
+    AND the readiness exec lands — the agent answers (IncusExecRequest)
+  THEN the instance is provisioned and its handle is reaped
+    AND a build or exec failure surfaces (ImageBuildException / a failed exec), optionally consulting the doctor
+----
+
+*Preview inertness:* under a closed `RunGate` the edges do not ssh/build/create — the scion narrates the
+plan (PENDING, E9) without touching the Incus host. *The recipe-digest subtlety* (see above) is metier
+detail owned here, not host-visible. The scion grafts back under the host step; on failure the transversal
+doctor-consult follows the same pattern as the other scions.
+
 == Related documentation
 
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] — where this scion is
+  graft-called (the "instance is provisioned" host step).
 * link:cluster-edge-spec.adoc[cluster-edge] — the edge this most closely mirrors (kubectl contact).
 * link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] — the other axis of the same readiness gate.
 * link:auth-edge-spec.adoc[auth-edge] — the sibling extraction, same bare-`ProcessBuilder` shape.

@@ -1,6 +1,6 @@
 ---
 name: seed-broker-host-adaptation
-description: "How the HOST modules adapt to the migrated seed-broker model (design settled 2026-07-10, code NOT yet written). OSGi is migrated (SeedEnvelope/SeedCoordinate/SeedCodec/@Graft/DoctorGraftReflector shipped); the host lags. Getting a SeedBroker host-side is SOLVED (awaitService / FrameworkLaunchPipeline.during). The DSL is ONE verb sow — HATEOAS: a plant advertises the coordinates you sow next. The Pulumi stack is an envelope store; a stored envelope re-sows; CRUD addresses the SHELL (coordinate), never the payload. Three stale pulumi-edge sites + SystemdAdapterResource still open envelopes."
+description: "How the HOST modules adapt to the migrated seed-broker model (design settled 2026-07-10, EXTENDED 2026-07-11b, code NOT yet written). OSGi is migrated; the host lags. 07-11b adds: the neutral port is a CELLAR (store/fetch/neighbours over a neutral Parcel), NOT a Garden (pulumi-edge is conservation, not gardening; harvest stays a field verb). Live/preview: the ambient RunGate service (published in Felix at boot), NOT static fakes — the real edge inert under a closed gate; render is E9's orthogonal job. The host edge reaches its OSGi consumer by registerService at boot, satisfied by StartLevelLever ORDER (static+mandatory @Reference kept); the broker NEVER sees the edge (collects only SeedHandlers; the Cellar is a collaborator 2 hops below). Scenario placement detector: 3 misplaced host stages (ResourcesStage decodes systemd host-side; BboxStage narrates a metier phrase; the deleted mocks)."
 metadata:
   type: project
 ---
@@ -167,5 +167,71 @@ single verb. What changed is the annotations name ROLES, not the verb:
 + *`bouture`/cutting = a FOLLOWABLE coordinate* (HATEOAS), not the result of following it.
 + *Offline `MedicalRecordDump` resolves the broker BY CAPABILITY* (uniform), no host-only `new` shortcut.
 
-See [[seed-broker-contribution-model]] [[diagram-preview-file]] [[docs-diagrams-not-java]]. Lexicon:
+## EXTENSION 2026-07-11b — the CELLAR, the RunGate, and how the edge reaches OSGi
+
+Three discoveries the 07-10 design had as blind spots (grep-verified: the whiteboard/spec never mentioned
+fake/mock/LiveGate/preview/registerService before this). All now graved in the spec + lexicon + atlas.
+
+**The neutral port is a CELLAR, not a Garden (register correction).** `pulumi-edge` grows nothing — it is
+the COMMISSIONER's storage (the conservation register, adjacent to gardening). So the port is a `Cellar`
+addressed by a neutral `Parcel(org, project, stack)` (homed in `seed-broker-port`, the doctor projects
+`Patient` ↔ Parcel 1:1). Gestures: `store(Parcel, SeedEnvelope)` (put away, append-only), `fetch(Parcel)`
+(go get — NOT "harvest": harvest is the FIELD's hand-over, stays a gardening verb attached to the grower),
+`neighbours(Parcel)` (was cohort). Key insight (user: "je peux stocker des outils dans un cellier"): a
+cellar is a NEUTRAL addressable store — holds crops OR tools, never typed by contents — mirroring the
+envelope's opacity. The three doctor-named host ports (`MedicalRecordJournal.historyOf`/`cohort`,
+`InterventionJournal.entries`, `InterventionLedgerWriter.append`) FUSE into this one `Cellar`; host-side
+the three Stack* classes fuse into one impl.
+
+**Live vs preview: the ambient RunGate, fakes RETIRED (user: "oublie les fakes, le modèle statique ne
+répond pas au besoin").** TWO orthogonal axes the old "mock pattern" conflated: RENDER (how the runbook
+reads — `PendingMarkingScenarioExecutor` E9 rewrites NORMAL→PENDING, already in the tree) and TOUCH
+(whether a side-effect happens — the collaborator itself, inert under a closed gate). Preview = an HONEST
+plan, not a green lie fed by fabricated data. `RunGate` (from RunMode/LiveGate) is published ONCE as an
+ambient service in Felix at boot; each edge @References it and self-inhibits when closed — the REAL edge
+inert, never a fake. DECISIVE (option A over B): the collaborators are resolved by
+`context.getServiceReference(...)` (registry lookup, verified in Systemd/Cluster scenarios), NEVER off a
+sown seed — so a seed-borne gate could never reach them; the gate must live in the registry. The mocks
+(`SystemdAdapterStage.seedHealthyProbe`, `ClusterReadinessStage.seedReadyContact`) are DELETED, removing
+the `SystemdStatusSnapshot`/`ClusterReadinessContact` imports from the core. OPEN sub-fork: A1 (each edge
+self-inhibits) vs A2 (the inhibition lives in the scenario's existing `resolveProbe()`/`resolveContact()`
+seam) — leaning A2.
+
+**How the host edge reaches an OSGi consumer (answers "how is pulumi-edge visible?").** It is NOT visible
+to the BROKER, and must not be: `DefaultSeedBroker` collects only `SeedHandler`s (the growers, projecting
+metier) by constructor `@Reference(MULTIPLE)` — STATIC. The `Cellar` is not a handler; it is a
+COLLABORATOR a bundle @References, 2 hops below the broker (`DefaultReadinessAuthority` handler →
+`MedicalRecordRegistry` → `MedicalRecordJournal`/Cellar). The host is outside Felix, cannot be a DS
+component; it only `registerService(Cellar.class, hostObject)` — works because `Cellar` is `type=seam`
+(host+bundles share the Class). The ONE risk is boot ORDER: the `@Reference` is static+mandatory, so the
+host must register the Cellar BEFORE consumers activate — solved by `StartLevelLever` (host holds the
+single global start-level cursor, `BootPlanner` owns the role→level scale): register while consumers sit
+above the cursor, THEN raise it → direct bind, no ranking, no rebind. Keep the reference static+mandatory
+(a doctor with no cellar is a wiring bug, fail loud — do NOT relax to OPTIONAL/dynamic).
+
+**Scenario PLACEMENT (the test the whiteboard proved, user framing: not coverage, MISPLACEMENT).** Holes
+are normal mid-migration; the STRUCTURE is stabilised. The test per host stage: does it speak the language
+of the module it lives in? Grep-measured on ClusterSeedScenario's 6 nested steps: WELL-PLACED = preflight,
+incus (delegates + gardening @As "provisioned"), outputs (all gardening), systemd-adapter + cluster-
+readiness (graft-callers, the switch pattern proven). MISPLACED (metier from the host, the migration's
+remaining MOVE work) = `ResourcesStage` (decodes a `SystemdRuntimeProbe` into
+`SeedSystemdAdapterRuntimeStatusSnapshot` host-side — duplicates systemd-bdd), `BboxStage` (narrates "bbox
+reservations are reconciled" + holds `ReconciliationResult` — a metier phrase; belongs in a bbox scenario,
+the one genuinely-missing -bdd IF bbox is a consulting domain), and the deleted mocks. Only 2 domains have
+a `-bdd` today (cluster, systemd); doctor is CONSULTED, orchestrates nothing.
+
+**Cutting selection — SETTLED in principle + mechanism, one detail open.** A végétal advertises SEVERAL
+cuttings; the host picks BY REL (gardening role), never by content/index — it hands the opaque plant to
+the broker and asks "the cutting for role X", gets it back directly (the split TARGETED by role — one
+meta-coordinate `SplitCoordinate`, request-shaped: no rel → split all `{rootstock → scions}`; rel=X → that
+one cutting). The envelope stays `(domain, coordinate, payload)` — cuttings are ASKED, not embedded
+(HATEOAS by introspection). Roles are SETTLED: `@Scion("fruit")` (consultationReport — produced & kept)
+and `@Scion("sowing")` (expectations — sown toward next cycle; chosen over "seed" which is the request
+envelope); a fixed neutral plant-part set (fruit·sowing·flower·cutting·foliage·root), each domain maps its
+scions onto it. STILL OPEN (decide at the host increment): whether the targeted answer is the raw cutting
+VALUE (leaning this) or a re-sowable coordinate; and whether `SplitCoordinate` carries the optional rel or
+a sibling meta-coordinate reads better.
+
+See [[seed-broker-contribution-model]] [[runmode-livegate-pulumi-abstraction]] [[preview-whatif-topic]]
+[[diagram-preview-file]] [[docs-diagrams-not-java]]. Lexicon:
 `docs/architecture/osgi/seed-gardening-lexicon.adoc`; spec: `docs/architecture/osgi/seed-broker-spec.adoc`.

@@ -418,15 +418,16 @@ those inner graphs (`ConsultationReportReader`, `ExpectationReader`, `Interventi
 `MedicalRecordReader`) are bundle-internal, OSGi-side.
 
 * *The host READ ports* — the Layer-1 seams the host implements so OSGi reads the stack history
-  WITHOUT interpreting it. Their signatures speak only `Document` (and the seam key `Patient`): a
-  `doctor.records` type NEVER crosses — the typed record (`Visit`, `InterventionLedger`) is rebuilt
-  OSGi-side FROM the opaque blobs, on the far side of the membrane, never returned across the port:
+  WITHOUT interpreting it. A `doctor.records` type NEVER crosses — the typed record (`Visit`,
+  `InterventionLedger`) is rebuilt OSGi-side FROM the opaque blobs, on the far side of the membrane,
+  never returned across the port. These two ports FUSE into the one neutral `Cellar` (§
+  <<the-neutral-crud-port-is-a-cellar>>), keyed by a neutral `Parcel` (never `Patient`):
 +
 [cols="1,2",options="header"]
 |===
-| read port | role
-| `MedicalRecordJournal` | `historyOf(Patient)` walks the patient's Pulumi stack timeline and yields one opaque `visit` `Document` per readable entry (payload = the raw consultation-report + expectation blobs); `MedicalRecordReader` folds them into a typed `Visit` OSGi-side. Also enumerates the cohort (sibling stacks — Layer-1 host knowledge). The read twin of the write port `MedicalRecordRegistry`.
-| `InterventionJournal` | `entries()` walks the one fixed intervention-ledger stack (`intervention-ledger/dev`) and yields one opaque `intervention` `Document` per history entry; `InterventionReader` rebuilds the `InterventionLedger` OSGi-side. Unkeyed — there is exactly one ledger stack.
+| read port (→ `Cellar`) | role
+| `MedicalRecordJournal` → `Cellar.fetch(Parcel)` | walks the parcel's Pulumi stack timeline and yields one opaque `visit` `SeedEnvelope` per readable entry (payload = the raw consultation-report + expectation blobs); `MedicalRecordReader` folds them into a typed `Visit` OSGi-side. `cohort` → `Cellar.neighbours(Parcel)` (sibling parcels — Layer-1 host knowledge). The read twin of the write port `MedicalRecordRegistry`.
+| `InterventionJournal` → `Cellar.fetch(Parcel)` at the fixed ledger parcel | walks the one fixed intervention-ledger stack (`intervention-ledger/dev`) and yields one opaque `intervention` `SeedEnvelope` per history entry; `InterventionReader` rebuilds the `InterventionLedger` OSGi-side. The ledger is just a fixed parcel.
 |===
 
 == The contract: a wire-record per coordinate, the schema projected from it
@@ -677,9 +678,9 @@ flowchart LR
     p1["stack"]
     p3["resource / output"]
   end
-  subgraph seed["SEED — gardening (neutral middle)"]
-    s1["parcel — StackCoordinate(project, stack)"]
-    s3["a plant — SeedEnvelope under a coordinate"]
+  subgraph seed["SEED — neutral middle (gardening grow + conservation store)"]
+    s1["parcel — Parcel(org, project, stack), in seed-broker-port"]
+    s3["a végétal — SeedEnvelope under a coordinate"]
   end
   subgraph doctor["DOCTOR side (OSGi)"]
     d1["Patient(org, project, stack)"]
@@ -697,30 +698,103 @@ flowchart LR
 ....
 
 Read the figure as ONE neutral column with TWO projections pointing INTO it. A `parcel` is a
-`StackCoordinate(project, stack)` (neutral, already in `pulumi-edge`); `a plant` is a `SeedEnvelope` under
-a coordinate. `Patient` is how the DOCTOR projects a stack; the Pulumi `stack` is how the EDGE realises
-one — neither word crosses to the other side, only the neutral parcel sits between them.
+`Parcel(org, project, stack)` — the neutral coordinate, homed in `seed-broker-port` (the fondation seam),
+NOT in `pulumi-edge`; a `végétal` is a `SeedEnvelope` under a coordinate. `Patient` is how the DOCTOR
+projects a parcel; `StackCoordinate` is how the EDGE realises one — neither word crosses to the other
+side, only the neutral parcel sits between them.
 
 * *Who maps on the PULUMI side — the EDGE (`pulumi-edge`, host).* Projects Pulumi's model onto the
-  neutral: a `parcel` becomes `createOrSelectStack(project, stack)`, a `plant` an output under the
-  coordinate slug (CRUD-by-shell, § above). Knows Pulumi + the neutral, never the doctor.
+  neutral: a `parcel` becomes `createOrSelectStack(project, stack)`, storing/fetching a `végétal` as an
+  output under the coordinate slug (CRUD-by-shell, § above). Knows Pulumi + the neutral, never the doctor.
 * *Who maps on the DOCTOR side — the HANDLER (`doctor-core`, OSGi).* Projects the doctor's aggregate onto
   the neutral: `Patient → parcel`, `Visit → a stack state`, `ConsultationReport → a plant`. Knows the
   doctor + the neutral, never Pulumi.
 * *The two never meet.* Neither adapter imports the other's vocabulary; both import only the middle. Pulumi
   cannot transpire into the doctor because there is no edge where their words touch.
 
-=== The neutral CRUD port lives in the middle (`seed-broker-port`)
+[[the-neutral-crud-port-is-a-cellar]]
+=== The neutral CRUD port is a CELLAR (`seed-broker-port`)
 
 The interface that materialises the envelope CRUD must speak ONLY the broker vocabulary — never a doctor
 word. A port named `MedicalRecordJournal` means the FRONTIER knows the doctor: the leak moved from the
-payload to the interface NAME. So the neutral CRUD port lives in `seed-broker-port` (the middle), written
-in gardening terms — sow an envelope into a parcel, harvest a parcel's envelopes, addressed by
-`SeedCoordinate` / a parcel, never by `Patient`. The DOCTOR *consumes* it (`@Reference`) and projects its
-aggregate behind it; the host EDGE *provides* it (resolved by capability). (Nuance vs the port-ownership
-law "the port is the consumer's": the consumer is still the doctor, but the port's FACE is neutral by
-requirement, so it is homed with the vocabulary it speaks — the middle — not with the consumer's module.
-The doctor's `historyOf(Patient)`-shaped view sits BEHIND the neutral port, as its projection.)
+payload to the interface NAME. But naming matters in a subtler way too (correction 2026-07-11b): the port
+is NOT in the gardening register at all — `pulumi-edge` grows nothing, it is the COMMISSIONER's storage
+(the conservation register, adjacent to gardening). So the neutral port is a *`Cellar`* — the
+commissioner's append-only store, addressed by a neutral `Parcel`:
+
+[cols="1,2",options="header"]
+|===
+| `Cellar` (in `seed-broker-port`) | gesture
+| `store(Parcel, SeedEnvelope)` | put a végétal away in the parcel's cellar (append-only — never overwrite)
+| `fetch(Parcel) : List<SeedEnvelope>` | go get what is stored (re-read by key). NOT `harvest` — harvest is the field's hand-over; fetch is the cellar's retrieval
+| `neighbours(Parcel) : List<Parcel>` | the neighbouring cellars (sibling parcels under the same soil — was `cohort`)
+|===
+
+Why a cellar and not a garden: a cellar is a NEUTRAL addressable store — it holds crops OR tools, and is
+never typed by its contents. This mirrors the envelope's opacity exactly: the cellar never looks inside
+(the végétal is sealed — the genus); it knows only the parcel (the shelf) and the gesture (store / fetch).
+`harvest` STAYS a gardening verb attached to the grower (in-container), explicitly not a cellar operation
+— so the two registers share no word, the decorrelation stated as vocabulary.
+
+The three doctor-named host ports (`MedicalRecordJournal.historyOf`/`cohort`, `InterventionJournal.entries`,
+`InterventionLedgerWriter.append`) FUSE into this one `Cellar`: `historyOf` and `entries` are the same
+`fetch` (the ledger is just a fixed parcel), `cohort` is `neighbours`, `append` is `store`. Host-side the
+three classes (`StackMedicalRecordJournal` + `StackInterventionJournal` + `PulumiInterventionLedgerWriter`)
+fuse into ONE `Cellar` impl over the Pulumi backend.
+
+The DOCTOR *consumes* the `Cellar` (`@Reference`) and projects its aggregate behind it; the host EDGE
+*provides* it. (Nuance vs the port-ownership law "the port is the consumer's": the consumer is still the
+doctor, but the port's FACE is neutral by requirement, so it is homed with the vocabulary it speaks — the
+middle — not with the consumer's module. The doctor's `historyOf(Patient)`-shaped view sits BEHIND the
+neutral port, as its projection: `Patient ↔ Parcel` 1:1.)
+
+[[edge-reaches-osgi]]
+=== How the host EDGE reaches an OSGi consumer — registerService, not a handler
+
+The `Cellar` is a host object (it reads the Pulumi backend, so it CANNOT be a Felix bundle), yet its
+consumer (`JournalMedicalRecordRegistry`, `@Reference MedicalRecordJournal` → soon `Cellar`) lives OSGi-side.
+The channel is the one the preview mock already proved: `registerService(Cellar.class, hostObject)` into
+Felix, resolved by the bundle because `Cellar` is a `type=seam` interface (host + bundles share the same
+`Class`). Two facts frame it, both load-bearing:
+
+* *The broker never sees the edge, and must not.* `DefaultSeedBroker` collects only `SeedHandler`s (the
+  growers, which project a metier onto the neutral) by constructor `@Reference(MULTIPLE)`. The `Cellar` is
+  not a handler — it is a COLLABORATOR a handler's dependency (`MedicalRecordRegistry`) `@References`, two
+  hops below the broker. The host contributes NO handler (it is outside Felix and cannot be a DS component);
+  it only registers a collaborator a bundle consumes.
+* *The reference is STATIC + mandatory, so boot ORDER is the whole difficulty.* If the consumer activates
+  before the host registers the `Cellar`, the mandatory reference is unsatisfied and the consumer never
+  starts. The fix is ordering, not weakening the reference: the host holds the single global start-level
+  cursor (`StartLevelLever`, levels assigned per role by `BootPlanner`), so it registers the `Cellar` while
+  the consumer bundles sit above the cursor, THEN raises the cursor — the reference binds directly, no
+  `greedy`, no rebind, no ranking. Keep the reference static + mandatory: a doctor with no cellar is a
+  wiring bug that must fail loud, not be papered over with `OPTIONAL`/`dynamic`.
+
+[[live-preview-rungate]]
+=== Live vs preview — the ambient RunGate, not a fake
+
+Whether a run TOUCHES the world (kubectl, dbus, the Pulumi backend) or only PLANS is a fact of the whole
+run, not a property of any seed — so it is published ONCE as a neutral ambient service, `RunGate` (derived
+from `RunMode`/`LiveGate`), into Felix at boot. Each edge `@References` it and, when it is closed, stays
+inert (touches nothing, answers "not reached / empty") — the REAL edge inert, never a fabricated fake.
+This is decisive and structural, not preference: the edges are resolved by `context.getServiceReference(...)`
+(a registry lookup, verified in `SystemdAdapterScenario`/`ClusterReadinessScenario`), never off a sown
+seed — so a seed-borne gate could never reach them; the gate must live in the registry, where the
+collaborator lives.
+
+Two orthogonal axes the earlier "mock pattern" wrongly conflated:
+
+[cols="1,2,2",options="header"]
+|===
+| axis | governs | lever
+| RENDER | how the runbook reads (plan vs result) | `PendingMarkingScenarioExecutor` (E9) — bodies still `proceed()` so the tree builds, `InvocationMode` rewritten `NORMAL → PENDING` as it reaches the model
+| TOUCH | whether a real side-effect happens | the collaborator itself, inert under a closed `RunGate`
+|===
+
+So preview is an HONEST plan (E9 narrates it PENDING), not a green lie fed by fabricated data. The static
+fakes/mocks are retired (decision 2026-07-11b): `SystemdAdapterStage.seedHealthyProbe` and
+`ClusterReadinessStage.seedReadyContact` are DELETED, and with them the host's `SystemdStatusSnapshot` /
+`ClusterReadinessContact` imports — a large part of why the core still spoke metier.
 
 === The migration criterion + sequencing: host speaks seed only, doctor logic migrates to the domain
 
@@ -732,10 +806,13 @@ only `SeedEnvelope`/`SeedCoordinate`/a parcel → it stays, as legitimate transp
 [cols="1,2,2",options="header"]
 |===
 | host site | speaks doctor → MIGRATES to the domain | stays host (pure seed)
-| `StackMedicalRecordJournal` | `new VisitWire`, `codec.encode`, `FIELD_*` | the stack-timeline walk, collect-by-coordinate → opaque `SeedEnvelope`s
-| `StackInterventionJournal` | `new Document(Domain.DOCTOR…)`, decode | the ledger-history walk, envelope transport
+| `StackMedicalRecordJournal` | `new VisitWire`, `codec.encode`, `FIELD_*` | the stack-timeline walk, collect-by-coordinate → opaque `SeedEnvelope`s (becomes the `Cellar.fetch`/`store` impl)
+| `StackInterventionJournal` | `new Document(Domain.DOCTOR…)`, decode | the ledger-history walk, envelope transport (fuses into the same `Cellar`)
 | `SystemdAdapterResource` | `decode(Consultation.class)`, `.consultationReport()`/`.expectations()` | file the grafts the plant advertises, by coordinate
 | `MedicalRecordDump` | `decode(VisitWire)`, read `.consultationReport()`, render YAML (rendering IS doctor logic) | open Felix, `sow`, write the result
+| `SystemdAdapterStage` / `ClusterReadinessStage` (the mocks) | `SystemdStatusSnapshot.builder`, `ClusterReadinessContact` — a whole fake collaborator built host-side | DELETED (not migrated): replaced by the ambient `RunGate` § <<live-preview-rungate>> — the real edge inert under a closed gate
+| readiness shim (`ClusterBootstrapReadinessVerifier`, `RequiredControllers`, `SeedSystemdAdapterRuntimeStatusSnapshot`, `ResourcesStage`) | `ControllerRef`, `ClusterReadinessContact`, `ReadinessInput`, `SystemdRuntimeProbe` — real cluster/systemd logic duplicated host-side | MIGRATES: the domain scenarios (`cluster-bdd`/`systemd-bdd`) already own this; the host keeps only the scion's gardening verdict
+| `Checkpoint` (rootstock id, everywhere) | a `doctor.records` id the host names | neutralise → a neutral gardening rootstock id
 |===
 
 The subtlety the criterion exposes: `MedicalRecordDump`'s YAML rendering is DOCTOR logic (it knows a
@@ -837,6 +914,13 @@ migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces
 * *The offline dump* (`MedicalRecordDump`) opens Felix when it needs the broker — booting OSGi for a dump
   is acceptable (user, 2026-07-10), so it goes uniform with `RecordInterventionCommand`: no host-pure
   transcoder exception. Rendering-as-YAML becomes a `sow`.
+* *Live vs preview + edge visibility — DESIGNED 2026-07-11b (see § <<live-preview-rungate>>, §
+  <<edge-reaches-osgi>>).* The static mock pattern is retired: preview is E9's PENDING render + the real
+  edge inert under the ambient `RunGate`. The host `Cellar` reaches its OSGi consumer by
+  `registerService` at boot, satisfied by start-level ORDER (the reference stays static + mandatory). The
+  broker never sees the edge — it collects only `SeedHandler`s; the `Cellar` is a collaborator two
+  `@Reference` hops below. This closes the biggest metier leak in the core (the deleted mocks) and answers
+  the "how is a host object visible OSGi-side" question the earlier worklist left implicit.
 * *The six `<slug>.schema.json` files* are not yet authored. `SCHEMA_CONCORD` is active and will bind
   each coordinate to its schema as the files land, one coordinate at a time.
 * *Residual host reasoning on records* — sites still calling `Severity.parse()` / branching

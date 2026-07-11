@@ -363,12 +363,15 @@ source.
 . *The pipeline refuses to touch the live system in preview* — `[narrated]` green +
 .. GIVEN seven scattered `Deployment.getInstance().isDryRun()` reads, one consulted too late so the
    readiness probe waits a full minute for a kubeconfig a dry-run never publishes
-.. WHEN the injected `RunMode` fact becomes an `ExecutionCondition` selecting a `PreviewExecutor`
-   (après — the `LiveGate` of the avant is erased): the executor decouples rendering from execution,
-   the tree builds against inert probes and the reaching mode is rewritten NORMAL→PENDING (E9)
+.. WHEN two ORTHOGONAL levers separate (decision 2026-07-11b): (RENDER) `PendingMarkingScenarioExecutor`
+   (E9) decouples rendering from execution — the tree builds, the reaching mode is rewritten
+   NORMAL→PENDING; (TOUCH) the ambient `RunGate` service (from `RunMode`), published once in Felix, is
+   consulted by each edge, which stays inert under a closed gate — the REAL edge inert, not a fabricated
+   fake (the static mock pattern is retired)
 .. THEN no live probe or wait fires in preview (the one-minute hang is gone), and the runbook renders a
    RICH plan — every phase PENDING, the nested G/W/T present — not the empty shell a naive dry-run
-   would give (named erasure of the seven reads + the false `JGIVEN_DRY_RUN` + `LiveGate` itself).
+   would give (named erasure of the seven reads + the false `JGIVEN_DRY_RUN`; `LiveGate` collapses to the
+   one `RunGate` publish + edge-side consumption, no longer read across the core).
 
 . *The pipeline decides the stack outputs through one guarded assembler* — `[narrated]` green +
 .. GIVEN an omniscient `OutputBuilder` pulling each summary by name over raw maps, systemd flattening
@@ -386,6 +389,11 @@ with the socle (§ <<the-bdd-as-engine-turn>>); its preview mechanism (`Executio
 `PreviewExecutor`) is the one piece still to design, and the whole flips playable when the
 ClusterSeed-vertical increment ships. Scenario 2 (the output registry) is orthogonal to the turn and
 flips playable when the registry ships.
+
+NOTE: *The full TARGET scenario map — the 6-step root runbook, which step grafts which domain scion, and
+the per-domain G/W/T distribution — lives at link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed
+scenario map] (settled 2026-07-11c).* This atlas view is the host-pipeline capabilities; the map is the
+concrete scenario instance those capabilities play.
 
 [NOTE]
 .The output gate and the broker-split compose — they are two distinct flows (2026-07-10)

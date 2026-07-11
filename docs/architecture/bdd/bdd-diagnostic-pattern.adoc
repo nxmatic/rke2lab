@@ -740,6 +740,28 @@ public Stages systemd_adapter_probe_runs() {
 
 The report stays concise on success, expands with context on failure.
 
+== The doctor as a CONSULTED sub-step (its place in the ClusterSeed scenario map)
+
+In the ClusterSeed vision (link:bdd.adoc#clusterseed-scenario-map[the scenario map]) the doctor plays NO
+scenario of its own — it is not a root step, it orchestrates nothing. It is CONSULTED transversally by a
+domain scion in trouble (systemd on a symptom, cluster on a failing phase, bbox on a refused row). Its
+G/W/T is therefore a nested sub-step UNDER a scion's failing phase, never a top-level runbook node:
+
+[listing]
+----
+  (nested under a scion's failing phase)
+  WHEN the domain consults the doctor about a symptom (ConsultingService.consult)
+  THEN the generalist admits the patient — the neutral Parcel projected as Patient, OSGi-side
+    AND reads the medical record — Cellar.fetch(parcel), the visit blobs rebuilt inside the bundle realm
+    AND returns a consultation: a @Scion("fruit") (the finding) + a @Scion("sowing") (verify next visit)
+----
+
+This is the ONE place the Cellar is READ (`fetch(Parcel)`) and the `fruit`/`sowing` scion roles are
+produced (see link:../osgi/seed-broker-spec.adoc[the seed-broker spec] — Cellar + the split-by-role). The
+projection `Parcel → Patient` is entirely OSGi-side; the host, and every calling scion, hold only neutral
+gardening terms. The consultation grafts back as part of the calling scion's scion, so the operator sees
+the diagnosis exactly under the phase that failed.
+
 == Related Patterns
 
 This pattern composes several existing rke2lab patterns:

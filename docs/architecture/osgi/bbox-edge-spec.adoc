@@ -58,8 +58,39 @@ flowchart LR
   class world w;
 ....
 
+== The bbox SCION scenario (target — the metier definition)
+
+In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) bbox is a
+graft-caller: the host step "the network reservations are settled" sows THIS scenario in-container and
+grafts its scion. The host speaks gardening; this scenario speaks the bbox metier (reservation · diff ·
+outcome). NOT YET a `bbox-bdd` bundle — the reconciliation runs host-side today (`BboxStage` +
+`BboxReconciliationOrchestrator`); the move is to lift it into a domain scenario, graft-called like
+systemd/cluster.
+
+[listing]
+----
+SCENARIO: the desired reservations are reconciled against the router
+  GIVEN the desired (mac, ip, hostname) reservations for the run
+    AND the BboxReconciler contact (edge) — resolved from the registry, inert if the RunGate is closed
+  WHEN the edge opens one session, fetches the router's reservation table once
+    AND diffs each desired row against the table
+  THEN every desired row has a BboxRowOutcome — present-already / created / corrected (BboxAction)
+    AND a row that could not be reconciled is SURFACED, never silently dropped
+----
+
+*Preview inertness is intrinsic here:* `BboxReconciler.reconcile(..., dryRun, ...)` already carries a
+`dryRun` flag — under a closed `RunGate` the edge diffs but does not write, so the scion plays honestly
+without touching the router (no separate fake). *On a refused row* the domain MAY consult the doctor
+itself (a symptom), the same transversal-consult pattern as systemd/cluster — the host never sees it.
+
+The scion grafts back under the host step; its `@Scion("fruit")`/`@Scion("sowing")` roles (if it consults)
+project through the neutral port exactly as the doctor's do (see
+link:seed-broker-spec.adoc[the seed-broker spec]).
+
 == Related documentation
 
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] — where this scion is
+  graft-called (the "network reservations are settled" host step).
 * link:incus-edge-spec.adoc[incus-edge] — the sibling extraction (a bare-ProcessBuilder contact).
 * link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] — the library-backed edge that EMBEDS its jars
   (dbus-java is not OSGi); bbox imports instead because its client is made a bundle.

@@ -301,8 +301,35 @@ flowchart LR
    thin `ClusterBootstrapReadinessVerifier` down to the host concerns it keeps. Build green through
    seed-master; an in-container boot test proves the edge `@Component` resolves and the contact works.
 
+== The cluster SCION scenario (the metier definition — SHIPS today)
+
+In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) cluster is a
+graft-caller: the host step "the cluster becomes ready" (nested under resources) sows THIS scenario
+in-container and grafts its scion. This one SHIPS — `ClusterReadinessScenario` in the `cluster-bdd`
+bundle, front-door `ClusterBddScenarios.run()`. The host speaks gardening; this scenario speaks the cluster
+metier (readiness · phase · observation).
+
+[listing]
+----
+SCENARIO: the cluster's control plane is ready
+  GIVEN the ClusterReadinessContact (edge) — resolved from the registry, inert if the RunGate is closed
+  WHEN each ClusterReadinessPhase is probed (api reachable, controllers effective)
+  THEN the cluster is ready — every phase observed healthy
+    AND on a failing phase the domain CONSULTS the doctor ITSELF (not the host), transversally
+----
+
+The contact is resolved by `context.getServiceReference(ClusterReadinessContact.class)` — the live
+`KubectlClusterContact` bundle when the `RunGate` is open, inert when closed (the real kubectl edge stays
+home, the scion renders PENDING via E9 — NOT a host-side fake; see
+link:seed-broker-spec.adoc#live-preview-rungate[the RunGate section]). Fork B holds: the checkpoint OWNS
+its consult — the domain consults the doctor itself on a failing phase, the host never does. The host reaps
+only a coarse verdict + the grafted scion (the `VerificationResult` it derives is from the scion's coarse
+SUCCESS/FAILED, never from a domain phase internal).
+
 == Related documentation
 
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] — where this scion is
+  graft-called (the "cluster becomes ready" host step, nested under resources).
 * link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge] — the edge this mirrors (the systemd contact).
 * link:../patterns/frontier-playability-model.adoc[frontier-playability model] — the edge/port/playability axes.
 * link:../patterns/port-edge-domain-ownership.adoc[port-edge-domain ownership] — domain CALLS / port DECLARES / edge PROVIDES.
