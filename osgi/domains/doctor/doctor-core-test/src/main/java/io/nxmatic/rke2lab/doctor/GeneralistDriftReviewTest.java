@@ -3,17 +3,16 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.internal.ClinicalAccess;
 import io.nxmatic.rke2lab.doctor.internal.DriftSpecialist;
 import io.nxmatic.rke2lab.doctor.internal.Generalist;
 import io.nxmatic.rke2lab.doctor.internal.GrantPolicy;
+import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerRegistry;
 import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
+import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Patient;
@@ -27,7 +26,6 @@ import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,21 +50,27 @@ class GeneralistDriftReviewTest {
     return new ConsultationReport("systemd-adapter", List.of(), plan);
   }
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
+  /**
+   * A capturing {@link InterventionLedgerRegistry} — the mock the drift specialist records into.
+   */
+  private static final class CapturingLedger implements InterventionLedgerRegistry {
+    private final List<Intervention> recorded = new ArrayList<>();
 
-  private static Map<String, Object> payloadOf(SeedEnvelope document) {
-    try {
-      return MAPPER.readValue(document.payload(), MAP);
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
+    @Override
+    public InterventionLedger ledger() {
+      return new InterventionLedger(List.copyOf(recorded));
+    }
+
+    @Override
+    public void record(Intervention intervention) {
+      recorded.add(intervention);
     }
   }
 
   @Test
   void resolvedExpectationIsReviewedAndExternalChangeInferred() {
-    final List<SeedEnvelope> captured = new ArrayList<>();
-    final DriftSpecialist drift = new DriftSpecialist(captured::add);
+    final CapturingLedger captured = new CapturingLedger();
+    final DriftSpecialist drift = new DriftSpecialist(captured);
     final Generalist generalist =
         Generalist.builder()
             .specialists(List.of())
@@ -94,11 +98,10 @@ class GeneralistDriftReviewTest {
 
     assertEquals(1, letters.size());
     assertEquals("drift/confounded-inferred/v1", letters.get(0).assessment().schemaRef().id());
-    assertEquals(1, captured.size());
-    assertEquals(DoctorCoordinate.INTERVENTION.slug(), captured.get(0).coordinate());
-    final Map<String, Object> inferred = payloadOf(captured.get(0));
-    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED.id(), inferred.get("provenance"));
-    assertEquals(problem.toRef(), inferred.get("problem"));
+    assertEquals(1, captured.recorded.size());
+    final Intervention inferred = captured.recorded.get(0);
+    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED, inferred.provenance());
+    assertEquals(problem, inferred.problem());
   }
 
   @Test
@@ -119,17 +122,17 @@ class GeneralistDriftReviewTest {
         new Visit(1, Instant.ofEpochSecond(2), List.of(connectionRefusedReport()), List.of());
 
     final MedicalRecord record2 = new MedicalRecord(PATIENT, List.of(visit1, visit2dirty));
-    final List<SeedEnvelope> captured2 = new ArrayList<>();
+    final CapturingLedger captured2 = new CapturingLedger();
     final Generalist g2 =
         Generalist.builder()
             .specialists(List.of())
             .access(minimalAccess())
-            .driftSpecialist(new DriftSpecialist(captured2::add))
+            .driftSpecialist(new DriftSpecialist(captured2))
             .build();
 
     final List<ReferralReply> none = g2.reviewOpenProblems(record2, InterventionLedger.empty());
 
     assertTrue(none.isEmpty(), "nothing resolved → nothing to review");
-    assertTrue(captured2.isEmpty());
+    assertTrue(captured2.recorded.isEmpty());
   }
 }

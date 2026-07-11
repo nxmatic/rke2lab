@@ -52,7 +52,8 @@ class HealthSystemTest {
     };
   }
 
-  // The single construction path returns the ConsultingService seam; the white-box actor tests reach
+  // The single construction path returns the ConsultingService seam; the white-box actor tests
+  // reach
   // the bundle-internal Generalist (recordForCurrentPatient is OFF the seam now — no record crosses
   // to the host) by casting, since this fragment shares doctor-core's loader.
   private static Generalist admit(Patient patient, MedicalRecordRegistry registry) {

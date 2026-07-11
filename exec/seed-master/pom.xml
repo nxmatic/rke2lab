@@ -403,12 +403,6 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-core-fake</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
     <!-- Declarative Services on the test classpath: felix.scr + the DS-runtime API trio it wires to,
          so the in-container SystemdAdapterStageTest can start SCR (withScr()) and have it activate
          the fragment-contributed @Components. Not inherited (seed-master uses bundle-parent, not
