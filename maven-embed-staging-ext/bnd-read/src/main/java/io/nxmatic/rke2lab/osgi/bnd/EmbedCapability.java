@@ -42,13 +42,20 @@ public record EmbedCapability(Clause clause) {
   public static final String TYPE_EDGE = "edge";
 
   /**
-   * A pure data bundle: only records, enums, and sealed ADT roots — zero behavior. The diagnostic
-   * DAG vocabulary a domain reasons over. Installed bundle-side like a model (its exports are its
-   * own, never system-exported) — records are the OSGi vocabulary's implementation and never cross
-   * to the host (the path-addressing keystone). The staging extension's purity guard fails the
-   * build if a {@code type=record} bundle exports a type that is not a record / enum / sealed-ADT.
+   * A domain's CONTRACT bundle: its data vocabulary (records / enums / sealed ADT) AND the service
+   * interfaces a consumer resolves from the registry — but NO concrete class and NO
+   * {@code @Component}. Installed bundle-side like a model (its exports are its own, never
+   * system-exported) and wired bundle-to-bundle, NOT a seam (a domain contract is consumed inside
+   * OSGi, never host-side — the host speaks only to the broker). It carries no {@code @Component},
+   * so it does NOT {@code Require} the SCR extender: a consumer that needs only the interface
+   * imports THIS, not the domain's {@code -core} (whose live {@code @Component} impl pulls SCR into
+   * resolution). A test mocks the interface via {@code registerService} — no {@code @Component}
+   * needed to mock. The staging extension's {@link
+   * io.nxmatic.rke2lab.domain.annotations.StagingGate#CONTRACT_PURITY contract-purity} guard fails
+   * the build if a {@code type=contract} bundle exports a concrete class. Supersedes the {@code
+   * type=seam} {@code -port} for a domain whose contract does not cross to the host.
    */
-  public static final String TYPE_RECORD = "record";
+  public static final String TYPE_CONTRACT = "contract";
 
   /**
    * The seam (a {@code -port}): the membrane the flat host shares with the framework. NOT installed
@@ -102,17 +109,21 @@ public record EmbedCapability(Clause clause) {
 
   /**
    * Whether this carrier loads on the BUNDLE side of the seam — a {@code model}, an {@code edge},
-   * or a {@code record}. Its exported packages are owned by its own bundle classloader and must
+   * or a {@code contract}. Its exported packages are owned by its own bundle classloader and must
    * NEVER reach {@code system.packages.extra} (a second exporter there would split the class). The
    * discriminator the leak guard turns on.
    */
   public boolean isDomain() {
-    return TYPE_MODEL.equals(type()) || TYPE_EDGE.equals(type()) || TYPE_RECORD.equals(type());
+    return TYPE_MODEL.equals(type()) || TYPE_EDGE.equals(type()) || TYPE_CONTRACT.equals(type());
   }
 
-  /** Whether this carrier is a pure-data bundle — subject to the build-time record-purity guard. */
-  public boolean isRecord() {
-    return TYPE_RECORD.equals(type());
+  /**
+   * Whether this carrier is a domain CONTRACT bundle — data vocabulary (records / enums / sealed
+   * ADT) + service interfaces, no concrete class, no {@code @Component}. Subject to the build-time
+   * contract-purity guard, and installed bundle-side (never system-exported) like a model.
+   */
+  public boolean isContract() {
+    return TYPE_CONTRACT.equals(type());
   }
 
   /** Whether this carrier is the seam — system-exported for the flat host, never installed. */

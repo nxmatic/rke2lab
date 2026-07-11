@@ -37,7 +37,7 @@ class GovernanceReaderTest {
     final File jar = jar(dir, plainPackageInfo());
     final GovernanceReader g = governance(jar);
     assertEquals(EnforcementLevel.ERROR, g.levelOf(StagingGate.SPEC_COVERAGE));
-    assertEquals(EnforcementLevel.ERROR, g.levelOf(StagingGate.RECORD_PURITY));
+    assertEquals(EnforcementLevel.ERROR, g.levelOf(StagingGate.CONTRACT_PURITY));
   }
 
   @Test
@@ -56,7 +56,7 @@ class GovernanceReaderTest {
     assertEquals(EnforcementLevel.WARN, g.levelOf(StagingGate.SPEC_COVERAGE));
     assertEquals(EnforcementLevel.IGNORE, g.levelOf(StagingGate.INSTANCE_DISCIPLINE));
     assertEquals(
-        EnforcementLevel.ERROR, g.levelOf(StagingGate.RECORD_PURITY), "unspecified ⇒ ERROR");
+        EnforcementLevel.ERROR, g.levelOf(StagingGate.CONTRACT_PURITY), "unspecified ⇒ ERROR");
   }
 
   private static GovernanceReader governance(File jar) {

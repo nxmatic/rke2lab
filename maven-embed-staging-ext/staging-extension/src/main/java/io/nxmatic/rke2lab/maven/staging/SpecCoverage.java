@@ -27,8 +27,8 @@ import org.objectweb.asm.Opcodes;
  * <p>This guard only DETECTS the violations; how they are reported (fail, list, or ignore) is the
  * {@link GovernanceReader}'s call, read from {@code @GovernedBy(SPEC_COVERAGE, level)} on the
  * bundle's package-infos (default {@code ERROR}). The guard stays LOCAL to the bundle it reads — it
- * opens the one jar, reads its exported types, decides — exactly like its twin {@link RecordPurity}
- * reads its own classes; it never groups or cross-references bundles.
+ * opens the one jar, reads its exported types, decides — exactly like its twin {@link
+ * ContractPurity} reads its own classes; it never groups or cross-references bundles.
  *
  * <p>An INSTANCE reached from its subject ({@link ResolvedBundle#specCoverage(Path)}), not a static
  * helper — navigable back to the bundle it checks, like the rest of this model.

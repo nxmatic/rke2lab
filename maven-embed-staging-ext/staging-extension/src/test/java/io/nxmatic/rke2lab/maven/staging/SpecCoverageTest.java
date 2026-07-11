@@ -26,7 +26,7 @@ import org.objectweb.asm.Opcodes;
  * package + {@code @Transitional} / {@code @SpecGoverned} annotations), packs it into a jar with an
  * {@code Export-Package} manifest, writes a tiny {@code docs/} corpus, and asserts what {@link
  * SpecCoverage#violations()} reports. Bytecode metadata only (ASM) — never a loadable class, the
- * same reason as its twin {@link RecordPurityTest}.
+ * same reason as its twin {@link ContractPurityTest}.
  */
 class SpecCoverageTest {
 

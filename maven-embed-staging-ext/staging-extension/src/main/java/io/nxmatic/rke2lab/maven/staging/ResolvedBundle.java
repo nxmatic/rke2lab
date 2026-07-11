@@ -120,18 +120,19 @@ public record ResolvedBundle(
   }
 
   /**
-   * The purity check OF this bundle — only meaningful when it is a {@code type=record} carrier. The
-   * check is an instance reached from its subject (object-graph-navigability), not a static helper.
+   * The purity check OF this bundle — only meaningful when it is a {@code type=contract} carrier.
+   * The check is an instance reached from its subject (object-graph-navigability), not a static
+   * helper.
    */
-  public RecordPurity recordPurity() {
-    return new RecordPurity(this);
+  public ContractPurity contractPurity() {
+    return new ContractPurity(this);
   }
 
   /**
    * The spec-coverage check OF this bundle against {@code docsDir} — every exported type must be
    * named in a spec or {@code @Transitional}. Reports the violations only; how they are reported is
    * decided by {@link #governance()}. An instance reached from its subject, like {@link
-   * #recordPurity()}.
+   * #contractPurity()}.
    */
   public SpecCoverage specCoverage(java.nio.file.Path docsDir) {
     return new SpecCoverage(this, docsDir);
@@ -149,8 +150,8 @@ public record ResolvedBundle(
   /**
    * The governance OF this bundle — the {@link EnforcementLevel} each {@link StagingGate} reports
    * it at, read from {@code @GovernedBy} on its package-infos (default {@link
-   * EnforcementLevel#ERROR}). An instance reached from its subject, like {@link #recordPurity()} /
-   * {@link #specCoverage}.
+   * EnforcementLevel#ERROR}). An instance reached from its subject, like {@link #contractPurity()}
+   * / {@link #specCoverage}.
    */
   public GovernanceReader governance() {
     return new GovernanceReader(this);

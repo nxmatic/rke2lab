@@ -10,30 +10,37 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 
 /**
- * The build-time purity check OF a {@code type=record} {@link ResolvedBundle} — the law that gives
- * the {@link io.nxmatic.rke2lab.osgi.bnd.EmbedCapability#TYPE_RECORD record} category its meaning:
- * a pure-data bundle exports only records, enums, and sealed ADT roots, never behavior. It reads
- * each exported top-level class through ASM (bytecode only, no class linking — the records
+ * The build-time purity check OF a {@code type=contract} {@link ResolvedBundle} — the law that
+ * gives the {@link io.nxmatic.rke2lab.osgi.bnd.EmbedCapability#TYPE_CONTRACT contract} category its
+ * meaning: a domain-contract bundle exports its data vocabulary (records, enums, sealed ADT roots)
+ * AND the service interfaces a consumer resolves from the registry — but NEVER a concrete class (an
+ * implementation belongs in the domain's {@code -core}, whose {@code @Component} pulls SCR). It
+ * reads each exported top-level class through ASM (bytecode only, no class linking — the records
  * reference jackson / systemd types the extension realm does not carry), and reports every exported
- * type that is none of those. The staging strategy turns a non-empty report into a build failure.
+ * type that is a concrete class. The staging strategy turns a non-empty report into a build
+ * failure.
  *
- * <p>An INSTANCE of the bundle it checks (reached by {@link ResolvedBundle#recordPurity()}), not a
- * static helper — the check is navigable back to its subject, like the rest of this model
+ * <p>Widened from the former record-purity guard (records / enums / sealed only): a contract is a
+ * record bundle that may ALSO carry interfaces, so the "interface allowed only as a sealed ADT
+ * root" restriction is lifted — any interface is a legitimate contract face; only concrete classes
+ * are the violation.
+ *
+ * <p>An INSTANCE of the bundle it checks (reached by {@link ResolvedBundle#contractPurity()}), not
+ * a static helper — the check is navigable back to its subject, like the rest of this model
  * (object-graph-navigability).
  *
  * <p>Only TOP-LEVEL types are policed. A record's nested {@code Builder} (a plain class, the
  * endorsed construction contract for a record with a builder) carries a {@code $} in its class name
  * and is skipped — it is the record's own construction, not a separately-exported behavior type.
  */
-final class RecordPurity {
+final class ContractPurity {
 
   private final ResolvedBundle bundle;
 
-  RecordPurity(ResolvedBundle bundle) {
+  ContractPurity(ResolvedBundle bundle) {
     this.bundle = bundle;
   }
 
@@ -61,7 +68,7 @@ final class RecordPurity {
           continue; // a non-exported package is the bundle's private business, not the seam.
         }
         try (InputStream in = jar.getInputStream(entry)) {
-          if (!isPureData(new ClassReader(in))) {
+          if (!isContractType(new ClassReader(in))) {
             violations.add(binary.replace('/', '.'));
           }
         }
@@ -73,9 +80,12 @@ final class RecordPurity {
   }
 
   /**
-   * A record, an enum, or a sealed interface (an ADT root) — the only shapes a record bundle owns.
+   * A record, an enum, or ANY interface (a service contract or a sealed ADT root) — the shapes a
+   * contract bundle owns. A concrete class is the violation: an implementation belongs in the
+   * domain's {@code -core}, never on the contract face (it would pull behavior — and, if a
+   * {@code @Component}, the SCR extender — into a bundle consumers import for the interface alone).
    */
-  private static boolean isPureData(ClassReader reader) {
+  private static boolean isContractType(ClassReader reader) {
     final int access = reader.getAccess();
     if ((access & Opcodes.ACC_RECORD) != 0 || "java/lang/Record".equals(reader.getSuperName())) {
       return true;
@@ -83,25 +93,9 @@ final class RecordPurity {
     if ((access & Opcodes.ACC_ENUM) != 0) {
       return true;
     }
-    if ((access & Opcodes.ACC_INTERFACE) != 0) {
-      return isSealed(reader); // an interface is allowed ONLY as a sealed ADT root, not a contract.
-    }
-    return false;
-  }
-
-  /**
-   * Whether the class carries a {@code PermittedSubclasses} attribute — i.e. it is {@code sealed}.
-   */
-  private static boolean isSealed(ClassReader reader) {
-    final boolean[] sealed = {false};
-    reader.accept(
-        new ClassVisitor(Opcodes.ASM9) {
-          @Override
-          public void visitPermittedSubclass(String permittedSubclass) {
-            sealed[0] = true;
-          }
-        },
-        ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
-    return sealed[0];
+    // Any interface is a legitimate contract face — a service interface a consumer resolves, or a
+    // sealed ADT root. Annotations are interfaces too (ACC_INTERFACE set), and belong on a
+    // contract.
+    return (access & Opcodes.ACC_INTERFACE) != 0;
   }
 }

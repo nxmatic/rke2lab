@@ -37,7 +37,7 @@ import org.objectweb.asm.Type;
  *
  * <p>An INSTANCE reached from its subject ({@link ResolvedBundle#instanceDiscipline()}), not a
  * static helper — the check obeys the very discipline it enforces, navigable back to the bundle it
- * reads, like its twins {@link RecordPurity} / {@link SpecCoverage}.
+ * reads, like its twins {@link ContractPurity} / {@link SpecCoverage}.
  */
 final class InstanceDiscipline {
 

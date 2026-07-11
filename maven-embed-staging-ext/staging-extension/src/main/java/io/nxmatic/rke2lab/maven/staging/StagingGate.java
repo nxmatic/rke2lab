@@ -8,7 +8,7 @@ package io.nxmatic.rke2lab.maven.staging;
  * with the annotation module's enum.
  */
 enum StagingGate {
-  RECORD_PURITY,
+  CONTRACT_PURITY,
   SPEC_COVERAGE,
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,

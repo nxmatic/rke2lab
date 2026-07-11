@@ -137,9 +137,9 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
    * <p>The laws (each governable per bundle, default ERROR):
    *
    * <ul>
-   *   <li>{@link StagingGate#RECORD_PURITY} — a {@code type=record} bundle may export only records
-   *       / enums / sealed ADT roots. Delegated to a {@link RecordPurity} instance OF each record
-   *       bundle.
+   *   <li>{@link StagingGate#CONTRACT_PURITY} — a {@code type=contract} bundle may export records /
+   *       enums / sealed ADT roots AND service interfaces, but no concrete class. Delegated to a
+   *       {@link ContractPurity} instance OF each contract bundle.
    *   <li>{@link StagingGate#SPEC_COVERAGE} — a bundle may export only types named in a {@code
    *       docs/} spec or marked {@code @Transitional}. Delegated to a {@link SpecCoverage} instance
    *       OF each bundle. A {@code null} docs dir (not found) skips this law rather than failing
@@ -156,13 +156,13 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     final GateReport report = new GateReport();
     for (ResolvedBundle bundle : resolved) {
       final Map<StagingGate, EnforcementLevel> governance = bundle.governance().levels();
-      if (bundle.embed().map(EmbedCapability::isRecord).orElse(false)) {
+      if (bundle.embed().map(EmbedCapability::isContract).orElse(false)) {
         report.record(
-            StagingGate.RECORD_PURITY,
+            StagingGate.CONTRACT_PURITY,
             governance,
             bundle,
-            bundle.recordPurity().violations(),
-            "exports non-data types (only records / enums / sealed ADT roots allowed)");
+            bundle.contractPurity().violations(),
+            "exports a concrete class (only records / enums / sealed ADT / interfaces allowed)");
       }
       if (docsDir != null && bundle.isBundle() && bundle.embed().isPresent()) {
         report.record(

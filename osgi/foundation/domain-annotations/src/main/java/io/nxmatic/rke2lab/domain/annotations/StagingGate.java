@@ -6,8 +6,12 @@ package io.nxmatic.rke2lab.domain.annotations;
  * law.
  *
  * <ul>
- *   <li>{@link #RECORD_PURITY} — a {@code type=record} bundle may export only records, enums, and
- *       sealed ADT roots (a pure-data bundle, never behaviour).
+ *   <li>{@link #CONTRACT_PURITY} — a {@code type=contract} bundle may export records, enums, sealed
+ *       ADT roots, AND service interfaces, but NO concrete class (a domain's data vocabulary +
+ *       consumer-side contract, never an implementation — the "no impl" guard that keeps the
+ *       SCR-requiring live impl in the domain's {@code -core}). Widened from the former {@code
+ *       RECORD_PURITY} (records/enums/sealed only): a contract is a record bundle that may also
+ *       carry the interfaces a consumer resolves, so the two categories fused into one.
  *   <li>{@link #SPEC_COVERAGE} — every exported type must be named in a {@code docs/} spec or carry
  *       {@link Transitional}; a type in neither is code-out-of-spec.
  *   <li>{@link #INSTANCE_DISCIPLINE} — exported types should not publish {@code public static}
@@ -26,7 +30,7 @@ package io.nxmatic.rke2lab.domain.annotations;
  * </ul>
  */
 public enum StagingGate {
-  RECORD_PURITY,
+  CONTRACT_PURITY,
   SPEC_COVERAGE,
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,

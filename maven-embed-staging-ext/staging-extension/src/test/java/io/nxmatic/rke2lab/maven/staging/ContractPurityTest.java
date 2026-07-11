@@ -16,24 +16,23 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
 /**
- * The contract of the record-purity guard — the law that gives the {@code type=record} category its
- * meaning. Each case synthesises a {@code .class} carrying exactly the metadata the guard reads
+ * The contract of the contract-purity guard — the law that gives the {@code type=contract} category
+ * its meaning. Each case synthesises a {@code .class} carrying exactly the metadata the guard reads
  * (access flags + {@code PermittedSubclasses}), packs it into a jar with an {@code Export-Package}
- * manifest, and asserts what {@link RecordPurity#violations()} reports. The bytecode need not be a
- * loadable class — the guard reads metadata only, which is the whole point of using ASM over
+ * manifest, and asserts what {@link ContractPurity#violations()} reports. The bytecode need not be
+ * a loadable class — the guard reads metadata only, which is the whole point of using ASM over
  * reflection (the real records reference jackson/systemd types this realm cannot link).
  */
-class RecordPurityTest {
+class ContractPurityTest {
 
   // Under OUR root: the gates govern only io.nxmatic.rke2lab.* (a carrier's foreign exports are out
   // of jurisdiction — see ResolvedBundle#ourExportedPackages). PKG is the dotted Export-Package
-  // value;
-  // PATH is its binary form for the synthesised .class entries.
+  // value; PATH is its binary form for the synthesised .class entries.
   private static final String PKG = "io.nxmatic.rke2lab.ex";
   private static final String PATH = PKG.replace('.', '/');
 
   @Test
-  void recordEnumAndSealedAdtRootAreAllData(@TempDir File dir) throws IOException {
+  void recordEnumAndSealedAdtRootAreAllContract(@TempDir File dir) throws IOException {
     final File jar =
         jar(
             dir,
@@ -42,19 +41,13 @@ class RecordPurityTest {
             classNode(PATH + "/AnEnum", Opcodes.ACC_FINAL | Opcodes.ACC_ENUM, "java/lang/Enum"),
             sealedInterface(PATH + "/AnAdtRoot", PATH + "/AReccord"));
     assertTrue(
-        purity(jar).violations().isEmpty(), "record, enum, sealed ADT root are all pure data");
+        purity(jar).violations().isEmpty(), "record, enum, sealed ADT root are all contract types");
   }
 
   @Test
-  void aPlainClassIsAViolation(@TempDir File dir) throws IOException {
-    final File jar =
-        jar(dir, classNode(PATH + "/Behavior", Opcodes.ACC_PUBLIC, "java/lang/Object"));
-    assertEquals(List.of(PKG + ".Behavior"), purity(jar).violations());
-  }
-
-  @Test
-  void aNonSealedInterfaceIsAViolation(@TempDir File dir) throws IOException {
-    // An interface is data ONLY as a sealed ADT root; a plain contract interface is behavior.
+  void aServiceInterfaceIsAllowed(@TempDir File dir) throws IOException {
+    // Widened from record-purity: a plain (non-sealed) service interface is a legitimate contract
+    // face — the door a consumer resolves from the registry. The impl lives in the domain's -core.
     final File jar =
         jar(
             dir,
@@ -62,7 +55,16 @@ class RecordPurityTest {
                 PATH + "/AContract",
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT,
                 "java/lang/Object"));
-    assertEquals(List.of(PKG + ".AContract"), purity(jar).violations());
+    assertTrue(
+        purity(jar).violations().isEmpty(), "a service interface is a legitimate contract face");
+  }
+
+  @Test
+  void aConcreteClassIsAViolation(@TempDir File dir) throws IOException {
+    // An implementation belongs in the domain's -core, never on the contract face.
+    final File jar =
+        jar(dir, classNode(PATH + "/Behavior", Opcodes.ACC_PUBLIC, "java/lang/Object"));
+    assertEquals(List.of(PKG + ".Behavior"), purity(jar).violations());
   }
 
   @Test
@@ -106,9 +108,9 @@ class RecordPurityTest {
         "a re-exported third-party package is outside the gate's jurisdiction");
   }
 
-  /** A {@link RecordPurity} of a {@code type=record} bundle read from the synthesised jar. */
-  private static RecordPurity purity(File jar) {
-    return ResolvedBundle.read("g", "a", "1", jar).recordPurity();
+  /** A {@link ContractPurity} of a {@code type=contract} bundle read from the synthesised jar. */
+  private static ContractPurity purity(File jar) {
+    return ResolvedBundle.read("g", "a", "1", jar).contractPurity();
   }
 
   private record ClassNode(String binaryName, byte[] bytes) {}
@@ -146,11 +148,11 @@ class RecordPurityTest {
     final Manifest manifest = new Manifest();
     final Attributes main = manifest.getMainAttributes();
     main.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-    main.putValue("Bundle-SymbolicName", "ex.records");
+    main.putValue("Bundle-SymbolicName", "ex.contract");
     main.putValue("Export-Package", exportedPackage);
-    main.putValue("Provide-Capability", "io.nxmatic.rke2lab.embed; type=record");
+    main.putValue("Provide-Capability", "io.nxmatic.rke2lab.embed; type=contract");
 
-    final File jar = new File(dir, "records.jar");
+    final File jar = new File(dir, "contract.jar");
     try (JarOutputStream out = new JarOutputStream(new java.io.FileOutputStream(jar), manifest)) {
       for (ClassNode node : nodes) {
         out.putNextEntry(new ZipEntry(node.binaryName() + ".class"));
