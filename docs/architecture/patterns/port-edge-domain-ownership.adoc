@@ -199,6 +199,27 @@ APIs (consumed inside OSGi, never host-side). In the conceived end-state the ONL
 `seed-broker`; a `-port` sheds `type=seam` when zero host files import it. The mechanics below are
 correct for today and for `seed-broker` itself; the "every `-port` is a seam" universality is what
 narrows.
+
+*Realisation started (2026-07-11) — `bbox` is the first de-seamed domain.* `bbox-port` (type=seam)
+dissolved into `bbox-core` (type=model, installed): its records + the `BboxReconciler` interface +
+the pure `BlueprintRowEnumerator`, wired bundle-to-bundle to the edge (which `@Component`-provides
+the reconciler) and the `bbox-bdd` scion (which resolves + drives it), both in-container. No
+system-export, no seam. The concrete mechanic of "shedding type=seam" is thus: *fold the `-port`
+into the domain's `-core`* (a service interface cannot live in a `type=record` bundle — the staging
+purity guard rejects it — so the whole port becomes `type=model` core, not a `-record`), then rewire
+importers off the `.port` package onto `.core`.
+
+*Nuance the bbox case taught — a host import is not a reason to KEEP the seam.* The rule "shed when
+zero host files import it" reads backwards during the migration: `bbox` still had host importers (in
+the DEFERRED `exec/seed-master` — e.g. `BboxStage` resolving `BboxReconciler` host-side, and the
+`doctor.port` leak where `SystemdAdapterStage`/`ClusterReadinessStage` consult `ConsultingService`
+directly). Those host imports ARE the leak the migration removes, not a licence to keep the seam:
+the host must speak only gardening, so a host file naming a domain port is a bug to delete, not a
+constraint to honour. We de-seam in the OSGi world NOW; the deferred host is rewritten to stop
+importing the port (it grafts the scion / consults the broker instead). The seam does not wait on
+the leak — the leak waits on the host migration. `seed-broker-port` alone stays a genuine seam:
+RunGate + Cellar + SeedEnvelope ARE published by the host from outside Felix — the one real
+host↔OSGi membrane.
 ====
 
 *The seam law (the load-bearing invariant, today).* A class of a `-port` is loaded by the *host JCL* and shared

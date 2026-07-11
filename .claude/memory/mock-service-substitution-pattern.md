@@ -47,15 +47,41 @@ SCR activation is asynchronous after the trigger → await the published service
 `getServiceReference` poll (use only `org.osgi.framework`, NOT `org.osgi.util.tracker` — a runtime-only
 package the fragment host does not import).
 
+**In-container scion (the RETAINED shape for a `-bdd` scion, shipped 2026-07-11, `bbox`).** The third
+combination the first two lacked: registry-resolved collaborators, registered IN-CONTAINER (no seam),
+AND a harvested runbook. Three pieces:
+- `{domain}-bdd` (type=model): the jGiven `{Domain}Scenario` (resolves its contact + RunGate + doctor
+  from `FrameworkUtil.getBundle(this)`) + a `{Domain}BddScenarios.run()` front-door (a
+  `JUnitLauncherCore.selectClass(scenario)` that returns the serialized `(runbook, consultations)`).
+- `{domain}-bdd-test` (a FRAGMENT, `Fragment-Host: {domain}-bdd` — shares the bundle loader): a
+  passenger `{Domain}ScenarioInContainerTest` that (a) `FrameworkUtil.getBundle(FrontDoorClass).getBundleContext()
+  .registerService(...)` the MOCK contact + mock `RunGate` (+ mock doctor) — same loader, so the mock
+  IS the Class the scenario resolves, NO seam — then (b) invokes the front-door `run()`, (c) asserts on
+  the decoded envelope. Plus a `{Domain}BddTests.run()` = `InContainerJUnitRunner` entry naming the
+  fragment's package.
+- `src/test` `@OsgiWorld` proxy `{Domain}BddInContainerTest`: boots Felix, `installFixtureWithHost` +
+  `installImportClosureOf`, resolves, `host.loadClass(entry).run()`.
+- Reentrancy is safe: the front-door's `JUnitLauncherCore` spawns a fresh worker thread + `LauncherSession`
+  per call, so a launcher-inside-a-launcher (the proxy drives the passenger which drives the front-door)
+  does not collide.
+- jGiven fail-fast trap: a Then that throws (a surfaced failure) skips downstream steps AND leaves the
+  stage state unstable — so the `@Test` body must OWN the data sink (a `List`/`Map` created in the method,
+  passed to the Given, filled by the When), and read THAT for the post-play consult, never a stage getter.
+  (bbox lost the doctor-consult assertion until the outcomes sink moved into the `@Test` body.)
+
 ## How to apply
 
-- Writing a new `-bdd` scion test → out-of-container shape: boot Felix, `registerService` the edge mock
-  (the contact), play, assert on the harvested ReportModel. Copy `ClusterReadinessScenarioInContainerTest`.
-- Proving an SCR contribution / roster collection → in-container shape: passenger `*Test`,
-  `FrameworkUtil.getBundle` context, register the tier-tagged collaborator, bounded await. Copy
-  `HealthSystemContributionTest`.
+- Writing a new `-bdd` scion test → the IN-CONTAINER SCION shape (the default now). Copy the `bbox`
+  three-piece set (`bbox-bdd` + `bbox-bdd-test` fragment + proxy). The scion consults the RunGate (A2)
+  and the test registers a mock `RunGate` (`cultivating()` true/false) alongside the mock contact.
+- The out-of-container shape (`ClusterReadinessScenarioInContainerTest`) is the PRIOR form — it needs the
+  port system-exported (mock crosses on the host loader). cluster-bdd + systemd-bdd are to be RETROFITTED
+  onto the in-container fragment shape when their ports are de-seamed (see
+  [[port-edge-domain-ownership]] realisation note).
+- Proving an SCR contribution / roster collection → in-container passenger shape:
+  `HealthSystemContributionTest` (register tier-tagged collaborator, bounded await).
 - NEVER add a `@Component` fake to a `-test` fragment for the OSGi world again.
-- `dbus-systemd-edge-fake` + `StubConnection` + the `variant=fake` selector still exist ONLY host-side
-  (`exec/seed-master` old fluent-pipeline tests, DEFERRED) — they die when the host migrates, not before.
+- `StubConnection` + the `variant=fake` selector still exist ONLY host-side (`exec/seed-master` old
+  fluent-pipeline tests, DEFERRED) — they die when the host migrates, not before.
 
 See [[seed-broker-host-adaptation]] [[per-domain-osgi-fakes-chantier]] [[cluster-seed-execution-state]].
