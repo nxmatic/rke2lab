@@ -1,9 +1,16 @@
 ---
 name: per-domain-osgi-fakes-chantier
-description: "Chantier (opened 2026-07-07, NOT started): give every OSGi domain a well-defined fake fragment so BDD stage tests resolve fakes from the real registry via the (variant=fake) selector — killing hand-made host-side stubs. Runs in its own worktree off the Task-8 stable commit. Re-enables NestedRunbookTest."
+description: "CANCELLED for the OSGi world (2026-07-11) — superseded by [[mock-service-substitution-pattern]]: no standing variant=fake fragment; the caller registerService's its collaborators. Original (2026-07-07, never done): a fake fragment per OSGi domain resolved by the (variant=fake) selector. Kept as the record of the REVERSED approach + its NestedRunbookTest re-enable goal (which now uses the caller-injects shape instead)."
 metadata:
   type: project
 ---
+
+**⚠️ CANCELLED for the OSGi world (user, 2026-07-11).** This chantier's premise — a standing
+`variant=fake` `@Component` fragment per domain — was REVERSED. We killed the standing fakes
+(`doctor-core-fake` + `dsproof/` deleted) and adopted the opposite: the CALLER `registerService`s its
+collaborators (criterion: does it cross the seam?). The retained pattern is
+[[mock-service-substitution-pattern]]. Everything below is the record of the abandoned approach; do NOT
+implement it for OSGi. `dbus-systemd-edge-fake` survives ONLY host-side (deferred fluent-pipeline tests).
 
 **The chantier (user's proposal, 2026-07-07):** "il faut qu'on migre tous les domaines dans le monde
 OSGi, avec des fakes bien définis." Every OSGi domain should ship a **fake fragment** — a

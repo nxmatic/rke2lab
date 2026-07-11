@@ -24,7 +24,6 @@
     <module>systemd-core</module>
     <module>systemd-cdk8s-manifests</module>
     <module>dbus-systemd-edge</module>
-    <module>dbus-systemd-edge-fake</module>
     <module>systemd-bdd</module>
   </modules>
 </project>

@@ -393,16 +393,6 @@
       <artifactId>osgi.core</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- The two fake fragments: on the TEST classpath so OutOfContainerFrameworkExtension discovers
-         them by capability (installFixtureWithHost) and attaches them to their hosts (dbus-systemd-
-         edge / doctor-core) in SystemdAdapterStageTest, where the (variant=fake) selector resolves
-         the fakes from the real registry. Their Fragment-Host header is inert out of container. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>dbus-systemd-edge-fake</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
     <!-- Declarative Services on the test classpath: felix.scr + the DS-runtime API trio it wires to,
          so the in-container SystemdAdapterStageTest can start SCR (withScr()) and have it activate
          the fragment-contributed @Components. Not inherited (seed-master uses bundle-parent, not

@@ -174,8 +174,10 @@ fake/mock/LiveGate/preview/registerService before this). All now graved in the s
 
 **The neutral port is a CELLAR, not a Garden (register correction).** `pulumi-edge` grows nothing — it is
 the COMMISSIONER's storage (the conservation register, adjacent to gardening). So the port is a `Cellar`
-addressed by a neutral `Parcel(org, project, stack)` (homed in `seed-broker-port`, the doctor projects
-`Patient` ↔ Parcel 1:1). Gestures: `store(Parcel, SeedEnvelope)` (put away, append-only), `fetch(Parcel)`
+addressed by a neutral `Parcel(project, stack)` (homed in `seed-broker-port`; the doctor projects
+`Patient` ↔ Parcel 1:1 via `ParcelProjection`, which is the ONE place `org` lives — a doctor-side constant
+`"organization"`, NOT a Parcel field; the host never invents it). Gestures: `store(Parcel, SeedEnvelope)`
+(put away, append-only), `fetch(Parcel)`
 (go get — NOT "harvest": harvest is the FIELD's hand-over, stays a gardening verb attached to the grower),
 `neighbours(Parcel)` (was cohort). Key insight (user: "je peux stocker des outils dans un cellier"): a
 cellar is a NEUTRAL addressable store — holds crops OR tools, never typed by contents — mirroring the
