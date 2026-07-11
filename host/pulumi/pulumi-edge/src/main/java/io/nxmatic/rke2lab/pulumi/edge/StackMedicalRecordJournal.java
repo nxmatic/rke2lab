@@ -1,13 +1,12 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
-import io.nxmatic.rke2lab.seed.broker.codec.DocumentCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
-import io.nxmatic.rke2lab.seed.broker.port.Patient;
-import io.nxmatic.rke2lab.seed.broker.port.SeedBrokerCatalog;
-import io.nxmatic.rke2lab.seed.broker.port.VisitWire;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
+import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.doctor.records.VisitWire;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Role;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -23,9 +22,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The Pulumi file-backend implementation of the host {@link MedicalRecordJournal} READ port
  * (Layer-1): it walks a patient's stack history and wraps each readable entry's RAW
- * consultation-report and expectation output blobs into one opaque {@code visit} {@link Document},
- * WITHOUT interpreting the medical content. OSGi rebuilds the {@code MedicalRecord} from these
- * blobs inside the bundle realm.
+ * consultation-report and expectation output blobs into one opaque {@code visit} {@link
+ * SeedEnvelope}, WITHOUT interpreting the medical content. OSGi rebuilds the {@code MedicalRecord}
+ * from these blobs inside the bundle realm.
  *
  * <p>This is the Layer-1 half of what {@code LiveMedicalRecordRegistry} + {@code
  * MedicalRecordReader} used to do host-side: the timeline walk and the per-entry output harvest
@@ -39,7 +38,7 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
   private static final String BACKEND_URL_ENV = "PULUMI_BACKEND_URL";
   private static final String FILE_SCHEME = "file://";
 
-  private final DocumentCodec codec = new DocumentCodec();
+  private final SeedCodec codec = new SeedCodec();
   private final Optional<Path> backendDir;
   private final Consumer<String> logger;
 
@@ -64,7 +63,7 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
   }
 
   @Override
-  public List<Document> historyOf(Patient patient) {
+  public List<SeedEnvelope> historyOf(Patient patient) {
     if (backendDir.isEmpty()) {
       logger.accept(
           "medical record empty for "
@@ -84,10 +83,10 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
       throw new RuntimeException("medical record history present but unreadable under " + root, e);
     }
 
-    final List<Document> journal = new ArrayList<>(entries.size());
+    final List<SeedEnvelope> journal = new ArrayList<>(entries.size());
     for (StackHistory.Entry entry : entries) {
       try {
-        journal.add(visitDocument(entry, handle.snapshotOf(entry)));
+        journal.add(visitEnvelope(entry, handle.snapshotOf(entry)));
       } catch (StackException e) {
         // A present entry that cannot be materialized degrades to a skip with a reason — the fold
         // continues on the readable prefix rather than throwing into the diagnosis path.
@@ -130,20 +129,21 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
   }
 
   /**
-   * The opaque {@code visit} Document for one history entry: the entry's version + when plus the
-   * raw consultation-report and expectation output blobs, harvested by {@code
-   * StackSnapshot.outputsNamed} (the Pulumi output KEYS the resources wrote under — a host-internal
-   * transport concern, hence still {@code SeedBrokerCatalog} names, not {@code VisitWire} fields).
-   * The blob lists keep their exact per-resource shape; the host never parses them — it renders the
-   * whole {@link VisitWire} through the codec.
+   * The opaque {@code visit} {@link SeedEnvelope} for one history entry: the entry's version + when
+   * plus the raw consultation-report and expectation output blobs, harvested by {@code
+   * StackSnapshot.outputsNamed} under the {@link Role} keys the write frontier filed each scion
+   * under (the split verb groups scions by role, and the frontier persists {@code role -> value},
+   * so the read frontier harvests by the SAME role — write and read cannot drift). The blob lists
+   * keep their exact per-resource shape; the host never parses them — it renders the whole {@link
+   * VisitWire} through the codec.
    */
-  private Document visitDocument(StackHistory.Entry entry, StackSnapshot snapshot) {
+  private SeedEnvelope visitEnvelope(StackHistory.Entry entry, StackSnapshot snapshot) {
     final VisitWire visit =
         new VisitWire(
             entry.version(),
             entry.when(),
-            snapshot.outputsNamed(SeedBrokerCatalog.FIELD_CONSULTATION_REPORT),
-            snapshot.outputsNamed(SeedBrokerCatalog.FIELD_EXPECTATIONS));
-    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), codec.encode(visit));
+            snapshot.outputsNamed(Role.FRUIT),
+            snapshot.outputsNamed(Role.SOWING));
+    return SeedEnvelope.of(DoctorCoordinate.VISIT, codec.encode(visit));
   }
 }

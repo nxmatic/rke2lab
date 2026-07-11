@@ -10,20 +10,20 @@ import com.pulumi.automation.ProjectRuntimeName;
 import com.pulumi.automation.ProjectSettings;
 import com.pulumi.automation.WorkspaceStack;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
 import java.util.Map;
 
 /**
  * Writes interventions to the intervention-ledger Pulumi stack via the Automation API. Each {@link
- * #append(Document)} runs an out-of-run {@code up()} that registers a single {@link
+ * #append(SeedEnvelope)} runs an out-of-run {@code up()} that registers a single {@link
  * InterventionResource} carrying the intervention's data. The per-resource output (NOT a top-level
  * export) persists the intervention as a new history entry in the stack.
  *
- * <p>The canonical {@code intervention} Document arrives across the seam with a JSON-{@code String}
- * payload (the flat {@code Intervention.toOutputMap} shape, owned OSGi-side). The host deserializes
- * it to a {@code Map<String,Object>} with its OWN jackson and feeds {@link InterventionResource}
- * directly — no doctor type and no jackson type cross the seam.
+ * <p>The canonical {@code intervention} {@link SeedEnvelope} arrives across the seam with a
+ * JSON-{@code String} payload (the flat {@code Intervention.toOutputMap} shape, owned OSGi-side).
+ * The host deserializes it to a {@code Map<String,Object>} with its OWN jackson and feeds {@link
+ * InterventionResource} directly — no doctor type and no jackson type cross the seam.
  *
  * <p>The write mechanism mirrors the medical record's persistence contract: register per-resource
  * outputs under a component resource, bypassing top-level {@code ctx.export()} (which trips on
@@ -59,7 +59,7 @@ public final class PulumiInterventionLedgerWriter implements InterventionLedgerW
   // moot.
   @Override
   @SuppressWarnings("try")
-  public void append(Document intervention) {
+  public void append(SeedEnvelope intervention) {
     final Map<String, Object> payload = deserialize(intervention.payload());
 
     final ProjectSettings projectSettings =

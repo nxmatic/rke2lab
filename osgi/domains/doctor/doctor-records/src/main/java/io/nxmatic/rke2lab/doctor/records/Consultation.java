@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.seed.broker.port.Role;
 import io.nxmatic.rke2lab.seed.broker.port.Rootstock;
 import io.nxmatic.rke2lab.seed.broker.port.Scion;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
@@ -30,8 +31,8 @@ public record Consultation(
     @Rootstock String scenarioId,
     String narration,
     String diagnosisAdoc,
-    @Scion("fruit") Map<String, Object> consultationReport,
-    @Scion("sowing") List<Object> expectations) {
+    @Scion(Role.FRUIT) Map<String, Object> consultationReport,
+    @Scion(Role.SOWING) List<Object> expectations) {
 
   public Consultation {
     consultationReport = consultationReport == null ? Map.of() : Map.copyOf(consultationReport);

@@ -16,11 +16,12 @@ import java.lang.annotation.Target;
  * constants a wire-record used to carry).
  *
  * <p>Its {@link #value} is the scion's ROLE — a neutral gardening part the host names to select it
- * ("give me the {@code fruit} of this plant"), never the doctor's own field name. The role set is a
- * fixed neutral vocabulary (fruit · sowing · flower · cutting · foliage · root) each domain maps
- * its scions onto: {@code @Scion("fruit")} on {@code consultationReport}, {@code @Scion("sowing")}
- * on {@code expectations}. So the host holds no doctor word — it asks the broker for a role, the
- * reflector (which owns the class) answers by that role.
+ * ("give me the {@link Role#FRUIT} of this plant"), never the doctor's own field name. The role set
+ * is a fixed neutral vocabulary drawn from {@link Role} (a single source, so no call site spells a
+ * role as a magic string) each domain maps its scions onto: {@code @Scion(Role.FRUIT)} on {@code
+ * consultationReport}, {@code @Scion(Role.SOWING)} on {@code expectations}. So the host holds no
+ * doctor word — it asks the broker for a role, the reflector (which owns the class) answers by it,
+ * and the same {@link Role} constant is the Pulumi output key the frontier files each scion under.
  *
  * <p>Its twin is {@link Rootstock}, marking the receiver identity the scions graft onto. Reflected
  * OSGi-side only, where the wire-record's class lives (its own realm) — the {@link SplitCoordinate}

@@ -3,9 +3,8 @@ package io.nxmatic.rke2lab.pulumi.edge;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
-import io.nxmatic.rke2lab.seed.broker.port.Coordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Document;
-import io.nxmatic.rke2lab.seed.broker.port.Domain;
+import io.nxmatic.rke2lab.doctor.records.DoctorCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +35,7 @@ public final class StackInterventionJournal implements InterventionJournal {
   }
 
   @Override
-  public List<Document> entries() {
+  public List<SeedEnvelope> entries() {
     if (backendDir.isEmpty()) {
       return List.of();
     }
@@ -55,31 +54,30 @@ public final class StackInterventionJournal implements InterventionJournal {
       throw new RuntimeException("intervention ledger present but unreadable under " + backend, e);
     }
 
-    final List<Document> journal = new ArrayList<>(entries.size());
+    final List<SeedEnvelope> journal = new ArrayList<>(entries.size());
     for (StackHistory.Entry entry : entries) {
       // A present entry that cannot be read is exceptional, not absence: let the StackException
       // propagate rather than masking corruption as an empty ledger (layered error contract).
-      journal.addAll(interventionDocuments(snapshotOf(handle, entry)));
+      journal.addAll(interventionEnvelopes(snapshotOf(handle, entry)));
     }
     return journal;
   }
 
   /**
-   * One {@code intervention} Document PER intervention blob a history entry registered. {@code
-   * StackSnapshot.outputsNamed} returns a list (it collects the output across the entry's
+   * One {@code intervention} {@link SeedEnvelope} PER intervention blob a history entry registered.
+   * {@code StackSnapshot.outputsNamed} returns a list (it collects the output across the entry's
    * resources); each element is one intervention's flat map, which the host copies verbatim into a
-   * Document payload — the wire shape OSGi decodes as an {@code InterventionWire}. The host never
-   * parses a blob; it serializes each with its OWN jackson. (The former single Document wrapping
-   * the whole {@code {interventions:[…]}} list was the array-output framing leaking into the
-   * payload; unwrapping it here keeps one coordinate = one wire shape.)
+   * SeedEnvelope payload — the wire shape OSGi decodes as an {@code InterventionWire}. The host
+   * never parses a blob; it serializes each with its OWN jackson. (The former single envelope
+   * wrapping the whole {@code {interventions:[…]}} list was the array-output framing leaking into
+   * the payload; unwrapping it here keeps one coordinate = one wire shape.)
    */
-  private List<Document> interventionDocuments(StackSnapshot snapshot) {
-    final List<Document> documents = new ArrayList<>();
+  private List<SeedEnvelope> interventionEnvelopes(StackSnapshot snapshot) {
+    final List<SeedEnvelope> envelopes = new ArrayList<>();
     for (Object blob : snapshot.outputsNamed(InterventionLedgerLayout.OUTPUT_KEY)) {
-      documents.add(
-          new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), serialize(blob)));
+      envelopes.add(SeedEnvelope.of(DoctorCoordinate.INTERVENTION, serialize(blob)));
     }
-    return documents;
+    return envelopes;
   }
 
   private static StackSnapshot snapshotOf(StackHandle handle, StackHistory.Entry entry) {
