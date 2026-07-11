@@ -372,8 +372,6 @@ link:../bdd/bdd.adoc[BDD-as-engine] (le modèle BDD-as-engine y est le contenu p
 
 * link:../bdd/bdd.adoc[Pipeline spec] — la spec courante : le seeding-comme-scénarios-BDD dont ce
   POC a prouvé la viabilité (le modèle BDD-as-engine y est le contenu primaire).
-* link:../bdd/bdd.adoc#the-avant[Pipeline spec — l'avant] — la grammaire type-state `during`/`then`
-  que ce POC a remplacée, repliée là comme référence de l'avant/après.
 * link:seed-broker-spec.adoc[World gateway] — le seam `Document` +
   `consult(Document)` que l'arête cross-monde réutilise.
 * link:jgiven-osgi-testkit-handoff.adoc[jGiven-OSGi testkit] — jgiven comme bundle + le pattern

@@ -1302,7 +1302,7 @@ Throughout implementation, these decisions may require adjustment:
 * link:manifests-architecture.adoc[Manifests Architecture] - CDK8s patterns reused in seed-vclusters
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - How Layer 1 RKE2 auto-deploy works
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
-* link:../bdd/bdd.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded multi-stage workflow model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
+* link:../bdd/bdd.adoc[BDD-as-engine] - the seeding expressed as jGiven scenarios on the JUnit launcher
 
 === Configuration & Policies
 * link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies

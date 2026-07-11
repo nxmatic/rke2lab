@@ -144,12 +144,13 @@ re-pointing a stage.
 
 The `SPEC_COVERAGE` gate (`maven-embed-staging-ext`) requires every type a bundle EXPORTS to be
 named as a whole word in some `docs/` `.adoc`, OR to carry `@Transitional`. It is a code-first ratchet,
-not a violation counter: a type leaves the specs only when the CODE stops exporting it. So while
-`pipeline-port` still exports the fluent-grammar types (`Topic`, `FluentTopicRunner`, `PipelineContext`,
-`TopicFailure`) — because live code still uses them — the gate DEMANDS they stay documented; they are
-covered by link:../bdd/bdd.adoc[BDD-as-engine] and the atlas, not here. Each shipped edge's exported
-port types are covered by that edge's own spec (table above). This index names them once more so the
-sweep reads whole in one place.
+not a violation counter: a type leaves the specs only when the CODE stops exporting it. The
+fluent-synthesis grammar shows the far end of the ratchet: it was once the `pipeline-port` seam
+under SPEC_COVERAGE, but its engine (`Phase`, `PhaseRunner`, `PhaseFailure`) is now UN-EXPORTED,
+internal to `manifests-core` (`io.nxmatic.rke2lab.manifests.internal.synthesis`), so it left the
+specs the moment the code stopped exporting it — no doc names it any longer. Each shipped edge's
+exported contract types are covered by that edge's own spec (table above). This index names them
+once more so the sweep reads whole in one place.
 
 == Related documentation
 

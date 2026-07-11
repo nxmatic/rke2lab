@@ -907,10 +907,11 @@ migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces
 * *Getting a `SeedBroker` host-side is SOLVED (verified 2026-07-10).* `DefaultSeedBroker` is
   `@Component(service = SeedBroker.class)` — a published OSGi service resolved through
   `OsgiConnection.awaitService(SeedBroker.class, …)`. Two host contexts already do it: a pipeline stage
-  holding a connection (`SystemdAdapterStage` already sows a `readiness-verdict`), and an offline CLI via
-  `FrameworkLaunchPipeline.embedded().during(…, SeedBroker.class, …)` (`RecordInterventionCommand.main`).
-  So resolution is not the migration's problem — the migration is the sites below still speaking the
-  pre-rename seam vocabulary and still OPENING envelopes.
+  holding a connection (`SystemdAdapterStage` already sows a `readiness-verdict`), and an offline CLI
+  that boots via `FrameworkLaunch.embedded().launch()` and resolves the broker off the booted framework
+  (`RecordInterventionCommand.main`, on the deferred scenario-rewrite arc). So resolution is not the
+  migration's problem — the migration is the sites below still speaking the pre-rename seam vocabulary
+  and still OPENING envelopes.
 * *The three `pulumi-edge` frontier sites, stale against the renamed seam.*
   `StackMedicalRecordJournal` / `StackInterventionJournal` / `PulumiInterventionLedgerWriter` still import
   `Document`/`Coordinate`/`Domain`/`SeedBrokerCatalog`/`VisitWire`/`DocumentCodec` — none of which the
@@ -1055,9 +1056,11 @@ pass (delete the old name entirely — no compat shim), ridden on the unificatio
 === One seam only — the `-port`s stop being seams, become domain APIs
 
 If a client speaks only to the broker, nothing else crosses the WORLDS — so the seed-broker is the
-ONLY `type=seam`. Today TEN modules are `type=seam`: the eight domain `-port`s
-(`cluster`/`doctor`/`systemd`/`incus`/`netplan`/`manifests`/`bbox`/`auth`), plus `pipeline-port` and
-`world-gateway`. The conceived form keeps ONE — `seed-broker`.
+ONLY `type=seam`. This is now REALISED: the eight domain `-port`s
+(`cluster`/`doctor`/`systemd`/`incus`/`netplan`/`manifests`/`bbox`/`auth`) were de-seamed into
+`type=contract` bundles (wired bundle-to-bundle inside OSGi), and `pipeline-port` was dissolved (its
+engine relocated INTO `manifests-core` as un-exported internal synthesis). `seed-broker` is the one
+retained inter-WORLD seam.
 
 The `-port`s do NOT disappear — they REMAIN, structural, but CHANGE NATURE: from inter-WORLD seams
 (shared host↔OSGi, system-exported) to a domain's **external API** — an inter-DOMAIN vocabulary

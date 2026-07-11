@@ -1,4 +1,4 @@
-= OSGi boot decomposition — plan vs launch, one grammar, no twin runtimes
+= OSGi boot decomposition — plan vs launch, one launch operation, no twin runtimes
 :toc: left
 :toclevels: 3
 
@@ -6,11 +6,11 @@
 ====
 *Status:* SHIPPED (2026-06-23), on `refactor/osgi-boot-alignment`. Decomposes the embedded-OSGi
 boot so the pure *decision* (what to install, at what start-level, with what `system.packages.extra`) is
-told apart from the effectful *act* (boot Felix and make it so), expressed in the project's
-former fluent pipeline grammar (link:../bdd/bdd.adoc#the-avant[the avant — former fluent grammar];
-now superseded by BDD-as-engine, jGiven scenarios on the JUnit launcher), so that `OsgiRuntime` and
-`SeedRuntime` — a blurry pair with no principled split — dissolve into four phase-roles that each
-answer one question: *what is your one job?*
+told apart from the effectful *act* (boot Felix and make it so). The boot is a plain launch operation —
+`FrameworkLaunch.embedded().launch()`, plan+launch in one step, invoked as a scenario's first jGiven
+step (never a fluent-pipeline verb) — so that `OsgiRuntime` and `SeedRuntime` — a blurry pair with no
+principled split — dissolve into the discovery/planner/launcher/booted-framework roles that each answer
+one question: *what is your one job?*
 
 A follow-on pax/JCL volet then made the seam law declarative: the third-party boot stack (pax,
 felix.scr/resolver, the DS-API trio) is `optional` in `osgi/runtime`, so Maven keeps it off every
@@ -83,7 +83,7 @@ flowchart TB
   subgraph "osgi-runtime — EFFECTFUL launch (felix and pax)"
     Launcher["FrameworkLauncher NEW<br/>factory, config from knobs<br/>level-raise, STARTED latch, install loop"]
     Booted["BootedFramework NEW AutoCloseable<br/>context, awaitService"]
-    Pipe["BootPipeline NEW<br/>discovery then plan then launch"]
+    Pipe["FrameworkLaunch NEW<br/>embedded().launch(): plan+launch in one step"]
     Preset["embedded preset<br/>was SeedRuntime"]
     Launcher --> Booted
     Plan --> Pipe
@@ -93,10 +93,9 @@ flowchart TB
 
   subgraph "consumers"
     Exec["exec apps"]
-    Ffe["OutOfContainerFrameworkExtension shrinks"]
+    Ffe["OutOfContainerFrameworkExtension (boots Felix directly)"]
     Proof["proof apparatus test-only"]
     Exec --> Preset
-    Ffe --> Pipe
     Ffe --> Proof
     Proof --> Booted
   end
@@ -115,83 +114,64 @@ flowchart TB
 ----
 
 *Legend:* blue = pure plan (computable, inspectable, unit-testable without Felix); orange = effectful launch
-(the only code touching `org.osgi.framework.launch`); brown = the grammar; purple = test-only proof
-apparatus; bold border = new types. `SeedRuntime` and `OsgiRuntime` do not survive — the only sliver kept
-is the embedded *preset* (staged source + the no-embedded-bundles guard), which is config, not a class.
+(the only code touching `org.osgi.framework.launch`); brown = the launch entry point (`FrameworkLaunch`);
+purple = test-only proof apparatus; bold border = new types. `SeedRuntime` and `OsgiRuntime` do not
+survive — the only sliver kept is the embedded *preset* (staged source + the no-embedded-bundles guard),
+which is config, not a class.
 
-== The grammar — BootPipeline as a type-state machine
+== The launch operation — FrameworkLaunch, plan+launch in one step
 
-The boot has three real, non-reorderable topics; the grammar's type-state makes the plan/launch seam a
-*compile-time* boundary (you cannot launch without a plan; a pure-plan test stops at `PlanDone`).
+The boot has two real, non-reorderable acts, plan then launch; `FrameworkLaunch` folds them into one
+`launch()` — no caller inspects a `BootPlan` without booting, so a separate `PlanDone` state would be a
+speculative abstraction with no reader. The plan/launch split lives INSIDE `bootEmbedded()`
+(`BootPlanner.plan(...)` then `FrameworkLauncher.launch(plan, true)`), and `launch()` hands the live
+framework out for the caller to own.
 
 [mermaid]
 ----
 flowchart TB
-  Booting["Booting onFailure slot"]
-  DiscDone["DiscoveryDone"]
-  AwaitPlan["AwaitingPlan"]
-  PlanDone["PlanDone holds pure BootPlan"]
-  AwaitLaunch["AwaitingLaunch"]
-  LaunchDone["LaunchDone"]
-  RunT["run rt to tail"]
-  ResolveT["resolve T to driver"]
-  FwT["toFramework caller owns close"]
-  Booting -->|during discovery| DiscDone
-  DiscDone -->|then| AwaitPlan
-  AwaitPlan -->|during plan| PlanDone
-  PlanDone -->|then| AwaitLaunch
-  AwaitLaunch -->|during launch| LaunchDone
-  LaunchDone --> RunT
-  LaunchDone --> ResolveT
-  LaunchDone --> FwT
-  style Booting fill:#e1f5ff,stroke:#0066cc
-  style DiscDone fill:#e1f5ff,stroke:#0066cc
-  style AwaitPlan fill:#e1f5ff,stroke:#0066cc
-  style PlanDone fill:#cce5ff,stroke:#0066cc,stroke-width:3px
-  style AwaitLaunch fill:#fff4e6,stroke:#ff9900
-  style LaunchDone fill:#ffe0b2,stroke:#ff9900,stroke-width:3px
-  style RunT fill:#ffe0b2,stroke:#ff9900
-  style ResolveT fill:#ffe0b2,stroke:#ff9900
-  style FwT fill:#ffe0b2,stroke:#ff9900
+  Embedded["FrameworkLaunch.embedded()"]
+  Plan["BootPlanner.plan(...) — pure BootPlan"]
+  Launch["FrameworkLauncher.launch(plan, true)"]
+  Booted["BootedFramework — caller owns close"]
+  Embedded -->|launch| Plan
+  Plan --> Launch
+  Launch --> Booted
+  style Embedded fill:#e1f5ff,stroke:#0066cc
+  style Plan fill:#cce5ff,stroke:#0066cc,stroke-width:3px
+  style Launch fill:#ffe0b2,stroke:#ff9900,stroke-width:3px
+  style Booted fill:#ffe0b2,stroke:#ff9900,stroke-width:3px
 ----
 
-Mapped onto the grammar machinery (reused from `osgi/pipeline/pipeline-core`, see
-link:../bdd/bdd.adoc#the-avant[the avant — former fluent grammar]):
+The boot is NOT expressed as a fluent grammar. It is a plain launch operation: `FrameworkLaunch`
+does plan+launch in one step (no caller inspects a `BootPlan` without booting), and a scenario that
+needs a live world invokes it as its first jGiven step — the boot is a scenario step, not a pipeline
+verb. The pieces:
 
-* *Topics* `discovery` / `plan` / `launch` → `DiscoveryStage` / `PlanStage` / `LaunchStage`
-  (package-private builder interfaces).
-* *States* `AwaitingDiscovery` → `DiscoveryDone` → `AwaitingPlan` → `PlanDone` → `AwaitingLaunch` →
-  `LaunchDone`. Each transition calls `FluentTopicRunner.runDuring("boot", topic, stage, body,
-  state.onFailure)` and returns `new <Next>(state)` explicitly — *not* a DRY'd unchecked cast (the grammar
-  doc's first pitfall).
-* *Failure slot* `onFailure` on the pre-execution `Booting` state; a boot failure wraps as
-  `TopicFailure("launch", cause)`.
-* *Terminal verbs* on `LaunchDone`: `.run(Consumer<BootedFramework>)` and `.resolve(Class<T>, Consumer<T>)`
-  own the lifecycle (boot-run-**close**); `.toFramework()` hands the live `BootedFramework` out for the
-  caller to close (Jupiter `afterAll`).
+* *Plan+launch* — `FrameworkLaunch.Embedded.bootEmbedded()` calls `BootPlanner.plan(...)` then
+  `FrameworkLauncher.launch(plan, true)`; there is no separate discovery/plan/launch state chain (a
+  `PlanDone` state would be a speculative abstraction with no reader).
+* *Hand-out* — `FrameworkLaunch.embedded().launch()` returns the live `BootedFramework`; the caller
+  owns the lifecycle and closes it (`try (var f = FrameworkLaunch.embedded().launch()) { … }`, and
+  the Jupiter `afterAll` in the socle's `OsgiConnection.embedded()`).
 
-=== Call sites the grammar produces
+=== Call sites
 
 [source,java]
 ----
-// prod — exec app, via the embedded preset (the one line apps see; same simplicity as today)
-BootPipeline.embedded()                       // preset: staged source + no-embedded-bundles guard
-    .onFailure((topic, cause) -> SeedLog.error("boot", topic + ": " + cause.getMessage()))
-    .run(framework -> bootstrapPipeline.runWith(framework));
+// exec app / socle: boot the fixed prod topology, hand the world out, caller owns the lifecycle
+try (BootedFramework framework = FrameworkLaunch.embedded().launch()) {
+  // read services off framework.awaitService(...) / play the scenario against the live world
+}
 
-// prod — a CLI: boot, resolve ONE port service, drive it
-BootPipeline.embedded().resolve(ManifestSynthesisService.class, svc -> svc.synthesize(request));
-
-// test — OutOfContainerFrameworkExtension / JGivenTestkit.felix(): classpath source, test knobs, hands framework out
-BootPipeline.booting()
-    .during("discovery", d -> d.classpath().selecting(DiscoveryPolicy.onlyMatching("(type=model)")))
-    .then().during("plan", p -> p.systemPackages(extras))
-    .then().during("launch", l -> l.bootDelegation("sun.misc").frameworkLog(DEBUG))
-    .toFramework();
+// the socle's connection is exactly this — OsgiConnection.embedded() wraps launch() and closes it
+OsgiConnection connection = OsgiConnection.embedded();  // boot as the scenario's first step
 ----
 
-The `embedded()` preset collapses the three `during(...)` calls for the fixed prod topology, so exec apps
-keep their one-liner; the full chain is what the preset expands to and what tests spell out.
+Test worlds do NOT go through `FrameworkLaunch`: `OutOfContainerFrameworkExtension` /
+`JGivenTestkit.felix()` boot Felix directly with their own knobs (classpath source, `systemPackages`,
+`bootDelegation`, `withScr`), because a test needs to shape discovery and the system-package surface
+per fixture — the prod preset deliberately fixes those.
 
 == Module placement (owners verified on the reactor)
 
@@ -205,14 +185,11 @@ keep their one-liner; the full chain is what the preset expands to and what test
   `DiscoveryPolicy` it already owns. (Decision: planner lives *inside* boot-discovery, not a sibling — the
   footprint is identical, so a separate module buys only a boundary.)
 
-| `osgi/pipeline/pipeline-core`
-| `slf4j-api` only — *pure* (no osgi.core, no felix)
-| Nothing — `FluentTopicRunner` / `OnFailure` / `TopicFailure` reused as-is.
-
 | `osgi/runtime`
-| felix + pax + osgi.core, already depends on *both* `boot-discovery` and `pipeline-core`
-| `FrameworkLauncher`, `BootedFramework`, `BootPipeline`, the embedded preset. `OsgiRuntime` +
-  `SeedRuntime` *deleted*. No new module edge — runtime already has every dependency.
+| felix + pax + osgi.core, already depends on `boot-discovery`
+| `FrameworkLauncher`, `BootedFramework`, `FrameworkLaunch` + its embedded preset. `OsgiRuntime` +
+  `SeedRuntime` *deleted*. No fluent-grammar dependency — the boot is a plain launch operation, not a
+  pipeline (the former `pipeline-port` engine dissolved into `manifests-core`'s internal synthesis).
 |===
 
 `BootPlanner` runs host-side *before any framework exists* (it computes the plan Felix is launched with),
@@ -337,8 +314,8 @@ the topology; the launcher derives effects from it.
   still launches, now calling the planner. Reactor GREEN.
 . **Extract `FrameworkLauncher` + `BootedFramework` in `osgi/runtime`.** `OsgiRuntime.boot()` becomes
   *plan, launch, expose seam*. GREEN.
-. **Introduce `BootPipeline`** (the three-topic grammar) + the `embedded()` preset; route exec apps through
-  it; delete `SeedRuntime`. GREEN, `pulumi preview`.
+. **Introduce `FrameworkLaunch`** (plan+launch in one `launch()`) + the `embedded()` preset; route exec
+  apps through it; delete `SeedRuntime`. GREEN, `pulumi preview`.
 . **Route `OutOfContainerFrameworkExtension` through the shared planner+launcher**; delete the `startScr` mirror;
   keep the proof affordances. Delete `OsgiRuntime`. Full reactor GREEN with tests.
 +
@@ -371,9 +348,9 @@ Each step is a GREEN commit; squash-merge into `design/pre-integration`, never `
 
 * link:../patterns/port-edge-domain-ownership.adoc#the-boot-face[The boot face] — the seam law the
   decomposition keeps; the seam guard moves into `BootPlanner` unchanged.
-* link:../bdd/bdd.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] — the
-  former type-state machinery `BootPipeline` instantiates; `pipeline-core` is reused as-is (the current
-  model is BDD-as-engine, jGiven scenarios on the JUnit launcher).
+* link:../bdd/bdd.adoc[BDD-as-engine] — the current model (jGiven scenarios on the JUnit launcher);
+  the boot is a scenario's first step (`FrameworkLaunch.embedded().launch()` via
+  `OsgiConnection.embedded()`), not a fluent-pipeline verb.
 * link:osgi-boot-single-source-handoff.adoc[OSGi boot single-source handoff] — the `boot-discovery` model
   (`BundleIndex`, `DiscoveryPolicy`, `BundleLocation`) the planner builds on.
 * link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit] — why `JGivenTestkit.felix()` is a preset,

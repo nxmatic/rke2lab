@@ -766,7 +766,7 @@ the diagnosis exactly under the phase that failed.
 
 This pattern composes several existing rke2lab patterns:
 
-* **Pipeline spec (the avant — former fluent grammar)** (link:bdd.adoc#the-avant[]) - The superseded type-state model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
+* **BDD-as-engine** (link:bdd.adoc[]) - the seeding expressed as jGiven scenarios on the JUnit launcher
 * **Bootstrap identity provider** (link:../bootstrap/bootstrap-identity-provider.adoc[]) - Scenarios access identity via ThreadLocal
 * **ManifestDomainCatalog discipline** (link:../manifests/manifest-domain-catalog-pattern.adoc[]) - Type-safe identifiers prevent mismatches
 * **Nested classes** (CLAUDE.md) - Co-location keeps scenarios with production code
@@ -777,5 +777,5 @@ This pattern composes several existing rke2lab patterns:
 == Related Documentation
 
 * link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] - How scenario resources provision and verify Stage A
-* link:bdd.adoc#the-avant[Pipeline spec (the avant — former fluent grammar)] - The superseded type-state model, kept as the avant reference; the current model is BDD-as-engine (jGiven scenarios on the JUnit launcher)
+* link:bdd.adoc[BDD-as-engine] - the seeding expressed as jGiven scenarios on the JUnit launcher
 * link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access from scenarios

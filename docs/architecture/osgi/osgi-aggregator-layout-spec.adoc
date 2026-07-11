@@ -32,8 +32,9 @@ confirmed.
      gson, jakarta.annotation…) into the imports of EVERY world that installs scenario-engine — even a
      runner-only world that never plays a scenario. A single-responsibility wrap, installed only where
      jGiven is actually used, keeps those worlds clean.
-   * *The grammar seam never carries jGiven.* pipeline-port exports ONLY
-     `io.nxmatic.rke2lab.pipeline`; putting `com.tngtech.jgiven.*` on a seam would place jGiven in two
+   * *The synthesis grammar never carries jGiven.* The fluent-synthesis grammar is internal to
+     `manifests-core` (`io.nxmatic.rke2lab.manifests.internal.synthesis`, un-exported) and jGiven-free
+     by construction; putting `com.tngtech.jgiven.*` on any exported package would place jGiven in two
      realms → LinkageError. Keeping jGiven a separate bundle is what makes that impossible by
      construction.
 ====

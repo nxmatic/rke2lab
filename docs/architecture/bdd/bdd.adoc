@@ -20,13 +20,11 @@ Jupiter extensions. The substrate is the shipped socle above; the disposable ben
 viability survives only at tag `spike/bdd-pipeline-poc`, and the discovery record (the four operator
 paths, the ten learnings E1–E10) is link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC].
 
-*The former model — the fluent `during`/`then` grammar, `Topic` / `State<I,B>` / `PipelineContext` /
-`FluentTopicRunner` (shipped in the 212-commit pipeline-port arc) — is superseded.* It survives only
-as the *avant* of the evolution figure (§ <<the-avant>>): the graved before/after lives in
-link:../atlas/seed.adoc#the-bdd-as-engine-turn[host-pipeline L1, Diagram Q],
-and the full former text lives in git (`pipeline-spec.adoc` at commit `39fe4d8a`). It is not
-maintained in parallel — this is code hygiene applied to specs: one living model, the old one in
-history.
+The fluent `during`/`then` grammar (`Topic` / `State<I,B>` / `PipelineContext` / `FluentTopicRunner`)
+that the seeding was first built on is gone from the codebase — its engine was dissolved into
+`manifests-core`'s internal synthesis (`Phase`/`PhaseRunner`) and the boot de-grammatised into
+`FrameworkLaunch`. It is not described here; the full former text is in git (`pipeline-spec.adoc` at
+commit `39fe4d8a`) for anyone tracing the history.
 
 *Ownership (unchanged by the turn):* the pipeline — scenarios, engine, AND the bootstrap *reasoning*
 — is owned by the *OSGi world*. jGiven is already an OSGi bundle (`jgiven-wrap`), the JUnit launcher
@@ -50,7 +48,7 @@ fact, the Pulumi output sink), and renders/writes what the OSGi world produces.
   *rendering* from *execution* (E9) — a rich PENDING plan, no dry-run blindness. `LiveGate` is erased.
 * *Compile-time safety kept:* the value-DAG moves from type-state (`State<I,B>`) to scenario-state
   *plus* a build-time ASM DAG gate (topological: every `required` has a `guaranteed` upstream) — a
-  `StagingGate` sibling of the retired `PIPELINE_PATTERN`.
+  `StagingGate` sibling of `SYNTHESIS_PATTERN`.
 * *Migration:* legibility cleanup of the spec network FIRST (this pass), then ClusterSeed-vertical —
   one pipeline at a time into `seed-master`, the other six coexisting on the former model meanwhile.
 ====
@@ -244,15 +242,17 @@ Five decisions, taken together (2026-07-04), fix the model:
   everything. Order and dependencies are expressed by nested steps (`@NestedSteps` — already in
   production: `ClusterReadinessScenario` replays `SystemdAdapterScenario`). No mince scheduler survives
   (the POC confirmed the launcher + `@NestedSteps` carry all the ordering; there was nothing left for a
-  grammar to do). *This reaches the boot too:* `FrameworkLaunchPipeline` is a `Topic.Execution` of
-  effect already chained first inside seed (`ClusterSeedTopic.seedCluster()` runs
-  `FrameworkLaunchPipeline.embedded().during(framework -> seedClusterWithinFramework(...))`). It becomes
-  the *first jGiven step of the seed scenario* — "when the framework is launched" — a plain effect step
-  (bouchonné-probe pattern E2, no runbook value folded). There is no amorce paradox: the JUnit launcher
-  runs on the HOST flat classpath, OUTSIDE Felix (`SeedLauncherMain` — `main()` creates it), so
-  launching Felix is a narrated step the launcher plays, not a pre-amorce that must precede it. So the
-  fluent grammar has NO surviving user once seed migrates — `pipeline-port` stops exporting it, and only
-  then do its types leave the specs (the `SPEC_COVERAGE` code-first ratchet).
+  grammar to do). *This reached the boot too — DONE:* the boot is no longer a `Topic.Execution`.
+  `FrameworkLaunch.embedded().launch()` is a plain launch operation invoked as the *first jGiven step
+  of the seed scenario* — "when the framework is launched" — a plain effect step (bouchonné-probe
+  pattern E2, no runbook value folded), already how `OsgiConnection.embedded()` opens the world. There
+  is no amorce paradox: the JUnit launcher runs on the HOST flat classpath, OUTSIDE Felix
+  (`SeedLauncherMain` — `main()` creates it), so launching Felix is a narrated step the launcher plays,
+  not a pre-amorce that must precede it. The fluent grammar had no surviving OSGi user once the boot
+  was de-grammatised, so `pipeline-port` was dissolved: its engine relocated INTO `manifests-core` as
+  un-exported internal synthesis (`Phase`/`PhaseRunner`), leaving the specs the moment the code stopped
+  exporting it (the `SPEC_COVERAGE` code-first ratchet). The seed host's own `during/then` chains
+  (`ClusterSeedTopic.seedCluster()`) are the last to migrate, on the deferred scenario-rewrite arc.
 . *The value-DAG is carried by the jGiven state annotations*, not lost:
 +
 --
@@ -542,37 +542,25 @@ scenario model and unchanged by the turn — see link:../atlas/seed.adoc[seed or
 the contributor/registry design and the `SystemdRuntimeStatusReport` typed record.
 
 [[dag-gate]]
-== The DAG gate — build-time topological safety (replaces PIPELINE_PATTERN)
+== The DAG gate — build-time topological safety for scenario-state
 
-*Lead: the compile-time DAG safety of the former type-state survives the turn as a build-time ASM gate.
-It reads the `@Provided/ExpectedScenarioState` annotations and proves TOPOLOGICAL order (guaranteed
-BEFORE required), not mere presence — a `StagingGate` sibling of the retired `PIPELINE_PATTERN`.*
+*Lead: the compile-time DAG safety the former type-state gave a pipeline survives, for scenarios, as a
+build-time ASM gate. It reads the `@Provided/ExpectedScenarioState` annotations and proves TOPOLOGICAL
+order (guaranteed BEFORE required), not mere presence — a `StagingGate` sibling of `SYNTHESIS_PATTERN`.*
 
 Moving the value-DAG from type-state to runtime scenario-state would lose the compile-time guarantee if
 nothing replaced it. The gate replaces it at build time: it recovers the phase call ORDER from the
 composing method body via asm-tree `MethodInsnNode` iteration (mirroring `ReferencedTypes` /
-`PipelinePattern`), then walks it maintaining a produced-so-far set, and REJECTS a pipeline whose
-consumer precedes its producers — a fault a presence-only check accepts. `DagGateSpikeTest` proves the
-difference is genuinely topological, on test-classpath bytecode; confirming it on real staged bytecode
-is part of the migration.
+`ManifestsSynthesisPattern`), then walks it maintaining a produced-so-far set, and REJECTS a scenario
+whose consumer precedes its producers — a fault a presence-only check accepts. `DagGateSpikeTest`
+proves the difference is genuinely topological, on test-classpath bytecode; confirming it on real
+staged bytecode is part of the migration.
 
 This is one more `StagingGate` (ASM over staged bytecode, reached from `ResolvedBundle`, governable per
-package via `@GovernedBy`) — see link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance]. It
-supersedes `PIPELINE_PATTERN` (which policed the former Topic/Sink shape).
-
-[[the-avant]]
-== The avant — the fluent grammar / Topic / State model (reference only)
-
-*This is the model the BDD-as-engine turn supersedes. It is kept here only as the "avant" of the
-evolution figure — enough to read link:../atlas/seed.adoc#the-bdd-as-engine-turn[Diagram Q].
-The full former text is in git: `pipeline-spec.adoc` at commit `39fe4d8a` (and the fluent grammar
-convention doc it folded in). It is NOT maintained.*
-
-The former seeding was a *fluent type-state pipeline*: a compiler-ordered chain of scoped topic
-lambdas. Its full vocabulary and the concept-by-concept avant→après correspondence are graved in the
-evolution figure — see link:../atlas/seed.adoc#the-bdd-as-engine-turn[Diagram Q and its
-correspondence table] (host-pipeline L1). The full former text is in git (`pipeline-spec.adoc` at
-commit `39fe4d8a`). It is NOT maintained here.
+package via `@GovernedBy`) — see link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance].
+It is a scenario-state sibling of `SYNTHESIS_PATTERN` (which now polices the manifests synthesis
+`Phase.Execution`/`Sink` shape, the former pipeline `Topic` law renamed with the grammar's relocation
+into `manifests-core`).
 
 == Migration
 

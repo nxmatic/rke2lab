@@ -20,7 +20,7 @@ against the port and fails fast at build) and the *proof reframe* (the boot seam
 
 One process, two classloader worlds. The HOST world is flat and holds gRPC (invariant #1565: no gRPC
 type ever crosses into a bundle); the OSGI world holds the pure-model bundles Felix resolves. The host
-`FrameworkLaunchPipeline.embedded()` boots Felix inside `Pulumi.run`, the host seam reads the typed
+`FrameworkLaunch.embedded()` boots Felix inside `Pulumi.run`, the host seam reads the typed
 services from the registry, and OSGi logs converge on the host's Logback via Pax with
 `StaticLogbackContext` (logs follow the bootstrap direction — outward to the host).
 
@@ -30,7 +30,7 @@ flowchart TB
   subgraph proc["seed-master exec-jar (one process, one binary:)"]
     subgraph host["HOST world — flat classpath"]
       seam["host seam<br/>IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
-      rt["FrameworkLaunchPipeline.embedded<br/>(framework-launcher — boots Felix)"]:::host
+      rt["FrameworkLaunch.embedded<br/>(framework-launcher — boots Felix)"]:::host
       grpc["Pulumi SDK + grpc-netty"]:::host
       lb["SLF4J + Logback"]:::host
     end
@@ -74,14 +74,17 @@ services from the SCR registry. The pieces:
   under Felix, no live deploy). Generalised across all three entrypoints — the two CLIs
   (`manifests-cli`, `netplan-cli`) boot Felix the same way, and all three demote the model `-core` to
   `runtime` scope. `netplan.api` moved into `netplan-port` so the consumed contract is single-exported.
-* *`pipeline-port` + the boot decomposition* — the fluent-pipeline engine, once duplicated as
-  seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, is unified into the passive
-  `pipeline-port` bundle (`FluentTopicRunner`/`OnFailure`/`TopicFailure`), dual-consumed (in-bundle by
-  manifests-core, flat by seed-master). The three copied `bootEmbeddedOsgiRuntime()` were NOT collapsed
-  into a `SeedRuntime` seam (an earlier design) but DISSOLVED by the boot decomposition
-  (link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]): the pure decision `BootPlanner`
-  → `BootPlan` told apart from the effectful `FrameworkLauncher` → `BootedFramework`, entered through
-  one `FrameworkLaunchPipeline.embedded()` the three exec apps share. `OsgiRuntime` and the old
+* *The synthesis grammar + the boot decomposition* — the fluent-pipeline engine was once duplicated as
+  seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, briefly unified into a shared
+  `pipeline-port` seam, then DISSOLVED: with the boot de-grammatised and the seed's own chains the last
+  host holdout, manifests-core became its only OSGi consumer, so the engine relocated INTO manifests-core
+  as un-exported internal synthesis (`Phase`/`PhaseRunner`/`PhaseFailure`,
+  `io.nxmatic.rke2lab.manifests.internal.synthesis`) — no shared seam. The three copied
+  `bootEmbeddedOsgiRuntime()` were NOT collapsed into a `SeedRuntime` seam (an earlier design) but
+  DISSOLVED by the boot decomposition (link:../osgi/osgi-boot-decomposition-spec.adoc[boot
+  decomposition]): the pure decision `BootPlanner` → `BootPlan` told apart from the effectful
+  `FrameworkLauncher` → `BootedFramework`, entered through one `FrameworkLaunch.embedded().launch()` the
+  three exec apps share — a plain launch operation, not a pipeline verb. `OsgiRuntime` and the old
   `SeedRuntime` class are both GONE. (Name note: the socle's later `@SeedRuntime` is an unrelated
   homonym — a jGiven lifecycle-discipline annotation in `scenario-engine`, not this boot seam.)
 
@@ -233,13 +236,13 @@ flowchart TB
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component"]:::osgi
     reg2["NodeEnvContributorRegistry @Component+@Reference"]:::osgi
-    pc["pipeline-port — PASSIVE grammar<br/>FluentTopicRunner / OnFailure / TopicFailure"]:::osgi
+    pc["manifests.internal.synthesis — PASSIVE grammar<br/>Phase / PhaseRunner / PhaseFailure (un-exported)"]:::osgi
     plan["BootPlanner → BootPlan (pure decision)"]:::osgi
   end
   subgraph HOST["host space — actualises"]
     seam0["IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
     fx["embedded Felix + felix.scr (R4)"]:::osgi
-    flp["FrameworkLaunchPipeline.embedded<br/>(effectful: FrameworkLauncher → BootedFramework)"]:::host
+    flp["FrameworkLaunch.embedded().launch()<br/>(plain launch: FrameworkLauncher → BootedFramework)"]:::host
   end
   cli["manifests-cli / netplan-cli — NOW boot Felix"]:::host
   reg["service registry (SCR publishes)"]:::osgi
@@ -252,8 +255,7 @@ flowchart TB
   cli -->|boot via| flp
   seam0 -->|boot via| flp
   flp -->|"reads the plan"| plan
-  flp -->|"wraps the outer topic via"| pc
-  comp -.->|"in-bundle runner"| pc
+  comp -.->|"in-bundle synthesis runner"| pc
   spi -.->|implement| bapi
   seam0 -.->|"system-exported"| bapi
   classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
@@ -269,17 +271,17 @@ flowchart TB
   box is NOT erased: it is rewired from `sl` to the registry via the boot pipeline — a changed
   collaborator, named per the ritual.
 
-. *`pipeline-port` is a NEW box on an EXISTING seam.* It is passive (pure logic), so by the purity axis it
-  is OSGi-space, and it crosses to the host the SAME way the `-port` modules do (system-exported flat, one
-  copy) — no new seam invented. It unifies the two runner copies (`TopicRunner` + `SynthesisTopicRunner`)
-  the atlas never drew, so it rewires nothing on the map; both `comp` (in-bundle) and `flp` (host) point to
-  it, proving dual-consumption.
+. *The synthesis grammar is now internal to manifests-core, not a seam.* It unified the two runner copies
+  (`TopicRunner` + `SynthesisTopicRunner`) the atlas never drew, briefly as a shared `pipeline-port` seam;
+  once the boot was de-grammatised and the seed's own chains were the last host holdout, manifests-core
+  was its only OSGi consumer, so it relocated INTO manifests-core (`Phase`/`PhaseRunner`, un-exported).
+  Only `comp` (in-bundle) points to it now — the host `flp` boot no longer uses it, so it crosses no seam.
 
 . *The boot is DECOMPOSED, not a `SeedRuntime` seam.* An earlier design collapsed the three
   `bootEmbeddedOsgiRuntime()` copies into a host `SeedRuntime` prefix; the shipped shape instead
   DISSOLVED them (link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]) into a pure
   decision (`BootPlanner` → `BootPlan`, OSGi-space) told apart from the effectful act
-  (`FrameworkLauncher` → `BootedFramework`), entered through one `FrameworkLaunchPipeline.embedded()` the
+  (`FrameworkLauncher` → `BootedFramework`), entered through one `FrameworkLaunch.embedded()` the
   three exec apps share. `OsgiRuntime` and the `SeedRuntime` class are GONE. (The socle's later
   `@SeedRuntime` is an unrelated homonym — a jGiven discipline annotation, not this boot seam.)
 
@@ -293,9 +295,10 @@ holds.
 ====
 *Confirmed in code.* CLI alignment shipped (`a925e877..92a56cea`): both CLIs boot embedded Felix,
 `netplan.api`→`netplan-port`, all three exec demoted `-core` to `runtime`, the 8 SPI files deleted, both
-CLIs run for real (EXIT 0). The pipeline grammar was unified into one `FluentTopicRunner` (now in
-`pipeline-port`), dual-consumed. The boot was then DECOMPOSED (`BootPlanner`/`BootPlan` +
-`FrameworkLauncher`/`BootedFramework` + `FrameworkLaunchPipeline`), retiring `OsgiRuntime` and the old
+CLIs run for real (EXIT 0). The pipeline grammar was unified into one runner, briefly shared as
+`pipeline-port`, then DISSOLVED into manifests-core's un-exported internal synthesis
+(`Phase`/`PhaseRunner`) once it had no other OSGi consumer. The boot was DECOMPOSED (`BootPlanner`/`BootPlan` +
+`FrameworkLauncher`/`BootedFramework` + `FrameworkLaunch`), retiring `OsgiRuntime` and the old
 `SeedRuntime` class — see link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]. The
 `pc`/`flp`/`plan` boxes are blue (their world colour), no green remaining in Diagram K.
 ====
@@ -345,13 +348,13 @@ AND its additivity.
 .. THEN every `main()` entrypoint boots embedded Felix and reads its `-port` from the registry — AND
    `netplan.api` moves into `netplan-port` so the consumed contract is single-exported.
 
-. *One fluent pipeline grammar, dual-consumed in-bundle and flat* — `[playable]` blue +
-.. GIVEN the grammar duplicated as `TopicRunner` + `SynthesisTopicRunner`
-.. WHEN `pipeline-port` unifies `FluentTopicRunner` and the boot decomposition
-   (`BootPlanner`/`FrameworkLauncher`, entered via `FrameworkLaunchPipeline.embedded()`) dissolves the
-   three boot copies
-.. THEN one pipeline grammar is consumed both in-bundle and flat, behind one boot seam — AND it
-   crosses to the host the same way the ports do, no new seam (L2 dropped: host-coupled).
+. *One synthesis grammar, internal to manifests-core* — `[playable]` blue +
+.. GIVEN the grammar duplicated as `TopicRunner` + `SynthesisTopicRunner`, briefly shared as `pipeline-port`
+.. WHEN the boot is de-grammatised (a plain `FrameworkLaunch.embedded().launch()`, not a pipeline verb)
+   and the boot decomposition (`BootPlanner`/`FrameworkLauncher`) dissolves the three boot copies, leaving
+   manifests-core the grammar's only OSGi consumer
+.. THEN the grammar relocates INTO manifests-core as un-exported internal synthesis (`Phase`/`PhaseRunner`)
+   — no shared seam, nothing crosses to the host (L2 dropped: host-coupled).
 
 . *Nothing of ours discovers services by ServiceLoader any more* — `[playable]` blue +
 .. GIVEN `ServiceLoader` + the 8 orphaned `META-INF/services` files
