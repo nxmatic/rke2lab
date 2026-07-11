@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.bbox.core;
 
+import io.nxmatic.rke2lab.bbox.contract.BboxReservationRequest;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.ArrayList;
 import java.util.List;

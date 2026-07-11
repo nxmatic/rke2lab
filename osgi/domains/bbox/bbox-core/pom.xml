@@ -11,16 +11,19 @@
 
   <artifactId>bbox-core</artifactId>
   <name>osgi/domains/bbox/bbox-core</name>
-  <description>The bbox domain's data + contract + logic: the flat reservation vocabulary
-    (BboxReservationRequest / BboxRowOutcome / BboxAction), the BboxReconciler service interface
-    (reconcile a set of desired DHCP reservations against the router, dry-run or apply), and the pure
-    BlueprintRowEnumerator that derives the canonical RKE2 reservations from the netplan blueprint.
-    type=model — installed as a bundle and wired bundle-to-bundle to the edge (which provides the
-    reconciler @Component) and the scion (which resolves + drives it), both in-container. No
-    java-bbox-api-client type crosses; no seam (the reconciler no longer crosses to the host — that
-    was bbox-port's vestige from the host-side reconciler).</description>
+  <description>The bbox domain's logic: the pure BlueprintRowEnumerator that derives the canonical
+    RKE2 reservations from the netplan blueprint (producing bbox-contract's BboxReservationRequests).
+    type=model — installed as a bundle and wired bundle-to-bundle to the scion that drives it,
+    in-container. The reservation vocabulary and the BboxReconciler interface live in bbox-contract;
+    this module holds only the enumerator logic. No java-bbox-api-client type crosses; no seam.</description>
 
   <dependencies>
+    <!-- The enumerator produces bbox-contract's BboxReservationRequest vocabulary. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bbox-contract</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- BlueprintRowEnumerator derives each reservation from the netplan blueprint. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

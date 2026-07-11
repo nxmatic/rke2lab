@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.bbox.core;
+package io.nxmatic.rke2lab.bbox.contract;
 
 /**
  * One desired DHCP reservation to reconcile, flat: the {@code (mac, ip, hostname)} triple the bbox

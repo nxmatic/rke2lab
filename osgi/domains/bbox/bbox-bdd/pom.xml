@@ -21,9 +21,15 @@
     it by class-selection, the host grafts its ScenarioModel — the class never crosses a realm.</description>
 
   <dependencies>
-    <!-- The bbox domain's data + contract: the reservation/outcome/action contract and the
-         BboxReconciler the scenario's DSL speaks, plus the BlueprintRowEnumerator (in core) that
-         derives the canonical reservations. netplan-contract comes transitively through bbox-core. -->
+    <!-- The bbox contract: the reservation/outcome/action vocabulary and the BboxReconciler the
+         scenario's DSL speaks and resolves from the registry. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bbox-contract</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- bbox-core: the pure BlueprintRowEnumerator the scenario drives to derive the canonical
+         reservations. netplan-contract comes transitively through bbox-core. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-core</artifactId>

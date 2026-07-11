@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.bbox.core;
+package io.nxmatic.rke2lab.bbox.contract;
 
 import java.net.URI;
 import java.util.List;
@@ -15,9 +15,10 @@ import java.util.List;
  * ({@code dryRun = !cultivating()}). The outcomes come back in request order, each carrying its
  * {@code (cluster, node)} identity so the caller correlates without re-matching.
  *
- * <p>A service interface, not data — so it lives in {@code bbox-core} (type=model, installed +
- * wired bundle-to-bundle), not {@code bbox-record}. Both the edge that provides it and the scion
- * that resolves it play in-container, so it never crosses to the host: no seam.
+ * <p>A consumer-side service interface — so it lives in {@code bbox-contract} (type=contract,
+ * installed + wired bundle-to-bundle) alongside the flat reservation vocabulary it speaks. Both the
+ * edge that provides it and the scion that resolves it play in-container, so it never crosses to
+ * the host: no seam.
  */
 public interface BboxReconciler {
 

@@ -14,12 +14,13 @@
   <packaging>pom</packaging>
   <name>osgi/domains/bbox</name>
   <description>The bbox domain: the contact toward the Bouygues Bbox router (DHCP reservation
-    reconciliation). bbox-port declares the neutral reconcile verb over a home vocabulary (no
-    java-bbox-api-client type crosses the seam); bbox-edge is the @Component that embeds the client
-    (like dbus-systemd embeds dbus-java) and translates home↔library. The host keeps the orchestration
-    (blueprint enumeration, the Pulumi resource graph) and composes the contact from the registry.</description>
+    reconciliation). bbox-contract declares the neutral reconcile verb (BboxReconciler) over a home
+    vocabulary (no java-bbox-api-client type crosses); bbox-core holds the pure BlueprintRowEnumerator
+    logic; bbox-edge is the @Component that embeds the client (like dbus-systemd embeds dbus-java) and
+    translates home↔library; the scion resolves the reconciler and drives it in-container.</description>
 
   <modules>
+    <module>bbox-contract</module>
     <module>bbox-core</module>
     <module>bbox-edge</module>
     <module>bbox-bdd</module>

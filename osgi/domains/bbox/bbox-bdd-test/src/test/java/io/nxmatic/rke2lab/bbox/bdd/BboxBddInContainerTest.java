@@ -50,7 +50,8 @@ class BboxBddInContainerTest {
           // (the scion consults the doctor) are pulled through the host's import closure.
           .systemPackages("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
           // The JUnit-Platform runner world (launcher + engine) the front-door drives in-container.
-          // Everything else (bbox-record, bbox-core, seed-broker-codec, jackson, jGiven) is derived
+          // Everything else (bbox-contract, bbox-core, seed-broker-codec, jackson, jGiven) is
+          // derived
           // from the host bundle's manifest in the test body via installImportClosureOf.
           .withJUnitRunner()
           .build();

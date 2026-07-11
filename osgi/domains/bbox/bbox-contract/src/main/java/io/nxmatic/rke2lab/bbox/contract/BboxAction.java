@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.bbox.core;
+package io.nxmatic.rke2lab.bbox.contract;
 
 /**
  * The flat verdict for one reconciled reservation — the home mirror of the library's reconcile

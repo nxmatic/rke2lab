@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.bbox.core;
+package io.nxmatic.rke2lab.bbox.contract;
 
 import java.util.Optional;
 import java.util.OptionalInt;

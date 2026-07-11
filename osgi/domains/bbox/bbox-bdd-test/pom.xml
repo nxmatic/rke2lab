@@ -30,10 +30,11 @@
       <scope>provided</scope>
     </dependency>
     <!-- The vocabulary the mocks + assertions speak: the reconciler + its reservation/outcome/action
-         types, the RunGate, the doctor's ConsultingService, the SeedEnvelope the consult rides. -->
+         types (all in the contract), the RunGate, the doctor's ConsultingService, the SeedEnvelope
+         the consult rides. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>bbox-core</artifactId>
+      <artifactId>bbox-contract</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
