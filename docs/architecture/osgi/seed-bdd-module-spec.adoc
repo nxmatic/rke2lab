@@ -1,0 +1,90 @@
+= seed-bdd — the common gardening spine every seed exec rebuilds on
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN, ready to implement (2026-07-12). `seed-bdd` is the FOUNDATION module holding the
+gardening spine common to every seed exec — the host runbook stages spoken in the gardening register
+(`Cellar` fetch/store, the sow-and-graft caller, the world opening, the harness). An exec (`seed-master`,
+and the seed execs after it) adds only its OWN root composition: which scions, in what order. It realises
+the host half of link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] atop
+link:gardening-model-spec.adoc[the gardening model].
+====
+
+== Why a module — common spine vs per-exec composition
+
+The target host runbook is uniform: every root step is EITHER pure-host gardening (`Cellar` fetch/store,
+preflight) OR a *sow-and-graft caller* (sow a domain scenario toward the gardening, graft its scion). The
+STAGES that speak these gestures are the same for every seed exec; only the COMPOSITION — the phase order,
+which scion each step sows — is exec-specific. So the stages are common (`seed-bdd`), the composition is
+the exec's (`seed-master` writes its `ClusterSeedScenario`, a later exec writes its own).
+
+[cols="1,2",options="header"]
+|===
+| layer | contents · home
+| *common* | the gardening stages (`Cellar` fetch/store, the sow-and-graft caller, preflight, the world
+opening + the seeding harness) — **`osgi/foundation/seed-bdd`**
+| *per-exec* | `Main` + the concrete root scenario (the phase chain: preflight → … → outputs) — the exec
+module (**`seed-master`**, …)
+|===
+
+== Placement and consumption — under osgi/, consumed FLAT by the host
+
+`seed-bdd` lives in `osgi/foundation/` (beside `seed-broker-port`, whose BDD counterpart it is), yet the
+host consumes it as a *flat jar*. Location and realm are independent axes — the precedent is
+`scenario-engine` (`osgi/runtime/`): *a bundle is a superset of a plain jar*, and the split is by PACKAGE,
+not by module.
+
+* *One artifact, one BSN* (`io.nxmatic.rke2lab.osgi.foundation.seed.bdd`), both a bundle and a plain jar.
+* *The host-side spine is NOT exported* — the sow-and-graft caller, the world opening, the harness sit in
+  a base package the host reads on the flat classpath, never wired in-container. Exporting them would let
+  a bundle load a second copy of a seam class (the `DUPLICATE_REALM_CLASS` collision the engine's bnd
+  guards against).
+* *Only in-realm halves are exported* (if any) — what an in-container scion could one day want.
+* *Host-only imports are `resolution:=optional`* (`jgiven.report.*`, framework-launch, …) — exactly as
+  `scenario-engine`, so the bundle still RESOLVES when installed in-container for its exported packages.
+
+This is NOT the codec's dual-realm (staged bundle + shaded flat, two copies). It is one jar whose
+non-exported base package the host uses flat, and whose exported packages a bundle *may* install —
+superset, not duplication. If a scion later needs the spine in-realm, that is the moment to reconsider —
+reversibly, per package, never by inflating the seam.
+
+== Dependencies — leans on seed-port + engine, never inflates seed-port
+
+`seed-bdd` DEPENDS on `seed-broker-port` (it consumes `Cellar`, `SeedEnvelope`, `Parcel`, `SeedBroker`,
+`RunGate`) and on the neutral half of `scenario-engine` (the sow-and-graft mechanics). The arrow runs
+FROM `seed-bdd` TO `seed-port` — depending on the seam is not entering it. `seed-port` stays the minimal
+membrane; the gardening stages are a consumer, not a seam inhabitant.
+
+== Who speaks gardening — the stages, not the engine
+
+The engine stays at the FLIRT level: `ScenarioGraft` names the horticultural gesture (*graft*) but its
+signatures are mechanical (`rebuild(String)`, `graftUnder(ReportModel, …)`); the domain front-door
+(`*BddScenarios.run()`) grows the scion. `seed-bdd`'s stages SPEAK gardening in their step titles ("I go
+to the cellar for the parcel's state", "I sow X and graft its scion", "I store the harvest") and COMPOSE
+those flirt façades underneath. The engine gains no gardening type; the vocabulary lives in `seed-bdd`'s
+stages, which call the engine's neutral mechanics.
+
+The sow-and-graft caller is not a new façade — the two façades exist (the front-door grows, `ScenarioGraft`
+grafts). It is their COMPOSITION as one gardening stage: sow the scion (play it in-container via the
+front-door), reap its serialized runbook, `rebuild` + `graftUnder` it under this step. One gesture, four
+times, in the root scenario.
+
+== The root scenario — a per-exec composition on the common stages
+
+`seed-master`'s `ClusterSeedScenario` is the concrete instance: pure-host `Cellar.fetch` opening (read the
+parcel's state — where we start from), four sow-and-graft callers (bbox · incus · systemd · cluster, the
+dependency chain whose terminal fruit is *the cluster answers ready*), pure-host `Cellar.store` closing
+(the harvest filed to its parcel). The cellar at both ends — `fetch` opens, `store` closes; between them
+everything is cultivated fresh (no scion reads the cellar; the manifests graft is grown fresh, not cached).
+
+== Related documentation
+
+* link:gardening-model-spec.adoc[The gardening model] — the roles the stages speak.
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[The ClusterSeed scenario map] — the concrete root runbook
+  the exec composes.
+* link:seed-broker-spec.adoc[The seed-broker spec] — the door the sow-and-graft caller sows toward.
+* link:host-cellar-realisation-spec.adoc[Host Cellar realisation] — the `Cellar` the fetch/store stages use.
+* link:engine-lifecycle-spec.adoc[engine-lifecycle-spec] — `scenario-engine`, the flirt-level mechanics
+  (`ScenarioGraft`, the launcher) `seed-bdd` composes.
