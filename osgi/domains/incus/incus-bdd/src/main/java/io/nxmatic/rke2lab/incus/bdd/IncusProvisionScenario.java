@@ -15,7 +15,6 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
-import io.nxmatic.rke2lab.incus.contract.ImageBuildException;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
@@ -248,11 +247,10 @@ public class IncusProvisionScenario
       if (!cultivating) {
         return self();
       }
-      try {
-        imageBuilder.build(imageRequest());
-      } catch (ImageBuildException failed) {
-        record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failed.getMessage());
-        throw new AssertionError("incus image build failed: " + failed.getMessage(), failed);
+      final Optional<String> failure = imageBuilder.build(imageRequest());
+      if (failure.isPresent()) {
+        record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failure.get());
+        throw new AssertionError("incus image build failed: " + failure.get());
       }
       record("incus image", true, SymptomKind.IMAGE_BUILD_FAILED, null);
       return self();

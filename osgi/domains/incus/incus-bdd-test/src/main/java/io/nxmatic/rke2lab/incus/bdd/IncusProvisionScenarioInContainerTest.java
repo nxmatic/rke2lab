@@ -12,7 +12,6 @@ import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
-import io.nxmatic.rke2lab.incus.contract.ImageBuildException;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
@@ -161,7 +160,9 @@ public class IncusProvisionScenarioInContainerTest {
   private static ImageBuilder builds() {
     return new ImageBuilder() {
       @Override
-      public void build(ImageBuildRequest request) {}
+      public Optional<String> build(ImageBuildRequest request) {
+        return Optional.empty();
+      }
 
       @Override
       public String recipeDigest() {
@@ -170,12 +171,12 @@ public class IncusProvisionScenarioInContainerTest {
     };
   }
 
-  /** An ImageBuilder that throws on build (a failed build). */
+  /** An ImageBuilder that reports a failed build (present = the failure summary). */
   private static ImageBuilder failsToBuild() {
     return new ImageBuilder() {
       @Override
-      public void build(ImageBuildRequest request) {
-        throw new ImageBuildException("distrobuilder exited non-zero");
+      public Optional<String> build(ImageBuildRequest request) {
+        return Optional.of("distrobuilder exited non-zero");
       }
 
       @Override
@@ -203,8 +204,9 @@ public class IncusProvisionScenarioInContainerTest {
     boolean built;
 
     @Override
-    public void build(ImageBuildRequest request) {
+    public Optional<String> build(ImageBuildRequest request) {
       this.built = true;
+      return Optional.empty();
     }
 
     @Override

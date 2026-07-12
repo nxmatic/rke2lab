@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.incus.edge;
 
-import io.nxmatic.rke2lab.incus.contract.ImageBuildException;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import java.io.IOException;
@@ -14,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.osgi.service.component.annotations.Component;
 
@@ -36,7 +36,18 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
       "io/nxmatic/rke2lab/incus/edge/remote-build-incus-image.sh";
 
   @Override
-  public void build(ImageBuildRequest request) {
+  public Optional<String> build(ImageBuildRequest request) {
+    // The internal plumbing throws the edge-private ImageBuildException deep in the process code;
+    // this boundary converts it once into the seam's human summary (empty = success).
+    try {
+      buildOrThrow(request);
+      return Optional.empty();
+    } catch (ImageBuildException failed) {
+      return Optional.of(failed.summary());
+    }
+  }
+
+  private void buildOrThrow(ImageBuildRequest request) {
     final Path workspace = Path.of(request.workspaceDir());
     final String localExecutable = tryResolveExecutable(request.builderBinary());
 
