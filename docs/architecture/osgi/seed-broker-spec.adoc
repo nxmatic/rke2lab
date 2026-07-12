@@ -367,31 +367,36 @@ The host never names `*BddScenarios` nor a `*Coordinate` enum — only the found
 string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
 verdict.
 
-[[crossing-is-a-sow-ambient-is-a-lookup]]
-=== Crossing → `sow`; ambient / same-domain → lookup
+[[the-broker-closes-the-host-osgi-gap]]
+=== The broker closes the HOST↔OSGi gap; in-container, a scion resolves by lookup
 
-A scion resolves three kinds of collaborator, and only one is a broker crossing. The rule, so a
-scenario reads uniformly:
+The broker door exists to close ONE gap: host↔OSGi. The host is flat-classpath and speaks only
+gardening, so it cannot resolve an OSGi service or name a domain type — it sows a neutral coordinate
+(`RunbookCoordinate(soil)`) and the door reaches the scion. That is the one crossing the broker earns.
 
-[cols="1,1,2",options="header"]
+Once a scion is playing IN-CONTAINER, it is already in the OSGi world, where naming a domain type and
+resolving a service from the registry are ordinary. So a scion resolves ALL its collaborators by
+lookup, not by the broker:
+
+[cols="1,2",options="header"]
 |===
-| the scion needs… | how | why
-| another SOIL (a cross-domain crossing) | `broker.sow(coordinate, seed)` | it is a crossing — the
-  broker's whole purpose. E.g. the bbox scenario consulting the doctor: today `resolveDoctor()` +
-  `ConsultingService.consult(...)` (naming a doctor type, hand-rolling the `FrameworkUtil` lookup);
-  becomes `broker.sow(DoctorCoordinate.CONSULTATION, checkpoint)` — the scion names no doctor type,
-  the crossing is uniform with every other. `consult` was already `SeedEnvelope → SeedEnvelope`: a
-  `sow` in disguise.
-| the ambient run-condition | look up `RunGate` | a fact of the WHOLE run, published once — looked
-  up, never sown (its own § below). Not a crossing.
-| its OWN domain's edge (`BboxReconciler`, …) | look up the contact | a scenario consuming its own
-  domain's port is direct, same world — not host↔OSGi, not cross-domain. The broker is for crossings,
-  not for resolving every collaborator.
+| the scion needs… | how
+| another domain's service (the doctor's `ConsultingService`) | look it up from its own bundle
+  registry (`FrameworkUtil`). Domain-to-domain, in-container — NOT a host↔OSGi gap. The consult is a
+  service call (`consult(SeedEnvelope) → SeedEnvelope`), not a broker `sow`. Routing a scion→scion
+  consult through the broker would be gratuitous — it is not gardening, it is one domain talking to
+  another in the world they share.
+| the ambient run-condition | look up `RunGate` — a fact of the WHOLE run, published once (its own §
+  below).
+| its OWN domain's edge (`BboxReconciler`, `ClusterReadinessContact`, …) | look up the contact from
+  the registry — same domain, same world.
 |===
 
-This makes the broker EARN each `sow`: it absorbs the one real crossing a scenario hid (the doctor
-consult), leaving ambient and same-domain resolution as plain lookups. Applying it to
-`BboxReconciliationScenario` deletes `resolveDoctor()` and the `ConsultingService` dependency.
+So the broker has exactly one job at the scion boundary: the host→scion play (`RunbookCoordinate`).
+Everything a scion needs while playing is a lookup. The earlier temptation to route the doctor consult
+through the broker was rejected: it is not a host↔OSGi crossing (it is scion→scion, in-container), so
+it stays the service verb it always was — consistent with `consult` STAYING a verb (§ the principle
+above), not becoming a handler.
 
 == OSGi holds the authority; the host transports (the asymmetry)
 

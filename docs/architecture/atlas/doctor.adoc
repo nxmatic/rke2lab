@@ -468,39 +468,6 @@ demanded once `VisitWire` moved into `doctor-contract`. The ledger path is alrea
 nothing to flip). *Sequencing residue:* the read-side HATEOAS reflector is designed-not-coded (off the
 critical path); the visit-assembly flip is the FIRST code step, prerequisite to the host Cellar emerging.
 
-=== A scion consults the doctor by `sow`, not by naming it (2026-07-12)
-
-The rule link:../osgi/seed-broker-spec.adoc#crossing-is-a-sow-ambient-is-a-lookup[crossing → `sow`,
-ambient → lookup] lands its first code case in the bbox scion: a refused row is a symptom the scion
-carries to the doctor — a cross-domain crossing, so it goes through the ONE door. BEFORE, the scenario
-named a doctor type and hand-rolled the lookup; AFTER, it sows a neutral coordinate and names no doctor
-type.
-
-.Diagram F — bbox→doctor consult: BEFORE (names ConsultingService) vs AFTER (broker.sow)
-[mermaid]
-----
-flowchart TB
-  subgraph BEFORE[Before — the scion names the doctor]
-    b1["BboxReconciliationScenario<br/>resolveDoctor(): ServiceReference&lt;ConsultingService&gt;<br/>doctor.consult(checkpoint)"]
-    b2["dep on doctor-contract (ConsultingService)"]
-    b1 --- b2
-  end
-  subgraph AFTER[After — the scion sows a coordinate]
-    a1["BboxReconciliationScenario<br/>broker.sow(DoctorCoordinate.CONSULTATION, checkpoint)<br/>resolveDoctor() deleted"]
-    a2["dep on seed-broker-port (SeedBroker) only<br/>consult was already SeedEnvelope→SeedEnvelope"]
-    a1 --- a2
-  end
-  BEFORE -.the crossing becomes a sow.-> AFTER
-
-  style BEFORE fill:#fdeaea,stroke:#c0392b
-  style AFTER fill:#e8f5e9,stroke:#2e7d32
-----
-
-*Monotone check:* the doctor's `CONSULTATION` handler is unchanged — only its CALLER stops naming it.
-`RunGate` (ambient) and `BboxReconciler` (the scion's own domain edge) stay lookups, per the rule. This
-is the twin, on the request axis, of the runbook handler the seed atlas records: both make `broker.sow`
-the single door, one for the consult a scion raises, one for the scenario the host plays.
-
 === Design scenarios — the doctor capabilities as DSL sentences
 
 The doctor view predates the capability-anchoring device, so its design lived only in the inventory
