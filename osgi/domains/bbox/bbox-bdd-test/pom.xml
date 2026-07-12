@@ -26,7 +26,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-bdd</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- The vocabulary the mocks + assertions speak: the reconciler + its reservation/outcome/action
@@ -35,25 +34,21 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-contract</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- the passenger decodes the harvested RunbookEnvelope + the consultation payloads with jackson,
@@ -74,7 +69,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -91,13 +85,11 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pipeline-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

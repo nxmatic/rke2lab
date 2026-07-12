@@ -31,7 +31,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -41,13 +40,11 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-contract</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-contract-test</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -55,7 +52,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -66,7 +62,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-spi</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -77,7 +72,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-contract</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -89,7 +83,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- The codec that (de)serializes wire-contract; nested in the doctor-core host bundle (T2), so
@@ -97,7 +90,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -135,13 +127,11 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pipeline-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

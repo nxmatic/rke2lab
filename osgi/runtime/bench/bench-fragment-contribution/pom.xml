@@ -25,7 +25,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bench-fragment-host</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header -->

@@ -22,18 +22,15 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- BlueprintRowEnumerator derives each reservation from the netplan blueprint. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
-      <version>${project.version}</version>
     </dependency>
   </dependencies>
 

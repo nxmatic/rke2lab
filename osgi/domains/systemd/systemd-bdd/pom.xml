@@ -27,32 +27,27 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a failing read (fork B
          — the checkpoint owns its consult, the same way cluster-bdd does). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The doctor's wire contract: the readiness-checkpoint/observation/consultation the scenario
          builds to consult the doctor and carries back. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The neutral envelope + codec: the scenario speaks SeedEnvelope, not a doctor class. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
          the jgiven-wrap bundle, pulled into the live world by this bundle's import closure
@@ -70,7 +65,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The launcher engine the front-door hands to the runner. -->
     <dependency>
@@ -100,20 +94,17 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- JGivenTestkit.felix() — the jGiven boot closure the out-of-container proof installs. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pipeline-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

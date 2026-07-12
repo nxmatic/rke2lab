@@ -43,7 +43,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>boot-logging</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The shared boot MODEL: the embed capability, the BootStackJar registry, and the
          ClasspathBundleIndex this executor consumes to locate bundles + mirror their imports before
@@ -51,7 +50,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>boot-discovery</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- FrameworkLauncher + BootPipeline name the boot-stack jars via the BootStackJar registry (the
          start-level layering). It would arrive transitively through boot-discovery, but we compile

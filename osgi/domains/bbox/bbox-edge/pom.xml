@@ -24,14 +24,12 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The bbox client + gson are real OSGi bundles: this edge compiles against them and IMPORTS
          them at runtime (staged as carriers, resolved from the registry) — no embedding. -->
     <dependency>
       <groupId>io.nxmatic</groupId>
       <artifactId>java-bbox-api-client</artifactId>
-      <version>0.2.1</version>
     </dependency>
     <dependency>
       <groupId>com.google.code.gson</groupId>
@@ -53,13 +51,11 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

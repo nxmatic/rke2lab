@@ -21,12 +21,10 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.github.seancfoley</groupId>
@@ -38,12 +36,10 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-spi</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- bnd-consumed construction annotations: @Component declares the DS descriptor bnd generates
          (geste A only — the runtime stays on ServiceLoader until a later slice). -->
@@ -57,7 +53,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-contract-test</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

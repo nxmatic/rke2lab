@@ -26,7 +26,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
          installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade) so it
@@ -36,7 +35,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-core</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- BlueprintExportCommand serializes the blueprint POJOs to YAML at build time, flat (no Felix):
@@ -62,7 +60,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

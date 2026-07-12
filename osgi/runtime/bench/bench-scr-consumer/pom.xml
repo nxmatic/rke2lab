@@ -23,7 +23,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bench-scr-api</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- bnd-consumed: @Component / @Reference generate OSGI-INF/*.xml + the Service-Component header -->
     <dependency>

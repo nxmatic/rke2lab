@@ -24,7 +24,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
     <!-- bnd-consumed construction annotations: DefaultSeedBroker (@Component) collects the

@@ -24,7 +24,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-edge</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- The contact the passenger resolves + calls typed (ClusterReadinessContact + ControllerRef).
@@ -32,7 +31,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-contract</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- The generic in-container runner the fragment's entry delegates to (InContainerJUnitRunner).
@@ -40,7 +38,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -56,7 +53,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

@@ -26,7 +26,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- JGivenTestkit (src/main) builds on the out-of-container envelope, moved to the runtime engine
          module (JUnit/jGiven are runtime-scope now); the @Osgi tag the guard test wears stays in
@@ -34,7 +33,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
     <!--
@@ -47,19 +45,16 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pipeline-probe</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pipeline-probe-test</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- byte-buddy installed as its own OSGi bundle (it is OSGi-enabled); jgiven-wrap imports it. -->

@@ -34,17 +34,14 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab.sdks</groupId>
       <artifactId>incus</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pulumi-edge</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pulumi-edge-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- Runtime-scope: the host compiles only against the -port types; unitrepo-core is needed at
@@ -53,7 +50,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- felix.resolver is the org.osgi.service.resolver.Resolver PROVIDER: its bundle activator
@@ -75,17 +71,14 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- The neutral launcher core + the OSGi connection contract (JUnitLauncherCore,
@@ -95,7 +88,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
          flattened into the uber-jar (excluded from the shade). runtime scope MACHINE-ENFORCES path
@@ -105,7 +97,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The cdk8s carrier bundle: embedded INTACT under META-INF/bundles, the Fragment-Host the
@@ -118,7 +109,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The ssh-to-age edge: embedded INTACT + installed by OsgiRuntime, NOT flattened (excluded
@@ -128,7 +118,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>ssh-to-age-edge</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The dbus-systemd edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime,
@@ -138,7 +127,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>dbus-systemd-edge</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The cluster edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
@@ -148,7 +136,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-edge</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The incus edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
@@ -160,7 +147,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-edge</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The bbox edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime. runtime
@@ -170,7 +156,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-edge</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
@@ -187,14 +172,12 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The seed-broker seam: Document + SeedBroker. The stage sows a checkpoint Document through
          the broker and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The document codec: JSON (de)serialization + validation for Document payloads. Shaded flat
          into the host classpath (binding to the host's flat jackson). The SAME source is nested into
@@ -203,7 +186,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The seed-broker mechanism (embed type=runtime): the DefaultSeedBroker @Component that
          collects every SeedHandler by DS and dispatches by coordinate. RUNTIME scope like an
@@ -213,13 +195,7 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-runtime</artifactId>
-      <version>${project.version}</version>
       <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic</groupId>
-      <artifactId>java-bbox-api-client</artifactId>
-      <version>0.2.1</version>
     </dependency>
     <dependency>
       <groupId>com.google.code.findbugs</groupId>

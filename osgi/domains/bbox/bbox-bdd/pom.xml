@@ -26,32 +26,27 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- bbox-core: the pure BlueprintRowEnumerator the scenario drives to derive the canonical
          reservations. netplan-contract comes transitively through bbox-core. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a refused row. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The frontier vocabulary: the RunGate the scion consults, the SeedEnvelope it consults the
          doctor with and carries the consultation back on. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
          the jgiven-wrap bundle, pulled into the live world by this bundle's import closure
@@ -69,7 +64,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The launcher engine the front-door hands to InContainerJUnitRunner. -->
     <dependency>

@@ -64,7 +64,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The shared boot-discovery model the out-of-container envelope reads (ClasspathBundleIndex:
          locate / embeddableBundles / exportsForImportsOf) so test and prod agree on boot discovery
@@ -72,7 +71,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>boot-discovery</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
     <!-- slf4j-api for the resolution-failure diagnostic (OutOfContainerFrameworkExtension.resolve()
@@ -99,7 +97,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

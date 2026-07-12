@@ -23,7 +23,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -58,7 +57,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- The out-of-container framework envelope moved to the runtime engine module (JUnit/jGiven are
@@ -66,7 +64,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- junit-jupiter (test) is inherited from build-parent. -->

@@ -30,14 +30,12 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- The JUnit-in-OSGi testkit: now only the test-only tags (@Osgi/@Pipeline) a fragment wears. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <!-- The fragment's src/main @Test classes compile against Jupiter; provided keeps them out of

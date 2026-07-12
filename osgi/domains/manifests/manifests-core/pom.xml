@@ -30,7 +30,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The cdk8s vocabulary (org.cdk8s + software.constructs) comes from the manifests-cdk8s carrier
          bundle, which embeds the flat cdk8s closure and exports those packages. provided: this is a
@@ -39,7 +38,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
-      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -76,12 +74,10 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- systemd's cdk8s rendering of its units (io.nxmatic.rke2lab.systemd.cdk8s), contributed as a
          fragment of the manifests-cdk8s carrier. manifests-core imports that package to drive the
@@ -89,19 +85,16 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-cdk8s-manifests</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The systemd domain's unit vocabulary: StorageStage synthesises the dbus-tcp unit from the
          typed SystemdUnitId, not a literal — the import draws the producer edge in the graph. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- org.osgi.resource (capability graph types used by ManifestsDomainRegistry / VisitOrder).
          Declared explicitly: it previously leaked in transitively via the obsolete org.osgi.core

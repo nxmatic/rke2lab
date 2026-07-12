@@ -25,13 +25,11 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The two interfaces name Patient (records, same bundle) + SeedEnvelope (the consult envelope). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The records carry jackson binding annotations (@JsonValue/@JsonCreator on the wire enums). -->
     <dependency>

@@ -33,7 +33,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pulumi-edge</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- compile scope, not test: GrpcChannelNoiseCapture is a JUnit extension shared as a main-scope
          fixture (same rationale as StackHistoryFixture), so the consumers register it without a

@@ -26,26 +26,22 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-contract</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a failing phase (Q2 —
          the cluster domain already knows the doctor, it publishes ClusterSpecialist). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The frontier vocabulary: the checkpoint/observation/verdict Documents the scenario builds to
          consult the doctor and to carry the verdict. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
          the jgiven-wrap bundle, pulled into the live world by this bundle's import closure
@@ -63,7 +59,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <!-- The launcher engine the front-door hands to InContainerJUnitRunner. -->
     <dependency>
@@ -93,20 +88,17 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- JGivenTestkit.felix() — the jGiven boot closure the out-of-container proof installs. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pipeline-testkit</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
