@@ -376,9 +376,20 @@ ARTICULATION*; the full `Given/When/Then` of each domain scion lives in that dom
 below. Settled 2026-07-11c (whiteboard reversed here).
 
 *The regularity (user decision, uniformity):* every root step is EITHER pure-host gardening (no domain to
-consult) OR a *graft-caller* (sows a domain scenario in-container, grafts its scion). No host step speaks
-metier — it sows a scenario and reaps a verdict + a grafted scion. The two registers (host gardening on
-top, domain metier in the grafted scion) meet at the neutral port — the language switch.
+consult) OR a *sow-and-graft caller*. No host step speaks metier — it sows a scenario and reaps a verdict
++ a grafted scion. The two registers (host gardening on top, domain metier in the grafted scion) meet at
+the neutral port — the language switch.
+
+*A sow-and-graft caller composes TWO gestures in TWO worlds, one per half of the seam:* to *sow* (`sow`)
+is played IN-CONTAINER — the scion's front-door (`*BddScenarios.run()`) plays it inside Felix and
+serialises its runbook to JSON (the only thing that crosses the seam); to *graft* (`graft`) is played
+HOST-side — `ScenarioGraft.rebuild(json)` + `graftUnder(hostTree, …)` folds that JSON into the host's own
+runbook tree. The graft is host-side by construction: a `@NestedSteps` composes within ONE jGiven engine,
+so a live jGiven object cannot cross realms (it would `ClassCastException` on the flat host loader) — only
+the flat JSON crosses, and the host rebuilds a model of ITS OWN realm to graft. There is one host tree
+(the trunk the operator reads top-down); the four callers each graft one scion INTO it. So `sow` appears
+four times in-container, `graft` four times host-side, and they meet at the JSON — "sow-and-graft caller"
+names the composition of both, not the graft alone.
 
 [mermaid]
 ....
@@ -386,10 +397,10 @@ flowchart TB
   subgraph root["ClusterSeedScenario — HOST runbook (gardening register)"]
     r0["the entry gates are enforced (preflight) — pure host"]
     rc["the parcel's state is fetched (Cellar.fetch) — pure host"]
-    r1["the network reservations are settled (bbox) — graft-caller"]
-    r2["the instance is provisioned (incus) — graft-caller"]
-    r3["the systemd adapter is launched — graft-caller"]
-    r4["the cluster becomes ready (cluster) — graft-caller"]
+    r1["the network reservations are settled (bbox) — sow-and-graft"]
+    r2["the instance is provisioned (incus) — sow-and-graft"]
+    r3["the systemd adapter is launched — sow-and-graft"]
+    r4["the cluster becomes ready (cluster) — sow-and-graft"]
     r5["the harvest is stored (Cellar.store) — pure host"]
     r0 --> rc --> r1 --> r2 --> r3 --> r4 --> r5
   end
@@ -400,10 +411,14 @@ flowchart TB
     s4["cluster: readiness·phase·observation"]
   end
   doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
-  r1 -.grafts.-> s1
-  r2 -.grafts.-> s2
-  r3 -.grafts.-> s3
-  r4 -.grafts.-> s4
+  r1 -.sow (in-container).-> s1
+  r2 -.sow (in-container).-> s2
+  r3 -.sow (in-container).-> s3
+  r4 -.sow (in-container).-> s4
+  s1 -.graft JSON (host).-> r1
+  s2 -.graft JSON (host).-> r2
+  s3 -.graft JSON (host).-> r3
+  s4 -.graft JSON (host).-> r4
   s3 -.consults.-> doctor
   s4 -.consults.-> doctor
 
@@ -436,15 +451,15 @@ closes (file the harvest). Between them everything is cultivated FRESH — no sc
 cluster scion probes the live cluster; the manifests graft is grown fresh, never cached). The two
 pure-host ends touch the cellar; the four graft-callers only sow and graft.
 
-*The graft-caller shape is UNIFORM — one pattern, four times:*
+*The sow-and-graft caller shape is UNIFORM — one pattern, four times (the two halves annotated):*
 
 [listing]
 ----
   WHEN <the host wants outcome X>
-  THEN I sow <domain>'s scenario through the neutral port (in-container)
+  THEN I sow <domain>'s scenario through the neutral port      [SOW — in-container: the front-door plays it, serialises to JSON]
    AND under a closed RunGate the real edge stays inert, the plan renders PENDING (E9, see § runmode-preview)
-   AND I reap a coarse verdict (grew / did not)
-   AND I graft the returned scion under this step (its metier detail shows in the runbook tree)
+   AND I reap a coarse verdict (grew / did not)                [the verdict travels IN the JSON]
+   AND I graft the returned scion under this step              [GRAFT — host: rebuild the JSON in the host realm, graftUnder]
 ----
 
 The host holds only: a `Parcel`, a `RunGate`, a verdict, an opaque scion runbook — nothing metier. The
