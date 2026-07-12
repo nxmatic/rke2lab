@@ -4,7 +4,8 @@ package io.nxmatic.rke2lab.manifests.cli;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunch;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
@@ -145,12 +146,18 @@ public final class Main {
     public void run() {
       // Boot the embedded Felix from the bundles staged in this exec-jar (the shared boot seam),
       // resolve the one manifests-world service from the registry, drive it, then close. There is
-      // no
-      // flat-classpath fallback: since the Resolver became an @Reference, manifests-core's
+      // no flat-classpath fallback: since the Resolver became an @Reference, manifests-core's
       // @Component activates only under a framework, so off-framework ServiceLoader yielded a null
       // Resolver — the bug this migration fixes.
-      FrameworkLaunchPipeline.embedded()
-          .during("synthesize", ManifestSynthesisService.class, this::synthesize);
+      try (BootedFramework framework = FrameworkLaunch.embedded().launch()) {
+        final ManifestSynthesisService synthesisService =
+            framework.awaitService(ManifestSynthesisService.class, 30_000);
+        if (synthesisService == null) {
+          throw new IllegalStateException(
+              "no ManifestSynthesisService in the OSGi registry within 30s");
+        }
+        synthesize(synthesisService);
+      }
     }
 
     private void synthesize(ManifestSynthesisService synthesisService) {
