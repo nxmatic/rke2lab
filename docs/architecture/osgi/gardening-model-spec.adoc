@@ -177,6 +177,18 @@ becomes a question to the gardener is HATEOAS — holding an opaque sachet and N
 one asks it what it advertises, then `sow`s at the advertised coordinate (the same one verb).
 ====
 
+[TIP]
+====
+*Capability as a service — the cellar is the LEAST-capable realisation, so cleverness lives on the
+capable side.* A cellar realisation (a Pulumi backend, a git store) knows nothing of any domain. So the
+model does not ask it to interpret. If the domain (OSGi) can already RENDER an interpretation — assemble
+a typed view from neutral parts — it OFFERS that as a service; it is up to the cellar to CONSUME it or
+not, per what it can do. The neutral store returns EVERYTHING neutral (parts by their case name); the
+interpretation capability is a service the domain offers, never a requirement on the store. This is why a
+`fetch` stamps no domain coordinate: it hands back neutral cases, and the capable side — which asked for
+this parcel — knows what to make of them.
+====
+
 .C4 L3 Component (dynamic) — storing a COMPOSITE: the cellar asks the gardener "what is this?", then files neutral parts
 [mermaid]
 ----

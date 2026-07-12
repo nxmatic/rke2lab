@@ -269,11 +269,25 @@ matches `ParcelProjection.LEDGER`).
   a field the neutral seam forces the host to invent. The figure text was loose; the shipped
   `(project, stack)` record stands.
 
-. *One coordinate-slug per stored envelope on read.* `fetch` must stamp each rebuilt envelope with a
-  coordinate. Since no reader inspects it, the slug need only be stable + neutral. Decide: does `fetch`
-  read the slug from the stored output NAME (the store wrote it there), closing the CRUD-by-shell loop?
-  That is the design's intent ("the name comes from the plant") — confirm the store writes the slug as
-  the output name and fetch reads it back.
+. *What coordinate does `fetch` stamp? — RESOLVED (2026-07-12): NONE. Collect-all-neutral, capability
+  as a service.* The guiding principle (the user's): the cellar is the LEAST-capable realisation — the
+  host knows nothing of the doctor. So we do not ask it to be clever. If the OSGi side can already
+  RENDER a service (interpret, assemble), it OFFERS it; it is up to the cellar to CONSUME that service or
+  not, per what it can do. This is REST/HATEOAS turned toward storage: the neutral store returns
+  everything neutral, and the interpretation CAPABILITY is a service the domain offers, never a
+  requirement on the store. Concretely: `fetch(parcel)` returns `{version, when, + every present output
+  by its NEUTRAL name}` (the `Role.*` cases) — NO doctor coordinate stamped, no doctor type. The OSGi
+  reader — which asked for THIS parcel — knows what to assemble. The "which coordinate / which assembly"
+  lives entirely on the capable side.
++
+*The neutral shelf is Pulumi's NATIVE addressing, not an invented label (realisation detail).* The
+cellar need not mint any coordinate: the Pulumi checkpoint already carries each resource's native
+identity — the `type` token (e.g. `rke2lab:controlplane:SystemdAdapter`), the `urn`, the logical name —
+alongside its `outputs` (see `StackSnapshot`, iterating `deployment.resources[]`). That native identity
+IS the neutral shelf: the cellar addresses by what the SOIL already gives it, no doctor word. A different
+furniture (a git store) would have its own native discriminant (path, blob sha) — the principle is the
+same, the medium differs. So `fetch` hands back resources addressed by their Pulumi-native meta + neutral
+outputs; the capable OSGi side filters/assembles by what it asked for.
 
 . *`store` for the medical-record parcel vs the ledger parcel.* Today only the ledger is written
   (`append`); the medical record is written elsewhere (`SystemdAdapterResource` nests
