@@ -120,14 +120,12 @@ package "systemd-adapter" {
 }
 
 package "systemd-contract" {
-  rectangle "SystemdAdapterApiPaths\nSTATUS_SYSTEMD + HEALTHZ_SYSTEMD" as apiPaths
   rectangle "SystemdProbeRequest\ndbusHost/Port + nodeName + imageBuilderHost" as probeReq
 }
 
 rectangle "systemd D-Bus\norg.freedesktop.systemd1" as systemdDbus
 
 app --> controller
-controller ..> apiPaths : serves the paths named by
 controller --> provider
 provider <|.. dbusProvider
 dbusProvider ..> probeReq : opens dbus-on-TCP from
@@ -179,11 +177,6 @@ wired bundle-to-bundle inside the OSGi world, so neither side leaks its own conf
 [cols="2,3",options="header"]
 |===
 | Port type | Contract
-
-| `SystemdAdapterApiPaths`
-| The two normalized HTTP endpoints as constants — `STATUS_SYSTEMD` (`/status/systemd`) and
-  `HEALTHZ_SYSTEMD` (`/healthz/systemd`). A single source of truth shared by the controller that
-  serves them and the Pulumi readiness probe that reads them; no path string is hand-typed twice.
 
 | `SystemdProbeRequest`
 | The pure input crossing the readiness seam: the host-side facts `SystemdRuntimeProbe` needs to
