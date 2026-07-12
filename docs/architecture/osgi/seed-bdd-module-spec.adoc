@@ -95,6 +95,45 @@ dependency chain whose terminal fruit is *the cluster answers ready*), pure-host
 (the harvest filed to its parcel). The cellar at both ends — `fetch` opens, `store` closes; between them
 everything is cultivated fresh (no scion reads the cellar; the manifests graft is grown fresh, not cached).
 
+[[the-amorce]]
+== The amorce — Pulumi wraps, the GIVEN bootstraps, the store carries the one irreducible fact
+
+Bootstrapping is the hardest seam: the world does not exist yet, and it must be born in the right order.
+There are TWO layers, and the frontier between them is precise.
+
+*Layer 1 — the Pulumi envelope (the exec's `Main`, host-side, irreducible).* The whole program runs
+*inside* `Pulumi.run(context -> …)`: the `com.pulumi` provisioning graph cannot enter Felix (it stays
+host, per the migration spec), and the run-mode fact — is this a live run or a preview? — is only knowable
+there (`Deployment.getInstance().isDryRun()`, projected to `RunMode`). So `Main` is and stays the Pulumi
+entry point; it captures the `RunMode` and plays the root scenario on the launcher (`JUnitLauncherCore`,
+flat host loader, `selectClass(ClusterSeedScenario)`). This layer is NOT a jGiven step — it *precedes* the
+jGiven world.
+
+*Layer 2 — the GIVEN bootstraps the gardening (narrated).* Everything else the run needs is built in the
+scenario's GIVEN, read as narration: open the `Gardening` (`Gardening.open()` — boots the framework, finds
+the gardener), publish the `RunGate` into the registry so the scions resolve it (`registerService`, not a
+handler — the ambient run-condition the map's GIVEN names), build the `Cellar` realisation
+(`PulumiCellar.fromEnvironment`) and the `PreflightGate` (delegating to the exec's entry-gate enforcer),
+name the `Parcel`. The map's GIVEN — "I have access to the open gardening, and a RunGate" — IS this
+bootstrap; opening the gardening is a precondition, never a WHEN.
+
+*What crosses layer 1 → layer 2: exactly one value — the `RunMode`.* It is the sole fact only `Main`
+(inside `Pulumi.run`) can capture; the GIVEN bootstraps all the rest from it. It crosses through the
+launcher's *session store* — the inbound channel `JUnitLauncherCore.run(…, seedSessionStore)` exists for:
+`Main` seeds the value into the `LauncherSession` store; a jGiven-ordered `TestInstancePostProcessor`
+reads it and sets it on the scenario before the GIVEN runs. JUnit already bridges the two store realms —
+a Jupiter extension's `ExtensionContext.getStore(ns)` walks the parent chain up to the session-level store
+the driver seeded (same namespace parts on both sides), so no bridge code is written; the launcher's
+channel is used for what it was built for.
+
+*Why the store, not a static field or the global flag:* the store is the launcher's designed inbound
+channel (typed, namespaced, cross-thread-safe), and the amorce is where other execs will carry their own
+one-or-two irreducible facts — a generic `seed-bdd` mechanism (a typed key + the seeding consumer + the
+post-processor) earns its place, where a static field would be a per-exec one-off and re-reading the
+global `isDryRun()` in the GIVEN would couple the scenario to the `com.pulumi` global. This is NOT the
+former `HostSeeder`: it carries ONE value and sets it — no executor swap, no model injection, no report
+toggle, no probe fan-out. The channel, minus the machinery.
+
 == Related documentation
 
 * link:gardening-model-spec.adoc[The gardening model] — the roles the stages speak.

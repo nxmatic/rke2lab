@@ -284,6 +284,42 @@ that discipline surfaced a design defect — the watcher's re-parse — which th
 source.
 ====
 
+=== Diagram S — the amorce sequence: Pulumi wraps, the GIVEN bootstraps
+
+Diagram R is the static before/after; the amorce is DYNAMIC — the order the world is born in, the hardest
+seam. Two layers, one value crossing between them (the `RunMode`, through the launcher's session store).
+The frozen design lives in link:../osgi/seed-bdd-module-spec.adoc#the-amorce[seed-bdd-module-spec § the
+amorce]; this is its sequence.
+
+[mermaid]
+----
+sequenceDiagram
+  participant P as Pulumi
+  participant M as Main (host)
+  participant L as JUnitLauncherCore
+  participant S as ClusterSeedScenario (GIVEN)
+  participant G as Gardening (Felix + gardener)
+  participant Sc as a scion
+
+  P->>M: Pulumi.run(context)
+  Note over M: capture RunMode (isDryRun) — the ONE irreducible fact
+  M->>L: run(selectClass(ClusterSeedScenario), seed RunMode into session store)
+  L->>S: play — a post-processor sets RunMode before GIVEN
+  Note over S: GIVEN bootstraps (narrated):
+  S->>G: Gardening.open() — boot framework, find the gardener
+  S->>G: registerService(RunGate) — projected from RunMode (scions resolve it)
+  Note over S: build PulumiCellar, PreflightGate, Parcel
+  Note over S: WHEN ×7 — preflight · fetch · 4× sow-and-graft · store
+  S->>Sc: broker.sow(RunbookCoordinate(soil))
+  Sc-->>S: runbook JSON → ScenarioGraft grafts it host-side
+----
+
+*The frontier is precise:* Layer 1 (`Main`, inside `Pulumi.run`) is host-irreducible — the `com.pulumi`
+graph cannot enter Felix and `isDryRun()` is only knowable there. Layer 2 (the GIVEN) bootstraps the
+gardening as narration. Only the `RunMode` crosses, through the launcher's designed inbound channel — NOT
+the former `HostSeeder` (one value set, none of the executor-swap / model-injection / probe-fan-out
+machinery). Opening the gardening is the GIVEN, never a WHEN; the seven WHENs are the map's runbook.
+
 === Design scenarios — the host-pipeline capabilities as DSL sentences
 
 . *The pipeline refuses to touch the live system in preview* — `[narrated]` green +
