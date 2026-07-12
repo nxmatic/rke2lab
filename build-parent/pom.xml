@@ -304,6 +304,11 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>seed-bdd</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>seed-broker-codec</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>

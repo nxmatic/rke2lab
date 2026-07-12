@@ -37,18 +37,25 @@ host consumes it as a *flat jar*. Location and realm are independent axes — th
 not by module.
 
 * *One artifact, one BSN* (`io.nxmatic.rke2lab.osgi.foundation.seed.bdd`), both a bundle and a plain jar.
-* *The host-side spine is NOT exported* — the sow-and-graft caller, the world opening, the harness sit in
-  a base package the host reads on the flat classpath, never wired in-container. Exporting them would let
-  a bundle load a second copy of a seam class (the `DUPLICATE_REALM_CLASS` collision the engine's bnd
-  guards against).
-* *Only in-realm halves are exported* (if any) — what an in-container scion could one day want.
-* *Host-only imports are `resolution:=optional`* (`jgiven.report.*`, framework-launch, …) — exactly as
-  `scenario-engine`, so the bundle still RESOLVES when installed in-container for its exported packages.
+* *The SOW half IS exported* (`seed.bdd.sow` — `RunbookSower`). Sowing a runbook coordinate through the
+  broker is REALM-AGNOSTIC: the host sows today (embedded, one host), but a scion could sow another peer's
+  runbook in-container tomorrow (remote — the same door, the same gesture, § REST embedded-today /
+  remote-tomorrow). So the reusable half travels; the package is exported for that future in-realm reuse.
+* *The GRAFT half + the rest of the spine are NOT exported* — the base package `seed.bdd`
+  (`SowAndGraftStage` composing `ScenarioGraft`, the world opening, the Cellar stages, preflight). The
+  graft is LOCAL to whoever owns the runbook tree (`ScenarioGraft` is host-side by construction — one
+  jGiven engine, only JSON crosses), so it runs on the flat host classpath, never wired in-container.
+  Exporting a host-side stage would let a bundle load a second copy of a seam class (the
+  `DUPLICATE_REALM_CLASS` collision the engine's bnd guards against).
+* *Host-only imports are `resolution:=optional`* (framework-launch, jGiven, `org.osgi.framework`) — exactly
+  as `scenario-engine`, so the bundle still RESOLVES when installed in-container to provide `seed.bdd.sow`.
 
-This is NOT the codec's dual-realm (staged bundle + shaded flat, two copies). It is one jar whose
-non-exported base package the host uses flat, and whose exported packages a bundle *may* install —
-superset, not duplication. If a scion later needs the spine in-realm, that is the moment to reconsider —
-reversibly, per package, never by inflating the seam.
+This is the `scenario-engine` split, applied to the sow/graft asymmetry you surface for the remote mode:
+*export by PACKAGE, not by module*. The reusable SOW travels in-realm; the tree-local GRAFT stays home.
+It is NOT the codec's dual-realm (two copies) — one jar whose exported `sow` package a bundle *may* install
+and whose non-exported base package the host uses flat, superset not duplication. When the remote mode
+lands (a scion sowing a peer's sub-scenario), `seed.bdd.sow` is already the in-realm half it needs; any
+further stage a scion wants is exported then, per package, reversibly, never by inflating the seam.
 
 == Dependencies — leans on seed-port + engine, never inflates seed-port
 
