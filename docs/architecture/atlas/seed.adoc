@@ -337,7 +337,7 @@ flowchart TB
     b1["seed-master controlplane<br/>~95 files: pipeline/Topic grammar,<br/>host-side bbox/incus/systemd/readiness metier,<br/>IncusResourceBootstrap fuses graph + contacts + manifests"]
   end
   subgraph AFTER[After — gardening skeleton + door]
-    a1["host runbook: gardening only<br/>preflight · graft-callers (sow) · outputs=Cellar.store"]
+    a1["host runbook: gardening only<br/>preflight · Cellar.fetch · graft-callers (sow) · Cellar.store<br/>(the cellar bookends; between them, cultivated fresh)"]
     a2["domain metier = in-container scions<br/>bbox-bdd · incus-bdd · systemd-bdd · cluster-bdd (ship)"]
     a3["IncusResourceBootstrap: com.pulumi.* graph stays host;<br/>contacts + manifests graft reached by sow (cultivated fresh)"]
     a1 --> a2
