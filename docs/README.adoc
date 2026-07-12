@@ -23,7 +23,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:architecture/bootstrap/bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements and outputs
 * link:architecture/bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster/infrastructure identity flows through synthesis
 * link:architecture/patterns/context-registry-architecture.adoc[ContextRegistry Architecture] (✅ Complete) - Type-safe record sharing pattern with Pulumi Output interaction
-* link:architecture/bootstrap/provisioning-slice-architecture.adoc[Provisioning Slice Architecture] - Hot-reload vs static resource partitioning
+* link:architecture/bootstrap/provisioning-slice-architecture.adoc[The incus bootstrap of master] - the Pulumi graph + the materialized targets + the checksum→reload glue, and the current transposition gap
 * link:architecture/systemd/host-slot-management.adoc[Host Slot Management] - Slot rotation mechanism for deployment history, rollback, and audit trails
 
 === Policies & Configuration

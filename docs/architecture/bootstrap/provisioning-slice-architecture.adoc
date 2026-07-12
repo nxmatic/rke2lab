@@ -1,311 +1,199 @@
-= Provisioning Slice Architecture
+= The incus bootstrap of master — the Pulumi graph and the materialized targets
 :toc:
 :toclevels: 3
 
 == Overview
 
-Provisioning slices are independently reconcilable resource partitions that enable hot-reload of node components without full instance renewal. Each slice is a self-contained materializer component that declares what to materialize, its storage policy, and its materialized paths for checksum computation.
-
-== Execution Domains
-
-Slices are organized by *where* the resources execute:
-
-* **Node**: Runs on the node OS (systemd units, NRI plugin binary)
-* **K8s**: Runs in Kubernetes API (Pods, Services, ConfigMaps)
-* **Infrastructure**: Defines the instance itself (cloud-init, RKE2 initial bootstrap)
-
-== Storage Policies
-
-Each slice has a storage policy that determines lifecycle behavior:
-
-* **STATIC**: Changes trigger full instance renewal. Stored in Incus instance config (`user.rke2lab.provisioning.slice.*`). Used for infrastructure that defines the instance bootstrap.
-
-* **HOT_RELOAD**: Changes trigger reconciliation without instance renewal. Stored in Pulumi outputs and ConfigMaps. Used for runtime components that can be updated dynamically.
-
-== Three-Slice Architecture
-
-=== InfrastructureSlice (STATIC)
-
-Node infrastructure that defines the instance itself:
-
-* Cloud-init files (`/srv/host/cloudconfig-nocloud.d`)
-* RKE2 initial bootstrap config (`/srv/host/rke2-config.d`)
-* Environment ConfigMaps for systemd (`/srv/host/rke2lab-environment.d`)
-
-Changes require instance recreation because they define the bootstrap process.
-
-=== K8sSlice (HOT_RELOAD)
-
-Kubernetes API resources - reloadable via RKE2 auto-apply:
-
-* All manifest units from all domains (`/srv/host/rke2-manifests.d/<layer>/<package>/`)
-* Organized by: cluster, storage, replication, gitops, runtime, networking, mesh, ha, cicd
-* Includes DaemonSet manifests (e.g., flox-runtime DaemonSet)
-
-Hot-reloadable because RKE2 watches `/srv/host/rke2-manifests.d/` and Kubernetes reconciles changes.
-
-=== NodeSlice (HOT_RELOAD)
-
-Node runtime components:
-
-* Systemd units and scripts (`/srv/host/systemd-units.d`, `/srv/host/systemd-scripts.d`)
-* NRI plugin binary + hooks (`/srv/host/k8s-daemonset.d/runtime/flox`)
-* Future: other node-side agents, configs, binaries
-
-Hot-reloadable because:
-
-* Systemd can `daemon-reload` to pick up unit/script changes
-* DaemonSet init container + reconciler sidecar handle binary updates via trampoline to node
-
-== C4 Context Diagram: Slice Architecture in the Provisioning System
-
-[mermaid]
-----
-graph TB
-    subgraph PulumiApp["Pulumi Application (Stage A Bootstrap)"]
-        Bootstrap[IncusResourceBootstrap<br/>Orchestrates slice materialization]
-        Registry[ProvisioningSliceRegistry<br/>Tracks slices & checksums]
-        Inventory[ProvisioningResourceInventory<br/>Computes checksums via pipeline]
-    end
-
-    subgraph Slices["Slice Components (Self-Contained Materializers)"]
-        Infra[InfrastructureSlice<br/>STATIC: cloud-init, RKE2 bootstrap<br/>Triggers: instance renewal]
-        K8s[K8sSlice<br/>HOT_RELOAD: manifests<br/>Triggers: RKE2 auto-apply]
-        Node[NodeSlice<br/>HOT_RELOAD: systemd, NRI plugin<br/>Triggers: daemon-reload, DaemonSet trampoline]
-    end
-
-    subgraph Storage["Storage & Reconciliation"]
-        IncusConfig[Incus Instance Config<br/>user.rke2lab.provisioning.slice.*<br/>STATIC slices only]
-        PulumiOutputs[Pulumi Outputs / ConfigMaps<br/>HOT_RELOAD slices only]
-        Filesystem[Host Filesystem<br/>/srv/host/* mounted as disks]
-    end
-
-    subgraph Runtime["Runtime Consumers"]
-        CloudInit[cloud-init<br/>Consumes: Infrastructure slice]
-        RKE2[RKE2 Auto-Apply<br/>Watches: /srv/host/rke2-manifests.d]
-        Systemd[systemd daemon<br/>Loads: /srv/host/systemd-units.d]
-        Containerd[containerd + NRI<br/>Loads: /srv/host/k8s-daemonset.d]
-    end
-
-    Bootstrap -->|materialize & register| Infra
-    Bootstrap -->|materialize & register| K8s
-    Bootstrap -->|materialize & register| Node
-
-    Infra -->|register| Registry
-    K8s -->|register| Registry
-    Node -->|register| Registry
-
-    Bootstrap -->|compute checksums| Inventory
-    Inventory -->|reads slices from| Registry
-
-    Infra -->|writes to| Filesystem
-    K8s -->|writes to| Filesystem
-    Node -->|writes to| Filesystem
-
-    Inventory -->|static checksums| IncusConfig
-    Inventory -->|hot-reload checksums| PulumiOutputs
-
-    IncusConfig -->|change triggers renewal| CloudInit
-    CloudInit -->|bootstrap reads| Filesystem
-
-    PulumiOutputs -->|no renewal on change| RKE2
-    PulumiOutputs -->|no renewal on change| Systemd
-    PulumiOutputs -->|no renewal on change| Containerd
-
-    RKE2 -->|watches & reconciles| Filesystem
-    Systemd -->|daemon-reload from| Filesystem
-    Containerd -->|loads NRI plugin from| Filesystem
-
-    style Infra fill:#ffcccc
-    style K8s fill:#ccffcc
-    style Node fill:#ccffcc
-    style IncusConfig fill:#ffcccc
-    style PulumiOutputs fill:#ccffcc
-----
-
-**Legend:**
-
-* Red (STATIC): Changes trigger full instance renewal via Incus instance config
-* Green (HOT_RELOAD): Changes trigger reconciliation without renewal
-
-**Key Flows:**
-
-1. **Materialization**: Bootstrap orchestrates each slice to materialize its resources to `/srv/host/*`
-2. **Registration**: Slices self-register with registry, declaring name, policy, and paths
-3. **Checksum Partitioning**: Inventory computes checksums and partitions by policy
-4. **Storage Split**: STATIC → Incus config (triggers renewal), HOT_RELOAD → outputs (no renewal)
-5. **Runtime Consumption**: Each runtime component consumes its slice from mounted filesystem
-
-Each slice component:
-
-1. Implements `ProvisioningSlice` interface
-2. Materializes its own resources to filesystem
-3. Self-registers with the registry
-4. Declares its storage policy
-5. Provides paths for checksum computation
-
-== Registration Flow
-
-[mermaid]
-----
-sequenceDiagram
-    participant Bootstrap as IncusResourceBootstrap
-    participant Infra as InfrastructureSlice
-    participant K8s as K8sSlice
-    participant Node as NodeSlice
-    participant Registry as ProvisioningSliceRegistry
-
-    Bootstrap->>Infra: materialize(paths)
-    Infra->>Infra: write resources
-    Bootstrap->>Registry: register(infraSlice)
-
-    Bootstrap->>K8s: materialize(paths)
-    K8s->>K8s: write resources
-    Bootstrap->>Registry: register(k8sSlice)
-
-    Bootstrap->>Node: materialize(paths)
-    Node->>Node: write resources
-    Bootstrap->>Registry: register(nodeSlice)
-
-    Bootstrap->>Registry: computeChecksums()
-    Registry-->>Bootstrap: Slices(static, hotReload)
-----
-
-The registry partitions checksums by policy:
-
-* `staticSlices` → stored in Incus instance config
-* `hotReloadSlices` → stored in Pulumi outputs / ConfigMaps
-
-== Instance Replacement Mechanism
-
-The slice architecture integrates with Pulumi's resource lifecycle via a deliberate layering:
-
-1. **Our code**: Computes slice checksums and decides which go into instance config (STATIC only)
-2. **Pulumi layer**: Instance resource configured with `.replaceOnChanges(List.of("config", "config.*"))`
-3. **Incus SDK**: Auto-generated from upstream Pulumi provider (`pulumi-language-java`), vendor code
-4. **Incus API**: Receives delete + create operations from Pulumi
-
-When a STATIC slice checksum changes:
-
-* Our code writes new checksum to `user.rke2lab.provisioning.slice.*` in instance config
-* Pulumi detects config change → triggers replacement due to `replaceOnChanges`
-* Incus SDK executes delete-before-replace → instance renewed
-
-When a HOT_RELOAD slice checksum changes:
-
-* Our code stores checksum in Pulumi outputs (not instance config)
-* Pulumi sees no config change → no replacement triggered
-* Reconciler reads new checksum from outputs → hot-reloads component
-
-**Key insight**: We're not duplicating checksums. We're controlling **which** checksums appear in instance config to leverage Pulumi's existing `replaceOnChanges` mechanism. The Incus SDK doesn't have its own checksum logic - it's just a pass-through to the Incus API.
-
-== Class Structure
-
-[mermaid]
-----
-classDiagram
-    ProvisioningSlice <|.. InfrastructureSlice
-    ProvisioningSlice <|.. K8sSlice
-    ProvisioningSlice <|.. NodeSlice
-    ProvisioningSliceRegistry o-- ProvisioningSlice
-    ProvisioningSlice ..> SliceStoragePolicy
-
-    class ProvisioningSlice {
-        <<interface>>
-        +name() String
-        +storagePolicy() SliceStoragePolicy
-        +materialize(paths)
-        +getMaterializedPaths() List~Path~
-    }
-
-    class InfrastructureSlice {
-        +name() "infrastructure"
-        +storagePolicy() STATIC
-        +materialize(paths)
-    }
-
-    class K8sSlice {
-        +name() "k8s"
-        +storagePolicy() HOT_RELOAD
-        +materialize(paths)
-    }
-
-    class NodeSlice {
-        +name() "node"
-        +storagePolicy() HOT_RELOAD
-        +materialize(paths)
-        -materializeHostSystemdAssets()
-        -materializeResourceTree()
-    }
-
-    class ProvisioningSliceRegistry {
-        -sliceDefinitions Map
-        -sliceRoots Map
-        -pathOwnership Map
-        +register(slice)
-        +getSliceRoots() Map
-        +getStoragePolicy(name) SliceStoragePolicy
-    }
-
-    class SliceStoragePolicy {
-        <<enumeration>>
-        STATIC
-        HOT_RELOAD
-    }
-----
-
-== Key Design Decisions
-
-=== Why Systemd Units are in NodeSlice
-
-Systemd units and scripts are provisioned to `/srv/host/systemd-*` as disk mounts. They are:
-
-* Consumed by systemd daemon at runtime (not embedded in cloud-init)
-* Referenced via `RequiresMountsFor` and `ConditionPathExists` in unit files
-* Hot-reloadable via `systemctl daemon-reload`
-
-Therefore they belong in NodeSlice (HOT_RELOAD), not InfrastructureSlice (STATIC).
-
-=== Why Separate K8s and Node Slices
-
-K8sSlice contains Kubernetes API resources (YAML manifests). NodeSlice contains node-side binaries and configs consumed by those resources. Different execution domain, different reconciliation mechanism:
-
-* K8s: RKE2 auto-applies manifest changes → Kubernetes reconciles
-* Node: DaemonSet trampolines updates to host → systemd/containerd reloads
-
-=== Component Self-Registration vs ServiceLoader
-
-Slices are explicitly instantiated in `IncusResourceBootstrap.prepareHostState()` rather than discovered via `ServiceLoader`. This keeps the flow explicit and avoids the complexity of auto-discovery for a small, fixed set of slices.
-
-Revisit if slice count grows significantly.
-
-== Verification
-
-After deployment, verify slice partitioning:
-
-[source,bash]
-----
-# Static slice stored in instance config (triggers renewal on change)
-incus config show bioskop:master | grep "user.rke2lab.provisioning.slice"
-
-# Hot-reload slices in Pulumi outputs (no renewal on change)
-pulumi stack output seedProvisioningMetadata
-----
-
-Expected output structure:
-
-[source,yaml]
-----
-slices:
-  static:
-    infrastructure: "abc123..."
-  hotReload:
-    k8s: "def456..."
-    node: "789ghi..."
-----
+Seeding a master is two distinct gestures, fused for a long time in a single
+host class (`IncusResourceBootstrap`) and now being split along the realm
+boundary the gardening model draws:
+
+* **The Pulumi graph** — the `com.pulumi.incus` resources that provision the VM
+  itself: `Project · Network · Profile · Image · Instance`. This is a
+  `com.pulumi.*` object graph; it **stays host** (Pulumi cannot enter Felix). It
+  is the commissioner's own gesture, kept in `seed-master`.
+
+* **The materialization** — writing onto the master the files its downstream
+  consumers read (cloud-init seed, systemd units, k8s manifests, rke2 config, the
+  env-config overlay). This is *metier*: it reasons over domains, catalogs, layer
+  contributions. In the gardening model it is a **scion played in-container**
+  (`broker.sow`), fed a host-neutral activation payload — never a host class that
+  names `manifests.contract`.
+
+This document is the map of both gestures: what each materialized target writes,
+who reads it downstream, and its reload protocol — the load-bearing knowledge that
+must survive the transposition. It closes with the *current gap*: what the
+top-down demolition removed ahead of its replacement, so the work-list is explicit.
+
+== The materialized targets — what lands on master, and who reads it
+
+Each target is a downstream consumer that reads files we materialize and has its
+own reload protocol. This table is the authoritative contract of the seam; the
+paths and reload policies are what the master's scripts and daemons actually
+depend on.
+
+[cols="1,2,2,1",options="header"]
+|===
+| Target | Materializes onto master | Downstream consumer | Reload
+
+| `cloud-init`
+| `/var/lib/cloud/seed/nocloud/` (user-data, meta-data, network-config)
+| cloud-init, first boot
+| STATIC (defines the instance → change triggers instance renewal)
+
+| `systemd`
+| `/srv/host/systemd-{units,scripts,libexec}.d/`
+| systemd daemon
+| DYNAMIC (`systemctl daemon-reload`)
+
+| `k8s`
+| `…/server/manifests/` (`/srv/host/rke2-manifests.d/<layer>/<package>/`)
+| rke2-server manifest watch
+| DYNAMIC (RKE2 auto-apply → Kubernetes reconciles)
+
+| `rke2-config`
+| `manifestsRoot/runtime/rke2-config/` (etcd flags, advertise-address, TLS-SAN)
+| rke2-server, startup
+| DYNAMIC
+
+| `rke2lab-env`
+| `manifestsRoot/runtime/env-config/` — the per-section ConfigMaps + the
+  aggregated `99-configmap-env-section-controlplane-layer-contributions.yml`
+| flox `profile-common.sh` sources the YAMLs and turns their `data:` keys into
+  shell environment variables (incl. `RKE2LAB_POLICY_LINK_*`, read by
+  `rke2lab-manifests-install.sh` to decide which layers are symlinked live, and by
+  the per-layer `*-ready.sh` gates)
+| DYNAMIC
+|===
+
+`k8s` and `rke2-config` are *passive* — the cdk8s synthesis + explode fills their
+directories upstream; the target only declares ownership for checksum/inventory.
+`cloud-init`, `systemd`, and `rke2lab-env` are *active* producers.
+
+== The checksum→reload mechanism — the glue between the two gestures
+
+The reload column above is not documentation; it is *driven*. It is the nerve that
+joins the materialized targets (metier) to the Pulumi Instance (host), and it
+decides — per change — whether the master is *renewed* or *hot-reloaded*. Losing
+it means: even with the graph and the scions restored, a re-synthesis has no way to
+reconcile.
+
+The mechanism, as it stood:
+
+* Each target declares a `TargetReloadPolicy`: **STATIC** (consumed once, at
+  boot — e.g. cloud-init, which defines the instance) or **DYNAMIC** (re-watched
+  and re-applied on change — systemd, k8s, rke2-config, rke2lab-env).
+* A checksum is computed per target over its materialized roots (with foreign-
+  descendant scoping so a file owned by another target does not perturb the digest).
+* **STATIC** checksums are written into the Incus instance config under
+  `user.rke2lab.provisioning.slice.*`. The Pulumi `Instance` is configured with
+  `replaceOnChanges(["config", "config.*"])`, so a STATIC checksum change makes
+  Pulumi see a `config.*` diff and **replace the instance** (delete-before-create).
+* **DYNAMIC** checksums are stored in Pulumi outputs (not instance config). Pulumi
+  sees no config diff → no replacement; a reconciler reads the new checksum from
+  outputs and **hot-reloads** the component.
+
+The key insight the old design captured: we do not duplicate checksums, we control
+*which* checksums appear in instance config, to leverage Pulumi's existing
+`replaceOnChanges` — the Incus SDK is a pass-through to the Incus API, it has no
+checksum logic of its own.
+
+This straddles the realm boundary: the checksum *computation* reads materialized
+paths (metier, in-container with the scion), but the *partition* into instance
+config vs outputs and the `replaceOnChanges` wiring live on the Pulumi `Instance`
+(host). The target vision must place each half on its side and define how the
+per-target checksums cross from the scion to the host graph.
+
+== The activation payload — how "which layers" reaches the master
+
+The `RKE2LAB_POLICY_LINK_*` variables in the env-config overlay are the master's
+copy of the operator's per-domain activation choice (mesh on/off, cluster-api
+on/off, …). Their journey is the crux of the realm split:
+
+. The operator's choice lives in the Pulumi config (`policy.link.*`).
+. It must reach the `rke2lab-env` materialization as *seed variables* the
+  synthesis folds into the overlay ConfigMap.
+. The synthesis (the manifests domain) knows the vocabulary — the
+  `ManifestDomainCatalog`, the `RKE2LAB_POLICY_LINK_<X>_ENABLED` naming, the
+  `ManifestDomainPolicy` that filters which domains are synthesized at all.
+
+**Target shape:** the host `sow`s a host-neutral activation payload (raw booleans,
+`mesh: false`) — naming no domain type — and the in-container manifests scion
+translates it into both the `ManifestDomainPolicy` (synth-time: which domains are
+built) and the `seedVariables` (link-time: the `RKE2LAB_POLICY_LINK_*` written into
+the overlay). The translation that used to live host-side (`ManifestLinkPolicy`,
+`ControlplanePolicy`) descends into the scion, which alone may name its own catalog.
+`writeControlplaneOverlay(root, layerContext, seedVariables)` — already published
+OSGi-side as `NodeEnvOverlayService` — is the sink; it awaits a caller in the scion.
+
+== Current gap — what the demolition removed ahead of its replacement
+
+`IncusResourceBootstrap` (host, ~3800 lines) fused the Pulumi graph *and* a
+`ProvisioningTargetRegistry` of the five targets above. A top-down cut, driven by
+the target ClusterSeed scenario map (which shows only the gardening: preflight →
+`Cellar.fetch` → sow-and-graft → `Cellar.store`), removed the whole class before
+the replacement scions existed. The result is seven open deltas:
+
+[cols="1,3,2",options="header"]
+|===
+| # | Delta | Target home
+
+| 1
+| **Pulumi graph** — `Project/Network/Profile/Image/Instance`. Called nowhere
+  outside the generated SDK today. The scion `IncusProvisionScenario` builds the
+  *image* and probes *reachability*, but states itself that "the actual instance
+  provisioning stays host-side" — it does not provision. This is a **regression**:
+  the graph should have stayed host, per the atlas target.
+| host (`seed-master`) — restore
+
+| 2
+| `cloud-init` materialization
+| in-container scion, sow-triggered
+
+| 3
+| `systemd` materialization
+| in-container scion, sow-triggered
+
+| 4
+| `k8s` materialization (passive; synthesis already fills it)
+| in-container scion, sow-triggered
+
+| 5
+| `rke2-config` materialization (passive)
+| in-container scion, sow-triggered
+
+| 6
+| `rke2lab-env` overlay — `writeControlplaneOverlay` survives OSGi-side but is
+  orphaned (no caller); `ManifestLinkPolicy`/`ControlplanePolicy` survive
+  host-side but are consumed only by tests, their env-maps read by no production
+  path.
+| in-container scion (sink already present)
+
+| 7
+| **checksum→reload glue** — `TargetChecksumPipeline`, `TargetReloadPolicy`, the
+  STATIC/DYNAMIC partition, and the `replaceOnChanges` + `user.rke2lab.provisioning.slice.*`
+  instance-config wiring. Deleted whole. Without it, a re-synthesis cannot decide
+  renew-vs-hot-reload — the master neither recreates nor reconciles.
+| split: checksum computation in-container (scion); partition + `replaceOnChanges`
+  host (Pulumi Instance)
+|===
+
+There is no `manifests-bdd` yet: nothing in the seed flow triggers synthesis or
+materialization. The only live entry point is `manifests-cli` (outside the seed
+flow, via `ManifestSynthesisRequest.fromSystemProperties()`). All five
+materialization targets are orphaned *of trigger*, not of mechanism — the
+synthesis machinery survives intact OSGi-side, waiting to be played as a scion.
+
+**Why this matters:** a master provisioned by the previous binary carries the
+materialized files (the `99-…` overlay, the `RKE2LAB_POLICY_LINK_*` vars) because
+that binary still ran the registry. The current `seed-master` reproduces neither
+the Pulumi graph nor the materialization — so a fresh seed would not stand up a
+master. Closing these deltas is the substance of the incus/materialization
+transposition, distinct from (and larger than) the realm-boundary gate that first
+surfaced it.
 
 == Related Documentation
 
-* link:../bdd/bdd.adoc[BDD-as-engine] - the seeding expressed as jGiven scenarios on the JUnit launcher (slice checksum computation was once a fluent pipeline)
-* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/ProvisioningSlice.java[ProvisioningSlice.java] - Interface definition
-* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/NodeSlice.java[NodeSlice.java] - Implementation example
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[BDD-as-engine — the ClusterSeed scenario map] — the target host runbook these gestures compose into
+* link:../atlas/seed.adoc[Atlas — Seed orchestration] — Diagram R (the host realisation) states the graph stays host, the metier becomes scions
+* link:../osgi/seed-broker-spec.adoc[Seed broker spec] — `broker.sow` and the runbook handler, the channel the activation payload travels
