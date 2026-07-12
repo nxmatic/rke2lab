@@ -297,75 +297,80 @@ last.
 
 Order: Family 1 and Family 2 are independent (either first); Family 3 follows both.
 
-=== The crux — the "instance provisioned" WHEN, and a contradiction to settle
+=== The crux — the "instance provisioned" WHEN, and its resolution
 
 The ClusterSeed map (link:../bdd/bdd.adoc#clusterseed-scenario-map[bdd.adoc]) says
 the incus scion is "image + instance". Reality contradicts it: the scion
 (`IncusProvisionScenario`) builds the image and probes reachability, and states
-itself that "the actual instance provisioning stays host-side". The Pulumi graph
-that *provisions* the instance is host (Pulumi cannot enter Felix). So the WHEN has
-two parts in two realms, and the map's "image + instance = the scion" conflates
-them. Two shapes are on the table:
+itself that "the actual instance provisioning stays host-side". The provisioning
+that *brings the instance into being* is host: the Pulumi engine resolves the
+resource graph and drives the Incus provider over gRPC — a control flow that runs
+around `Main`, outside Felix. So the WHEN has two parts in two realms, and the
+map's "image + instance = the scion" conflates them.
 
-[cols="1,3",options="header"]
-|===
-| Shape | Consequence
+**Decision (settled): shape (A) — host provisions, then sows the scion to verify.**
 
-| **(A) Host provisions, then sows the scion.** The WHEN is two-beat: (a) the host
-  unrolls the Pulumi graph (Project/Network/Profile/Image/Instance); (b) it then
-  sow-and-grafts the incus scion that *verifies* image + reachability. Provision
-  (host) and verification (scion) are separated.
-| The graph is a genuine host step again — but the WHEN stops being a *uniform*
-  sow-and-graft caller (it gains a host-provision beat before the sow). The map's
-  regularity ("every root step is pure-host OR a sow-and-graft caller") needs a
-  third shape, or the provision beat folds into the pure-host register preceding
-  the sow. Keeps `com.pulumi` entirely out of Felix. **Aligned with the atlas.**
+The alternative — (B) *the scion drives, the host provides the graph as a service*
+— is ruled out on a hard constraint, not a preference: it would have the scion
+*direct* the provisioning, i.e. Pulumi's control flow crossing the seam INTO
+Felix. But it is the engine that resolves the graph and drives the provider; a
+scion has no engine around it. Pulumi crosses the frontier and directs the
+operations, never the reverse. (B) inverts the direction of control and is
+physically impossible.
 
-| **(B) The scion drives, the host provides.** The scion stays the WHEN body; the
-  Pulumi graph becomes a service the GIVEN publishes and the scion invokes.
-| Preserves the uniform caller shape — but drives `com.pulumi.*` into the scion's
-  path. Pulumi cannot enter Felix, so the "service" would have to be a host-side
-  proxy the scion calls across the seam per resource — heavy, and inverts the
-  "graph stays host" principle. **Likely ruled out.**
-|===
+So the WHEN is two-beat:
 
-=== Figure 3 — the two shapes of the "instance provisioned" WHEN
+. **(pure-host beat) the instance is provisioned** — the host declares the resource
+  graph (Project/Network/Profile/Image/Instance) and the Pulumi engine drives the
+  Incus provider over gRPC to create the VM. This sits in the *pure-host* register,
+  exactly like `Cellar.fetch` and preflight — no domain metier, no sow.
+. **(sow-and-graft beat) the instance is verified** — the host sow-and-grafts the
+  incus scion, which builds the image and probes reachability in-container, and
+  grafts its verdict.
+
+This keeps the map's regularity honest: a root step is *pure-host gardening* OR a
+*sow-and-graft caller*. The provisioning is the former (a host beat), the
+verification is the latter — two steps, each in one register, rather than one WHEN
+straddling both. The map's current single "the instance is provisioned (incus) —
+sow-and-graft" line splits into these two.
+
+=== Figure 3 — the resolved shape of the "instance provisioned" WHEN
 
 [mermaid]
 ----
-flowchart LR
-  subgraph A["(A) host provisions, then sows — atlas-aligned"]
-    direction TB
-    a1["host: unroll Pulumi graph<br/>(pure-host beat)"]
-    a2["sow incus scion<br/>→ verify image + reachability"]
-    a3["graft verdict"]
+flowchart TB
+  subgraph host["pure-host beat — provisioning (no metier, no sow)"]
+    a1["declare resource graph<br/>Project·Network·Profile·Image·Instance"]
+    a2["Pulumi engine → gRPC → Incus provider"]
+    a3["VM created"]
     a1 --> a2 --> a3
   end
 
-  subgraph B["(B) scion drives, host provides — likely ruled out"]
-    direction TB
-    b1["sow incus scion (WHEN body)"]
-    b2["scion calls a 'graph service'<br/>per resource, across the seam"]
-    b3["com.pulumi.* driven from<br/>the scion's path ✗ (cannot enter Felix)"]
+  subgraph sow["sow-and-graft beat — verification"]
+    b1["sow incus scion"]
+    b2["in-container: build image + probe reachability"]
+    b3["graft verdict"]
     b1 --> b2 --> b3
   end
 
-  classDef ok fill:#dfd,stroke:#2a2,stroke-width:2px;
-  classDef bad fill:#fee,stroke:#a22,stroke-width:2px;
-  class a1,a2,a3 ok;
-  class b1,b2,b3 bad;
+  a3 --> b1
+
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef s fill:#def,stroke:#25a,stroke-width:2px;
+  class a1,a2,a3 h;
+  class b1,b2,b3 s;
 ----
 
-In (A) the graph is a host beat *before* the sow (like `Cellar.fetch` precedes the
-grafts); the WHEN then sow-and-grafts the scion that only *verifies*. In (B) the
-scion stays the body but must reach `com.pulumi` across the seam — which the
-"Pulumi cannot enter Felix" constraint forbids.
+The provisioning beat is host (like `Cellar.fetch` precedes the grafts); the
+verification beat is the uniform sow-and-graft caller. Direction of control flows
+one way only — host provisions, then sows; Pulumi never runs from inside a scion.
 
 The materialization half is already half-answered by the map (bdd.adoc): the
 manifests/flox synthesis is a *graft cultivated fresh*, sown-reaped-consumed at
 once, never a cellar artifact. Family 2's `manifests-bdd` scion IS that fresh
-graft. What the map does not yet resolve is where the *Pulumi-graph* half lives —
-that is the (A)/(B) choice above, to be settled before Family 1 code.
+graft — sown during (or after) the provisioning beat, its material written to the
+master. The Pulumi-provisioning half is settled here as the pure-host beat above;
+Family 1 code follows this shape.
 
 == Related Documentation
 
