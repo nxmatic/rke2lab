@@ -414,10 +414,10 @@ flowchart TB
     s4["cluster: readiness·phase·observation"]
   end
   doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
-  r1 -.broker.sow RUNBOOK.-> s1
-  r2 -.broker.sow RUNBOOK.-> s2
-  r3 -.broker.sow RUNBOOK.-> s3
-  r4 -.broker.sow RUNBOOK.-> s4
+  r1 -."sow(RUNBOOK)".-> s1
+  r2 -."sow(RUNBOOK)".-> s2
+  r3 -."sow(RUNBOOK)".-> s3
+  r4 -."sow(RUNBOOK)".-> s4
   s1 -.graft JSON (host).-> r1
   s2 -.graft JSON (host).-> r2
   s3 -.graft JSON (host).-> r3
