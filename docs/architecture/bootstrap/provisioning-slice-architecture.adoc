@@ -1,4 +1,4 @@
-= The incus bootstrap of master — the Pulumi graph and the materialized targets
+= The incus bootstrap of master — Pulumi provisioning + the materialized targets
 :toc:
 :toclevels: 3
 
@@ -8,10 +8,17 @@ Seeding a master is two distinct gestures, fused for a long time in a single
 host class (`IncusResourceBootstrap`) and now being split along the realm
 boundary the gardening model draws:
 
-* **The Pulumi graph** — the `com.pulumi.incus` resources that provision the VM
-  itself: `Project · Network · Profile · Image · Instance`. This is a
-  `com.pulumi.*` object graph; it **stays host** (Pulumi cannot enter Felix). It
-  is the commissioner's own gesture, kept in `seed-master`.
+* **The Pulumi provisioning** — the `com.pulumi.incus` resources that bring the VM
+  itself into being: `Project · Network · Profile · Image · Instance`. The Java
+  code declares these as a *resource graph* (their dependencies: Instance needs
+  Image + Profile, Profile references Network, all under Project); the **Pulumi
+  engine** resolves that graph topologically and talks **gRPC** to the Incus
+  *resource provider* (a separate plugin process) which makes the real Incus API
+  calls. This whole machine — engine, gRPC channel, provider processes — lives
+  *around* the program, host-side: `Main` itself runs *inside* `Pulumi.run(...)`.
+  It therefore **stays host** (it cannot enter Felix — a scion in the OSGi
+  container has no engine around it). It is the commissioner's own gesture, kept
+  in `seed-master`.
 
 * **The materialization** — writing onto the master the files its downstream
   consumers read (cloud-init seed, systemd units, k8s manifests, rke2 config, the
@@ -32,10 +39,13 @@ top-down demolition removed ahead of its replacement, so the work-list is explic
 flowchart TB
   op["operator's Pulumi config<br/>(policy.link.*, incus.*)"]
 
-  subgraph host["HOST realm — seed-master (com.pulumi.* lives here)"]
-    pgraph["Pulumi graph<br/>Project·Network·Profile·Image·Instance"]
+  subgraph host["HOST realm — seed-master, inside Pulumi.run(...)"]
+    decl["resource declarations<br/>Project·Network·Profile·Image·Instance"]
+    engine["Pulumi engine<br/>resolves the graph, talks gRPC"]
     payload["activation payload<br/>(host-neutral booleans: mesh=false…)"]
   end
+
+  provider["Incus resource provider<br/>(gRPC plugin process)"]
 
   subgraph felix["OSGi realm — in Felix (metier, names its own catalog)"]
     scion["manifests scion (manifests-bdd)<br/>synthesis + materialization"]
@@ -47,26 +57,28 @@ flowchart TB
     vm["the VM instance"]
   end
 
-  op --> pgraph
+  op --> decl
   op --> payload
-  pgraph -->|provisions| vm
+  decl -->|"builds the resource graph"| engine
+  engine -->|gRPC| provider
+  provider -->|"Incus API creates"| vm
   payload -.->|"broker.sow (JSON, no domain type)"| scion
   scion -->|writes| files
-  pgraph -.->|"sow (verify)"| verify
-  verify -.->|"graft JSON"| pgraph
+  engine -.->|"sow (verify)"| verify
+  verify -.->|"graft JSON"| engine
 
   classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef f fill:#def,stroke:#25a,stroke-width:2px;
   classDef m fill:#fee,stroke:#a22,stroke-width:2px;
-  class host,pgraph,payload h;
+  class host,decl,engine,payload h;
   class felix,scion,verify f;
   class master,files,vm m;
 ----
 
 The seam is the dotted line: only host-neutral JSON crosses it (the activation
-payload in, the verdict/scion out). The Pulumi graph never enters Felix; the
-metier never leaves it. The master receives both the VM (from the host graph) and
-its files (from the scion).
+payload in, the verdict/scion out). The Pulumi engine + gRPC + provider never
+enter Felix; the metier never leaves it. The master receives both the VM (from
+the host, via the provider) and its files (from the scion).
 
 == The materialized targets — what lands on master, and who reads it
 
