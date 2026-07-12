@@ -352,7 +352,7 @@
         <artifactId>incus</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
-</dependencies>
+    </dependencies>
   </dependencyManagement>
 
   <!--
