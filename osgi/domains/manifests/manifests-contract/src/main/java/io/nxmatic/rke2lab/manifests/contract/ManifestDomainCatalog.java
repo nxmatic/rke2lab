@@ -13,8 +13,13 @@ import java.util.Objects;
  * "/operator"}) — something the instance accessors cannot do, since they require a built catalog.
  * The instance accessors and the builder's default-domain lists both reference these constants too,
  * so a domain string is spelled exactly once in the codebase.
+ *
+ * <p>A record — the two lists are its state; {@link #builder()} is the endorsed construction path
+ * (validation lives in {@link Builder#build()}, the canonical constructor defensively copies). It
+ * is a record, not a plain class, so it stays on the contract face (contract-purity: the seam
+ * carries records / enums / interfaces, never a concrete class).
  */
-public final class ManifestDomainCatalog {
+public record ManifestDomainCatalog(List<String> all, List<String> stageALinkableDomains) {
 
   public static final String CLUSTER = "cluster";
   public static final String STORAGE = "storage";
@@ -27,12 +32,9 @@ public final class ManifestDomainCatalog {
   public static final String CLUSTER_API = "cluster-api";
   public static final String PLATFORM = "platform";
 
-  private final List<String> all;
-  private final List<String> stageALinkable;
-
-  private ManifestDomainCatalog(Builder builder) {
-    this.all = List.copyOf(builder.allDomains);
-    this.stageALinkable = List.copyOf(builder.stageALinkableDomains);
+  public ManifestDomainCatalog {
+    all = List.copyOf(all);
+    stageALinkableDomains = List.copyOf(stageALinkableDomains);
   }
 
   public static Builder builder() {
@@ -77,14 +79,6 @@ public final class ManifestDomainCatalog {
 
   public String platform() {
     return PLATFORM;
-  }
-
-  public List<String> all() {
-    return all;
-  }
-
-  public List<String> stageALinkableDomains() {
-    return stageALinkable;
   }
 
   public boolean isKnownDomainId(String domainId) {
@@ -164,7 +158,7 @@ public final class ManifestDomainCatalog {
         throw new IllegalArgumentException(
             "Manifest domain catalog must contain at least one domain");
       }
-      return new ManifestDomainCatalog(this);
+      return new ManifestDomainCatalog(List.copyOf(allDomains), List.copyOf(stageALinkableDomains));
     }
   }
 

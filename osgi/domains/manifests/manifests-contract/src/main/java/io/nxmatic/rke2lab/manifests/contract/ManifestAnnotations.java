@@ -9,8 +9,13 @@ import java.util.Map;
  *
  * <p>These annotations enable manifest exploding (splitting consolidated YAML into per-resource
  * files organized by domain/package).
+ *
+ * <p>A stateless record — the annotation keys are compile-time constants (composable at
+ * static-init), and {@link #packageAnnotations} is the pure map-building behavior a manifest unit
+ * calls. Record, not a plain class, so it stays on the contract face (contract-purity: the seam
+ * carries records / enums / interfaces, never a concrete class).
  */
-public final class ManifestAnnotations {
+public record ManifestAnnotations() {
 
   public static final String DOMAIN = "io.nxmatic.rke2lab/domain";
   public static final String PACKAGE = "io.nxmatic.rke2lab/package";
