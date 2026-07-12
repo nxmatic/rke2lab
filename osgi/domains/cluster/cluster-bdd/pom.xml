@@ -78,6 +78,14 @@
       <artifactId>osgi.core</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- bnd-consumed construction annotations: ClusterRunbookHandler (@Component) publishes the runbook
+         SeedHandler that plays this bundle's scenario in-container. provided — SCR supplies the
+         runtime, bnd only needs them to emit the descriptor + the extender requirement. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- The out-of-container proof: OutOfContainerFrameworkExtension boots a real Felix (test scope),
          installs this bundle + its closure, and plays the scenario — the mock ClusterReadinessContact
