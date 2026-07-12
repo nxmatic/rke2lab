@@ -58,15 +58,44 @@ Two facts the reading settled, both load-bearing and both places I had it wrong 
      carried doctor names, but that WAS the leak the de-seam exposes — all three do the one thing: persist
      onto the Pulumi state. The doctor is the cellar's first consumer, not its owner.
 
-. *`store` does NOT use the split.* CREATE files one sealed envelope under its coordinate SLUG, payload
-  verbatim — no `FIELD_*`, no `@Scion`/`@Rootstock` reflection. The split/HATEOAS mechanism (shipped,
-  see below) is a SEPARATE, LATER concern: it is how a reaped plant that ADVERTISES graft coordinates
-  gets each grafted sub-scion filed under its own coordinate — a COMPOSITION of stores, not the store
-  gesture itself. The host Cellar needs none of it to compile or to serve the doctor's read/write.
+. *`store` of a COMPOSITE asks the gardener "what is this?"; `store` of a single part is verbatim
+  (corrected 2026-07-12 — the model's link:gardening-model-spec.adoc#cellar-asks[cellar-asks] law).* The
+  cellar does not open the sachet and does not let the caller say where. Recognising two cases:
+  ** *ledger (intervention)* — a single sealed part: filed verbatim under its coordinate, no split. This is
+     the degenerate case (nothing to decompose), and it is ALREADY opaque in the shipped
+     `PulumiInterventionLedgerWriter`/`StackInterventionJournal` — only the leak NAMES remain
+     (`OUTPUT_KEY="interventions"`, `DoctorCoordinate.INTERVENTION`).
+  ** *medical-record (visit)* — a COMPOSITE: the cellar (holding the opaque envelope) asks the gardener
+     `sow(SplitCoordinate(domain), envelope)`, gets back neutral parts (`{ rootstock → { role → value } }`
+     — drawers and cases, `Role.FRUIT`/`Role.SOWING`), and files each part verbatim in its case. The split
+     is the STORE mechanism for a composite, not a separate later concern — the shipped `DoctorSplitReflector`
+     exists precisely to answer this.
+
+*The real leak the cartography exposed (2026-07-12).* Splitting a visit by case is CORRECT and neutral
+(`Role.*` is furniture vocabulary, not a doctor word — "one does not mix the seeds"). The leak is that
+today `StackMedicalRecordJournal.visitEnvelope` RECOMPOSES a `VisitWire` (a doctor type) host-side from the
+two role-keyed outputs, and the OSGi reader then `codec.decode(…, VisitWire.class)`. The fix is directional,
+not flattening: the host `fetch` returns the case contents OPAQUE (sealed sachets, addressed by case), and
+the `{cases} → Visit` recomposition moves to the DOMAIN (`MedicalRecordReader`, OSGi). Today it is
+inverted (host recomposes, OSGi decodes); the furniture model says the host files/returns neutral cases and
+the doctor assembles.
 
 The one mechanical change that makes CRUD opaque: `StackSnapshot.outputsNamed` stops being keyed on a
 domain FIELD name (`"consultationReport"`, `OUTPUT_KEY="interventions"`) and starts being keyed on the
-COORDINATE SLUG (the envelope shell). That single reshape kills both leak names.
+neutral case/coordinate (`Role.*` / the envelope shell), never a doctor field. That single reshape kills
+both leak names.
+
+[IMPORTANT]
+====
+*The read-side reflector (HATEOAS) is DESIGNED, NOT CODED — a missing OSGi piece beside this host Cellar.*
+The STORE direction has its shipped reflector (`DoctorSplitReflector` serving `SplitCoordinate`). The
+symmetric READ idiom — holding an opaque sachet and asking "what can I reap from this?" then `sow`ing at an
+advertised coordinate (seed-broker-spec § `hateoas-the-plant-advertises`) — has NO reflector yet. It is not
+needed for the doctor's current read path (which fetches by a KNOWN coordinate — the address suffices, no
+"what is this?"), so it does not block this host Cellar. But `fetch`-by-advertised-role, when a consumer
+needs it, requires that missing OSGi piece; it is out of THIS doc's scope, noted so it is not assumed
+present.
+====
 
 === The `pulumi ↔ seed ↔ doctor` shape (seed-broker-spec, restated)
 
@@ -78,6 +107,105 @@ The middle (`seed`) speaks gardening; two mirror adapters project ONTO it, never
 * *Doctor side — the HANDLER (`doctor-core`, OSGi):* `Patient → parcel`, `ConsultationReport → plant`.
   Knows the doctor + the neutral, NEVER Pulumi. **Already shipped.**
 * The two never meet: neither imports the other's vocabulary, both import only the middle.
+
+.C4 L2 Container (static) — where the Cellar lives, the seam it crosses, who holds whom
+[mermaid]
+----
+flowchart TB
+  subgraph hostjvm["Host JVM (flat classpath) — the COMMISSIONER"]
+    pulumi["Pulumi runtime<br/>(com.pulumi.*)"]
+    edge["pulumi-edge<br/>the CELLAR impl + Stack* helpers"]
+    backend["file:// Pulumi backend<br/>(stacks, history, checkpoints)"]
+    edge --> backend
+    pulumi -.-> edge
+  end
+  subgraph felix["Embedded Felix (OSGi) — SOILS + GARDENER"]
+    broker["DefaultSeedBroker<br/>(the door)"]
+    doctor["doctor-core<br/>@Reference Cellar"]
+    reflector["DoctorSplitReflector<br/>(SeedHandler)"]
+    broker --> reflector
+    doctor --> broker
+  end
+  edge ==>|"registerService(Cellar.class) at boot<br/>(seam type, shared Class)"| doctor
+  edge ==>|"store composite: sow(SplitCoordinate)"| broker
+
+  style hostjvm fill:#fff4e6,stroke:#ff9900
+  style felix fill:#eef,stroke:#88a
+  style edge fill:#ffe0b2,stroke:#ff9900,stroke-width:2px
+  style backend fill:#ffffff,stroke:#ff9900
+  style broker fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+----
+
+*Legend:* the CELLAR impl is a HOST object (it reads the Pulumi backend, so it cannot be a Felix bundle);
+it crosses into Felix as a `type=seam` service via `registerService(Cellar.class, …)` at boot, consumed
+by `doctor-core` `@Reference`. For a composite `store` the edge is itself a broker CLIENT
+(`sow(SplitCoordinate, …)`). Bold edges are the two host→Felix crossings; the backend is host-only.
+
+.C4 L4 Code (static) — the types at the seam (what crosses, what stays)
+[mermaid]
+----
+flowchart LR
+  subgraph seam["seed-broker-port (type=seam — shared Class both sides)"]
+    Cellar["«interface» Cellar<br/>store / fetch / neighbours"]
+    Parcel["«record» Parcel<br/>(project, stack)"]
+    Envelope["«record» SeedEnvelope<br/>(domain, coordinate, payload)"]
+    Role["«const» Role<br/>FRUIT / SOWING (cases)"]
+    Split["«record» SplitCoordinate"]
+  end
+  subgraph hostcode["pulumi-edge (host only)"]
+    Impl["«class» PulumiCellar<br/>implements Cellar"]
+    Stack["Stack{Handle,History,Snapshot}"]
+    Impl --> Stack
+    Impl -.implements.-> Cellar
+  end
+  subgraph doctorcode["doctor-contract / doctor-core (OSGi only)"]
+    VisitWire["«record» VisitWire"]
+    Reader["«class» MedicalRecordReader<br/>ASSEMBLES from cases"]
+    Reader --> VisitWire
+  end
+  Impl -->|"fetch → opaque cases"| Envelope
+  Envelope -->|"cross the seam"| Reader
+  Impl -->|"addresses by"| Parcel
+  Impl -->|"files by case"| Role
+
+  style seam fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+  style hostcode fill:#fff4e6,stroke:#ff9900
+  style doctorcode fill:#eef,stroke:#88a
+----
+
+*Legend:* green = the seam types (the ONLY types shared across the frontier — a shared `Class`); orange =
+host-only (`PulumiCellar` + the `Stack*` helpers, never seen by OSGi); blue = OSGi-only (`VisitWire`,
+`MedicalRecordReader` — the doctor types the host must NOT name). The crossing carries only
+`SeedEnvelope`s (opaque) addressed by `Parcel`, filed by neutral `Role` cases. `VisitWire` stays
+OSGi-side — the whole point of moving assembly there.
+
+.C4 L3 Component (dynamic) — the host returns opaque CASES; the DOMAIN assembles the visit (the corrected direction)
+[mermaid]
+----
+flowchart LR
+  subgraph host["pulumi-edge (host) — the CELLAR"]
+    fetch["fetch(parcel)<br/>read outputs by case<br/>(fruit / sowing)"]
+    cases["opaque CASES<br/>sealed sachets,<br/>NO VisitWire built"]
+    fetch --> cases
+  end
+  subgraph osgi["doctor-core (OSGi) — the DOMAIN"]
+    reader["MedicalRecordReader<br/>ASSEMBLES the Visit<br/>from the cases"]
+    visit["Visit / MedicalRecord<br/>(doctor types, legal HERE)"]
+    reader --> visit
+  end
+  cases -->|"neutral cases cross the seam"| reader
+
+  style host fill:#fff4e6,stroke:#ff9900
+  style osgi fill:#eef,stroke:#88a
+  style cases fill:#ffffff,stroke:#ff9900,stroke-width:2px
+  style reader fill:#e8eaf6,stroke:#3949ab,stroke-width:2px
+----
+
+*Legend (target, not current):* today it is INVERTED — the host builds a `VisitWire` (a doctor type it can
+no longer name) and OSGi decodes it. The furniture model reverses the direction: the host `fetch` returns
+neutral cases opaque, and `MedicalRecordReader` (where `VisitWire` now lives) assembles. This is the FIRST
+code step (§ <<plan>>), prerequisite to the host Cellar emerging without re-incarnating the host-side
+recomposition.
 
 == The `Cellar` contract (already in `seed-broker-port`, `type=seam`)
 
@@ -182,9 +310,22 @@ verify -Dmaven.build.cache.skipCache=true -DskipTests=false` (NEVER `install`; c
   confirmation, no code. Parcel arity + register-timing are already resolved (2026-07-12). Blocks
   nothing else once answered.
 
+. *FIRST CODE STEP — move the visit ASSEMBLY host→OSGi (resequenced 2026-07-12).* The "OSGi is stable"
+  premise does NOT hold for the visit read path: `StackMedicalRecordJournal` RECOMPOSES a `VisitWire`
+  host-side (`new VisitWire(…, outputsNamed(Role.FRUIT), outputsNamed(Role.SOWING))`) — a doctor type the
+  host can no longer even name (it is why `pulumi-edge` fails to compile). Before the host Cellar can
+  emerge cleanly, `MedicalRecordReader` (OSGi, where `VisitWire` now lives) must ASSEMBLE the visit from
+  the neutral cases the cellar returns (`fruit`/`sowing`), instead of receiving a host-built `VisitWire`.
+  Doing this FIRST is the whole point of the ordering: if the host Cellar came first, we would be forced
+  to either break compilation or re-incarnate the host-side recomposition — the exact bad pattern the
+  furniture model forbids. The read reflector (HATEOAS) is NOT on this path (the doctor fetches by a KNOWN
+  coordinate — the address suffices); it stays designed-not-coded, out of scope here.
+
 . *Write the host `Cellar` impl* (working name `PulumiCellar` / `StackCellar` — pick in step 1) in
-  `pulumi-edge`, implementing `store`/`fetch`/`neighbours` by fusing the three journals' mechanics,
-  keyed by coordinate slug (no `FIELD_*`, no `OUTPUT_KEY`, no doctor import).
+  `pulumi-edge`, implementing `store`/`fetch`/`neighbours` as the conservation ROLE over a composition of
+  furnitures: `fetch` returns the neutral CASES opaque (no `VisitWire`, no doctor import); `store` files a
+  single part verbatim (ledger) and asks the gardener to split a composite (visit) — the cellar is itself
+  a broker CLIENT for the composite store. No `FIELD_*`, no `OUTPUT_KEY`.
 
 . *Retire the three fused classes* (`StackMedicalRecordJournal`, `StackInterventionJournal`,
   `PulumiInterventionLedgerWriter`) and the leak constants (`InterventionLedgerLayout.OUTPUT_KEY`, any

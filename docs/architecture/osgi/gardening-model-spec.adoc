@@ -52,10 +52,42 @@ INCARNATES each one, but the role is the model's, not the realisation's.
 | Carries the request in and the harvest back, speaking ONLY gardening, holding no plot's vocabulary.
 
 | *CELLAR*
-| The COMMISSIONER's conservation organ, its neutral face turned toward the growers. *Not a sixth actor*
-  — it is how the commissioner conserves: a neutral, addressable, append-only store that holds crops OR
-  tools and is never typed by its contents.
+| The COMMISSIONER's conservation organ, its neutral face turned toward the growers. *Not a sixth actor*,
+  and *not a single piece of furniture* — it is a COMPOSITION of furnitures (pot, vase, fridge, shelf,
+  seed-drawer cabinet, tool board) federated by the conservation ROLE. It holds crops OR tools, sealed,
+  never typed by its contents (§ <<cellar-asks>>).
 |===
+
+.C4 L1 System-Context (static) — the five roles and who talks to whom (the client has ONE relationship: it sows)
+[mermaid]
+----
+flowchart TB
+  commissioner["COMMISSIONER (provisioner)<br/>wants · launches · CONSERVES<br/>[the driving actor]"]
+  gardener["GARDENER<br/>grows on all plots, owns none<br/>routes a seed by coordinate<br/>[the one door: sow]"]
+  soils["SOILS / plots<br/>the DOMAINS — each grows<br/>only what it owns<br/>[the growers]"]
+  cellar["CELLAR<br/>conservation ROLE over a<br/>composition of furnitures<br/>[neutral, sealed, addressable]"]
+  tools["TOOLS + channel<br/>carries request in / harvest back<br/>speaks ONLY gardening"]
+
+  commissioner -->|"sows the first seed"| gardener
+  commissioner -.->|"conserves via"| cellar
+  gardener -->|"routes to the grower"| soils
+  soils -->|"stores / fetches (@Reference)"| cellar
+  tools -.->|"carries for"| commissioner
+
+  classDef actor fill:#efe6fb,stroke:#8250df;
+  classDef door fill:#e1f5ff,stroke:#0066cc,stroke-width:3px;
+  classDef grow fill:#e8f5e9,stroke:#2e7d32;
+  classDef store fill:#fff4e6,stroke:#ff9900;
+  class commissioner,tools actor;
+  class gardener door;
+  class soils grow;
+  class cellar store;
+----
+
+*Legend:* purple = the driving actor + its channel; blue = the one door (`sow`); green = the growers
+(domains); orange = the conservation store. Solid = the seed/store flow; dashed = an ownership/carry
+relation. Note the cellar is reached by the GROWER (`@Reference`), never by the gardener — the gardener
+only routes; and the commissioner conserves THROUGH the cellar, which is its own organ.
 
 [IMPORTANT]
 ====
@@ -69,6 +101,104 @@ confusions the model rules out:
   concern. A grower may STORE into / FETCH from the cellar (it is a tool laid in its hand), but the
   cellar is owned by the commissioner, not by the gardener.
 ====
+
+[[cellar-asks]]
+== The cellar is a composition of furnitures + a role — and it asks the gardener where to file
+
+The cellar is not one store with one flat shelf. It is a COMPOSITION of *furnitures* — each a neutral,
+STRUCTURED addressing space of one nature (the *pot* = per-resource output, the *vase* = top-level
+export, the *fridge* = a history entry, the *shelf* = an entry's address, the *seed-drawer cabinet* =
+drawers/cases, the *tool board* = the registered collaborators) — federated by the conservation ROLE. It
+is the role that makes these furnitures A cellar rather than a heap; `store`/`fetch`/`neighbours` are the
+role's interface, and BEHIND them the role dispatches to the right furniture.
+
+Two furniture laws, model-level:
+
+* *One does not mix.* Each thing has ITS place — this seed in that drawer, that case; this preserve on
+  that shelf. Storage is structured, never a heap.
+* *The sachet stays sealed.* A furniture knows the PLACE (the _where_), never the CONTENT (the _what_).
+  Structure is not opening.
+
+.C4 L3 Component (static) — the CELLAR is the conservation ROLE composing several furnitures (each a neutral addressing space)
+[mermaid]
+----
+flowchart TB
+  subgraph cellar["CELLAR — conservation ROLE (store / fetch / neighbours)"]
+    direction TB
+    role["the ROLE dispatches by NATURE<br/>(learnt from the gardener's answer)"]
+    subgraph furn["furnitures — neutral, STRUCTURED addressing spaces"]
+      direction LR
+      pot["pot<br/>per-resource output<br/>[a rooted plant]"]
+      vase["vase<br/>top-level export<br/>[cut flowers]"]
+      fridge["fridge<br/>a history entry<br/>[a preserve]"]
+      shelf["shelf<br/>an entry's address"]
+      drawers["seed-drawer cabinet<br/>drawer = @Rootstock<br/>case = @Scion(Role)"]
+      board["tool board<br/>registered collaborators<br/>(Cellar, RunGate)"]
+    end
+    role --> pot
+    role --> vase
+    role --> fridge
+    role --> drawers
+    pot -.-> shelf
+    fridge -.-> shelf
+  end
+
+  style cellar fill:#fff4e6,stroke:#ff9900,stroke-width:2px
+  style role fill:#ffe0b2,stroke:#ff9900,stroke-width:2px
+  style furn fill:#fffaf3,stroke:#ffcc80
+  classDef piece fill:#ffffff,stroke:#ff9900;
+  class pot,vase,fridge,shelf,drawers,board piece;
+----
+
+*Legend:* the ROLE (`store`/`fetch`/`neighbours`) is the single face; the furnitures behind it are the
+natures it dispatches to. Each furniture is neutral and structured — it holds sealed sachets at
+determined places (shelf, drawer/case), never typed by contents. "One does not mix" is why they are
+distinct furnitures; "the sachet stays sealed" is why none of them opens a payload.
+
+[IMPORTANT]
+====
+*Filing is not blind, and it is not the caller's job — the CELLAR asks the gardener "what is this?".*
+When a grower says `store(parcel, thing)`, it hands an OPAQUE, possibly composite sachet and does NOT say
+where. The cellar itself — holding only the sealed envelope — asks the gardener to decompose it
+(`sow(SplitCoordinate(domain), sachet)`), and the gardener answers in NEUTRAL parts
+(`{ rootstock → { role → value } }` — drawers and cases, never a domain field name). From that answer the
+cellar learns both the NATURE (which furniture: pot / vase / fridge) and the PLACE (which case), and files
+each part verbatim. So three parties each know one thing, and none opens the sachet:
+
+* the *caller* knows nothing of storage — it says "file this";
+* the *cellar* knows the FURNITURE (how/where to file neutral parts) — but asks the gardener for the _what_;
+* the *gardener* (via the domain's split reflector) knows the DECOMPOSITION (which parts, which cases).
+
+*Asymmetry with retrieval.* Storing a composite REQUIRES the "what is this?" round-trip. Fetching BY A
+NAMED coordinate does NOT: the named coordinate IS the address — filed there, re-read there. The cellar is
+therefore itself a CLIENT of the gardener (for `store`), never the reverse; the gardener only ROUTES a
+retrieval to the grower, and the grower draws from the cellar it holds. The one case where retrieval again
+becomes a question to the gardener is HATEOAS — holding an opaque sachet and NOT knowing the coordinate,
+one asks it what it advertises, then `sow`s at the advertised coordinate (the same one verb).
+====
+
+.C4 L3 Component (dynamic) — storing a COMPOSITE: the cellar asks the gardener "what is this?", then files neutral parts
+[mermaid]
+----
+sequenceDiagram
+  participant Grower as GROWER (caller)
+  participant Cellar as CELLAR (conservation role)
+  participant Gardener as GARDENER (broker)
+  participant Furniture as FURNITURE (drawer/case)
+
+  Grower->>Cellar: store(parcel, sachet)  [opaque, maybe composite]
+  Note over Cellar: holds only the sealed envelope<br/>does NOT open it
+  Cellar->>Gardener: sow(SplitCoordinate(domain), sachet)  "what is this?"
+  Gardener-->>Cellar: { rootstock → { role → value } }  [neutral parts]
+  Note over Cellar: learns NATURE + PLACE<br/>from the answer
+  Cellar->>Furniture: file each part VERBATIM in its case
+  Note over Grower,Furniture: three parties, one fact each — none opens the sachet
+----
+
+*Legend:* the caller says only "file this"; the CELLAR (not the caller) asks the gardener to decompose;
+the gardener answers in neutral drawers/cases; the cellar files verbatim. For a SINGLE part (the ledger)
+there is nothing to decompose — the round-trip degenerates and the sachet is filed directly. For a fetch
+BY A NAMED coordinate there is no round-trip at all (the address is the where).
 
 == The verbs — two registers that share no word
 

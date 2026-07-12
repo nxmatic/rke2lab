@@ -426,6 +426,48 @@ with the previous atlas vision: the host-adaptation is the mechanism that realis
 already drew, not a competing shape. The next step (increment: OSGi `seed ↔ doctor` first, then host
 `seed ↔ pulumi`) is licensed.
 
+=== The Cellar realisation — the visit-assembly direction flips (2026-07-12)
+
+The `SeedBrokerCatalog.FIELD_*`/`OUTPUT_KEY` erasure above (l.417) is realised by the CELLAR: the three
+doctor-named host ports fuse into one neutral `Cellar` impl. The spec sub-parts this atlas links:
+
+* link:../osgi/gardening-model-spec.adoc[the gardening model] — the ROLE model (five roles; the cellar
+  as a composition of furnitures; the cellar asks the gardener "what is this?" to store a composite).
+* link:../osgi/host-cellar-realisation-spec.adoc[host Cellar realisation] — the Pulumi realisation of the
+  cellar role (the impl, the L2/L4 seam figures).
+
+The one edit this atlas records is a DIRECTION flip on the visit read path — the leak the cartography
+exposed (a doctor type, `VisitWire`, recomposed HOST-side, which the de-seam now forbids the host to
+name):
+
+.Diagram E — visit assembly: BEFORE (host recomposes) vs AFTER (OSGi assembles from neutral cases)
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — host recomposes a doctor type]
+    b_host["StackMedicalRecordJournal (host)<br/>new VisitWire(outputsNamed(FRUIT),<br/>outputsNamed(SOWING))"]
+    b_osgi["MedicalRecordReader (OSGi)<br/>codec.decode(VisitWire.class)"]
+    b_host -->|"VisitWire crosses (doctor type!)"| b_osgi
+  end
+  subgraph AFTER[After — host returns neutral cases, domain assembles]
+    a_host["Cellar.fetch (host)<br/>return opaque CASES<br/>(fruit / sowing) — no VisitWire"]
+    a_osgi["MedicalRecordReader (OSGi)<br/>ASSEMBLES Visit from cases"]
+    a_host -->|"neutral cases cross"| a_osgi
+  end
+  BEFORE -.the flip.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+  style b_host fill:#fff,stroke:#c0392b
+  style a_host fill:#fff,stroke:#2e7d32
+----
+
+*Monotone check:* no box of Diagram P or the host-adaptation is erased or rewired — this only reverses
+one arrow's direction (assembly moves host→OSGi), which is exactly what "the host speaks only gardening"
+demanded once `VisitWire` moved into `doctor-contract`. The ledger path is already opaque (a single part,
+nothing to flip). *Sequencing residue:* the read-side HATEOAS reflector is designed-not-coded (off the
+critical path); the visit-assembly flip is the FIRST code step, prerequisite to the host Cellar emerging.
+
 === Design scenarios — the doctor capabilities as DSL sentences
 
 The doctor view predates the capability-anchoring device, so its design lived only in the inventory

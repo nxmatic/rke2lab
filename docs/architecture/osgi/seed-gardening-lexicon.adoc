@@ -190,7 +190,17 @@ FR-EN reserve it draws from.
 == Conservation (post-récolte) — le registre du commanditaire
 
 Un registre ADJACENT au jardinage : ce que le commanditaire fait de la récolte, une fois la frontière
-re-traversée. Le contenant SUIT la nature de ce que le jardinier rapporte (ce n'est pas un choix libre).
+re-traversée.
+
+=== Les MOBILIERS — des espaces d'adressage neutres et structurés
+
+Chaque mobilier est un espace de rangement d'une NATURE donnée, adressé par une place déterminée. Deux
+règles gouvernent tous les mobiliers :
+
+* *On ne mélange pas.* Chaque chose a SA place : telle graine dans tel tiroir, telle case ; telle conserve
+  sur telle étagère. Le rangement est STRUCTURÉ, jamais un tas.
+* *Le sachet reste scellé.* Le mobilier connaît la PLACE (le _où_), jamais le CONTENU (le _quoi_) : la case
+  ne sait pas ce qu'il y a dans le sachet. Structure ≠ ouverture.
 
 |===
 | Français | English | Terme modèle seed
@@ -198,11 +208,29 @@ re-traversée. Le contenant SUIT la nature de ce que le jardinier rapporte (ce n
 | pot | pot | **output per-resource** (niché sous sa resource) — pour une plante enracinée
 | vase | vase | **export top-level** — pour des fleurs coupées (une valeur autonome)
 | frigidaire | fridge | **un fruit conservé** — une conserve précise (une entrée d'historique)
-| cellier | cellar | **le port neutre `Cellar`** (`seed-broker-port`) — le DÉPÔT du commanditaire, adressé par parcelle. Un dépôt NEUTRE : il range indifféremment des produits (végétaux récoltés) ET des outils ; il n'est pas typé par son contenu (l'enveloppe reste scellée). `pulumi-edge` TIENT le cellier (backend Pulumi) ; il ne jardine pas.
-| ranger | to store | **`Cellar.store(Parcel, SeedEnvelope)`** — déposer au cellier, append-only (on n'écrase rien)
-| aller chercher | to fetch | **`Cellar.fetch(Parcel)`** — reprendre ce qui est rangé au cellier (relecture par clé). PAS « récolter » : récolter est le geste du champ (hand-over), aller chercher est le geste du cellier
+| étagère | shelf | l'adresse d'une conserve dans un meuble — une `Parcel`/`StackCoordinate` (le _où_ d'une entrée)
+| meuble à tiroirs (des graines) | seed drawer cabinet | un mobilier à cases : un **tiroir** = un `@Rootstock` (le receveur), une **case** = un `@Scion(Role)` (la part neutre — `fruit`, `sowing`). On range chaque sachet dans sa case, scellé
+| tableau à outils | tool board | le mobilier des OUTILS posés au cellier — les collaborateurs enregistrés dans Felix (`Cellar`, `RunGate`), chacun à sa place (par type de service)
+|===
+
+=== Le CELLIER — une composition de mobiliers + le rôle de conservation
+
+Le cellier n'est PAS un mobilier : c'est une **composition de mobiliers** (pot, vase, frigidaire, étagère,
+meuble à tiroirs, tableau à outils) fédérée par le **rôle de conservation** (l'organe du commanditaire).
+C'est le rôle qui fait de ces meubles réunis un cellier, et non un tas de meubles.
+
+|===
+| Français | English | Terme modèle seed
+
+| cellier | cellar | **le port neutre `Cellar`** (`seed-broker-port`) — le rôle de conservation du commanditaire, adressé par parcelle. Interface d'UN rôle, DERRIÈRE laquelle plusieurs mobiliers ; neutre par construction (il range n'importe quel `SeedEnvelope` scellé, jamais typé par son contenu). `pulumi-edge` TIENT le cellier (backend Pulumi) ; il ne jardine pas
+| ranger | to store | **`Cellar.store(Parcel, SeedEnvelope)`** — append-only. Recevant « range ça » (opaque), le cellier DEMANDE au jardinier « c'est quoi ? » (`sow(SplitCoordinate, …)`) et, de la nature/parts qu'on lui répond, DISPATCHE vers le bon mobilier (pot/vase/frigidaire) et la bonne case. Il ne range pas dans « son » meuble : il choisit le meuble selon la réponse
+| aller chercher | to fetch | **`Cellar.fetch(Parcel)`** — reprendre ce qui est rangé (relecture par adresse). Reprendre-par-adresse ne re-demande PAS au jardinier : l'adresse EST le _où_ (on a rangé là, on relit là). PAS « récolter » (geste du champ)
 | celliers voisins | neighbouring cellars | **`Cellar.neighbours(Parcel)`** — les parcelles voisines sous le même sol (ex-`cohort`)
 |===
+
+CAUTION: le cellier est lui-même CLIENT du jardinier : pour RANGER un composite opaque il interroge le
+broker (« c'est quoi ? ») ; jamais l'inverse (le jardinier ne demande rien au cellier). C'est le grower
+qui puise au cellier (`@Reference Cellar`), le jardinier ne fait que ROUTER la demande vers lui.
 
 CAUTION: `récolter`/harvest reste un verbe de JARDINAGE (voir Potager, l.récolte) — le geste du grower au
 champ. Ce n'est PAS une opération de cellier : on ne récolte pas un cellier, on y RANGE (`store`) et on y
