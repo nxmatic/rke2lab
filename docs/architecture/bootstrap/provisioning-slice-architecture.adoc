@@ -302,6 +302,38 @@ master. Closing these deltas is the substance of the incus/materialization
 transposition, distinct from (and larger than) the realm-boundary gate that first
 surfaced it.
 
+=== Corroboration — the synthesis cannot be driven from the host today
+
+Trying to *run* the synthesis (to compare its output against `main`, per the
+founding rule) surfaced the same wall from three angles, all one cause:
+
+* **`manifests-cli` off-framework** — `java -jar manifests-cli-exec.jar` throws
+  `NoClassDefFoundError: ManifestSynthesisRequest`. Not a packaging bug to fix: the
+  contract types are staged as a bundle (for Felix), deliberately NOT on the flat
+  classpath — the host is not meant to name them. The crash IS the frontier working.
+* **In-framework `awaitService`** — booting Felix and calling
+  `awaitService(ManifestSynthesisService.class)` returns null after 5s. SCR is
+  ACTIVE, reads all 15 component descriptors, they reach `satisfied` — but no
+  delayed component is ever promoted to `active`, so no service is published
+  (`registry has 0`). On `main` the same delayed components published fine; the
+  difference is not version, start-levels, or DS-runtime packages (all equivalent).
+* **The pattern itself is condemned** — a host (flat realm) resolving a domain
+  service by type is exactly the realm-boundary anti-pattern
+  (`EntryGatePolicyEnforcer.awaitService(ManifestUpdateGate)`). The gardening model
+  forbids it: the host does not reach into the registry for domain logic, **it
+  sows**.
+
+So the SCR-activation puzzle is a symptom of chasing a doomed path, not a bug to
+fix in isolation. The correct shape: **the synthesis is a scion, driven through the
+broker.** `manifests-cli` becomes a *sower* (like `Gardening.sow(soil)` in
+seed-master) — it names no domain type, sows a synthesis coordinate, and the
+manifests domain plays its scion in-container and seals the result. This is
+precisely Family 2's missing piece: **there is no `manifests-bdd`** — the synthesis
+has no runbook handler, so nothing can sow it. The CLI cannot be fixed locally; it
+waits on the manifests scion existing. (The bdd map already frames this: the
+manifests synthesis is "a graft cultivated fresh" — that graft is the
+`manifests-bdd` scion.)
+
 == Target vision — how the seven deltas are restored
 
 The deltas are not seven independent chantiers; they group by nature and realm,
