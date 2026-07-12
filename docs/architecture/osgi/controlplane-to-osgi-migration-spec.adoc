@@ -135,10 +135,22 @@ Read from the imports (2026-07-07):
   not by the stage. The stage consumes only its `BootstrapResult`.
 |===
 
-The lesson the earlier draft got wrong: `IncusStage` was never "blocked pending a service". The incus
-contacts DID migrate (into `incus-edge`), but their consumer is host Pulumi code, not the stage — so
-the stage keeps calling the host, which now composes the edges. Migrating a contact does not imply
-re-pointing a stage.
+A migrated contact does not imply a re-pointed stage: the contact moves into an `-edge`, its consumer
+may stay host Pulumi code.
+
+[IMPORTANT]
+====
+*The host holds only `seed-broker-port`; it reaches every domain through `broker.sow`.* A domain's
+contact types are `type=contract` — installed bundle-side, wired bundle-to-bundle, NOT a seam — so they
+are not on the host's flat classpath and the host cannot consume them by `awaitService`. A contact is a
+`SeedHandler` behind the door; the host sows a coordinate and reaps a verdict.
+
+The frontier therefore runs THROUGH `IncusResourceBootstrap`, not around it: the `com.pulumi.*`
+provisioning graph is host (Pulumi cannot enter Felix); the contact-consuming metier (`ImageBuilder`,
+`AuthTokenContact`, the network blueprint) is the domain's in-container scion (`incus-bdd`), reached by
+`sow`. Incus is a graft-caller in link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario
+map] — the host sows the incus scenario and grafts its scion, holding no incus vocabulary.
+====
 
 == The SPEC_COVERAGE ratchet
 
