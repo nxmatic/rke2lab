@@ -750,6 +750,16 @@ doctor, but the port's FACE is neutral by requirement, so it is homed with the v
 middle — not with the consumer's module. The doctor's `historyOf(Patient)`-shaped view sits BEHIND the
 neutral port, as its projection: `Patient ↔ Parcel` 1:1.)
 
+[NOTE]
+.Open question — the freshness/versioning of what is stored
+====
+`store`/`fetch` are append-only and opaque; the cellar says nothing about whether a `fetch`ed végétal is
+still TRUE against the source that grew it. A stored artifact can go stale — so a cellar read is a cache,
+and a cache can lie (version skew). This is why material that must be current (e.g. the manifests/flox
+synthesis) is a graft *cultivated fresh*, not fetched. When freshness matters, the cellar's contract
+needs a versioning/staleness answer — not yet designed, and not required by the current consumers.
+====
+
 [[edge-reaches-osgi]]
 === How the host EDGE reaches an OSGi consumer — registerService, not a handler
 

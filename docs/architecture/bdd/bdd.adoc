@@ -449,16 +449,24 @@ link:../osgi/seed-broker-spec.adoc[the seed-broker spec].
 [cols="1,2,1",options="header"]
 |===
 | scion (host step) | full G/W/T defined in | status
-| bbox (network reservations) | link:../osgi/bbox-edge-spec.adoc[bbox-edge-spec] | needs `bbox-bdd` (metier is host-side today)
-| incus (instance provisioned) | link:../osgi/incus-edge-spec.adoc[incus-edge-spec] | needs `incus-bdd` (metier is host-side today)
-| systemd (adapter launched) | link:../osgi/dbus-systemd-edge-spec.adoc[dbus-systemd-edge-spec] | ships today (`systemd-bdd`)
-| cluster (readiness) | link:../osgi/cluster-edge-spec.adoc[cluster-edge-spec] | ships today (`cluster-bdd`)
+| bbox (network reservations) | link:../osgi/bbox-edge-spec.adoc[bbox-edge-spec] | ships (`bbox-bdd`, `BboxReconciliationScenario`)
+| incus (instance provisioned) | link:../osgi/incus-edge-spec.adoc[incus-edge-spec] | ships (`incus-bdd`, `IncusProvisionScenario` — image + instance + consults doctor)
+| systemd (adapter launched) | link:../osgi/dbus-systemd-edge-spec.adoc[dbus-systemd-edge-spec] | ships (`systemd-bdd`)
+| cluster (readiness) | link:../osgi/cluster-edge-spec.adoc[cluster-edge-spec] | ships (`cluster-bdd`)
 | doctor (consulted sub-step) | link:bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern] | consulted, not a root step
 |===
 
-*Deferred scoping question (honest gap):* manifests / auth / netplan / unitrepo have `-port`/`-core` but
-no step here. Whether they become more steps of THIS runbook or a separate pipeline is NOT decided — the
-ClusterSeed path above is fully mapped and ready; these are the residue to scope in a later pass.
+*The manifests/flox synthesis is a GRAFT CULTIVATED FRESH, not a cellar artifact.* The old host bootstrap
+fused two unrelated concerns under incus: the incus contact (image + instance — that IS the incus scion,
+which does NOT touch manifests) and the synthesis of the node's material (cloud-init / node-env, the
+`manifests-contract` services). That material is a graft the scion grows FRESH when it provisions —
+sown, reaped, consumed at once — never conserved. Fetching it from a cellar would be a cache: an
+optimisation that can lie (a stored artifact stale against its source). So there is no second cellar and
+no "material synthesised" host step; the incus scion (or a manifests scion it consults, bundle-to-bundle
+in-container) sows the synthesis and uses the fresh graft. The cellar stays out of the manifests story.
+
+*Deferred scoping (honest gap):* auth / netplan / unitrepo have contracts but no step here — whether they
+become steps or are consulted by a scion is not yet decided. The ClusterSeed path above is fully mapped.
 
 == Where a scenario lives — the placement & naming rule
 
