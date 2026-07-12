@@ -61,6 +61,38 @@ and whose non-exported base package the host uses flat, superset not duplication
 lands (a scion sowing a peer's sub-scenario), `seed.bdd.sow` is already the in-realm half it needs; any
 further stage a scion wants is exported then, per package, reversibly, never by inflating the seam.
 
+.C4 L3 Component (static) — one artifact, two halves: the SOW package exported, the GRAFT + stages host-flat
+[mermaid]
+----
+flowchart TB
+  subgraph bdd["seed-bdd (one BSN, one jar)"]
+    subgraph sow["seed.bdd.sow — EXPORTED (realm-agnostic)"]
+      g["Gardening<br/>opens Felix, holds the gardener, sow(soil)"]
+    end
+    subgraph base["seed.bdd — NOT exported (host-flat, tree-local)"]
+      sg["SowAndGraftStage<br/>composes sow + graft"]
+      ce["CellarStage — fetch/store"]
+      pf["PreflightStage + PreflightGate"]
+    end
+  end
+  port["seed-broker-port<br/>SeedBroker · RunbookCoordinate · Cellar · RunGate"]
+  eng["scenario-engine<br/>OsgiConnection · ScenarioGraft"]
+
+  g --> port
+  g --> eng
+  sg --> g
+  sg --> eng
+  ce --> port
+  bdd -.exports only.-> sow
+
+  classDef exp fill:#e8f5e9,stroke:#2e7d32;
+  classDef flat fill:#fff4e6,stroke:#ff9900;
+  classDef dep fill:#e1f5ff,stroke:#0066cc;
+  class sow,g exp;
+  class base,sg,ce,pf flat;
+  class port,eng dep;
+----
+
 == Dependencies — leans on seed-port + engine, never inflates seed-port
 
 `seed-bdd` DEPENDS on `seed-broker-port` (it consumes `Cellar`, `SeedEnvelope`, `Parcel`, `SeedBroker`,
@@ -86,6 +118,35 @@ own loader). `RunbookCoordinate` is a neutral value-coordinate in `seed-broker-p
 one graft home — four times in the root scenario. `seed-bdd` therefore depends on `seed-broker-port`
 (the `SeedBroker` door + `RunbookCoordinate`) and the neutral `ScenarioGraft`, never on a domain's
 `*BddScenarios` or `*Coordinate`.
+
+.C4 L4 Code (static) — the sow/graft split in classes: the realm-agnostic sow, the tree-local graft
+[mermaid]
+----
+classDiagram
+  class Gardening {
+    <<record, seed.bdd.sow — exported>>
+    +OsgiConnection connection
+    +SeedBroker gardener
+    +open() Gardening$
+    +sow(soil) String
+    +close()
+  }
+  class SowAndGraftStage {
+    <<Stage, seed.bdd — host-flat>>
+    -ScenarioGraft graft
+    +sowing(soil, Gardening, ReportModel) hidden
+    +the_scion_is_sown_and_grafted(step)
+  }
+  class ScenarioGraft {
+    <<scenario-engine — host-side>>
+    +rebuild(json) ReportModel
+    +graftUnder(hostTree, step, scion)
+  }
+  SowAndGraftStage --> Gardening : SOW (realm-agnostic)
+  SowAndGraftStage --> ScenarioGraft : GRAFT (tree-local, host)
+  note for Gardening "the SOW half travels in-realm (remote): a scion-peer could hold it"
+  note for ScenarioGraft "the GRAFT half stays home: one jGiven engine, only JSON crosses"
+----
 
 == The root scenario — a per-exec composition on the common stages
 
