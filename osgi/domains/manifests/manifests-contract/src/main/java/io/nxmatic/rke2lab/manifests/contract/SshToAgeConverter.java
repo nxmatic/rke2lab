@@ -17,9 +17,12 @@ public interface SshToAgeConverter {
   /**
    * Convert an OpenSSH private key to an age private key.
    *
+   * <p>Throws an unchecked conversion failure (the edge's own type) if the tool is absent or exits
+   * non-zero — a failed conversion is a defect to surface fast, not a recoverable outcome, so it
+   * propagates uncaught.
+   *
    * @param sshPrivateKey OpenSSH-format private key (PEM text)
    * @return the age private key in standard format
-   * @throws SshToAgeConversionException if the tool is absent or exits non-zero
    */
   String toAgeKey(String sshPrivateKey);
 }
