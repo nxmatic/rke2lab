@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.pulumi.edge;
 import com.pulumi.automation.StackDeployment;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,5 +81,52 @@ public record StackSnapshot(StackDeployment wrapped) {
     }
 
     return collected;
+  }
+
+  /**
+   * Collects EVERY output present in the deployment, keyed by its native output name, each value
+   * the list of that key's values across the resources that carry it (resource order preserved).
+   * This is the neutral, collect-all read the {@code Cellar} hands back: the frontier stamps no
+   * domain coordinate and hardcodes no case name — it returns what the soil holds, by the soil's
+   * own output names, and the capable (OSGi) side reads the cases it knows. Never throws; empty
+   * when the deployment is absent or malformed.
+   */
+  public Map<String, List<Object>> allOutputs() {
+    Map<String, List<Object>> byName = new LinkedHashMap<>();
+
+    Optional<Map<String, Object>> deploymentOpt = deployment();
+    if (deploymentOpt.isEmpty()) {
+      return byName;
+    }
+
+    Object resourcesObj = deploymentOpt.get().get("resources");
+    if (!(resourcesObj instanceof List)) {
+      return byName;
+    }
+
+    @SuppressWarnings("unchecked")
+    List<Object> resources = (List<Object>) resourcesObj;
+
+    for (Object resourceObj : resources) {
+      if (!(resourceObj instanceof Map)) {
+        continue;
+      }
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> resource = (Map<String, Object>) resourceObj;
+
+      Object outputsObj = resource.get("outputs");
+      if (!(outputsObj instanceof Map)) {
+        continue;
+      }
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> outputs = (Map<String, Object>) outputsObj;
+
+      outputs.forEach(
+          (name, value) -> byName.computeIfAbsent(name, k -> new ArrayList<>()).add(value));
+    }
+
+    return byName;
   }
 }
