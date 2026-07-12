@@ -381,10 +381,13 @@ consult) OR a *sow-and-graft caller*. No host step speaks metier — it sows a s
 the neutral port — the language switch.
 
 *A sow-and-graft caller composes TWO gestures in TWO worlds, one per half of the seam:* to *sow* (`sow`)
-is played IN-CONTAINER — the scion's front-door (`*BddScenarios.run()`) plays it inside Felix and
-serialises its runbook to JSON (the only thing that crosses the seam); to *graft* (`graft`) is played
-HOST-side — `ScenarioGraft.rebuild(json)` + `graftUnder(hostTree, …)` folds that JSON into the host's own
-runbook tree. The graft is host-side by construction: a `@NestedSteps` composes within ONE jGiven engine,
+is `broker.sow(new RunbookCoordinate(soil), trigger)` — the host holds only a soil NAME (a `String`) and
+reaps the runbook as JSON; the domain's runbook handler plays its scenario in-container (through its own
+front-door `*BddScenarios.run()`, on its own loader — the host never names it) and seals the runbook into
+the reaped envelope (see link:../osgi/seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the runbook
+handler]). `RunbookCoordinate` is a neutral value-coordinate in the foundation seam, so the host names no
+domain type. To *graft* (`graft`) is played HOST-side — `ScenarioGraft.rebuild(json)` +
+`graftUnder(hostTree, …)` folds that JSON into the host's own runbook tree. The graft is host-side by construction: a `@NestedSteps` composes within ONE jGiven engine,
 so a live jGiven object cannot cross realms (it would `ClassCastException` on the flat host loader) — only
 the flat JSON crosses, and the host rebuilds a model of ITS OWN realm to graft. There is one host tree
 (the trunk the operator reads top-down); the four callers each graft one scion INTO it. So `sow` appears
@@ -411,10 +414,10 @@ flowchart TB
     s4["cluster: readiness·phase·observation"]
   end
   doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
-  r1 -.sow (in-container).-> s1
-  r2 -.sow (in-container).-> s2
-  r3 -.sow (in-container).-> s3
-  r4 -.sow (in-container).-> s4
+  r1 -.broker.sow RUNBOOK.-> s1
+  r2 -.broker.sow RUNBOOK.-> s2
+  r3 -.broker.sow RUNBOOK.-> s3
+  r4 -.broker.sow RUNBOOK.-> s4
   s1 -.graft JSON (host).-> r1
   s2 -.graft JSON (host).-> r2
   s3 -.graft JSON (host).-> r3
@@ -456,7 +459,7 @@ pure-host ends touch the cellar; the four graft-callers only sow and graft.
 [listing]
 ----
   WHEN <the host wants outcome X>
-  THEN I sow <domain>'s scenario through the neutral port      [SOW — in-container: the front-door plays it, serialises to JSON]
+  THEN I sow <domain>'s runbook coordinate through the broker  [SOW — broker.sow(<domain>.RUNBOOK); the domain's handler plays its scenario in-container, seals the runbook JSON]
    AND under a closed RunGate the real edge stays inert, the plan renders PENDING (E9, see § runmode-preview)
    AND I reap a coarse verdict (grew / did not)                [the verdict travels IN the JSON]
    AND I graft the returned scion under this step              [GRAFT — host: rebuild the JSON in the host realm, graftUnder]

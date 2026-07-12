@@ -337,8 +337,8 @@ flowchart TB
     b1["seed-master controlplane<br/>~95 files: pipeline/Topic grammar,<br/>host-side bbox/incus/systemd/readiness metier,<br/>IncusResourceBootstrap fuses graph + contacts + manifests"]
   end
   subgraph AFTER[After — gardening skeleton + door]
-    a1["host runbook: gardening only<br/>preflight · Cellar.fetch · graft-callers (sow) · Cellar.store<br/>(the cellar bookends; between them, cultivated fresh)"]
-    a2["domain metier = in-container scions<br/>bbox-bdd · incus-bdd · systemd-bdd · cluster-bdd (ship)"]
+    a1["host runbook: gardening only<br/>preflight · Cellar.fetch · sow-and-graft callers · Cellar.store<br/>(the cellar bookends; between them, cultivated fresh)"]
+    a2["domain scions, reached by broker.sow(RUNBOOK)<br/>each domain grows a runbook SeedHandler that<br/>plays bbox-bdd · incus-bdd · systemd-bdd · cluster-bdd (ship)"]
     a3["IncusResourceBootstrap: com.pulumi.* graph stays host;<br/>contacts + manifests graft reached by sow (cultivated fresh)"]
     a1 --> a2
     a1 --> a3
@@ -349,11 +349,14 @@ flowchart TB
   style AFTER fill:#e8f5e9,stroke:#2e7d32
 ----
 
-*Monotone / honest edits:* the domain scions already ship (bbox/incus/systemd/cluster `-bdd`) — the map's
-old "needs -bdd" was stale, corrected. The `Cellar` role is realised host-side (`PulumiCellar`). What
-remains is the spine rebuild (Main sows the scenario; the root steps become graft-callers; outputs →
-`Cellar.store`) and dissolving `IncusResourceBootstrap`'s contact/manifests consumption into `sow` — the
-`com.pulumi.*` provisioning graph stays host (Pulumi cannot enter Felix). The manifests/flox synthesis is
+*Monotone / honest edits:* the domain scenarios already ship (bbox/incus/systemd/cluster `-bdd`) — the
+map's old "needs -bdd" was stale, corrected. The `Cellar` role is realised host-side (`PulumiCellar`).
+What remains is: each domain grows a runbook `SeedHandler` (a `RUNBOOK` coordinate + a handler that plays
+its own scenario in-container — the reflection lives INSIDE the domain, never on the host, see
+link:../osgi/seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the runbook handler]); the spine rebuild
+(Main sows the scenario; the root steps become sow-and-graft callers via `broker.sow(RUNBOOK)` + host-side
+`ScenarioGraft`; outputs → `Cellar.store`); and dissolving `IncusResourceBootstrap`'s contact/manifests
+consumption into `sow` — the `com.pulumi.*` provisioning graph stays host (Pulumi cannot enter Felix). The manifests/flox synthesis is
 a graft cultivated fresh, not a cellar artifact (no second cellar; a cache could lie on version skew).
 
 [NOTE]

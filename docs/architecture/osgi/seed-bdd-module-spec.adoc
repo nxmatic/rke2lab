@@ -60,16 +60,21 @@ membrane; the gardening stages are a consumer, not a seam inhabitant.
 == Who speaks gardening — the stages, not the engine
 
 The engine stays at the FLIRT level: `ScenarioGraft` names the horticultural gesture (*graft*) but its
-signatures are mechanical (`rebuild(String)`, `graftUnder(ReportModel, …)`); the domain front-door
-(`*BddScenarios.run()`) grows the scion. `seed-bdd`'s stages SPEAK gardening in their step titles ("I go
-to the cellar for the parcel's state", "I sow X and graft its scion", "I store the harvest") and COMPOSE
-those flirt façades underneath. The engine gains no gardening type; the vocabulary lives in `seed-bdd`'s
-stages, which call the engine's neutral mechanics.
+signatures are mechanical (`rebuild(String)`, `graftUnder(ReportModel, …)`). `seed-bdd`'s stages SPEAK
+gardening in their step titles ("I go to the cellar for the parcel's state", "I sow X and graft its
+scion", "I store the harvest") and COMPOSE the neutral mechanics underneath. The engine gains no
+gardening type; the vocabulary lives in `seed-bdd`'s stages, which call the engine's neutral mechanics.
 
-The sow-and-graft caller is not a new façade — the two façades exist (the front-door grows, `ScenarioGraft`
-grafts). It is their COMPOSITION as one gardening stage: sow the scion (play it in-container via the
-front-door), reap its serialized runbook, `rebuild` + `graftUnder` it under this step. One gesture, four
-times, in the root scenario.
+The sow-and-graft caller composes the two halves of the crossing (link:seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the
+runbook handler]): the SOW half is `broker.sow(new RunbookCoordinate(soil), trigger)` — the host holds
+only a soil NAME (a `String`) and reaps the runbook as JSON, never naming a `*Coordinate` enum nor
+reaching a `*BddScenarios` front-door (that reflection lives INSIDE the domain's runbook handler, on its
+own loader). `RunbookCoordinate` is a neutral value-coordinate in `seed-broker-port` (the twin of
+`SplitCoordinate`), so the seam names nothing a domain owns. The GRAFT half is
+`ScenarioGraft.rebuild(payload)` + `graftUnder(hostTree, step)`, host-side. One gesture — one door out,
+one graft home — four times in the root scenario. `seed-bdd` therefore depends on `seed-broker-port`
+(the `SeedBroker` door + `RunbookCoordinate`) and the neutral `ScenarioGraft`, never on a domain's
+`*BddScenarios` or `*Coordinate`.
 
 == The root scenario — a per-exec composition on the common stages
 

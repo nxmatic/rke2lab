@@ -325,6 +325,74 @@ AsciiDoc) WITHOUT interpreting it. So an `Exchange`'s RESPONSE is the verdict, N
 the runbook rides a separate observability channel (serialized, grafted, never read to decide). REST's
 own split: status/headers for the machine, a log body for the human.
 
+[[playing-a-scenario-is-a-sow]]
+=== Playing a scion scenario is a `sow` — the runbook handler, not reflection
+
+The host wants a domain's scion PLAYED and its runbook back. The tempting shortcut is for the host to
+reach the domain's execution front-door (`*BddScenarios.run()`) reflectively — `Class.forName` on the
+scion bundle's loader, invoke `run()`, take the JSON. *Rejected:* the host would name a domain type
+(`BboxBddScenarios`), and reflection lands it inside a world the gardening register has no business
+knowing. It also opens a SECOND execution door beside the broker — the one-door invariant broken.
+
+The correct shape needs NO new port type — a `SeedHandler` is already `SeedEnvelope → SeedEnvelope`,
+and "play a scenario" is just a `handle()` that PLAYS instead of computes. And it needs NO per-domain
+coordinate enum either — a per-domain `RUNBOOK` constant would force the host to name `BboxCoordinate`,
+re-corrupting the very decorrelation the broker exists for. Instead, `RunbookCoordinate` is a *value
+coordinate* in the foundation seam, the exact twin of `SplitCoordinate`: a record parameterised by a
+soil NAME (a `String`), routed by `equals`, so the host names no domain type.
+
+* *the coordinate* — `RunbookCoordinate(String domain)` lives in `seed-broker-port`. The host holds
+  only a soil name (`"bbox"`, `"cluster"` — gardening knows a parcel by its soil, never a domain's
+  vocabulary) and sows `new RunbookCoordinate(soil)`. This is `SplitCoordinate`'s pattern applied to
+  the play-scenario verb: two equal records route to the same handler, the seam names nothing a domain
+  owns.
+* *the handler* — each scion domain contributes a `@Component SeedHandler` serving `new
+  RunbookCoordinate(itsDomain)`, whose `handle(trigger)` plays its OWN scenario in-container through
+  the front-door (`*BddScenarios.run()`, called from INSIDE the domain bundle — same loader,
+  legitimate) and returns the serialized `RunbookEnvelope` sealed in a `SeedEnvelope`.
+
+The reflection does not vanish — it MOVES INTO the domain, where the front-door invoking its own
+scenario on its own loader is ordinary. The host is left with one door and a soil name:
+
+[listing]
+----
+  broker.sow(new RunbookCoordinate(soil), trigger)   // one door; soil is a String, no domain type
+     → reaps a SeedEnvelope (the runbook as neutral JSON)
+     → ScenarioGraft.rebuild(payload) + graftUnder(hostTree, step)   // host-side graft
+----
+
+So the SOW half of a sow-and-graft caller (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario
+map]) is `broker.sow` at a neutral `RunbookCoordinate`; the GRAFT half is `ScenarioGraft`, host-side.
+The host never names `*BddScenarios` nor a `*Coordinate` enum — only the foundation seam and a soil
+string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
+verdict.
+
+[[crossing-is-a-sow-ambient-is-a-lookup]]
+=== Crossing → `sow`; ambient / same-domain → lookup
+
+A scion resolves three kinds of collaborator, and only one is a broker crossing. The rule, so a
+scenario reads uniformly:
+
+[cols="1,1,2",options="header"]
+|===
+| the scion needs… | how | why
+| another SOIL (a cross-domain crossing) | `broker.sow(coordinate, seed)` | it is a crossing — the
+  broker's whole purpose. E.g. the bbox scenario consulting the doctor: today `resolveDoctor()` +
+  `ConsultingService.consult(...)` (naming a doctor type, hand-rolling the `FrameworkUtil` lookup);
+  becomes `broker.sow(DoctorCoordinate.CONSULTATION, checkpoint)` — the scion names no doctor type,
+  the crossing is uniform with every other. `consult` was already `SeedEnvelope → SeedEnvelope`: a
+  `sow` in disguise.
+| the ambient run-condition | look up `RunGate` | a fact of the WHOLE run, published once — looked
+  up, never sown (its own § below). Not a crossing.
+| its OWN domain's edge (`BboxReconciler`, …) | look up the contact | a scenario consuming its own
+  domain's port is direct, same world — not host↔OSGi, not cross-domain. The broker is for crossings,
+  not for resolving every collaborator.
+|===
+
+This makes the broker EARN each `sow`: it absorbs the one real crossing a scenario hid (the doctor
+consult), leaving ambient and same-domain resolution as plain lookups. Applying it to
+`BboxReconciliationScenario` deletes `resolveDoctor()` and the `ConsultingService` dependency.
+
 == OSGi holds the authority; the host transports (the asymmetry)
 
 The two sides are NOT symmetric. OSGi owns every rich type and all reasoning. The host has *no*
@@ -507,6 +575,53 @@ unit. They form a hierarchy matching `Document(domain, coordinate, payload)`.
 
 So `domain` = ownership, `coordinate` = type = schema key. A new domain plugs in additively: one more
 `@Component`, its own schemas, no gateway change.
+
+[[two-kinds-of-coordinate]]
+== Two kinds of coordinate — the domain's vocabulary vs the gardener's
+
+The moment a SECOND coordinate turned out to be a record parameterised by a domain string
+(`RunbookCoordinate`, joining `SplitCoordinate`), the pattern stopped being a one-off and became a
+CATEGORY. There are exactly two kinds of `SeedCoordinate`, and the split is the model's decorrelation
+made structural:
+
+[cols="1,1,1,2",options="header"]
+|===
+| kind | shape | routed by | whose vocabulary
+| *domain coordinate* | an enum constant a domain declares (`DoctorCoordinate.CONSULTATION`) | identity
+  (the constant) | the DOMAIN's — its own metier verbs; naming one means naming a domain type
+| *value coordinate* | a record parameterised by a soil name (`SplitCoordinate(domain)`,
+  `RunbookCoordinate(domain)`) | `equals` (two equal records route together) | the GARDENER's — a
+  generic verb sown toward ANY soil, the host holding only a soil `String`, naming no domain type
+|===
+
+*Why this matters, and why the two sides are ASYMMETRIC by intent:*
+
+* The *value* side is a CLOSED set — it is the gardener's whole vocabulary, and a gardener has finitely
+  many generic gestures ("split this", "play this soil's runbook"). So `ValueCoordinate` is a `sealed
+  interface … permits SplitCoordinate, RunbookCoordinate`: adding a verb is a deliberate act (extend the
+  `permits` list, reviewed in one place), never an accident buried in a domain. Everything the host may
+  sow that is NOT a domain's own coordinate is exactly one of these — enumerable, and provably pure
+  gardening (the host constructs `new X(soil)`, never a domain type).
+* The *domain* side stays OPEN — `SeedCoordinate` is an unsealed root a domain implements freely
+  (`DoctorCoordinate implements SeedCoordinate`), because "a domain contributes its coordinates without
+  editing the center" (§ <<contribution-and-opacity>>) is the whole extensibility thesis. Sealing the
+  root would break it.
+
+So the hierarchy is three levels, one branch closed:
+
+[listing]
+----
+SeedCoordinate            (interface — the concept: slug() + domain(); OPEN root)
+ ├── ValueCoordinate      (sealed — the gardener's vocabulary, routed by equals)
+ │    ├── SplitCoordinate(domain)      slug "split"
+ │    └── RunbookCoordinate(domain)    slug "runbook"
+ └── <domain enums>       (DoctorCoordinate.…, routed by identity — the domain's vocabulary)
+----
+
+This is what keeps the frontier pure jardinerie: the host reaches a scion through a value coordinate
+(`RunbookCoordinate`) and never names a domain enum; a domain reaches another domain through that
+domain's coordinate (`DoctorCoordinate.CONSULTATION`), OSGi-side, where naming a domain type is
+ordinary.
 
 [[contribution-and-opacity]]
 == Contribution + opacity — a domain owns its vocabulary, the host holds none of it

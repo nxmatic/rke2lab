@@ -16,7 +16,7 @@ package io.nxmatic.rke2lab.seed.broker.port;
  * transpires to the host. The reaped {@link SeedEnvelope} carries the scions grouped under their
  * rootstock; the frontier nests each scion under its receiver, opaque.
  */
-public record SplitCoordinate(String domain) implements SeedCoordinate {
+public record SplitCoordinate(String domain) implements ValueCoordinate {
 
   /** The single wire slug of the split verb, across every domain. */
   public static final String SLUG = "split";
