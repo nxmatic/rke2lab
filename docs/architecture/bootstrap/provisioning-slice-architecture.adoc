@@ -192,6 +192,70 @@ master. Closing these deltas is the substance of the incus/materialization
 transposition, distinct from (and larger than) the realm-boundary gate that first
 surfaced it.
 
+== Target vision — how the seven deltas are restored
+
+The deltas are not seven independent chantiers; they group by nature and realm,
+with a dependency order.
+
+=== Three families
+
+**Family 1 — the Pulumi graph (delta #1), pure host.** The `com.pulumi.incus`
+resources return, host-side, as the provisioning body of the "the instance is
+provisioned" WHEN. Code that exists in `342b7c327~1` and should not have left.
+
+**Family 2 — the five materializations (deltas #2–6), metier → scion.** They share
+one missing piece: there is no `manifests-bdd`. The synthesis machinery
+(`ManifestSynthesisService`, `NodeEnvOverlayService`, explode) is intact OSGi-side
+but nothing plays it as a scion. Standing up `manifests-bdd` — a scion that
+synthesizes + materializes, fed a host-neutral activation payload sown by the host
+— unblocks all five at once, on the same pattern as bbox/incus/systemd/cluster.
+
+**Family 3 — the checksum→reload glue (delta #7), straddling.** Checksum
+computation in-container (scion, reads materialized paths), partition +
+`replaceOnChanges` on the host `Instance`. It *depends* on both other families (a
+graph to wire `replaceOnChanges` onto, materializations to checksum), so it comes
+last.
+
+Order: Family 1 and Family 2 are independent (either first); Family 3 follows both.
+
+=== The crux — the "instance provisioned" WHEN, and a contradiction to settle
+
+The ClusterSeed map (link:../bdd/bdd.adoc#clusterseed-scenario-map[bdd.adoc]) says
+the incus scion is "image + instance". Reality contradicts it: the scion
+(`IncusProvisionScenario`) builds the image and probes reachability, and states
+itself that "the actual instance provisioning stays host-side". The Pulumi graph
+that *provisions* the instance is host (Pulumi cannot enter Felix). So the WHEN has
+two parts in two realms, and the map's "image + instance = the scion" conflates
+them. Two shapes are on the table:
+
+[cols="1,3",options="header"]
+|===
+| Shape | Consequence
+
+| **(A) Host provisions, then sows the scion.** The WHEN is two-beat: (a) the host
+  unrolls the Pulumi graph (Project/Network/Profile/Image/Instance); (b) it then
+  sow-and-grafts the incus scion that *verifies* image + reachability. Provision
+  (host) and verification (scion) are separated.
+| The graph is a genuine host step again — but the WHEN stops being a *uniform*
+  sow-and-graft caller (it gains a host-provision beat before the sow). The map's
+  regularity ("every root step is pure-host OR a sow-and-graft caller") needs a
+  third shape, or the provision beat folds into the pure-host register preceding
+  the sow. Keeps `com.pulumi` entirely out of Felix. **Aligned with the atlas.**
+
+| **(B) The scion drives, the host provides.** The scion stays the WHEN body; the
+  Pulumi graph becomes a service the GIVEN publishes and the scion invokes.
+| Preserves the uniform caller shape — but drives `com.pulumi.*` into the scion's
+  path. Pulumi cannot enter Felix, so the "service" would have to be a host-side
+  proxy the scion calls across the seam per resource — heavy, and inverts the
+  "graph stays host" principle. **Likely ruled out.**
+|===
+
+The materialization half is already half-answered by the map (bdd.adoc): the
+manifests/flox synthesis is a *graft cultivated fresh*, sown-reaped-consumed at
+once, never a cellar artifact. Family 2's `manifests-bdd` scion IS that fresh
+graft. What the map does not yet resolve is where the *Pulumi-graph* half lives —
+that is the (A)/(B) choice above, to be settled before Family 1 code.
+
 == Related Documentation
 
 * link:../bdd/bdd.adoc#clusterseed-scenario-map[BDD-as-engine — the ClusterSeed scenario map] — the target host runbook these gestures compose into
