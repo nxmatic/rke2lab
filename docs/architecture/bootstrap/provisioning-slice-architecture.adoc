@@ -25,6 +25,49 @@ who reads it downstream, and its reload protocol — the load-bearing knowledge 
 must survive the transposition. It closes with the *current gap*: what the
 top-down demolition removed ahead of its replacement, so the work-list is explicit.
 
+=== Figure 1 — the two gestures across the realm boundary
+
+[mermaid]
+----
+flowchart TB
+  op["operator's Pulumi config<br/>(policy.link.*, incus.*)"]
+
+  subgraph host["HOST realm — seed-master (com.pulumi.* lives here)"]
+    pgraph["Pulumi graph<br/>Project·Network·Profile·Image·Instance"]
+    payload["activation payload<br/>(host-neutral booleans: mesh=false…)"]
+  end
+
+  subgraph felix["OSGi realm — in Felix (metier, names its own catalog)"]
+    scion["manifests scion (manifests-bdd)<br/>synthesis + materialization"]
+    verify["incus scion (incus-bdd)<br/>image build + reachability probe"]
+  end
+
+  subgraph master["MASTER — /srv/host + instance"]
+    files["materialized files<br/>cloud-init · systemd · k8s · rke2-config · env-config"]
+    vm["the VM instance"]
+  end
+
+  op --> pgraph
+  op --> payload
+  pgraph -->|provisions| vm
+  payload -.->|"broker.sow (JSON, no domain type)"| scion
+  scion -->|writes| files
+  pgraph -.->|"sow (verify)"| verify
+  verify -.->|"graft JSON"| pgraph
+
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef f fill:#def,stroke:#25a,stroke-width:2px;
+  classDef m fill:#fee,stroke:#a22,stroke-width:2px;
+  class host,pgraph,payload h;
+  class felix,scion,verify f;
+  class master,files,vm m;
+----
+
+The seam is the dotted line: only host-neutral JSON crosses it (the activation
+payload in, the verdict/scion out). The Pulumi graph never enters Felix; the
+metier never leaves it. The master receives both the VM (from the host graph) and
+its files (from the scion).
+
 == The materialized targets — what lands on master, and who reads it
 
 Each target is a downstream consumer that reads files we materialize and has its
@@ -77,6 +120,30 @@ joins the materialized targets (metier) to the Pulumi Instance (host), and it
 decides — per change — whether the master is *renewed* or *hot-reloaded*. Losing
 it means: even with the graph and the scions restored, a re-synthesis has no way to
 reconcile.
+
+=== Figure 2 — how a change decides renew vs hot-reload
+
+[mermaid]
+----
+flowchart TB
+  change["a target's materialized files change<br/>→ its checksum changes"]
+  policy{"target's<br/>TargetReloadPolicy?"}
+
+  change --> policy
+  policy -->|STATIC| cfg["write checksum into instance config<br/>user.rke2lab.provisioning.slice.*"]
+  policy -->|DYNAMIC| out["store checksum in Pulumi outputs"]
+
+  cfg --> diff["Pulumi sees a config.* diff<br/>(replaceOnChanges: config, config.*)"]
+  diff --> renew["INSTANCE RENEWED<br/>(delete-before-create)"]
+
+  out --> nodiff["Pulumi sees no config diff"]
+  nodiff --> recon["reconciler reads new checksum<br/>→ HOT-RELOAD the component"]
+
+  classDef s fill:#fee,stroke:#a22,stroke-width:2px;
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class cfg,diff,renew s;
+  class out,nodiff,recon d;
+----
 
 The mechanism, as it stood:
 
@@ -249,6 +316,38 @@ them. Two shapes are on the table:
   proxy the scion calls across the seam per resource — heavy, and inverts the
   "graph stays host" principle. **Likely ruled out.**
 |===
+
+=== Figure 3 — the two shapes of the "instance provisioned" WHEN
+
+[mermaid]
+----
+flowchart LR
+  subgraph A["(A) host provisions, then sows — atlas-aligned"]
+    direction TB
+    a1["host: unroll Pulumi graph<br/>(pure-host beat)"]
+    a2["sow incus scion<br/>→ verify image + reachability"]
+    a3["graft verdict"]
+    a1 --> a2 --> a3
+  end
+
+  subgraph B["(B) scion drives, host provides — likely ruled out"]
+    direction TB
+    b1["sow incus scion (WHEN body)"]
+    b2["scion calls a 'graph service'<br/>per resource, across the seam"]
+    b3["com.pulumi.* driven from<br/>the scion's path ✗ (cannot enter Felix)"]
+    b1 --> b2 --> b3
+  end
+
+  classDef ok fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef bad fill:#fee,stroke:#a22,stroke-width:2px;
+  class a1,a2,a3 ok;
+  class b1,b2,b3 bad;
+----
+
+In (A) the graph is a host beat *before* the sow (like `Cellar.fetch` precedes the
+grafts); the WHEN then sow-and-grafts the scion that only *verifies*. In (B) the
+scion stays the body but must reach `com.pulumi` across the seam — which the
+"Pulumi cannot enter Felix" constraint forbids.
 
 The materialization half is already half-answered by the map (bdd.adoc): the
 manifests/flox synthesis is a *graft cultivated fresh*, sown-reaped-consumed at
