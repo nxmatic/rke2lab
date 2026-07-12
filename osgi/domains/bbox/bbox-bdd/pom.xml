@@ -84,6 +84,14 @@
       <artifactId>osgi.core</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- bnd-consumed construction annotations: BboxRunbookHandler (@Component) publishes the runbook
+         SeedHandler that plays this bundle's scenario in-container. provided — SCR supplies the
+         runtime, bnd only needs them to emit the descriptor + the extender requirement. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <!-- The in-container proof lives in the bbox-bdd-test FRAGMENT (Fragment-Host: bbox-bdd), which
          shares this bundle's loader so its mock BboxReconciler + RunGate are the same Class the
          scenario resolves — no seam, no system-export. So this main bundle carries NO test-scope
