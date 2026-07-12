@@ -4,12 +4,14 @@
 
 [NOTE]
 ====
-*Status:* DESIGN, ready to implement (2026-07-12). `seed-bdd` is the FOUNDATION module holding the
-gardening spine common to every seed exec — the host runbook stages spoken in the gardening register
-(`Cellar` fetch/store, the sow-and-graft caller, the world opening, the harness). An exec (`seed-master`,
-and the seed execs after it) adds only its OWN root composition: which scions, in what order. It realises
-the host half of link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] atop
-link:gardening-model-spec.adoc[the gardening model].
+*Status:* being implemented (2026-07-12). `seed-bdd` is the FOUNDATION module holding the gardening spine
+common to every seed exec — the host runbook stages spoken in the gardening register (the preflight gate,
+`Cellar` fetch/store, the sow-and-graft caller) plus the open `Gardening` the GIVEN carries. An exec
+(`seed-master`, and the seed execs after it) adds only its OWN root composition: which scions, in what
+order. It realises the host half of link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario
+map] atop link:gardening-model-spec.adoc[the gardening model]. Opening the gardening is NOT a WHEN — the
+map's GIVEN is "I have access to the open gardening", so the driver opens the `Gardening` instance and
+hands it to the scenario's Given; the seven WHENs are preflight → fetch → four sow-and-graft → store.
 ====
 
 == Why a module — common spine vs per-exec composition
@@ -37,13 +39,15 @@ host consumes it as a *flat jar*. Location and realm are independent axes — th
 not by module.
 
 * *One artifact, one BSN* (`io.nxmatic.rke2lab.osgi.foundation.seed.bdd`), both a bundle and a plain jar.
-* *The SOW half IS exported* (`seed.bdd.sow` — `RunbookSower`). Sowing a runbook coordinate through the
-  broker is REALM-AGNOSTIC: the host sows today (embedded, one host), but a scion could sow another peer's
-  runbook in-container tomorrow (remote — the same door, the same gesture, § REST embedded-today /
-  remote-tomorrow). So the reusable half travels; the package is exported for that future in-realm reuse.
+* *The SOW half IS exported* (`seed.bdd.sow` — `Gardening`). The open gardening is an INSTANCE holding
+  the live connection + the gardener (the `SeedBroker`), and it knows how to sow: `gardening.sow(soil)`
+  grows that soil's scenario through the gardener and reaps the runbook. Sowing is REALM-AGNOSTIC: the
+  driver holds the open gardening host-side today (embedded), but a scion-peer could hold one in-container
+  tomorrow (remote — the same door, the same gesture, § REST embedded-today / remote-tomorrow). So the
+  reusable half travels; the package is exported for that future in-realm reuse.
 * *The GRAFT half + the rest of the spine are NOT exported* — the base package `seed.bdd`
-  (`SowAndGraftStage` composing `ScenarioGraft`, the world opening, the Cellar stages, preflight). The
-  graft is LOCAL to whoever owns the runbook tree (`ScenarioGraft` is host-side by construction — one
+  (`SowAndGraftStage` composing `ScenarioGraft`, the `CellarStage`, the `PreflightStage`/`PreflightGate`).
+  The graft is LOCAL to whoever owns the runbook tree (`ScenarioGraft` is host-side by construction — one
   jGiven engine, only JSON crosses), so it runs on the flat host classpath, never wired in-container.
   Exporting a host-side stage would let a bundle load a second copy of a seam class (the
   `DUPLICATE_REALM_CLASS` collision the engine's bnd guards against).
