@@ -2,6 +2,37 @@
 :toc:
 :toclevels: 3
 
+== The founding rule of the migration — two black-box frontiers
+
+The seeding sits between two frontiers, and the whole migration obeys one rule:
+**our internal restructuring must be invisible at both edges.**
+
+* **Upward — the Pulumi frontier (the commissioner).** `seed-master` crosses it to
+  hand Pulumi the resources and the checksums; that we keep. But the Pulumi engine
+  must never see that we reorganised the inside (host/OSGi split, scions,
+  gardening). It sees its resources + a checksum string, nothing more. It is
+  *indifferent to who wrote the files* — host component or in-container scion, same
+  thing: the only channel that tells it "the provisioning files changed" is a value
+  planted in one of its resources. The realm boundary does not exist for it.
+
+* **Downward — the master frontier (the provisioned node).** The master must not
+  see the new version either. Its consumers — cloud-init, the systemd daemon, the
+  rke2 manifest watch, and the contacts the incus/systemd/cluster scions probe
+  (ssh/incus exec, dbus-on-TCP, kube API) — must observe the same materialized
+  files and the same endpoints, whether host or OSGi produces/probes them.
+
+Both frontiers are black boxes: the refactoring changes the inside, never the
+observable surface at either edge. This invariant is what justifies delta #7 (the
+checksum stays the files→commissioner channel regardless of who computes it) and
+what keeps the whole restoration honest — we may reorganise everything within, so
+long as these two surfaces do not move.
+
+**Corollary (the verification method):** the truth of "invisible at both edges" is
+checked by *comparison with the base the master was provisioned from* (`main`).
+The outputs — the materialized files, the Pulumi outputs, the instance config —
+must match byte-for-byte. Any divergence is a migration defect, not a new feature.
+We already suspect drift; the comparison below measures it.
+
 == Overview
 
 Seeding a master is two distinct gestures, fused for a long time in a single
