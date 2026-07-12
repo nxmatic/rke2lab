@@ -1,29 +1,69 @@
 package io.nxmatic.rke2lab.controlplane;
 
-import io.nxmatic.rke2lab.controlplane.pipeline.ApplicationPipeline;
+import com.pulumi.Pulumi;
+import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedScenario;
+import io.nxmatic.rke2lab.controlplane.bdd.SeedRun;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
+import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.pulumi.edge.RunMode;
+import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import java.util.List;
+import org.junit.jupiter.engine.JupiterTestEngine;
+import org.junit.platform.engine.discovery.DiscoverySelectors;
 
-/** Entry point for the Pulumi management-cluster bootstrap program. */
+/**
+ * The Pulumi entry point — Layer 1 of the amorce (see
+ * docs/architecture/osgi/seed-bdd-module-spec.adoc § the amorce). The whole program runs inside
+ * {@code Pulumi.run}: the {@code com.pulumi} graph cannot enter Felix, and the run's facts — the
+ * {@link RunMode} (from {@code isDryRun}), the {@link Parcel} (project/stack), the derived {@link
+ * BootstrapConfig} (from the Pulumi {@code Config}) — are only knowable here. {@code Main} captures
+ * them into a {@link SeedRun} and plays {@link ClusterSeedScenario} on the launcher, seeding the
+ * {@code SeedRun} through the session store; the scenario's GIVEN (Layer 2) bootstraps the open
+ * gardening from it.
+ *
+ * <p>Nothing else lives here: opening the gardening, publishing the RunGate, building the Cellar
+ * are the GIVEN's narrated work. {@code Main} is the thin Pulumi envelope that captures what only
+ * it can know and hands it across.
+ */
 public final class Main {
+
+  /** The session-store channel carrying the run's facts from Main to the scenario's GIVEN. */
+  private static final SessionSeed<SeedRun> SEED = new SessionSeed<>(SeedRun.class, "seed-run");
 
   private Main() {}
 
   public static void main(String[] args) {
-    ApplicationPipeline.run(
-        launch ->
-            launch
-                .onFailure(
-                    (topic, cause) -> SeedLog.error("pipeline", topic + ": " + cause.getMessage()))
-                .during(
-                    "environment",
-                    env ->
-                        env.installLogSink()
-                            .loadBootstrapConfig()
-                            .loadControlplanePolicy()
-                            .loadOptions())
-                .then()
-                .during("cluster seed", seed -> seed.seedCluster())
-                .then()
-                .during("outputs", outputs -> outputs.exportOrPrint())
-                .complete());
+    Pulumi.run(
+        context -> {
+          final RunMode runMode = RunMode.detect(true);
+          final Rke2labConfig config = Rke2labConfig.from(ConfigLoader.of(context.config()));
+          final BootstrapConfig bootstrap = BootstrapConfig.from(config);
+          final Parcel parcel = new Parcel(context.projectName(), context.stackName());
+          final SeedRun run =
+              new SeedRun(
+                  runMode,
+                  parcel,
+                  bootstrap,
+                  config.entryGate().cleanWorktreeRequired().orElse(true));
+
+          try {
+            new JUnitLauncherCore<Boolean>()
+                .run(
+                    Main.class.getClassLoader(),
+                    JupiterTestEngine.class,
+                    wiring -> List.of(DiscoverySelectors.selectClass(ClusterSeedScenario.class)),
+                    (launcher, request) -> {
+                      launcher.execute(request);
+                      return Boolean.TRUE;
+                    },
+                    SEED.into(run));
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("the cluster-seed run was interrupted", interrupted);
+          }
+        });
   }
 }

@@ -179,6 +179,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
+    <!-- The common gardening spine: the host runbook stages ClusterSeedScenario composes (preflight,
+         Cellar fetch/store, sow-and-graft) + the open Gardening the GIVEN bootstraps + the SessionSeed
+         bootstrap channel. Consumed FLAT (seed-bdd's host-side base package is not exported). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-bdd</artifactId>
+    </dependency>
     <!-- The document codec: JSON (de)serialization + validation for Document payloads. Shaded flat
          into the host classpath (binding to the host's flat jackson). The SAME source is nested into
          doctor-core's Bundle-ClassPath OSGi-side, binding to the bundle's jackson — one source, two

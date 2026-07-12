@@ -2,113 +2,203 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.As;
+import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.NestedSteps;
+import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioStage;
+import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
+import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
+import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
+import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
+import io.nxmatic.rke2lab.seed.bdd.CellarStage;
+import io.nxmatic.rke2lab.seed.bdd.PreflightGate;
+import io.nxmatic.rke2lab.seed.bdd.PreflightStage;
+import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
+import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
+import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import java.util.Hashtable;
+import java.util.Objects;
+import java.util.function.Consumer;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * The composing scenario that replaces {@code ClusterSeedPipeline}. Extends {@code
- * ScenarioTestBase} (NOT {@code ScenarioTest}) so we declare the extensions ourselves in order:
- * {@link HostSeeder} FIRST, then {@code JGivenExtension}. No {@code Test} suffix on the class →
- * invisible to surefire; played only via the launcher by the driver.
+ * The ClusterSeed root scenario — the host runbook, spoken in the gardening register, composed on
+ * the common {@code seed-bdd} stages (link:docs/architecture/osgi/seed-bdd-module-spec.adoc). It is
+ * the concrete instance of link:docs/architecture/bdd/bdd.adoc#clusterseed-scenario-map[the
+ * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the seven WHENs —
+ * preflight → {@code Cellar.fetch} → four sow-and-graft callers (bbox · incus · systemd · cluster)
+ * → {@code Cellar.store}.
  *
- * <p>This class carries NO state and no {@code accept*} channel. {@link HostSeeder} pushes a {@link
- * StageContext} straight into the run's value-DAG ({@code ScenarioExecutor.readScenarioState}), so
- * every stage resolves its {@code @ExpectedScenarioState} the one way jGiven flows anything — the
- * DAG. The scenario's only job is composition: the phase order and the nested sub-trees.
+ * <p>The amorce is two-layered (§ the amorce): {@code Main} — inside {@code Pulumi.run} — captures
+ * the {@link RunMode} (the one fact only it can know) and seeds it through the launcher session
+ * store; this scenario {@link SeedReceiver receives} it before the GIVEN, which bootstraps
+ * everything else from it. Opening the gardening is the GIVEN's work, never a WHEN.
  *
- * <p>The runbook is NOT harvested back either: the driver seeds its OWN {@code ReportModel} into
- * the session store, {@link HostSeeder} plants it in jGiven's store so jGiven writes the run into
- * it, and the driver renders from the reference it already holds. The outputs are published by the
- * terminal {@link OutputsStage} into the driver's sink (jGiven runs {@code @AfterScenario} on
- * stages only, never on this instance).
+ * <p>Each sow-and-graft WHEN is a {@code @NestedSteps} step named for its crossing; its body sows
+ * the soil's runbook through the gardening and grafts the reaped scion under THIS step, into the
+ * live root {@link ReportModel} ({@code getScenario().getModel()} — the single trunk). jGiven adds
+ * a top-level step to the model at invocation time, so the rootstock step already exists when its
+ * body grafts under it.
  */
-@ExtendWith(
-    HostSeeder.class) // ours first: seeds the StageContext into the DAG + the injected model
-@ExtendWith(JGivenExtension.class) // jGiven second
+@ExtendWith(JGivenExtension.class)
 public class ClusterSeedScenario
     extends ScenarioTestBase<
-        ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then> {
+        ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then>
+    implements SeedReceiver<SeedRun> {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  /** Set once by {@link #receiveSeed} (the {@code SessionSeed} post-processor) before the GIVEN. */
+  @MonotonicNonNull private SeedRun run;
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
   }
 
+  @Override
+  public void receiveSeed(SeedRun run) {
+    this.run = run;
+  }
+
   @Test
-  void the_cluster_is_seeded() {
+  void the_cluster_seed_grows_to_a_ready_cluster() {
+    final SeedRun seedRun =
+        Objects.requireNonNull(
+            run, "the SeedRun was not seeded before the scenario ran (the driver must seed it)");
+    final ReportModel hostTree = getScenario().getModel();
+    given().i_have_access_to_the_open_gardening(seedRun);
     when()
-        .preflight()
+        .the_entry_gates_are_enforced()
         .and()
-        .bbox()
+        .the_parcels_state_is_fetched()
         .and()
-        .incus()
+        .the_network_reservations_are_settled(hostTree)
         .and()
-        .systemdAdapter()
+        .the_instance_is_provisioned(hostTree)
         .and()
-        .resources()
+        .the_systemd_adapter_is_launched(hostTree)
         .and()
-        .outputs();
+        .the_cluster_becomes_ready(hostTree);
+    then().the_harvest_is_stored();
   }
 
-  public static class Given extends Stage<Given> {}
+  /**
+   * The GIVEN bootstraps the open gardening from the received {@link RunMode}: open the {@link
+   * Gardening} (boot Felix, find the gardener), publish the {@link RunGate} into the registry so
+   * the scions resolve it, and build the host realisations the WHENs use — the {@link
+   * PulumiCellar}, the {@link PreflightGate}, the {@link Parcel}. All of it is narration; opening
+   * the gardening is a precondition, not a step.
+   */
+  public static class Given extends Stage<Given> {
 
+    @ProvidedScenarioState Gardening gardening;
+    @ProvidedScenarioState PulumiCellar cellar;
+    @ProvidedScenarioState PreflightGate preflightGate;
+    @ProvidedScenarioState Parcel parcel;
+
+    public Given i_have_access_to_the_open_gardening(@Hidden SeedRun run) {
+      this.gardening = Gardening.open();
+      // Publish the ambient RunGate the scions resolve — projected from the run mode.
+      // registerService,
+      // not a handler: the run-condition is a service the whole run shares (§ RunGate).
+      final RunGate runGate = run.runMode()::playsLive;
+      gardening.connection().context().registerService(RunGate.class, runGate, new Hashtable<>());
+
+      final Consumer<String> log = line -> {};
+      this.cellar = PulumiCellar.fromEnvironment(log);
+      final BootedFramework framework =
+          BootedFramework.attached(gardening.connection().framework());
+      this.preflightGate =
+          () ->
+              EntryGatePolicyEnforcer.enforceAll(
+                  run.config().localWorktreePath(), run.cleanWorktreeRequired(), framework);
+      this.parcel = run.parcel();
+      return self();
+    }
+  }
+
+  /** The seven WHENs — preflight, the cellar bookends, and the four sow-and-graft crossings. */
   public static class When extends Stage<When> {
+
     @ScenarioStage PreflightStage preflight;
-    @ScenarioStage BboxStage bbox;
-    @ScenarioStage IncusStage incus;
-    @ScenarioStage SystemdAdapterStage systemdAdapter;
-    @ScenarioStage ResourcesStage resources;
-    @ScenarioStage OutputsStage outputs;
+    @ScenarioStage CellarStage cellar;
+    @ScenarioStage SowAndGraftStage sowAndGraft;
+
+    @ScenarioState Gardening gardening;
+    @ScenarioState PulumiCellar cellarRealisation;
+    @ScenarioState PreflightGate preflightGate;
+    @ScenarioState Parcel parcel;
 
     @NestedSteps
-    @As("preflight")
-    public When preflight() {
-      preflight.the_preflight_gates_are_enforced();
+    @As("the entry gates are enforced")
+    public When the_entry_gates_are_enforced() {
+      preflight.gatedBy(preflightGate).the_entry_gates_are_enforced();
       return self();
     }
 
     @NestedSteps
-    @As("bbox")
-    public When bbox() {
-      bbox.the_bbox_reservations_are_reconciled();
+    @As("the parcel's state is fetched")
+    public When the_parcels_state_is_fetched() {
+      cellar.conserving(cellarRealisation, parcel).the_parcels_state_is_fetched();
       return self();
     }
 
     @NestedSteps
-    @As("incus")
-    public When incus() {
-      incus.the_incus_instance_is_provisioned();
+    @As("the network reservations are settled")
+    public When the_network_reservations_are_settled(@Hidden ReportModel hostTree) {
+      sowAndGraft
+          .sowing("bbox", gardening, hostTree)
+          .the_scion_is_sown_and_grafted("the network reservations are settled");
       return self();
     }
 
     @NestedSteps
-    @As("systemd adapter")
-    public When systemdAdapter() {
-      systemdAdapter.the_systemd_adapter_is_launched();
+    @As("the instance is provisioned")
+    public When the_instance_is_provisioned(@Hidden ReportModel hostTree) {
+      sowAndGraft
+          .sowing("incus", gardening, hostTree)
+          .the_scion_is_sown_and_grafted("the instance is provisioned");
       return self();
     }
 
     @NestedSteps
-    @As("resources")
-    public When resources() {
-      resources.the_bootstrap_resources_are_created();
+    @As("the systemd adapter is launched")
+    public When the_systemd_adapter_is_launched(@Hidden ReportModel hostTree) {
+      sowAndGraft
+          .sowing("systemd", gardening, hostTree)
+          .the_scion_is_sown_and_grafted("the systemd adapter is launched");
       return self();
     }
 
     @NestedSteps
-    @As("outputs")
-    public When outputs() {
-      outputs.the_stack_outputs_are_collected();
+    @As("the cluster becomes ready")
+    public When the_cluster_becomes_ready(@Hidden ReportModel hostTree) {
+      sowAndGraft
+          .sowing("cluster", gardening, hostTree)
+          .the_scion_is_sown_and_grafted("the cluster becomes ready");
       return self();
     }
   }
 
-  public static class Then extends Stage<Then> {}
+  /** The closing THEN — the harvest is filed to its parcel's cellar. */
+  public static class Then extends Stage<Then> {
+
+    @ScenarioStage CellarStage cellar;
+
+    @As("the harvest is stored")
+    public Then the_harvest_is_stored() {
+      // The cellar bookend closes the run; the végétaux cultivated fresh this run are filed to the
+      // parcel. (What exactly is stored is the harvest-shaping task; the bookend is here.)
+      return self();
+    }
+  }
 }
