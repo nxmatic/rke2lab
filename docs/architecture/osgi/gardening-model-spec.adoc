@@ -1,0 +1,183 @@
+= The gardening model — the entry point (roles, verbs, one gardening)
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN, the model's entry point (2026-07-12). This is the ROOT of the seed design: the
+gardening model, independent of any realisation. Everything else DESCENDS from it — the
+link:seed-broker-spec.adoc[seed-broker spec] realises the GARDENER role, the
+link:host-cellar-realisation-spec.adoc[host Cellar realisation] realises the CELLAR role, the domain
+handlers realise the SOILS. The link:seed-gardening-lexicon.adoc[gardening lexicon] is the FR-EN
+reference vocabulary this model draws its words from.
+
+*Why this doc exists (2026-07-12):* the model — the keystone reframe and the five roles — used to live
+INSIDE the seed-broker spec, so a realisation doc (the gardener's mechanism) doubled as the model's front
+door. That is the level-mixing this doc removes: the broker is not a sixth role, it is the *name of the
+gardener's realisation*. Asking "what role is proper to the broker?" returns nothing — the broker IS the
+gardener, incarnate. So the model needs its own home, above the realisations.
+====
+
+== The keystone — crossing worlds is a detail; the client sows a seed
+
+The load-bearing reframe. One is tempted to treat the host↔OSGi seam as *the* subject — classloader
+realms, the natures of a crossing object, seams to system-export. From the CLIENT's view all of that is
+plumbing. The client does not say "I cross a classloader frontier"; it says *sow this seed*. Whether the
+seed is sown by switching into Felix, staying flat, or tomorrow going HTTP-remote is behind the door —
+the client has ONE relationship and ONE local signal. This is REST's core promise (the client is blind
+to the server's implementation), transposed to an in-process seam; it is why the model is
+forward-compatible with a future remote split (same contract, a different transport).
+
+== The five roles
+
+The horticultural register names five roles. They are ROLES of the gardening model; a realisation
+INCARNATES each one, but the role is the model's, not the realisation's.
+
+[cols="1,3",options="header"]
+|===
+| Role | What it is (model-level, realisation-agnostic)
+
+| *COMMISSIONER* (provisioner)
+| The real driving actor: it WANTS, it LAUNCHES, and it CONSERVES the reaped harvest at home.
+
+| *GARDENER*
+| Transversal know-how: knows how to grow correctly on ALL plots, OWNS none, routes a seed to the plot
+  that grows it. The client does not till — it asks the gardener to sow (REST: the client requests, the
+  server acts).
+
+| *SOILS* / plots
+| The DOMAINS — each grows what it owns, and only that.
+
+| *TOOLS* + channel
+| Carries the request in and the harvest back, speaking ONLY gardening, holding no plot's vocabulary.
+
+| *CELLAR*
+| The COMMISSIONER's conservation organ, its neutral face turned toward the growers. *Not a sixth actor*
+  — it is how the commissioner conserves: a neutral, addressable, append-only store that holds crops OR
+  tools and is never typed by its contents.
+|===
+
+[IMPORTANT]
+====
+*The cellar is the commissioner's organ, not a third party, and the gardener never touches it.* Two
+confusions the model rules out:
+
+* The cellar is NOT a separate actor beside the commissioner — it is the commissioner's *conservation
+  register* (the storage face). "The commissioner conserves the harvest" and "the harvest goes in the
+  cellar" are one gesture said twice.
+* The cellar is NOT the gardener's. The gardener grows and routes; conservation is the commissioner's
+  concern. A grower may STORE into / FETCH from the cellar (it is a tool laid in its hand), but the
+  cellar is owned by the commissioner, not by the gardener.
+====
+
+== The verbs — two registers that share no word
+
+The model keeps two verb registers strictly apart, so the decorrelation is stated as vocabulary (a
+shared word would re-couple what the roles separate):
+
+[cols="1,1,2",options="header"]
+|===
+| Register | Verb | Gesture
+
+| gardening (the grower, at the field)
+| `sow`
+| hand a seed to the gardener to grow at the right plot
+
+| gardening (the grower, at the field)
+| `reap` / `harvest`
+| the grower's hand-over of what grew — a FIELD gesture, never a cellar operation
+
+| conservation (the cellar)
+| `store(Parcel, végétal)`
+| put a végétal away in the parcel's cellar — append-only, never overwrite
+
+| conservation (the cellar)
+| `fetch(Parcel)`
+| go get what is stored (re-read by key) — NOT `harvest`: harvest is the field's hand-over, fetch is the
+  cellar's retrieval
+
+| conservation (the cellar)
+| `neighbours(Parcel)`
+| the neighbouring cellars — sibling parcels under the same soil
+|===
+
+`harvest`/`reap` STAY gardening verbs attached to the grower; `store`/`fetch`/`neighbours` are the
+cellar's. The two registers share no verb — that is the model's guarantee that the field and the store
+do not bleed into each other.
+
+== The végétal is opaque — the cellar never looks inside
+
+What the cellar holds — a `végétal` — is SEALED: addressed by a neutral coordinate (the shelf: a
+`Parcel`), never read. The cellar knows only the parcel (where) and the gesture (store / fetch), never
+the contents (what). This opacity is the model's, not a realisation's convenience: it is why a single
+neutral cellar can hold every domain's harvest without knowing any domain — the shelf is neutral, the
+crop is sealed.
+
+== One gardening — one commissioner, one gardener, one cellar
+
+A single gardening has ONE commissioner, ONE gardener, ONE cellar. This is the model's multiplicity
+rule, and it is what makes "a single transverse cellar" not an oddity but the norm FOR ONE GARDENING: the
+cellar is single because the gardening is single, not because of anything about the soil it conserves
+onto. A richer deployment with several gardenings would have several commissioners, several gardeners,
+several cellars — the model does not forbid it, it simply is not one gardening's shape.
+
+*Different gardening VERSIONS realise the same role over different media.* "One cellar per gardening" is
+about count within one gardening; it does not tie the cellar to one medium across gardenings. The
+seed-master gardening conserves over the Pulumi backend; the cluster gardening will conserve over a
+git-oriented storage — two versions, two cellar realisations of the ONE role, each single within its own
+gardening. So a realisation doc must name WHICH gardening it serves; it must never present itself as
+"the cellar" (§ <<descend>>).
+
+WARNING: *the boundary of "one" is the GARDENING, never the soil.* A gardening conserves onto some soil,
+but the soil is not what makes the cellar single — the gardening is. Confusing "one cellar" with "one
+soil/backend" is the mistake corrected on 2026-07-12: the cellar is single per gardening, and would
+stay single across several soils of one gardening.
+
+[[descend]]
+== How the realisations descend from this model
+
+Each role is INCARNATED by a realisation; the realisation adds the *how*, never a new role.
+
+[cols="1,2,2",options="header"]
+|===
+| Model role | Realisation | Spec
+
+| GARDENER
+| the *seed-broker* — the one door `sow(coordinate, seed)`, handlers collected by Declarative Services,
+  routing by coordinate, the world-crossing hidden behind the door. (The broker is the gardener's name,
+  not a role.)
+| link:seed-broker-spec.adoc[seed-broker spec]
+
+| CELLAR
+| the commissioner's conservation organ — *one role, MANY realisations, one per gardening version.* The
+  seed-master gardening realises it over the *Pulumi backend* (`store`/`fetch`/`neighbours`, laid into the
+  framework at boot, opaque by coordinate slug). The cluster gardening will realise the SAME role over a
+  *git-oriented storage*. The role (and its opacity, its one-per-gardening rule) is the model's; the
+  medium is the realisation's.
+| link:host-cellar-realisation-spec.adoc[host Cellar realisation] (the Pulumi realisation, for seed-master)
+
+| SOILS
+| the *domain handlers* — each domain contributes a `SeedHandler` per coordinate it grows.
+| link:seed-broker-spec.adoc#contribution-and-opacity[seed-broker spec — contribution]
+
+| COMMISSIONER / TOOLS
+| the *host* (`pulumi-edge` + `seed-master`) — wants, launches (`pulumi up`), conserves via the cellar;
+  carries requests + harvests speaking only gardening.
+| link:seed-spec.adoc[seed spec — orchestration]
+|===
+
+NOTE: "From the system's point of view, the gardening IS the framework" is a REALISATION statement, not
+a model one: it holds because THIS system realises the gardener as a DS singleton in one Felix, so one
+gardening = one framework. At the model level the rule is simply *one gardening = one commissioner = one
+gardener = one cellar*; the framework identity is the seed-broker realisation of it.
+
+== Related documentation
+
+* link:seed-broker-spec.adoc[The seed-broker spec] — the GARDENER's realisation (the door, the handlers,
+  the crossing); reads this model as its root.
+* link:host-cellar-realisation-spec.adoc[Host Cellar realisation] — the CELLAR's realisation over the
+  Pulumi backend.
+* link:seed-gardening-lexicon.adoc[The gardening lexicon] — the full FR-EN vocabulary this model draws
+  from; its Actors table is the roles above, said in French.
+* link:seed-spec.adoc[The seed — orchestration architecture] — where the commissioner sows the first seed
+  and the germination cascade runs (seed-master specific).

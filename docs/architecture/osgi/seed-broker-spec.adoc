@@ -62,21 +62,23 @@ resources (Pulumi / master); *sows it* = execution, of which the world-crossing 
 detail. This is REST's core promise — the client is blind to the server's implementation — and it is
 the remedy to the seam's difficulty: the crossing is HIDDEN behind one door, not made omnipresent.
 
-The horticultural register names the ACTORS too (settled 2026-07-10), and the full lexicon lives at
-link:seed-gardening-lexicon.adoc[the gardening lexicon]:
+The five gardening ROLES (commissioner, gardener, soils, tools, cellar) are the model's, defined at
+link:gardening-model-spec.adoc[the gardening model] (the design's entry point); the full FR-EN register
+lives at link:seed-gardening-lexicon.adoc[the gardening lexicon]. This spec realises ONE of those roles —
+the *GARDENER* — so the broker is not a sixth actor but the gardener's incarnation. What that realisation
+adds:
 
-* the *COMMISSIONER* (the *provisioner*) = Pulumi, via the edge — the real driving actor: it wants,
-  launches (`pulumi up`), and CONSERVES the reaped harvest at home (in a *pot* / *vase* / *fridge*, i.e.
-  a per-resource output / top-level export / stack history — the container follows the harvest's nature).
-* the *GARDENER* = the `SeedBroker` — it knows how to grow correctly on ALL plots, owns none, routes by
-  coordinate (`DefaultSeedBroker` collecting handlers by DS). The gardener is transversal know-how, not a
-  landowner; the client does not till, it asks the gardener to sow (REST: the client requests, the server
-  acts).
-* the *SOILS* / plots = the DOMAINS (doctor, cluster) — each grows what it owns.
-* the *TOOLS* + channel = the host (`pulumi-edge`, `seed-master`) — it carries the request in and the
-  harvest back, speaking only gardening, holding no plot's vocabulary. This is the load-bearing goal of
-  the host migration: *the host speaks only gardening; all logic that speaks a domain migrates into that
-  domain* (§ <<remaining-migration>>).
+* the *GARDENER* is realised as the `SeedBroker` — the one door `sow(coordinate, seed)`, handlers
+  collected by Declarative Services (`DefaultSeedBroker`), routing by coordinate, the world-crossing
+  hidden behind the door. Transversal know-how, owns no plot; the client requests, the broker acts (REST).
+* the other roles are realised ELSEWHERE and only referenced here: the *COMMISSIONER* + *TOOLS* = the host
+  (`pulumi-edge`, `seed-master` — wants, launches `pulumi up`, conserves, carries requests speaking only
+  gardening); the *SOILS* = the DOMAINS (doctor, cluster — each a `SeedHandler`); the *CELLAR* = the host
+  conservation organ (§ <<the-neutral-crud-port-is-a-cellar>>, realised at
+  link:host-cellar-realisation-spec.adoc[host Cellar realisation]).
+
+The load-bearing goal of the host migration follows from the roles: *the host speaks only gardening; all
+logic that speaks a domain migrates into that domain* (§ <<remaining-migration>>).
 
 === The germination cascade — why the crossing is NOT symmetric (seed-master)
 

@@ -1,0 +1,209 @@
+= Host Cellar realisation — the PULUMI cellar for seed-master (one of several gardening versions)
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN, ready to implement (2026-07-12). This spec realises the *CELLAR role* of
+link:gardening-model-spec.adoc[the gardening model] over the Pulumi backend, *for the seed-master
+gardening* — the *how*, not the model (the model owns the roles, the multiplicity rule, the opacity; this
+doc does not re-derive them). It is one realisation of the cellar role among several: the seed-master
+gardening conserves over Pulumi (this doc); the *cluster gardening will conserve over a git-oriented
+storage* — a separate realisation of the SAME role, not covered here. So this is "the Pulumi cellar",
+never "the cellar". It is the sibling of link:seed-broker-spec.adoc[the seed-broker spec] (which realises
+the GARDENER role): both descend from the model, neither from the other. Concretely it narrows to ONE buildable first step:
+realise the host `Cellar` impl in `pulumi-edge`. It is the keystone we hit while attacking the host
+top-down — `Main`/`pulumi-edge` do not compile because the doctor domain's frontier is half-migrated: the
+OSGi side is shipped, the host impl is missing.
+
+The implementation plan lives at the end (§ <<plan>>); it is the NEXT work session's starting point.
+====
+
+== Why this is the first step (how we got here)
+
+Attacking the host top-down (`Main` → `ApplicationPipeline` → …) the build stops BELOW seed-master, in
+`pulumi-edge`, on `package io.nxmatic.rke2lab.doctor.port does not exist` /
+`io.nxmatic.rke2lab.doctor.records does not exist`. Those packages were de-seamed into
+`doctor.contract` (records fused, the `-port` seam dissolved). Three `pulumi-edge` classes still import
+them:
+
+* `StackMedicalRecordJournal` (implements the old `MedicalRecordJournal` READ port)
+* `StackInterventionJournal` (implements the old `InterventionJournal` READ port)
+* `PulumiInterventionLedgerWriter` (implements the old `InterventionLedgerWriter` WRITE port)
+
+The seed-broker spec already prescribes their fate: *the three fuse into ONE `Cellar` impl over the
+Pulumi backend.* Everything OSGi-side is already shipped (see § <<already-shipped>>); the ONLY missing
+link is this host impl. Realising it unblocks the whole host compilation and is prerequisite to the
+domain-by-domain BDD migration above it.
+
+[[the-model]]
+== The model — confirmed from the design, corrected against my own conflation
+
+Two facts the reading settled, both load-bearing and both places I had it wrong first:
+
+. *This is the realisation of the CELLAR role — one of the five gardening roles, defined at
+  link:gardening-model-spec.adoc[the gardening model].* The model states, and this doc does NOT re-derive:
+  the cellar is the COMMISSIONER's conservation organ (not a third actor, not the gardener's); one
+  gardening = one cellar; the végétal is opaque, addressed by a neutral `Parcel`, never read. What THIS
+  realisation adds — the *how* over the Pulumi backend:
+  ** the three verbs are pure Pulumi-backend gestures: `store`/`fetch` = write/read a `végétal` as a stack
+     OUTPUT keyed by coordinate slug (`createOrSelectStack(project, stack)`), `neighbours` = enumerate the
+     sibling stacks under the same soil. `Parcel(project, stack)` IS a Pulumi stack reference said in
+     gardening words.
+  ** the INTERFACE (`Cellar`, `Parcel`) is homed in `seed-broker-port` (the neutral fondation seam)
+     because its face must speak gardening; the IMPL is a host object in `pulumi-edge`, laid into Felix at
+     boot by `registerService` (§ open question #4, resolved) — because THIS system realises the gardener
+     as a DS singleton in one Felix, so one gardening = one framework = one laid cellar.
+  ** the doctor merely PROJECTS onto it (`Patient ↔ Parcel`, `Report ↔ végétal`); the three fusing classes
+     carried doctor names, but that WAS the leak the de-seam exposes — all three do the one thing: persist
+     onto the Pulumi state. The doctor is the cellar's first consumer, not its owner.
+
+. *`store` does NOT use the split.* CREATE files one sealed envelope under its coordinate SLUG, payload
+  verbatim — no `FIELD_*`, no `@Scion`/`@Rootstock` reflection. The split/HATEOAS mechanism (shipped,
+  see below) is a SEPARATE, LATER concern: it is how a reaped plant that ADVERTISES graft coordinates
+  gets each grafted sub-scion filed under its own coordinate — a COMPOSITION of stores, not the store
+  gesture itself. The host Cellar needs none of it to compile or to serve the doctor's read/write.
+
+The one mechanical change that makes CRUD opaque: `StackSnapshot.outputsNamed` stops being keyed on a
+domain FIELD name (`"consultationReport"`, `OUTPUT_KEY="interventions"`) and starts being keyed on the
+COORDINATE SLUG (the envelope shell). That single reshape kills both leak names.
+
+=== The `pulumi ↔ seed ↔ doctor` shape (seed-broker-spec, restated)
+
+The middle (`seed`) speaks gardening; two mirror adapters project ONTO it, never onto each other:
+
+* *Pulumi side — the EDGE (`pulumi-edge`, host):* `parcel → createOrSelectStack(project, stack)`;
+  `store`/`fetch` a `végétal` as an output under the coordinate slug. Knows Pulumi + the neutral,
+  NEVER the doctor. **This is the class we build.**
+* *Doctor side — the HANDLER (`doctor-core`, OSGi):* `Patient → parcel`, `ConsultationReport → plant`.
+  Knows the doctor + the neutral, NEVER Pulumi. **Already shipped.**
+* The two never meet: neither imports the other's vocabulary, both import only the middle.
+
+== The `Cellar` contract (already in `seed-broker-port`, `type=seam`)
+
+[cols="1,2",options="header"]
+|===
+| verb | gesture
+| `store(Parcel, SeedEnvelope)` | append-only: file the sealed envelope under its coordinate slug; never overwrite, never read the payload
+| `fetch(Parcel) : List<SeedEnvelope>` | re-read by key: collect the stored envelopes (oldest first), one opaque envelope per readable entry
+| `neighbours(Parcel) : List<Parcel>` | the sibling parcels under the same backend soil (the parcel's own first)
+|===
+
+`SeedEnvelope(domain, coordinate, payload)` — the shell (`domain`, `coordinate`: neutral `String`s) is
+what the frontier addresses BY; the `payload` (a JSON `String`) is sealed, never read. Each world uses
+its OWN jackson; no jackson type crosses.
+
+[[already-shipped]]
+== What is already shipped (verified 2026-07-12) — do NOT rebuild
+
+* `Cellar` interface + `Parcel` record — `seed-broker-port` (`type=seam`).
+* Doctor OSGi consumers, both `@Reference Cellar`, fully migrated:
+  ** `JournalMedicalRecordRegistry` — `cellar.fetch(ParcelProjection.parcelOf(patient))` +
+     `cellar.neighbours(...)`, folds via `MedicalRecordReader`.
+  ** `CellarInterventionLedgerRegistry` — `cellar.fetch(ParcelProjection.LEDGER)` +
+     `cellar.store(ParcelProjection.LEDGER, InterventionWriter.of(intervention))`.
+* `ParcelProjection` (doctor-core) — `Patient ↔ Parcel` 1:1, and `LEDGER = new Parcel("intervention-ledger", "dev")`.
+* The readers (`MedicalRecordReader`, `InterventionLedgerReader`) decode the payload directly
+  (`codec.decode(entry, VisitWire.class)` / `InterventionWire.class`) — they do NOT inspect the
+  envelope coordinate. So the coordinate the host stamps on a fetched envelope is not read by anyone on
+  the read path; it need only be a stable neutral slug.
+* The split machinery (SHIPPED, unused by the Cellar): `@Scion`/`@Rootstock`/`SplitCoordinate`/
+  `SeedContract` markers, `DoctorSplitReflector` (`@Component(service = SeedHandler.class)`, routed by
+  `DefaultSeedBroker.sow(new SplitCoordinate("doctor"), …)`). This is the HATEOAS/output-nesting path,
+  NOT the Cellar store — left for its real use later.
+
+== What is missing — the exact gap
+
+ONE class: the host `Cellar` impl over the Pulumi backend, fusing the three stale journals. Plus the
+death of the two leak names it currently carries (`OUTPUT_KEY`, any `FIELD_*` remnant) and the retiring
+of the three fused classes.
+
+The fusion map (each verb already exists as mechanics in one of the three classes):
+
+[cols="1,2",options="header"]
+|===
+| `Cellar` verb | fuses from
+| `fetch(Parcel)` | `StackMedicalRecordJournal.historyOf` (timeline walk → one envelope per entry). For the fixed ledger parcel it is `StackInterventionJournal.entries` (one envelope per blob). The parcel selects which; both return opaque `SeedEnvelope`s keyed by coordinate slug.
+| `neighbours(Parcel)` | `StackMedicalRecordJournal.cohort` (sibling-stack enumeration)
+| `store(Parcel, envelope)` | `PulumiInterventionLedgerWriter.append` (the out-of-run `up()` filing one history entry under a stable resource name)
+|===
+
+The helper machinery all three rely on STAYS and is reused verbatim: `StackHandle`, `StackHistory`,
+`StackSnapshot`, `StackCoordinate`, `StackException`, `PulumiBackendLayout`, `InterventionResource`,
+`InterventionLedgerLayout` (its `ledger()` coordinate = `Parcel("intervention-ledger","dev")` —
+matches `ParcelProjection.LEDGER`).
+
+== Open questions (2 of 4 resolved 2026-07-12; #2 + #3 remain)
+
+. *`Parcel` arity — RESOLVED (2026-07-12): keep `Parcel(project, stack)` as shipped.* Since the Cellar
+  is the Pulumi-backend frontier (§ <<the-model>> claim #1), `Parcel` IS a Pulumi stack reference; the
+  `org` in the figure text is the Pulumi org — a host/doctor-side constant applied when projecting, not
+  a field the neutral seam forces the host to invent. The figure text was loose; the shipped
+  `(project, stack)` record stands.
+
+. *One coordinate-slug per stored envelope on read.* `fetch` must stamp each rebuilt envelope with a
+  coordinate. Since no reader inspects it, the slug need only be stable + neutral. Decide: does `fetch`
+  read the slug from the stored output NAME (the store wrote it there), closing the CRUD-by-shell loop?
+  That is the design's intent ("the name comes from the plant") — confirm the store writes the slug as
+  the output name and fetch reads it back.
+
+. *`store` for the medical-record parcel vs the ledger parcel.* Today only the ledger is written
+  (`append`); the medical record is written elsewhere (`SystemdAdapterResource` nests
+  `FIELD_CONSULTATION_REPORT`/`FIELD_EXPECTATIONS` — the leak). The Cellar's `store` must become the
+  ONE write path, keyed by coordinate slug. Whether `SystemdAdapterResource`'s write folds into
+  `Cellar.store` now or in the domain-migration step is a scope call for the plan.
+
+. *How the host registers the Cellar into Felix — RESOLVED (2026-07-12): `registerService(Cellar.class,
+  hostImpl)`, NOT via the broker.* Confirmed against `DefaultSeedBroker` + seed-broker-spec
+  § `edge-reaches-osgi`. The host publishes the Cellar ACTIVELY into Felix, but the target is the bare
+  service registry, not the `SeedBroker`. Two load-bearing facts:
+  ** *The broker never sees the Cellar, and must not.* `DefaultSeedBroker` collects ONLY `SeedHandler`s
+     (growers projecting a metier onto the neutral) by constructor `@Reference(MULTIPLE)`. The host is
+     outside Felix, cannot be a DS component, so contributes no handler. The Cellar is not a grower — it
+     is a COLLABORATOR a handler's dependency (`MedicalRecordRegistry`) `@References`, two hops below the
+     broker: `SeedBroker → SeedHandler → MedicalRecordRegistry → @Reference Cellar`.
+  ** *The reference is STATIC + mandatory, so boot ORDER is the whole difficulty.* The host holds the
+     single global start-level cursor (`StartLevelLever`, levels per role from `BootPlanner`), registers
+     the Cellar while consumer bundles sit ABOVE the cursor, THEN raises it — the reference binds
+     directly, no `greedy`/`dynamic`/`OPTIONAL`. A doctor with no cellar is a wiring bug that must fail
+     loud.
+  +
+  This is STEP 2 territory (boot wiring), not the impl itself — sequenced by the plan, but the mechanism
+  is now settled.
+
+[[plan]]
+== Implementation plan (the next work session starts here)
+
+*Guiding rule:* replace the broken API with the design's, smallest step that recompiles, verified
+green before the next. Build per repo convention: `flox activate -- ./mvnw -pl <module> -am clean
+verify -Dmaven.build.cache.skipCache=true -DskipTests=false` (NEVER `install`; count `Tests run:`).
+
+. *Settle the two remaining open questions above* (slug-as-output-name, store scope) — a short design
+  confirmation, no code. Parcel arity + register-timing are already resolved (2026-07-12). Blocks
+  nothing else once answered.
+
+. *Write the host `Cellar` impl* (working name `PulumiCellar` / `StackCellar` — pick in step 1) in
+  `pulumi-edge`, implementing `store`/`fetch`/`neighbours` by fusing the three journals' mechanics,
+  keyed by coordinate slug (no `FIELD_*`, no `OUTPUT_KEY`, no doctor import).
+
+. *Retire the three fused classes* (`StackMedicalRecordJournal`, `StackInterventionJournal`,
+  `PulumiInterventionLedgerWriter`) and the leak constants (`InterventionLedgerLayout.OUTPUT_KEY`, any
+  `FIELD_*`), updating their tests to target the one `Cellar` impl.
+
+. *Compile `pulumi-edge` green.* This is the milestone: the doctor-frontier host impl exists, the dead
+  doctor.port/records imports are gone.
+
+. *Then re-run the seed-master compile* to surface the NEXT wall (bbox.port, FrameworkLaunchPipeline,
+  the fluent `pipeline.*`) — the top-down march resumes from a compiling `pulumi-edge`.
+
+NOTE: STEP 2 (register the Cellar into Felix at boot) and the domain-by-domain BDD migration (the
+graft-caller scenarios, `Main` on the launcher) are DOWNSTREAM of a compiling host and are scoped in
+link:seed-spec.adoc#migration[the seed spec migration] + link:bdd.adoc#clusterseed-scenario-map[the
+scenario map], not here.
+
+== Related documentation
+
+* link:seed-broker-spec.adoc[Seed-broker spec] — the Cellar section, the `pulumi ↔ seed ↔ doctor`
+  figure, the CRUD-by-shell model this narrows.
+* link:seed-spec.adoc#migration[Seed spec — migration] — the domain-by-domain dissolution this unblocks.
+* link:bdd.adoc#clusterseed-scenario-map[The ClusterSeed scenario map] — the graft-caller runbook above.

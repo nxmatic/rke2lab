@@ -3,14 +3,15 @@
 :toclevels: 2
 :sectnums:
 
-The seed-broker model speaks a horticultural register: a client sows a seed, the broker (the gardener)
-grows it on the right plot (a domain), and the reaped result is conserved by the commissioner. This is
-the reference lexicon — a general FR-EN gardening vocabulary we draw from, with a third column naming the
+The seed design speaks a horticultural register: a client sows a seed, the gardener grows it on the right
+plot (a domain), and the reaped result is conserved by the commissioner in the cellar. This is the
+reference lexicon — a general FR-EN gardening vocabulary we draw from, with a third column naming the
 **seed-model term** (the code type or concept) wherever a word is actually used in the design. An empty
 model column means the word is held in reserve, not yet load-bearing.
 
-The active, load-bearing subset is summarised in
-link:seed-broker-spec.adoc[the seed-broker spec]'s glossary; this file is the full reserve.
+The MODEL these words serve — the roles, verbs, and multiplicity rule — is
+link:gardening-model-spec.adoc[the gardening model] (the design's entry point); this file is the full
+FR-EN reserve it draws from.
 
 == Général
 
@@ -239,7 +240,9 @@ ce n'est pas « on utilise un faux outil qui invente une récolte verte ». Les 
 
 == Related documentation
 
-* link:seed-broker-spec.adoc[The seed-broker spec] — the model this lexicon serves; its glossary is the
+* link:gardening-model-spec.adoc[The gardening model] — the model this lexicon serves (roles, verbs,
+  multiplicity); its Actors table is the roles said in French.
+* link:seed-broker-spec.adoc[The seed-broker spec] — the GARDENER's realisation; its glossary is the
   active subset.
 * link:seed-spec.adoc[The seed — orchestration architecture] — where sow/scion/graft/rootstock first
   appear on the observability channel.
