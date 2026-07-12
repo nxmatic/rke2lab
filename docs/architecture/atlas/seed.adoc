@@ -321,6 +321,41 @@ the per-domain G/W/T distribution — lives at link:../bdd/bdd.adoc#clusterseed-
 scenario map] (settled 2026-07-11c).* This atlas view is the host-pipeline capabilities; the map is the
 concrete scenario instance those capabilities play.
 
+=== Diagram R — the host realisation: from a fluent monolith to a gardening skeleton
+
+The host-side realisation of the target: `pulumi-edge` back in the build (the `Cellar` role realised —
+link:../osgi/host-cellar-realisation-spec.adoc[host Cellar realisation]), and `seed-master` reduced to
+the load-bearing skeleton the scenario map rebuilds on. The links this diagram ties: the
+link:../osgi/gardening-model-spec.adoc[gardening model] (roles), the
+link:../bdd/bdd.adoc#clusterseed-scenario-map[scenario map] (the 6 steps), and the
+link:../osgi/controlplane-to-osgi-migration-spec.adoc[migration spec] (host reaches domains by `sow`).
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — the fluent host monolith]
+    b1["seed-master controlplane<br/>~95 files: pipeline/Topic grammar,<br/>host-side bbox/incus/systemd/readiness metier,<br/>IncusResourceBootstrap fuses graph + contacts + manifests"]
+  end
+  subgraph AFTER[After — gardening skeleton + door]
+    a1["host runbook: gardening only<br/>preflight · graft-callers (sow) · outputs=Cellar.store"]
+    a2["domain metier = in-container scions<br/>bbox-bdd · incus-bdd · systemd-bdd · cluster-bdd (ship)"]
+    a3["IncusResourceBootstrap: com.pulumi.* graph stays host;<br/>contacts + manifests graft reached by sow (cultivated fresh)"]
+    a1 --> a2
+    a1 --> a3
+  end
+  BEFORE -.demolished, git is the net.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+*Monotone / honest edits:* the domain scions already ship (bbox/incus/systemd/cluster `-bdd`) — the map's
+old "needs -bdd" was stale, corrected. The `Cellar` role is realised host-side (`PulumiCellar`). What
+remains is the spine rebuild (Main sows the scenario; the root steps become graft-callers; outputs →
+`Cellar.store`) and dissolving `IncusResourceBootstrap`'s contact/manifests consumption into `sow` — the
+`com.pulumi.*` provisioning graph stays host (Pulumi cannot enter Felix). The manifests/flox synthesis is
+a graft cultivated fresh, not a cellar artifact (no second cellar; a cache could lie on version skew).
+
 [NOTE]
 .The output gate and the broker-split compose — they are two distinct flows (2026-07-10)
 ====
