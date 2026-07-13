@@ -26,4 +26,4 @@ package io.nxmatic.rke2lab.seed.broker.port;
  * docs/architecture/osgi/seed-broker-spec.adoc (§ two kinds of coordinate).
  */
 public sealed interface ValueCoordinate extends SeedCoordinate
-    permits SplitCoordinate, RunbookCoordinate {}
+    permits SplitCoordinate, RunbookCoordinate, ShapeCoordinate {}

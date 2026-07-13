@@ -20,6 +20,7 @@
     <module>framework-launcher</module>
     <module>scenario-engine</module>
     <module>jgiven-wrap</module>
+    <module>victools-wrap</module>
     <module>junit-testkit</module>
     <module>bench</module>
   </modules>

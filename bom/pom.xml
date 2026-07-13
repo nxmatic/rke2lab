@@ -35,6 +35,7 @@
     <jackson.version>2.22.0</jackson.version>
     <asm.version>9.10.1</asm.version>
     <networknt.json-schema.version>1.5.6</networknt.json-schema.version>
+    <victools.version>4.38.0</victools.version>
     <jgit.version>7.7.0.202606012155-r</jgit.version>
     <software.constructs.version>10.6.0</software.constructs.version>
     <cdk8s.version>2.70.76</cdk8s.version>
@@ -228,6 +229,20 @@
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
         <version>${ipaddress.version}</version>
+      </dependency>
+      <!-- victools JSON-Schema generator (Draft 2020-12): the RecordSchemaProjector's engine — the
+           amont projection of a wire-record's shape. The generator core + its jackson module (nested
+           records, enum-slug, Optional → non-required); wrapped as an OSGi bundle in victools-wrap
+           (both jars ship without a Bundle-SymbolicName). -->
+      <dependency>
+        <groupId>com.github.victools</groupId>
+        <artifactId>jsonschema-generator</artifactId>
+        <version>${victools.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.victools</groupId>
+        <artifactId>jsonschema-module-jackson</artifactId>
+        <version>${victools.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.felix</groupId>
