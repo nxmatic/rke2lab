@@ -11,6 +11,7 @@ import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.BootstrapPaths;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
@@ -104,9 +105,19 @@ public class ClusterSeedScenario
     @ProvidedScenarioState PulumiCellar cellar;
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
+    @ProvidedScenarioState BootstrapPaths paths;
 
     public Given i_have_access_to_the_open_gardening(@Hidden SeedRun run) {
       this.gardening = Gardening.open();
+      // The provisioning topology, resolved once from the worktree — the state every materialising
+      // WHEN reads (the manifests scion's outdir, the systemd/rke2-config roots). The DARWIN-local
+      // view is where the provisioner writes; asHostView(NIXOS) is the mounted-assets view. This is
+      // PathStage.resolve() transposed onto the scenario's GIVEN.
+      this.paths =
+          BootstrapPaths.fromLocalWorktree(
+              run.config().localWorktreePath(),
+              run.config().clusterName(),
+              run.config().nodeName());
       // Publish the ambient RunGate the scions resolve — projected from the run mode.
       // registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).
