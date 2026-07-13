@@ -190,6 +190,37 @@ broker for the payload it must supply and found no verb to ask with. The audit:
   so there is nothing to project a schema FROM. `RunbookEnvelope` (the reap/output)
   is duplicated per domain `*BddScenarios`, none `@SeedContract`-annotated.
 
+.The two introspection operators — symmetric twins, same reflection level
+[mermaid]
+----
+flowchart TB
+  subgraph amont["AMONT — before sowing: what must I give?"]
+    q1["client: what payload for coordinate X?"]
+    sh["sow(ShapeCoordinate(domain), {coordinate:X})"]
+    shr["domain ShapeReflector<br/>projects JSON Schema from the @SeedContract(X) wire-record"]
+    q1 --> sh --> shr
+    shr -.->|"JSON Schema (opaque String)"| q1
+  end
+
+  subgraph aval["AVAL — after reaping: what did I get?  (SHIPPED)"]
+    q2["frontier: split this opaque envelope"]
+    sp["sow(SplitCoordinate(domain), envelope)"]
+    spr["domain SplitReflector<br/>reflects @Scion/@Rootstock components"]
+    q2 --> sp --> spr
+    spr -.->|"scions grouped (opaque String)"| q2
+  end
+
+  classDef todo fill:#fee,stroke:#a22,stroke-width:2px;
+  classDef done fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class q1,sh,shr todo;
+  class q2,sp,spr done;
+----
+
+Same reflection level, same mechanism (a value-coordinate + a domain reflector that
+holds the wire-record class + an opaque String reaped): Split reflects a record's
+`@Scion` components AVAL (on the reaped envelope); Shape projects a record's
+components' schema AMONT (on the input to sow). Only Shape is unrealized.
+
 So materializing `shape` is a build in **two pieces**, mirroring the shipped
 `SplitCoordinate` trio (coordinate + a domain reflector + broker routing by
 `equals`):

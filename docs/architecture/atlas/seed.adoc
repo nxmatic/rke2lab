@@ -410,3 +410,80 @@ owns, opaque". The one precision the host-adaptation adds: the registry must NOT
 content (that path is the split's), which is exactly the `SeedBrokerCatalog.FIELD_*` / `OUTPUT_KEY`
 erasure the doctor atlas NEXT already carries. No box of Diagram P is erased or rewired.
 ====
+
+== The manifests scion + the config path + shape introspection (design 2026-07-13)
+
+The four shipped scions (bbox/incus/systemd/cluster) reach the master through
+`broker.sow(RUNBOOK)`. Two things were still missing and are now designed (specs:
+link:../osgi/manifests-bdd-spec.adoc[manifests-bdd-spec],
+link:../osgi/seed-broker-spec.adoc#shape-realization[seed-broker § shape]): the
+FIFTH scion (manifests — the synthesis, until now driven by nobody), and the CONFIG
+path by which any policy reaches any scion.
+
+=== Diagram T — the fifth scion and the one config path
+
+The synthesis stops being host-resolved (the realm-boundary anti-pattern) and
+becomes a scion sown like the others; and the operator's policy travels ONE way — a
+host-neutral policy in `SeedRun`, a facet per soil in each sow trigger.
+
+[mermaid]
+....
+flowchart TB
+  cfg["operator config (Pulumi / CLI)"]
+  pol["one host-neutral policy in SeedRun<br/>{ manifests:{…}, cluster:{…}, … }"]
+  cfg --> pol
+  pol -->|"facet per soil in the trigger"| M
+  subgraph scions["domain scions (broker.sow(RUNBOOK), in-container)"]
+    B["bbox (∅ facet)"]
+    I["incus (∅)"]
+    S["systemd (∅ today)"]
+    C["cluster (∅ today)"]
+    M["manifests (NEW)<br/>facet → ManifestDomainPolicy (synth)<br/>+ RKE2LAB_POLICY_LINK_* overlay (link)"]
+  end
+  M -->|synth-time| tree["K8s + systemd + rke2-config tree"]
+  M -->|link-time| ov["99-… controlplane overlay<br/>read by master install/ready scripts"]
+
+  classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef new fill:#ffd,stroke:#aa2,stroke-width:2px;
+  class cfg,pol src;
+  class M new;
+....
+
+The two ends of the manifests policy (synth-time filter, link-time overlay) both
+derive from its facet, in-container — dissolving the host `ManifestLinkPolicy` leak.
+`fromSystemProperties()` (CLI) and `toEnvMap()` (seed) collapse into this one
+facet-translation. `Readiness`/`Preview` become the cluster/systemd facets of the
+SAME policy, reachable the day those scions read their trigger — no new channel.
+
+=== Diagram U — introspection has two symmetric operators (Split shipped, Shape to build)
+
+The broker describes itself through its own door (the REST `OPTIONS`/HATEOAS turn).
+`SplitCoordinate` (aval — decompose a reaped envelope) ships; its amont twin
+`ShapeCoordinate` (describe the payload a coordinate expects) is designed, never
+served — the gap the CLI-sower exposes.
+
+[mermaid]
+....
+flowchart LR
+  subgraph before["AMONT — what must I give? (TO BUILD)"]
+    sh["sow(ShapeCoordinate(domain),{coordinate:X})"]
+    shr["domain ShapeReflector<br/>projects JSON Schema of the @SeedContract(X) record<br/>(victools, wrapped)"]
+    sh --> shr
+  end
+  subgraph after["AVAL — what did I get? (SHIPPED)"]
+    sp["sow(SplitCoordinate(domain), envelope)"]
+    spr["domain SplitReflector<br/>reflects @Scion / @Rootstock"]
+    sp --> spr
+  end
+  classDef todo fill:#fee,stroke:#a22,stroke-width:2px;
+  classDef done fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class sh,shr todo;
+  class sp,spr done;
+....
+
+Same reflection level, same shape (a value-coordinate + a domain reflector holding
+the wire-record class + an opaque String reaped). Realizing Shape is a two-piece
+build — foundation (`ShapeCoordinate` in the `permits`, a `RecordSchemaProjector`
+over victools-wrapped) + domain (a `@SeedContract("runbook")` input wire-record,
+the typed home of the config facet). It is the a-priori-coupling eraser: a sower
+learns a payload's shape from the door instead of knowing it in advance.

@@ -18,6 +18,45 @@ It is the fifth scion, on the exact trio pattern the four shipped ones share
 (`*Scenario` + `*RunbookHandler` + `*BddScenarios`), with three differences its
 nature forces — spelled out below so the implementation does not blindly copy bbox.
 
+=== Figure 1 — C4 container: the scion behind the broker door
+
+[mermaid]
+----
+flowchart TB
+  subgraph host["HOST realm (flat) — names only seed-broker-port"]
+    caller["sower (seed WHEN / manifests-cli)<br/>holds a soil name + a policy JSON"]
+  end
+
+  broker["SeedBroker.sow(wanted, seed)<br/>routes by wanted coordinate"]
+
+  subgraph felix["OSGi realm — manifests-bdd bundle (its own loader)"]
+    handler["ManifestsRunbookHandler<br/>serves RunbookCoordinate('manifests')"]
+    front["ManifestsBddScenarios.run(trigger)<br/>in-container JUnit launcher"]
+    scen["ManifestSynthesisScenario<br/>resolves service + RunGate from registry"]
+    svc["ManifestSynthesisService (SCR)"]
+    overlay["NodeEnvOverlayService.writeControlplaneOverlay"]
+  end
+
+  caller -->|"sow(RunbookCoordinate('manifests'), policyJSON)"| broker
+  broker -->|routes| handler
+  handler --> front --> scen
+  scen -->|synth-time| svc
+  scen -->|link-time| overlay
+  scen -.->|RunbookEnvelope JSON| handler
+  handler -.->|reaped SeedEnvelope| broker
+  broker -.->|runbook JSON| caller
+
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef b fill:#eef,stroke:#55a,stroke-width:2px;
+  classDef f fill:#def,stroke:#25a,stroke-width:2px;
+  class host,caller h;
+  class broker b;
+  class felix,handler,front,scen,svc,overlay f;
+----
+
+Only host-neutral JSON crosses the broker door (policy in, runbook out). The
+reflection into `ManifestsBddScenarios` stays OSGi-side, in the domain's realm.
+
 == What makes the manifests scion different from the four others
 
 [cols="1,2,2",options="header"]
@@ -73,6 +112,28 @@ So there is no unified path; there is one duplicated path (manifests) and severa
 dead-ends. The scion work installs the single path.
 
 === The single path — a facet per soil, from one host-neutral policy
+
+.Figure 2 — one policy, a facet per soil, one channel (the trigger)
+[mermaid]
+----
+flowchart LR
+  cfg["operator config<br/>(Pulumi / CLI args)"]
+  pol["one host-neutral policy in SeedRun<br/>{ manifests:{…}, cluster:{…}, systemd:{…} }"]
+  cfg --> pol
+
+  pol -->|"facet['manifests']"| tM["sow(manifests, facet)"]
+  pol -->|"facet['cluster']"| tC["sow(cluster, facet)"]
+  pol -->|"facet['bbox'] = ∅"| tB["sow(bbox, {})"]
+
+  tM --> sM["manifests scion<br/>→ ManifestDomainPolicy + LINK_* + FloxDebug"]
+  tC --> sC["cluster scion<br/>(reads its facet when it grows one)"]
+  tB --> sB["bbox scion<br/>(no facet — unchanged)"]
+
+  classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef ch fill:#eef,stroke:#55a,stroke-width:2px;
+  class cfg,pol src;
+  class tM,tC,tB ch;
+----
 
 . **One source of truth, host-side.** `SeedRun` carries ONE host-neutral policy
   covering all domains — raw booleans/strings keyed by a plain domain string, built
@@ -236,6 +297,23 @@ same scaffolding bbox uses for `lastRunbook`).
   naming `manifests.contract`; the choice travels as a sown payload.
 
 === Dependency — the CLI's schema discovery needs `shape`
+
+.Figure 3 — the CLI sower: discover the shape, then sow the runbook
+[mermaid]
+----
+sequenceDiagram
+  participant CLI as manifests-cli (sower)
+  participant B as SeedBroker
+  participant SH as ManifestsSchemaReflector
+  participant RH as ManifestsRunbookHandler
+  CLI->>B: sow(ShapeCoordinate("manifests"), {})
+  B->>SH: route
+  SH-->>CLI: JSON Schema of the runbook input (opaque String)
+  Note over CLI: fill the policy payload per the schema (from args)
+  CLI->>B: sow(RunbookCoordinate("manifests"), policyJSON)
+  B->>RH: route
+  RH-->>CLI: runbook JSON
+----
 
 A sower that must KNOW the payload shape a priori is still coupled. For the CLI to
 *discover* it — "broker, what config do you want for the manifests runbook?" — the
