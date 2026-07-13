@@ -75,6 +75,21 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
     </dependency>
+    <!-- The seed-broker seam + the shape engine: manifests contributes its shape reflector (a
+         @Component SeedHandler serving ShapeCoordinate("manifests")), decoding via the codec and
+         projecting the runbook-input schema via seed-broker-shape's RecordSchemaProjector. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-shape</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>

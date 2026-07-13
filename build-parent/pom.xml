@@ -324,6 +324,11 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>seed-broker-shape</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>ssh-to-age-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -345,6 +350,11 @@
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>unitrepo-core</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>victools-wrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
