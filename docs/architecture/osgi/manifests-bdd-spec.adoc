@@ -111,58 +111,81 @@ policy reachable through it.**
 So there is no unified path; there is one duplicated path (manifests) and several
 dead-ends. The scion work installs the single path.
 
-=== The single path — a facet per soil, from one host-neutral policy
+=== The single path — one file, the shape carves each soil's facet
 
-.Figure 2 — one policy, a facet per soil, one channel (the trigger)
+The one source of truth is a PHYSICAL file: `Pulumi.dev.yaml`. It is already read by
+ONE reader, `ConfigLoader`, abstracted from its source through a `SectionReader`
+seam — the seed reads it live (`ConfigLoader.of(com.pulumi.Config)`, inside
+`Pulumi.run`), and any off-Pulumi caller reads the SAME file parsed to a map
+(`ConfigLoader.ofNestedRoot(yaml)`). So "one config path" is not an invented
+in-memory policy threaded through `SeedRun`; it is the file both realms' callers
+already point at, through the one reader.
+
+The `rke2lab:policy:` section is organised **by concern**, not by soil — `link`,
+`debug`, `network`, `readiness`, `preview`. This stays as-is (no migration): the
+concern grouping is the operator's natural vocabulary, and the seed's raw
+`PolicyConfig` DTO reads it verbatim (plain `Optional<Boolean>` keyed by camelCase —
+NO manifests type named). The soil→facet mapping does NOT live in the file; it is
+carried by the *shape* (below), so the file never needs a by-soil reshuffle.
+
+.Figure 2 — one file (by concern), the shape carves each soil's facet, one channel
 [mermaid]
 ----
 flowchart LR
-  cfg["operator config<br/>(Pulumi / CLI args)"]
-  pol["one host-neutral policy in SeedRun<br/>{ manifests:{…}, cluster:{…}, systemd:{…} }"]
-  cfg --> pol
+  yaml["Pulumi.dev.yaml<br/>rke2lab:policy: BY CONCERN<br/>link · debug · readiness · preview"]
+  loader["ConfigLoader — one reader, source-abstracted<br/>seed: of(Config) · CLI: ofNestedRoot(yaml)"]
+  yaml --> loader
+  loader --> sower["a sower toward soil S<br/>(seed WHEN or manifests-cli)"]
 
-  pol -->|"facet['manifests']"| tM["sow(manifests, facet)"]
-  pol -->|"facet['cluster']"| tC["sow(cluster, facet)"]
-  pol -->|"facet['bbox'] = ∅"| tB["sow(bbox, {})"]
-
-  tM --> sM["manifests scion<br/>→ ManifestDomainPolicy + LINK_* + FloxDebug"]
-  tC --> sC["cluster scion<br/>(reads its facet when it grows one)"]
-  tB --> sB["bbox scion<br/>(no facet — unchanged)"]
+  sower -->|"sow(ShapeCoordinate(S), {})"| shape["S's shape<br/>schema top-level = the concern names S owns"]
+  shape -.->|"e.g. manifests → {link, debug}"| sower
+  sower -->|"pluck those concerns from the yaml"| trig["sow(RunbookCoordinate(S), {link:{…}, debug:{…}})"]
+  trig --> scion["S's scion — reads its facet, translates in its OWN vocabulary"]
 
   classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef ch fill:#eef,stroke:#55a,stroke-width:2px;
-  class cfg,pol src;
-  class tM,tC,tB ch;
+  class yaml,loader src;
+  class sower,shape,trig ch;
 ----
 
-. **One source of truth, host-side.** `SeedRun` carries ONE host-neutral policy
-  covering all domains — raw booleans/strings keyed by a plain domain string, built
-  once from the Pulumi config (the CLI builds the same shape from its args). No
-  domain type named:
-+
-[source,json]
-----
-{ "manifests": { "mesh": false, "cluster-api": true, "storage": true, "debug": {...} },
-  "cluster":   { "readiness-override": {...} },
-  "systemd":   { ... } }
-----
-. **One channel — the sow trigger.** Each `sow(soil)` extracts the soil's facet
-  (the sub-map keyed by `soil`) and puts it in the trigger `SeedEnvelope` (today
-  `"{}"`). A soil with no facet gets `{}` — exactly today's behavior, so the four
-  shipped scions are unaffected until they grow one. This is a `seed-bdd` change
-  (`Gardening.sow` / `SowAndGraftStage` stop sending empty), not manifests-only.
+. **One source of truth — the file, one reader.** `Pulumi.dev.yaml`, read through
+  `ConfigLoader`. The seed binds it live via Pulumi; the CLI parses the same file to
+  a map and feeds `ofNestedRoot`. Neither caller invents a policy shape; both read
+  the operator's file.
+. **The shape carves the facet — no host names a domain vocabulary.** A soil's facet
+  is NOT a sub-map the caller knows a priori; it is DISCOVERED:
+  `sow(ShapeCoordinate(S), {})` reaps S's runbook-input schema, whose top-level
+  properties ARE the concern keys S owns (`manifests` → `link`, `debug`). The caller
+  plucks exactly those concern sub-maps from the yaml `policy` section and assembles
+  the trigger. Generic — the sower names NO domain vocabulary; the schema dictates
+  which concerns to pluck. This is why the concern grouping needs no by-soil sealing
+  in the file: the sealing lives in each soil's wire-record (which concerns it
+  declares), reviewed in one place, not in the yaml's shape.
+. **One channel — the sow trigger.** The plucked concerns become the trigger
+  `SeedEnvelope` payload (today `"{}"`). A soil whose schema names no concern gets
+  `{}` — exactly today's behavior, so the four shipped scions are unaffected until
+  they grow a wire-record. This is a `seed-bdd` change (`Gardening.sow` /
+  `SowAndGraftStage` stop sending empty), not manifests-only.
 . **One translator per domain — the scion.** Each scion reads its own facet in
   `handle(trigger)` and translates it in its OWN vocabulary. The manifests scion
   owns `ManifestDomainCatalog` + the `RKE2LAB_POLICY_LINK_*` naming, so it derives
-  `ManifestDomainPolicy` + `FloxDebugPolicy` + the link-time seed vars from its facet.
-  A scion sees ONLY its facet (sealed), never another domain's config.
+  `ManifestDomainPolicy` + `FloxDebugPolicy` + the link-time seed vars from the
+  `link`/`debug` concerns. A scion sees ONLY its facet, never another soil's config.
 
-**Consequences.** `fromSystemProperties()` AND `ManifestLinkPolicy.toEnvMap()` both
-dissolve into the manifests scion's one facet-translation. `ManifestLinkPolicy` /
-`ControlplanePolicy` (host, naming `manifests.contract`) go away. `ReadinessPolicy` /
-`PreviewPolicy` stop being dead-ends: they become the `cluster`/`systemd` facets of
-the same policy, reachable the day those scions read their trigger — no new channel.
-Every policy travels one way, for every caller and every domain.
+**Consequences.** `fromSystemProperties()` dissolves — the CLI reads the same file
+as the seed, through the same reader. `ManifestLinkPolicy.toEnvMap()` +
+`ManifestLinkPolicy` / `ControlplanePolicy` (host, naming `manifests.contract`) go
+away: the host stops translating, the scion does. `ReadinessPolicy` / `PreviewPolicy`
+stop being dead-ends — they are the `readiness` / `preview` concerns, plucked into
+the cluster/systemd facets the day those scions grow a wire-record — no new channel.
+Every policy travels one way, from one file, for every caller and every domain.
+
+*Design constraint this puts on piece 2 (the wire-record).* For the pluck to stay
+generic, the runbook-input wire-record's top-level component names MUST equal the
+yaml concern keys (`link`, `debug`) — the schema's top-level properties ARE those
+component names, and the caller plucks `policy.<name>` for each. So the wire-record
+nests (`record …(LinkFacet link, DebugFacet debug)`), mirroring the yaml's concern
+nesting exactly, rather than flattening into one bag.
 
 === The policy has TWO ends — the scion must cover both
 
@@ -202,6 +225,34 @@ delta #6 is exactly that this host→overlay call is orphaned. The scion closes 
 This is why the scion is the natural home: it is the single point that already knows
 the catalog, and it can satisfy both ends from one payload without any host type
 naming a domain vocabulary.
+
+==== The policy is LIVE logic, orphaned — reactivating it is the point
+
+This is not a cleanup that happens to satisfy a gate; it is a REGRESSION to close.
+On `main`, both ends were computed by ONE consumer — `HostSlotManifest.Builder.policy(ControlplanePolicy)`
+(the `controlplane/incus/` subtree) — which projected the policy into the slot's
+`MANIFEST.yaml`:
+
+* synth-time: `manifestDomain{cluster, storage, gitops, runtime, networking, mesh,
+  highAvailability, cicd, clusterApi, platform}` — each `policy.manifestLink().domains().isEnabled(catalog.X())`;
+* debug: `{mesh, networking, nriPluginsFlox}` — each `policy.debug().X()`;
+* link-time: `ManifestLinkPolicy.toEnvMap()` → the `RKE2LAB_POLICY_LINK_*` overlay.
+
+The incus-bootstrap demolition (commit `342b7c327`) removed `HostSlotManifest` — the
+policy's SOLE production consumer — but left `ControlplanePolicy` / `ManifestLinkPolicy`
+behind. So today they are **orphaned live logic**: still compiled, referenced only by
+tests and javadoc, computing nothing. Nobody derives `manifestDomain{}` or the
+`RKE2LAB_POLICY_LINK_*` anymore, so a freshly provisioned master no longer receives
+what the previous version wrote — a direct breach of the founding rule (invisible at
+the master frontier). The realm-boundary gate flags these three classes precisely
+because they are dead-yet-present.
+
+The transposition is therefore literal: the scion re-homes `HostSlotManifest.Builder.policy()`'s
+projection OSGi-side, driven by the plucked facet instead of a host `ControlplanePolicy`.
+Once the scion computes both ends, `ControlplanePolicy` / `ManifestLinkPolicy` and
+their tests are cut in the same change (the raw `PolicyConfig` DTO — the yaml READER —
+survives; only the host TRANSLATION dies). Reactivating this policy through the scion
+is the deliverable; the gate falling out is the side effect.
 
 === Scope — which of the host policies this scion absorbs
 
@@ -298,33 +349,43 @@ same scaffolding bbox uses for `lastRunbook`).
 
 === Dependency — the CLI's schema discovery needs `shape`
 
-.Figure 3 — the CLI sower: discover the shape, then sow the runbook
+.Figure 3 — the CLI sower: load the yaml, discover the shape, pluck, then sow
 [mermaid]
 ----
 sequenceDiagram
   participant CLI as manifests-cli (sower)
+  participant Y as Pulumi.dev.yaml
   participant B as SeedBroker
-  participant SH as ManifestsSchemaReflector
+  participant SH as ManifestsShapeReflector
   participant RH as ManifestsRunbookHandler
+  CLI->>Y: ConfigLoader.ofNestedRoot(parse)
+  Y-->>CLI: policy section (by concern)
   CLI->>B: sow(ShapeCoordinate("manifests"), {})
   B->>SH: route
   SH-->>CLI: JSON Schema of the runbook input (opaque String)
-  Note over CLI: fill the policy payload per the schema (from args)
-  CLI->>B: sow(RunbookCoordinate("manifests"), policyJSON)
+  Note over CLI: schema top-level = {link, debug} → pluck those concerns from the yaml
+  CLI->>B: sow(RunbookCoordinate("manifests"), {link:{…}, debug:{…}})
   B->>RH: route
   RH-->>CLI: runbook JSON
 ----
 
-A sower that must KNOW the payload shape a priori is still coupled. For the CLI to
-*discover* it — "broker, what config do you want for the manifests runbook?" — the
-`shape` meta-coordinate must be realized (it is designed but not served, see
+Two couplings dissolve here, and they are the SAME move. A sower that KNOWS the
+payload shape a priori is coupled to the wire-record; a sower that reads config from
+its OWN vocabulary (system properties) is coupled to a second source of truth. The
+shape closes both: the CLI reads the operator's `Pulumi.dev.yaml` (one file, § the
+single path) and asks the broker "what config do you want for the manifests runbook?"
+(`sow(ShapeCoordinate("manifests"), {})`). The reaped schema's top-level properties
+name the concerns to pluck (`link`, `debug`); the CLI plucks exactly those from the
+yaml `policy` section and sows the runbook — naming no manifests vocabulary, holding
+no contract class.
+
+For this the `shape` meta-coordinate must be realized (foundation piece 1 — SHIPPED,
+`ShapeCoordinate` + `RecordSchemaProjector`, see
 link:seed-broker-spec.adoc#shape-realization[seed-broker-spec § realization status]).
-Its piece 2 (a `@SeedContract("runbook")` input wire-record describing the policy
-facet) is exactly this spec's activation payload given a typed home. So the order is:
-realize `shape` (foundation piece 1) + give the runbook input a wire-record
-(piece 2, here) → the CLI sows `ShapeCoordinate("manifests")` to learn the shape,
-fills it, then sows `RunbookCoordinate("manifests")`. Until then the payload shape
-is known a priori (a temporary a-priori coupling, not the end state).
+Piece 2 (a `@SeedContract("runbook")` input wire-record + a `ManifestsShapeReflector`
+projecting it) gives the runbook input its typed home — its top-level components ARE
+the yaml concern keys (design constraint above), so the pluck stays generic. Until
+piece 2 ships the shape is known a priori (a temporary coupling, not the end state).
 
 == Related Documentation
 

@@ -175,20 +175,28 @@ consumed by `SCHEMA_CONCORD`); the meta-coordinate is that same projection, offe
 the door — the OpenAPI endpoint we had described but never served.
 
 [[shape-realization]]
-==== Realization status — designed, described, NOT yet served (the chantier)
+==== Realization status — foundation SHIPPED, per-domain reflector pending
 
-The introspection verb above is designed and load-bearing, but **not realized** —
-"the OpenAPI endpoint we had described but never served" is literally true in the
-code. Surfaced 2026-07-13 when `manifests-cli`, becoming a sower, needed to ask the
-broker for the payload it must supply and found no verb to ask with. The audit:
+The introspection verb above is designed and load-bearing. Surfaced 2026-07-13 when
+`manifests-cli`, becoming a sower, needed to ask the broker for the payload it must
+supply and found no verb to ask with. It is built in two pieces; **piece 1 (the
+broker-generic foundation) is shipped, piece 2 (the per-domain reflector + its input
+wire-record) is pending**:
 
-* `ValueCoordinate permits` carries only `SplitCoordinate, RunbookCoordinate` — no
-  `ShapeCoordinate` (nor an `available`/index coordinate).
-* No `RecordSchemaProjector` and no `SCHEMA_CONCORD` gate exist in code (both are
-  spec-only names today).
-* No wire-record describes a runbook *input*: the trigger has always been `"{}"`,
-  so there is nothing to project a schema FROM. `RunbookEnvelope` (the reap/output)
-  is duplicated per domain `*BddScenarios`, none `@SeedContract`-annotated.
+* *Piece 1 — SHIPPED.* `ValueCoordinate permits` now carries `ShapeCoordinate`
+  (routed by `equals` like Split/Runbook, no switch). `RecordSchemaProjector`
+  (module `seed-broker-shape`, victools-driven, Draft 2020-12) projects a
+  wire-record's schema — the amont twin of `DoctorSplitReflector`. victools is
+  wrapped as an OSGi bundle (`victools-wrap`, the jgiven-wrap pattern). The projector
+  is OSGi-only (only in-container reflectors project; the host reaps the opaque
+  String), so it is NOT dual-realm like `seed-broker-codec`.
+* *Piece 2 — pending.* No wire-record describes a runbook *input* yet: the trigger
+  has always been `"{}"`, so there is nothing to project a schema FROM, and no
+  domain contributes a `@Component SeedHandler` serving `new ShapeCoordinate(domain)`.
+  `RunbookEnvelope` (the reap/output) is duplicated per domain `*BddScenarios`, none
+  `@SeedContract`-annotated. Piece 2 lands with the manifests scion (a
+  `@SeedContract("runbook")` input record + a `ManifestsShapeReflector` driving the
+  projector). The `SCHEMA_CONCORD` build-time gate remains a spec-only name.
 
 .The two introspection operators — symmetric twins, same reflection level
 [mermaid]
@@ -196,8 +204,8 @@ broker for the payload it must supply and found no verb to ask with. The audit:
 flowchart TB
   subgraph amont["AMONT — before sowing: what must I give?"]
     q1["client: what payload for coordinate X?"]
-    sh["sow(ShapeCoordinate(domain), {coordinate:X})"]
-    shr["domain ShapeReflector<br/>projects JSON Schema from the @SeedContract(X) wire-record"]
+    sh["sow(ShapeCoordinate(domain), {coordinate:X})<br/>SHIPPED: coordinate + RecordSchemaProjector"]
+    shr["domain ShapeReflector — PENDING<br/>projects JSON Schema from the @SeedContract(X) wire-record"]
     q1 --> sh --> shr
     shr -.->|"JSON Schema (opaque String)"| q1
   end
@@ -212,14 +220,16 @@ flowchart TB
 
   classDef todo fill:#fee,stroke:#a22,stroke-width:2px;
   classDef done fill:#dfd,stroke:#2a2,stroke-width:2px;
-  class q1,sh,shr todo;
-  class q2,sp,spr done;
+  class q1,shr todo;
+  class sh,q2,sp,spr done;
 ----
 
 Same reflection level, same mechanism (a value-coordinate + a domain reflector that
 holds the wire-record class + an opaque String reaped): Split reflects a record's
 `@Scion` components AVAL (on the reaped envelope); Shape projects a record's
-components' schema AMONT (on the input to sow). Only Shape is unrealized.
+components' schema AMONT (on the input to sow). Shape's FOUNDATION is now shipped
+(the coordinate + the projector); only its per-domain reflector + input wire-record
+remain (piece 2, with the manifests scion).
 
 So materializing `shape` is a build in **two pieces**, mirroring the shipped
 `SplitCoordinate` trio (coordinate + a domain reflector + broker routing by
