@@ -231,6 +231,49 @@ components' schema AMONT (on the input to sow). Shape's FOUNDATION is now shippe
 (the coordinate + the projector); only its per-domain reflector + input wire-record
 remain (piece 2, with the manifests scion).
 
+=== `@Amendment` — the schema says the SHAPE, the role says WHICH state fills it
+
+Shape answers "what is the FORM of the payload" (a JSON Schema: an `outdir` string, a
+`link` object). It does NOT answer "which of the host's states goes into `outdir`" —
+and it cannot: the schema describes the wire-record, it knows nothing of
+`BootstrapPaths` and its seventeen roots. That second half is the missing piece a
+sower hits the instant it tries to fill a payload from real state.
+
+The answer is the AMONT twin of `@Scion`/`Role`, and it reuses the exact mechanism
+already proven aval. Downstream, a domain marks a reaped component with a neutral
+horticultural ROLE — `@Scion(Role.FRUIT)` on `consultationReport` — and the host
+affixes it by role, never learning the domain's field name. Upstream, a domain marks
+an INPUT component with a neutral role of GROWTH-NEED — `@Amendment(Amendment.SOIL)`
+on the materialisation-root component — and the host FILLS it by role, from its
+provisioning state, never learning the domain's field name. They meet on the role, as
+aval they meet on `Role`:
+
+[source,java]
+----
+@SeedContract("runbook")
+public record ManifestsRunbookInput(
+    @Amendment(Amendment.FACET) LinkFacet link,     // host fills FACET from ControlplanePolicy
+    @Amendment(Amendment.FACET) DebugFacet debug,
+    @Amendment(Amendment.SOIL)  Path materializationRoot) {}  // host fills SOIL from BootstrapPaths
+
+// host, amending the soil before it sows (the WHICH is an explicit host affixation,
+// exactly as materializeToStaging chose stagingManifestsRoot on main):
+//   amendment SOIL  <- paths.asStagingView(slot).manifestsRoot()
+//   amendment FACET <- controlplanePolicy's link/debug facet
+----
+
+`Amendment` is a neutral vocabulary of String constants (the twin of `Role`): `SOIL`
+(the plot to materialise into), `FACET` (the activation facet), more as growth-needs
+appear. The domain (the soil) DECLARES its needs by annotating its input record; the
+host AMENDS the soil by filling those roles from `BootstrapPaths` + the facet. The
+`WHICH` — which of the seventeen roots is `SOIL` — is an explicit host affixation
+(`manifestsRoot` in staging view), NOT a name-match derived from the schema: the
+topology knowledge is the host's, irreducibly, the same knowledge `IncusResourceBootstrap`
+carried on main. The schema VALIDATES the amended payload; the role SELECTS the state.
+
+This closes the amont side: Shape gives the form, `@Amendment` gives the mapping, the
+sower needs no a-priori knowledge of either the domain's fields or its own state names.
+
 So materializing `shape` is a build in **two pieces**, mirroring the shipped
 `SplitCoordinate` trio (coordinate + a domain reflector + broker routing by
 `equals`):

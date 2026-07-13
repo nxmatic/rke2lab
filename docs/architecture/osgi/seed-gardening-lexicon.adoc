@@ -49,7 +49,7 @@ FR-EN reserve it draws from.
 | gravier | gravel | (réserve)
 | chaux | lime | (réserve)
 | drainage | drainage | (réserve)
-| amendement | soil amendment | (réserve)
+| amendement | soil amendment | **`@Amendment(role)`** — ce que le jardinier (host) apporte au SOL (le domaine) au moment de semer, pour qu'il fasse pousser la greffe : le contexte de croissance dont un `sow` a besoin. Le twin AMONT de `@Scion` : Scion nomme une part RÉCOLTÉE par son rôle neutre (`Role.FRUIT`), Amendment nomme un besoin APPORTÉ par son rôle neutre (`Amendment.SOIL`, `Amendment.FACET`). Le domaine (le sol) DÉCLARE ses besoins en annotant les composants de son wire-record d'input ; le host les REMPLIT depuis son état de provisioning (`BootstrapPaths`, la facette), par rôle — ni l'un ni l'autre ne nomme le state de l'autre, ils se rencontrent sur le rôle. Sa forme est décrite par le schéma d'input (`ShapeCoordinate`) ; le rôle dit « lequel », que le schéma seul ne peut pas dire
 | paillage | mulch | (réserve)
 |===
 
@@ -116,7 +116,7 @@ FR-EN reserve it draws from.
 | pincer | to pinch | (réserve)
 | tuteurer | to stake | (réserve)
 | fertiliser | to fertilize | (réserve)
-| amender | to amend the soil | (réserve)
+| amender | to amend the soil | **amender** — apporter un `@Amendment` au sol avant de semer : le host remplit, depuis son état de provisioning, les besoins de croissance que le domaine a déclarés, et les joint au `sow` (dans le payload du `SeedEnvelope`). Le geste amont jumeau de `greffer` (aval)
 | cueillir | to pick | (réserve — cf. récolte)
 | greffer | to graft | **greffer** — fixer un scion (`@Scion`) sur un porte-greffe (`@Rootstock`)
 | bouturer | to take a cutting | **prélever une bouture** — suivre une coordonnée annoncée (HATEOAS = un `sow`)
