@@ -168,22 +168,6 @@
       <artifactId>ipaddress</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- felix.resolver as the Resolver SERVICE provider in-container: DefaultManifestSynthesisService
-         has a mandatory @Reference org.osgi.service.resolver.Resolver, which felix.resolver's
-         Bundle-Activator registers when STARTED. Production binds it the same way (the host starts
-         felix.resolver at boot). Same osgi.core:5.0.0 exclusion as manifests-core (it would shadow
-         osgi.core 8.0.0). -->
-    <dependency>
-      <groupId>org.apache.felix</groupId>
-      <artifactId>org.apache.felix.resolver</artifactId>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.osgi</groupId>
-          <artifactId>org.osgi.core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
   </dependencies>
 
   <build>

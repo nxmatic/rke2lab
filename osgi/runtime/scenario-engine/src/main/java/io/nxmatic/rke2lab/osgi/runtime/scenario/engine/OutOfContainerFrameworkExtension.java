@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
 import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleInstaller;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
 import java.nio.file.Files;
@@ -59,6 +60,7 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
   private final Optional<String> systemPackagesExtra;
   private final Optional<String> bootDelegation;
   private final boolean startScr;
+  private final boolean startResolver;
   private final List<String> classpathBundles;
   private final List<String> reactorBundles;
   private final List<String> matchFilters;
@@ -105,6 +107,7 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
             ? Optional.empty()
             : Optional.of(String.join(",", builder.bootDelegation));
     this.startScr = builder.startScr;
+    this.startResolver = builder.startResolver;
     this.classpathBundles = List.copyOf(builder.classpathBundles);
     this.reactorBundles = List.copyOf(builder.reactorBundles);
     this.matchFilters = List.copyOf(builder.matchFilters);
@@ -141,6 +144,12 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     // extender to activate. The rare test that must prove behaviour WITHOUT the extender present
     // opts out via withoutScr().
     private boolean startScr = true;
+    // felix.resolver runs by default too: the manifests + unitrepo synthesis @Components have a
+    // mandatory @Reference org.osgi.service.resolver.Resolver, which felix.resolver's
+    // Bundle-Activator
+    // registers. A test that installs neither opts out via withoutResolver() (a slightly wider TEST
+    // classpath carries the jar regardless, from bundle-test-parent — it is simply not started).
+    private boolean startResolver = true;
     private final List<String> classpathBundles = new ArrayList<>();
     private final List<String> reactorBundles = new ArrayList<>();
     private final List<String> exportImportsOf = new ArrayList<>();
@@ -197,6 +206,28 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
      */
     public Builder withoutScr() {
       this.startScr = false;
+      return this;
+    }
+
+    /**
+     * Install+start felix.resolver before the reactor bundles (the DEFAULT — see {@link
+     * #startResolver}). Its Bundle-Activator registers the {@code
+     * org.osgi.service.resolver.Resolver} service, a mandatory {@code @Reference} of the manifests
+     * + unitrepo synthesis {@code @Component}s. The twin of {@link #withScr()}: an explicit no-op
+     * documenting the dependency at the call site; new tests need not call it.
+     */
+    public Builder withResolver() {
+      this.startResolver = true;
+      return this;
+    }
+
+    /**
+     * Opt OUT of the default felix.resolver install — for a test that installs no bundle needing
+     * the {@code Resolver} service (the four contact scions, which mock their collaborators). The
+     * twin of {@link #withoutScr()}.
+     */
+    public Builder withoutResolver() {
+      this.startResolver = false;
       return this;
     }
 
@@ -294,6 +325,9 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
 
     if (startScr) {
       startScr();
+    }
+    if (startResolver) {
+      startResolver();
     }
     for (String symbolicName : classpathBundles) {
       installFromClasspath(symbolicName).start();
@@ -419,15 +453,21 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
    * by streaming its bytes into the framework's cache. One install path for both sources.
    */
   private Bundle installAt(BundleLocation location) throws Exception {
-    return switch (location) {
-      case BundleLocation.Staged staged -> {
-        try (var in = staged.open()) {
-          yield context().installBundle(staged.locationId(), in);
-        }
-      }
-      case BundleLocation.OnClasspath onClasspath ->
-          context().installBundle(onClasspath.locationId());
-    };
+    return new BundleInstaller(context()).install(location);
+  }
+
+  /**
+   * Start each bundle that is not a fragment (the shared install/start gesture prod's {@code
+   * FrameworkLauncher} runs on each installable): SCR only activates the {@code @Component}s of
+   * ACTIVE bundles, so a scenario that resolves a REAL sibling service — not a mock — needs its
+   * whole graph started, not merely resolved. Fragments are skipped (they merge into their host).
+   * The complement of {@link #installImportClosureOf}: install the closure, then start it.
+   */
+  public void startAll(List<Bundle> bundles) throws Exception {
+    final BundleInstaller installer = new BundleInstaller(context());
+    for (Bundle bundle : bundles) {
+      installer.startIfNotFragment(bundle);
+    }
   }
 
   /**
@@ -537,6 +577,33 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     scr.start();
     if (scr.getState() != Bundle.ACTIVE) {
       throw new IllegalStateException("felix.scr did not reach ACTIVE — DS is not running");
+    }
+  }
+
+  /**
+   * Install+start felix.resolver (the DEFAULT — see {@link Builder#startResolver}), so its
+   * Bundle-Activator registers the {@code org.osgi.service.resolver.Resolver} service the manifests
+   * + unitrepo synthesis {@code @Component}s reference. The twin of {@link #startScr()}, simpler:
+   * it imports only framework packages the system bundle already exports ({@code
+   * org.osgi.resource}, {@code org.osgi.service.resolver}, {@code org.osgi.framework}), so no
+   * import closure to walk — install and start.
+   *
+   * <p>TOLERANT of absence, unlike {@link #startScr()}: the Resolver is a NICHE provider (only
+   * synthesis worlds consume it), not the norm SCR is, and it is carried by bundle-test-parent — so
+   * a world tested off that parent (scenario-engine's own tests, bench) simply does not have the
+   * jar on its classpath. Absent → skip (a world that installs no Resolver-consuming bundle needs
+   * none); present but stalled → fail loud. A world that HAS the jar but wants it off opts out with
+   * {@link Builder#withoutResolver()}.
+   */
+  private void startResolver() throws Exception {
+    if (!classpath.contains("org.apache.felix.resolver")) {
+      return;
+    }
+    final Bundle resolver = installAt(classpath.locateBySymbolicName("org.apache.felix.resolver"));
+    resolver.start();
+    if (resolver.getState() != Bundle.ACTIVE) {
+      throw new IllegalStateException(
+          "felix.resolver did not reach ACTIVE — the Resolver service is not registered");
     }
   }
 

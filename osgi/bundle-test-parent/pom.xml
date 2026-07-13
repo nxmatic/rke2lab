@@ -75,6 +75,24 @@
       <artifactId>org.apache.felix.scr</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- felix.resolver on the test classpath: the org.osgi.service.resolver.Resolver SERVICE
+         provider (its Bundle-Activator registers it), a mandatory @Reference of the manifests +
+         unitrepo synthesis @Components. A -test harness that boots a scion driving REAL synthesis
+         (OutOfContainerFrameworkExtension.withResolver(), on by default like withScr()) installs +
+         starts it so those components activate. Declared once here — every fragment inherits it,
+         exactly like felix.scr; a world that does not need it opts out with .withoutResolver().
+         Same osgi.core:5.0.0 exclusion as manifests-core (it would shadow osgi.core 8.0.0). -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.resolver</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.osgi</groupId>
+          <artifactId>org.osgi.core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.service.component</artifactId>

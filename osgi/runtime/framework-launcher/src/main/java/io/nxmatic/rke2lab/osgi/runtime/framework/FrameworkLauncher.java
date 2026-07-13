@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.osgi.runtime.framework;
 
 import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BootPlan;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleInstaller;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.logging.FelixJulLogger;
 import io.nxmatic.rke2lab.osgi.boot.logging.HostLoggingBridge;
@@ -168,23 +169,13 @@ public final class FrameworkLauncher {
    */
   private static void installAtLevel(Framework framework, BundleLocation location, int startLevel)
       throws BundleException, IOException {
-    final Bundle bundle =
-        switch (location) {
-          case BundleLocation.Staged staged -> {
-            try (var in = staged.open()) {
-              yield framework.getBundleContext().installBundle(staged.locationId(), in);
-            }
-          }
-          case BundleLocation.OnClasspath onClasspath ->
-              framework.getBundleContext().installBundle(onClasspath.locationId());
-        };
+    final BundleInstaller installer = new BundleInstaller(framework.getBundleContext());
+    final Bundle bundle = installer.install(location);
     bundle.adapt(BundleStartLevel.class).setStartLevel(startLevel);
     // A fragment has no lifecycle of its own — calling start() on it throws. It is installed and
     // left to be merged into its host when the host resolves (OSGi Core §3.14), exactly as the test
-    // harness installs a -test fragment. Detected by the Fragment-Host header it declares.
-    if (bundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
-      bundle.start();
-    }
+    // harness installs a -test fragment. The shared installer skips fragments by their header.
+    installer.startIfNotFragment(bundle);
   }
 
   /**

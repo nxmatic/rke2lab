@@ -72,13 +72,9 @@ class ManifestsBddInContainerTest {
     // ssh-to-age-edge is reached by an SCR service reference, not a package import, so the import
     // closure does not pull it — yet DefaultManifestSynthesisService has a MANDATORY @Reference
     // SshToAgeConverter and will not activate without its provider. Install it explicitly so the
-    // synthesis component publishes its service in-container.
+    // synthesis component publishes its service in-container. (The other mandatory @Reference, the
+    // Resolver service, is provided by the testkit's withResolver() default — no manual install.)
     toResolve.add(felix.install("io.nxmatic.rke2lab.sshtoage.edge"));
-    // felix.resolver provides the org.osgi.service.resolver.Resolver service (another mandatory
-    // @Reference of the synthesis component), registered by its Bundle-Activator on start. Reached
-    // by neither package import nor the fixture scan, so install it explicitly.
-    final Bundle resolverBundle = felix.install("org.apache.felix.resolver");
-    toResolve.add(resolverBundle);
     if (!felix.resolve(toResolve)) {
       final StringBuilder states = new StringBuilder();
       for (Bundle b : toResolve) {
@@ -93,19 +89,14 @@ class ManifestsBddInContainerTest {
       }
       fail("manifests-bdd (with its -test fragment + synthesis graph) must resolve" + states);
     }
-    // Start felix.resolver first so its Bundle-Activator registers the Resolver service BEFORE the
-    // synthesis component that references it activates.
-    resolverBundle.start();
-    // Start every resolved non-fragment bundle in the graph — SCR only activates @Components of
-    // ACTIVE bundles, and the scenario resolves the REAL synthesis published by manifests-core (a
-    // sibling bundle, not the host). Unlike the contact scions (which mock their collaborators),
-    // this proof needs the whole synthesis graph running, exactly as the prod launcher starts each
-    // bundle. Fragments (Fragment-Host set) cannot be started — skip them.
-    for (Bundle bundle : toResolve) {
-      if (bundle.getHeaders().get(org.osgi.framework.Constants.FRAGMENT_HOST) == null) {
-        bundle.start();
-      }
-    }
+    // Start the whole graph (the shared install/start gesture prod's launcher runs on each bundle):
+    // SCR only activates @Components of ACTIVE bundles, and this scenario resolves the REAL
+    // synthesis published by manifests-core (a sibling bundle), not a mock — so unlike the contact
+    // scions it needs its whole graph started, not merely resolved. felix.resolver (the Resolver
+    // service the synthesis references) is already installed+started by the testkit's
+    // withResolver()
+    // default, before this graph.
+    felix.startAll(toResolve);
     host.start();
 
     final Class<?> runner = host.loadClass(RUNNER_FQN);
