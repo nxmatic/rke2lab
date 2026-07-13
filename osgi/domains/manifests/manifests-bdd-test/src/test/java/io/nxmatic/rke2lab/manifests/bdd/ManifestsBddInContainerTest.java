@@ -68,13 +68,11 @@ class ManifestsBddInContainerTest {
     // list. Resolve the host + the derived closure together, in one pass.
     final Bundle host = felix.installFixtureWithHost(BDD_FIXTURE).host();
     final List<Bundle> toResolve = new ArrayList<>(List.of(host));
+    // The closure chases BOTH the host's package imports AND its SCR service references, so
+    // ssh-to-age-edge (the SshToAgeConverter provider, reached by a @Reference, not a package
+    // import) is pulled automatically — no manual install. The Resolver service is provided by the
+    // testkit's withResolver() default.
     toResolve.addAll(felix.installImportClosureOf(host));
-    // ssh-to-age-edge is reached by an SCR service reference, not a package import, so the import
-    // closure does not pull it — yet DefaultManifestSynthesisService has a MANDATORY @Reference
-    // SshToAgeConverter and will not activate without its provider. Install it explicitly so the
-    // synthesis component publishes its service in-container. (The other mandatory @Reference, the
-    // Resolver service, is provided by the testkit's withResolver() default — no manual install.)
-    toResolve.add(felix.install("io.nxmatic.rke2lab.sshtoage.edge"));
     if (!felix.resolve(toResolve)) {
       final StringBuilder states = new StringBuilder();
       for (Bundle b : toResolve) {

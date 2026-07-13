@@ -209,6 +209,65 @@ public final class BundleIndex {
     }
   }
 
+  /**
+   * A non-seam bundle in the index that PROVIDES the service {@code objectClass} (its {@code
+   * Provide-Capability: osgi.service}), or empty. The service twin of {@link #exporterOf}: where
+   * that answers "who exports this package", this answers "who publishes this service" — the
+   * dependency the resolver ignores (bnd marks a {@code @Reference} requirement {@code
+   * effective:=active}), so a service-closure must resolve it explicitly. First match wins.
+   */
+  public Optional<BundleLocation> serviceProviderOf(String objectClass) {
+    return entries.stream()
+        .filter(e -> e.manifest().embed().map(embed -> !embed.isSeam()).orElse(true))
+        .filter(e -> e.manifest().providedServices().contains(objectClass))
+        .map(Entry::location)
+        .findFirst();
+  }
+
+  /**
+   * Close over the service PROVIDERS the {@code seeds} transitively need: for every MANDATORY
+   * {@code Require-Capability: osgi.service} not already provided by an installed bundle, pull the
+   * index bundle that publishes it ({@link #serviceProviderOf}), hand it to {@code onPulled}, and
+   * close over ITS required services in turn — a fixpoint, so a provider that itself references
+   * another service is not missed. Each provider is pulled once, in discovery order; no seed is.
+   *
+   * <p>The service analogue of {@link #closeOverImports}, kept SEPARATE and test-only: the prod
+   * {@code BootPlanner} installs the whole deployed bundle set from its plan, so it never needs to
+   * DISCOVER a provider — only the out-of-container test extension, installing a minimal host
+   * graph, must chase the {@code effective:=active} service requirements the resolver skips. {@code
+   * alreadyProvided} is the objectClasses installed bundles already publish (so a provider on the
+   * host graph is not re-pulled). Package imports of a pulled provider are NOT followed here — the
+   * caller runs {@link #closeOverImports} over the pulled set for that.
+   */
+  public void closeOverServices(
+      List<BundleLocation> seeds, Set<String> alreadyProvided, Consumer<BundleLocation> onPulled) {
+    final Set<String> provided = new LinkedHashSet<>(alreadyProvided);
+    final Set<String> pulledIds = new LinkedHashSet<>();
+    final Deque<BundleManifest> frontier = new ArrayDeque<>();
+    for (BundleLocation seed : seeds) {
+      final BundleManifest manifest = manifestOf(seed);
+      pulledIds.add(seed.locationId());
+      provided.addAll(manifest.providedServices());
+      frontier.add(manifest);
+    }
+    while (!frontier.isEmpty()) {
+      for (String required : frontier.removeFirst().requiredServices()) {
+        if (provided.contains(required)) {
+          continue;
+        }
+        final Optional<BundleLocation> provider = serviceProviderOf(required);
+        if (provider.isEmpty() || !pulledIds.add(provider.orElseThrow().locationId())) {
+          continue;
+        }
+        final BundleLocation pulled = provider.orElseThrow();
+        final BundleManifest providerManifest = manifestOf(pulled);
+        provided.addAll(providerManifest.providedServices());
+        onPulled.accept(pulled);
+        frontier.add(providerManifest);
+      }
+    }
+  }
+
   /** The parsed manifest of a location in this index — for an executor pinning its start level. */
   public BundleManifest manifestOf(BundleLocation location) {
     return entries.stream()

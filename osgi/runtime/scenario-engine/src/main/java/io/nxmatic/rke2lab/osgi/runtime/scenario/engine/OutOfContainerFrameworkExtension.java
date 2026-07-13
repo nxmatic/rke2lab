@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -631,18 +632,36 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
       seeds.add(classpath.locateBySymbolicName(host.getSymbolicName()));
     }
     final List<Bundle> pulled = new ArrayList<>();
-    classpath.closeOverImports(
-        seeds,
-        systemBundleExports(),
+    final List<BundleLocation> pulledLocations = new ArrayList<>();
+    final Consumer<BundleLocation> install =
         location -> {
           try {
             final Bundle bundle = installAt(location);
             installedBundles.put(bundle.getSymbolicName(), bundle);
             pulled.add(bundle);
+            pulledLocations.add(location);
           } catch (Exception ex) {
             sneaky(ex);
           }
-        });
+        };
+    // Chase two closures to a fixpoint: the package closure (who exports what a bundle imports) and
+    // the SERVICE closure (who publishes the osgi.service a bundle @References — the runtime
+    // dependency the resolver ignores, marked effective:=active). A service provider may itself
+    // import packages, and a package-pulled bundle may @Reference more services, so alternate until
+    // neither pulls anything new. The seeds' own services seed the service-provided set so a host
+    // that self-publishes a service is not re-pulled.
+    final Set<String> providedServices = new LinkedHashSet<>();
+    for (BundleLocation seed : seeds) {
+      providedServices.addAll(classpath.manifestOf(seed).providedServices());
+    }
+    int lastSize = -1;
+    while (pulled.size() != lastSize) {
+      lastSize = pulled.size();
+      final List<BundleLocation> frontier = new ArrayList<>(seeds);
+      frontier.addAll(pulledLocations);
+      classpath.closeOverImports(frontier, systemBundleExports(), install);
+      classpath.closeOverServices(frontier, providedServices, install);
+    }
     return pulled;
   }
 
