@@ -28,9 +28,13 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 @SeedContract("runbook")
 public record ManifestsRunbookInput(LinkFacet link, DebugFacet debug) {
 
-  public ManifestsRunbookInput {
-    link = link == null ? LinkFacet.defaults() : link;
-    debug = debug == null ? DebugFacet.disabled() : debug;
+  /**
+   * The complete facet with every concern at its default — the operator's usual posture, debug off.
+   * The seed a scion holds before a sow arrives (never a partial instance): every component is a
+   * complete sub-facet, so no incomplete state ever exists.
+   */
+  public static ManifestsRunbookInput defaults() {
+    return new ManifestsRunbookInput(LinkFacet.defaults(), DebugFacet.disabled());
   }
 
   /**
@@ -62,12 +66,6 @@ public record ManifestsRunbookInput(LinkFacet link, DebugFacet debug) {
    */
   public record DebugFacet(Toggle mesh, Toggle networking, NriPlugins nriPlugins) {
 
-    public DebugFacet {
-      mesh = mesh == null ? Toggle.off() : mesh;
-      networking = networking == null ? Toggle.off() : networking;
-      nriPlugins = nriPlugins == null ? NriPlugins.off() : nriPlugins;
-    }
-
     public static DebugFacet disabled() {
       return new DebugFacet(Toggle.off(), Toggle.off(), NriPlugins.off());
     }
@@ -84,10 +82,6 @@ public record ManifestsRunbookInput(LinkFacet link, DebugFacet debug) {
 
   /** The {@code debug.nriPlugins} sub-map — a single {@code flox} toggle. */
   public record NriPlugins(Toggle flox) {
-
-    public NriPlugins {
-      flox = flox == null ? Toggle.off() : flox;
-    }
 
     public static NriPlugins off() {
       return new NriPlugins(Toggle.off());

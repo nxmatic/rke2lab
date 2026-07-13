@@ -24,5 +24,6 @@
     <module>manifests-cdk8s</module>
     <module>manifests-core</module>
     <module>manifests-core-test</module>
+    <module>manifests-bdd</module>
   </modules>
 </project>
