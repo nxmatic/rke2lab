@@ -173,12 +173,18 @@ flowchart LR
   `link`/`debug` concerns. A scion sees ONLY its facet, never another soil's config.
 
 **Consequences.** `fromSystemProperties()` dissolves — the CLI reads the same file
-as the seed, through the same reader. `ManifestLinkPolicy.toEnvMap()` +
-`ManifestLinkPolicy` / `ControlplanePolicy` (host, naming `manifests.contract`) go
-away: the host stops translating, the scion does. `ReadinessPolicy` / `PreviewPolicy`
-stop being dead-ends — they are the `readiness` / `preview` concerns, plucked into
-the cluster/systemd facets the day those scions grow a wire-record — no new channel.
-Every policy travels one way, from one file, for every caller and every domain.
+as the seed, through the same reader. `ControlplanePolicy` does NOT go away — it is
+REACTIVATED as the host's sow pilot (§ the policy is live logic below): it keeps
+reading the yaml and now drives `sow(RunbookCoordinate("manifests"), facet)`, but
+carries only the RAW facets (`LinkPolicyConfig` + `DebugPolicyConfig` — neutral
+`Optional<Boolean>`, no manifests type). What dissolves is `ManifestLinkPolicy`,
+whose SOLE job was translating the raw booleans into `ManifestDomainPolicy` +
+`toEnvMap()`; that translation moves into the scion. So the host stops NAMING
+`manifests.contract` (the gate clears) while `ControlplanePolicy` stays in the flow.
+`ReadinessPolicy` / `PreviewPolicy` stay on `ControlplanePolicy` too — they are the
+`readiness` / `preview` concerns, sown into the cluster/systemd facets the day those
+scions grow a wire-record — no new channel. Every policy travels one way, from one
+file, for every caller and every domain.
 
 *Design constraint this puts on piece 2 (the wire-record).* For the pluck to stay
 generic, the runbook-input wire-record's top-level component names MUST equal the
@@ -244,15 +250,25 @@ behind. So today they are **orphaned live logic**: still compiled, referenced on
 tests and javadoc, computing nothing. Nobody derives `manifestDomain{}` or the
 `RKE2LAB_POLICY_LINK_*` anymore, so a freshly provisioned master no longer receives
 what the previous version wrote — a direct breach of the founding rule (invisible at
-the master frontier). The realm-boundary gate flags these three classes precisely
-because they are dead-yet-present.
+the master frontier).
 
-The transposition is therefore literal: the scion re-homes `HostSlotManifest.Builder.policy()`'s
-projection OSGi-side, driven by the plucked facet instead of a host `ControlplanePolicy`.
-Once the scion computes both ends, `ControlplanePolicy` / `ManifestLinkPolicy` and
-their tests are cut in the same change (the raw `PolicyConfig` DTO — the yaml READER —
-survives; only the host TRANSLATION dies). Reactivating this policy through the scion
-is the deliverable; the gate falling out is the side effect.
+The deliverable is to put this policy back in the flow, NOT to delete it. The split:
+
+* `ControlplanePolicy` is **reactivated** as the host's sow pilot — it reads the yaml
+  and drives `sow(RunbookCoordinate("manifests"), facet)`, carrying the raw facets it
+  already reads (`LinkPolicyConfig` + `DebugPolicyConfig`). It stops naming
+  `manifests.contract` (so the realm-boundary gate clears) but stays in the flow.
+* the TRANSLATION — raw booleans → `ManifestDomainPolicy` + `FloxDebugPolicy` +
+  `RKE2LAB_POLICY_LINK_*`, today `HostSlotManifest.Builder.policy()` + `ManifestLinkPolicy`
+  — moves OSGi-side into the scion, where it belongs (it names the manifests catalog).
+  This is a LITERAL transposition of the projection, driven by the sown facet.
+
+The guarantee that the policy is genuinely played by synthesis is structural, not a
+promise: `ManifestSynthesisRequest` carries `manifestDomainPolicy` + `floxDebugPolicy`
+as FIELDS — synthesis does not run without them. The scion sets them from the facet
+and calls `synthesize(request)`, so `ControlplanePolicy`'s logic IS the synthesis
+input, not something computed beside it. Only `ManifestLinkPolicy` (the host
+translator) dissolves; `ControlplanePolicy` and the raw `PolicyConfig` reader live on.
 
 === Scope — which of the host policies this scion absorbs
 
