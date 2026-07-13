@@ -86,6 +86,14 @@
       <artifactId>org.osgi.service.component.annotations</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- checker-qual: @MonotonicNonNull for the scenario's set-once outdir (created on the first
+         synthesis beat, read by the overlay beat + the Then). NullAway reads it at compile time;
+         provided (analysis-only, nothing resolves it at runtime). -->
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

@@ -25,5 +25,6 @@
     <module>manifests-core</module>
     <module>manifests-core-test</module>
     <module>manifests-bdd</module>
+    <module>manifests-bdd-test</module>
   </modules>
 </project>

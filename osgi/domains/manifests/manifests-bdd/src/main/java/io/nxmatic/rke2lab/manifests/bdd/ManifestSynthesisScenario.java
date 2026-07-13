@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.osgi.framework.BundleContext;
@@ -183,7 +184,14 @@ public class ManifestSynthesisScenario
     @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
     @ProvidedScenarioState Map<String, String> linkSeedVariables;
     @ProvidedScenarioState ManifestSynthesisResult result;
-    @ProvidedScenarioState Map<String, Object> overlaySnapshot;
+    @ProvidedScenarioState Path overlayFile;
+
+    // The run's one output tree — created once, reused by both synthesis beats (units + overlay),
+    // so
+    // the Then can read the overlay the WHEN wrote. The gate is read so the scion plays honestly;
+    // the live materialisation target is Family-2 territory (the checksum glue), a survey temp dir
+    // here regardless of cultivating(). @MonotonicNonNull: set once by outdir(), then read.
+    @MonotonicNonNull private Path outdir;
 
     public When the_policy_is_derived_from_the_facet() {
       final ManifestsRunbookInput.LinkFacet link = facet.link();
@@ -225,9 +233,9 @@ public class ManifestSynthesisScenario
               debug.mesh().enabled(),
               debug.networking().enabled(),
               debug.nriPlugins().flox().enabled());
-      final Path outdir = surveyOutdir();
+      final Path root = outdir();
       final ManifestSynthesisRequest request =
-          ManifestSynthesisRequest.builder(outdir, outdir.resolve("manifests.yaml"))
+          ManifestSynthesisRequest.builder(root, root.resolve("manifests.yaml"))
               .manifestDomainPolicy(java.util.Optional.of(domainPolicy))
               .floxDebugPolicy(floxDebug)
               .build();
@@ -241,28 +249,32 @@ public class ManifestSynthesisScenario
 
     public When the_controlplane_overlay_is_written() {
       final NodeEnvContext layerContext = new DefaultNodeEnvContext();
-      final Path overlayRoot = surveyOutdir().resolve("rke2lab-environment.d");
+      final Path overlayRoot = outdir().resolve("rke2lab-environment.d");
       try {
-        this.overlaySnapshot =
-            overlay.writeControlplaneOverlay(overlayRoot, layerContext, linkSeedVariables);
+        overlay.writeControlplaneOverlay(overlayRoot, layerContext, linkSeedVariables);
       } catch (IOException ex) {
         throw new UncheckedIOException("controlplane overlay write failed", ex);
       }
+      // The 99-… overlay the master's install/ready scripts read — the Then asserts its data.
+      this.overlayFile =
+          overlayRoot.resolve("99-configmap-env-section-controlplane-layer-contributions.yml");
       return self();
     }
 
-    private Path surveyOutdir() {
-      // The gate is read so the scion plays honestly; the live materialisation target is Family-2
-      // territory (the checksum glue), still a survey temp dir here regardless of cultivating().
-      final boolean cultivating = gate.cultivating();
-      try {
-        return Files.createTempDirectory(
-                cultivating ? "rke2lab-manifests-live-" : "rke2lab-manifests-survey-")
-            .toAbsolutePath()
-            .normalize();
-      } catch (IOException ex) {
-        throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+    private Path outdir() {
+      if (outdir == null) {
+        final boolean cultivating = gate.cultivating();
+        try {
+          outdir =
+              Files.createTempDirectory(
+                      cultivating ? "rke2lab-manifests-live-" : "rke2lab-manifests-survey-")
+                  .toAbsolutePath()
+                  .normalize();
+        } catch (IOException ex) {
+          throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+        }
       }
+      return outdir;
     }
 
     private static String bool(boolean value) {
@@ -281,7 +293,7 @@ public class ManifestSynthesisScenario
     @ExpectedScenarioState ManifestDomainPolicy domainPolicy;
     @ExpectedScenarioState Map<String, String> linkSeedVariables;
     @ExpectedScenarioState ManifestSynthesisResult result;
-    @ExpectedScenarioState Map<String, Object> overlaySnapshot;
+    @ExpectedScenarioState Path overlayFile;
 
     public Then every_enabled_domain_produced_its_units() {
       final int enabled = domainPolicy.enabledDomainIds().size();
@@ -306,23 +318,24 @@ public class ManifestSynthesisScenario
     }
 
     public Then the_overlay_carries_the_link_time_policy() {
-      for (Map.Entry<String, String> expected : linkSeedVariables.entrySet()) {
-        if (!overlaySnapshot.containsKey(expected.getKey())
-            && !overlayCarries(expected.getKey(), expected.getValue())) {
+      if (!Files.exists(overlayFile)) {
+        throw new AssertionError("controlplane overlay was not written: " + overlayFile);
+      }
+      final String rendered;
+      try {
+        rendered = Files.readString(overlayFile);
+      } catch (IOException ex) {
+        throw new UncheckedIOException("cannot read the controlplane overlay " + overlayFile, ex);
+      }
+      // The 99-… ConfigMap's data carries each RKE2LAB_POLICY_LINK_* the master's install/ready
+      // scripts read. Assert the rendered YAML names every link var — the link-time end landed.
+      for (String key : linkSeedVariables.keySet()) {
+        if (!rendered.contains(key)) {
           throw new AssertionError(
-              "overlay does not carry the link-time policy var " + expected.getKey());
+              "overlay does not carry the link-time policy var " + key + "\n" + rendered);
         }
       }
       return self();
-    }
-
-    private boolean overlayCarries(String key, String value) {
-      // The snapshot nests the seeded variables under contributor sections; a flat containsKey is
-      // the fast path, else scan the values for the seeded pair.
-      return overlaySnapshot.values().stream()
-          .anyMatch(
-              section ->
-                  section instanceof Map<?, ?> map && value.equals(String.valueOf(map.get(key))));
     }
   }
 }
