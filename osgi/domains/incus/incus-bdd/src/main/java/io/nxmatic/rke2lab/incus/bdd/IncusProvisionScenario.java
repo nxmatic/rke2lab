@@ -19,6 +19,7 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
 import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -30,9 +31,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceReference;
 
 /**
  * The incus provisioning checkpoint, a production jGiven scenario told in the INCUS DOMAIN's own
@@ -43,7 +41,7 @@ import org.osgi.framework.ServiceReference;
  * provisioning stays host-side), not a {@code -test} fragment (it is live seeding logic).
  *
  * <p>The bbox/systemd/cluster twin: it resolves its collaborators from its OWN bundle's registry
- * ({@link FrameworkUtil}) — both incus contacts, the ambient {@link RunGate} (whose {@link
+ * ({@link ScenarioRegistry}) — both incus contacts, the ambient {@link RunGate} (whose {@link
  * RunGate#cultivating() cultivating} decides build-for-real vs plan-only), and, on a failure, the
  * doctor's {@link ConsultingService}. The scenario is identical live and in test; only who
  * published the collaborators differs (the live {@code DistrobuilderImageBuilder} + {@code
@@ -173,10 +171,7 @@ public class IncusProvisionScenario
   }
 
   private <T> T require(Class<T> type, String message) {
-    final BundleContext context = bundleContext();
-    final ServiceReference<T> ref =
-        Objects.requireNonNull(context.getServiceReference(type), message);
-    return context.getService(ref);
+    return ScenarioRegistry.of(this).require(type, message);
   }
 
   /**
@@ -185,16 +180,7 @@ public class IncusProvisionScenario
    * doctor), so a failure without a doctor degrades to no consultation rather than a crash.
    */
   private Optional<ConsultingService> resolveDoctor() {
-    final BundleContext context = bundleContext();
-    return Optional.ofNullable(context.getServiceReference(ConsultingService.class))
-        .map(context::getService);
-  }
-
-  private BundleContext bundleContext() {
-    return Objects.requireNonNull(
-            FrameworkUtil.getBundle(getClass()),
-            "incus-bdd is not bundle-loaded — the scenario must play in-container")
-        .getBundleContext();
+    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /** Given: the seed node, both incus contacts, the run gate, and the observation sink. */

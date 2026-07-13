@@ -18,6 +18,7 @@ import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvOverlayService;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -30,9 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceReference;
 
 /**
  * The manifests synthesis scenario, a production jGiven scenario told in the MANIFESTS DOMAIN's own
@@ -53,7 +51,7 @@ import org.osgi.framework.ServiceReference;
  * writeControlplaneOverlay} lands the {@code 99-…} overlay the master's install/ready scripts read
  * — invisible at the master frontier (the founding rule).
  *
- * <p>It resolves its collaborators from its OWN bundle's registry ({@link FrameworkUtil}): the
+ * <p>It resolves its collaborators from its OWN bundle's registry ({@link ScenarioRegistry}): the
  * {@link ManifestSynthesisService} + {@link NodeEnvOverlayService} (the SCR-published synthesis)
  * and the ambient {@link RunGate} (whose {@link RunGate#cultivating() cultivating} decides whether
  * materialisation targets the real tree or a survey temp dir). The activation facet is seeded by
@@ -119,28 +117,17 @@ public class ManifestSynthesisScenario
   }
 
   private <T> T resolve(Class<T> type) {
-    final BundleContext context = bundleContext();
-    final ServiceReference<T> ref =
-        Objects.requireNonNull(
-            context.getServiceReference(type),
+    return ScenarioRegistry.of(this)
+        .require(
+            type,
             "no " + type.getSimpleName() + " in the registry (manifests-core must publish it)");
-    return context.getService(ref);
   }
 
   private RunGate resolveGate() {
-    final BundleContext context = bundleContext();
-    final ServiceReference<RunGate> ref =
-        Objects.requireNonNull(
-            context.getServiceReference(RunGate.class),
+    return ScenarioRegistry.of(this)
+        .require(
+            RunGate.class,
             "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
-    return context.getService(ref);
-  }
-
-  private BundleContext bundleContext() {
-    return Objects.requireNonNull(
-            FrameworkUtil.getBundle(getClass()),
-            "manifests-bdd is not bundle-loaded — the scenario must play in-container")
-        .getBundleContext();
   }
 
   /** Given: the activation facet and the synthesis collaborators. */

@@ -20,6 +20,7 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -32,9 +33,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceReference;
 
 /**
  * The bbox reservation-reconciliation scenario, a production jGiven scenario told in the BBOX
@@ -44,8 +42,8 @@ import org.osgi.framework.ServiceReference;
  * bbox-bdd} (only ports + the pure {@link BlueprintRowEnumerator}, no sealed internal), not a
  * {@code -test} fragment (it is live seeding logic).
  *
- * <p>It resolves its collaborators from its OWN bundle's service registry ({@link FrameworkUtil}):
- * the {@link BboxReconciler} contact, the ambient {@link RunGate} (whose {@link
+ * <p>It resolves its collaborators from its OWN bundle's service registry ({@link
+ * ScenarioRegistry}): the {@link BboxReconciler} contact, the ambient {@link RunGate} (whose {@link
  * RunGate#cultivating() cultivating} decides live-apply vs dry-run — the SCION consults it, not the
  * edge), and, on a refused row, the doctor's {@link ConsultingService}. The scenario is identical
  * live and in test; only who published the collaborators differs (the live {@code
@@ -154,12 +152,10 @@ public class BboxReconciliationScenario
   }
 
   private BboxReconciler resolveContact() {
-    final BundleContext context = bundleContext();
-    final ServiceReference<BboxReconciler> ref =
-        Objects.requireNonNull(
-            context.getServiceReference(BboxReconciler.class),
+    return ScenarioRegistry.of(this)
+        .require(
+            BboxReconciler.class,
             "no BboxReconciler in the registry (live edge or test mock must publish one)");
-    return context.getService(ref);
   }
 
   /**
@@ -168,12 +164,10 @@ public class BboxReconciliationScenario
    * a test registers a mock), so this fails loud rather than guessing a default.
    */
   private RunGate resolveGate() {
-    final BundleContext context = bundleContext();
-    final ServiceReference<RunGate> ref =
-        Objects.requireNonNull(
-            context.getServiceReference(RunGate.class),
+    return ScenarioRegistry.of(this)
+        .require(
+            RunGate.class,
             "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
-    return context.getService(ref);
   }
 
   /**
@@ -182,16 +176,7 @@ public class BboxReconciliationScenario
    * doctor), so a refused row without a doctor degrades to no consultation rather than a crash.
    */
   private Optional<ConsultingService> resolveDoctor() {
-    final BundleContext context = bundleContext();
-    return Optional.ofNullable(context.getServiceReference(ConsultingService.class))
-        .map(context::getService);
-  }
-
-  private BundleContext bundleContext() {
-    return Objects.requireNonNull(
-            FrameworkUtil.getBundle(getClass()),
-            "bbox-bdd is not bundle-loaded — the scenario must play in-container")
-        .getBundleContext();
+    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /**

@@ -14,6 +14,7 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest;
@@ -27,9 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceReference;
 
 /**
  * The systemd-adapter readiness checkpoint, a production jGiven scenario told in the SYSTEMD
@@ -42,7 +40,7 @@ import org.osgi.framework.ServiceReference;
  * <p>The systemd twin of {@code ClusterReadinessScenario}: identical shape, one difference of
  * nature — systemd has no phase chain, so the single probe's snapshot is read across a small chain
  * of readable assertions rather than a chain of contact calls. It resolves its collaborator — the
- * {@link SystemdRuntimeProbe} — from its OWN bundle's registry ({@link FrameworkUtil}); the
+ * {@link SystemdRuntimeProbe} — from its OWN bundle's registry ({@link ScenarioRegistry}); the
  * scenario is identical live and in test, only who published the probe differs (the live {@code
  * DbusSystemdProbe}, or a mock a test seeds into the registry before playing). A not-ready facet
  * throws, jGiven marks it FAILED and skips the downstream chained assertions, so the runbook shows
@@ -143,17 +141,15 @@ public class SystemdAdapterScenario
   }
 
   /**
-   * Resolve the systemd runtime probe from THIS bundle's registry — the in-container lookup ({@code
-   * FrameworkUtil.getBundle(this).getBundleContext()}). A test seeds a mock under the same
-   * interface before playing; live, SCR has published {@code DbusSystemdProbe}.
+   * Resolve the systemd runtime probe from THIS bundle's registry (via {@link ScenarioRegistry}). A
+   * test seeds a mock under the same interface before playing; live, SCR has published {@code
+   * DbusSystemdProbe}.
    */
   private SystemdRuntimeProbe resolveProbe() {
-    final BundleContext context = bundleContext();
-    final ServiceReference<SystemdRuntimeProbe> ref =
-        Objects.requireNonNull(
-            context.getServiceReference(SystemdRuntimeProbe.class),
+    return ScenarioRegistry.of(this)
+        .require(
+            SystemdRuntimeProbe.class,
             "no SystemdRuntimeProbe in the registry (live edge or test mock must publish one)");
-    return context.getService(ref);
   }
 
   /**
@@ -162,19 +158,7 @@ public class SystemdAdapterScenario
    * doctor), so a failing facet without a doctor degrades to no consultation rather than a crash.
    */
   private Optional<ConsultingService> resolveDoctor() {
-    final BundleContext context = bundleContext();
-    return Optional.ofNullable(context.getServiceReference(ConsultingService.class))
-        .map(context::getService);
-  }
-
-  /**
-   * THIS bundle's context — the in-container registry the scenario resolves its collaborators from.
-   */
-  private BundleContext bundleContext() {
-    return Objects.requireNonNull(
-            FrameworkUtil.getBundle(getClass()),
-            "systemd-bdd is not bundle-loaded — the scenario must play in-container")
-        .getBundleContext();
+    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /** Given: the seed node to reach, the probe, and the shared observation buffer the When fills. */

@@ -18,6 +18,7 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
@@ -29,9 +30,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceReference;
 
 /**
  * The cluster-readiness checkpoint, a production jGiven scenario told in the CLUSTER DOMAIN's own
@@ -41,7 +39,7 @@ import org.osgi.framework.ServiceReference;
  * not a {@code -test} fragment (it is live seeding logic).
  *
  * <p>It resolves its collaborator — the {@link ClusterReadinessContact} — from its OWN bundle's
- * service registry ({@link FrameworkUtil}); the scenario is identical live and in test, only who
+ * service registry ({@link ScenarioRegistry}); the scenario is identical live and in test, only who
  * published the contact differs (the live {@code KubectlClusterContact}, or a mock a test seeds
  * into the registry before playing). The phases form a strict chain (kubeconfig → API →
  * controllers): a not-ready phase throws, jGiven marks it FAILED and skips the downstream chained
@@ -147,17 +145,15 @@ public class ClusterReadinessScenario
   }
 
   /**
-   * Resolve the cluster contact from THIS bundle's registry — the in-container lookup ({@code
-   * FrameworkUtil.getBundle(this).getBundleContext()}). A test seeds a mock under the same
-   * interface before playing; live, SCR has published {@code KubectlClusterContact}.
+   * Resolve the cluster contact from THIS bundle's registry (via {@link ScenarioRegistry}). A test
+   * seeds a mock under the same interface before playing; live, SCR has published {@code
+   * KubectlClusterContact}.
    */
   private ClusterReadinessContact resolveContact() {
-    final BundleContext context = bundleContext();
-    final ServiceReference<ClusterReadinessContact> ref =
-        Objects.requireNonNull(
-            context.getServiceReference(ClusterReadinessContact.class),
+    return ScenarioRegistry.of(this)
+        .require(
+            ClusterReadinessContact.class,
             "no ClusterReadinessContact in the registry (live edge or test mock must publish one)");
-    return context.getService(ref);
   }
 
   /**
@@ -167,19 +163,7 @@ public class ClusterReadinessScenario
    * Unlike the contact, the doctor is OPTIONAL: the checkpoint still fails, just unconsulted.
    */
   private Optional<ConsultingService> resolveDoctor() {
-    final BundleContext context = bundleContext();
-    return Optional.ofNullable(context.getServiceReference(ConsultingService.class))
-        .map(context::getService);
-  }
-
-  /**
-   * THIS bundle's context — the in-container registry the scenario resolves its collaborators from.
-   */
-  private BundleContext bundleContext() {
-    return Objects.requireNonNull(
-            FrameworkUtil.getBundle(getClass()),
-            "cluster-bdd is not bundle-loaded — the scenario must play in-container")
-        .getBundleContext();
+    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /** Given: the kubeconfig to read the cluster through, the controllers to wait on, the contact. */
