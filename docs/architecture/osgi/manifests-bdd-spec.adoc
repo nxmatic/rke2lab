@@ -1,0 +1,256 @@
+= The manifests scion — synthesis played through the broker
+:toc:
+:toclevels: 3
+
+== Overview
+
+The manifests domain synthesizes the node's material — the K8s manifests, the
+systemd units, the rke2 config, the env-config overlay — from CDK8s units and node
+contributors. Today that synthesis (`ManifestSynthesisService`) survives OSGi-side
+but is driven by nobody in the seed flow: the host cannot resolve it by type across
+the realm boundary, and doing so would be the realm-boundary anti-pattern (see
+link:../bootstrap/provisioning-slice-architecture.adoc[the incus-bootstrap constat]
+§ corroboration). This spec designs the missing piece: **`manifests-bdd`, the
+manifests scion**, played in-container through the broker like bbox/incus/systemd/
+cluster — the "graft cultivated fresh" the ClusterSeed map already names.
+
+It is the fifth scion, on the exact trio pattern the four shipped ones share
+(`*Scenario` + `*RunbookHandler` + `*BddScenarios`), with three differences its
+nature forces — spelled out below so the implementation does not blindly copy bbox.
+
+== What makes the manifests scion different from the four others
+
+[cols="1,2,2",options="header"]
+|===
+| Concern | The four contact scions (bbox/incus/systemd/cluster) | The manifests scion
+
+| The gesture
+| *probe/reconcile* an external system (router, incus, dbus, kube-API) — read or
+  converge live state
+| *synthesize + materialize* files — pure generation into an output tree, touching
+  no live system
+
+| The input
+| enumerated from a static blueprint (bbox rows) or fixed markers; the scion holds
+  its own desired state
+| the operator's per-domain *activation choice* (`mesh` on/off, `cluster-api` on/off)
+  — which must arrive from the host, in the trigger
+
+| The doctor
+| consults on trouble (a refused row, an unreachable instance) — runtime symptoms
+| *no consult* — a synthesis failure is a build defect (a missing unit, a bad
+  template), surfaced as a failed step, not a medical symptom
+|===
+
+== The one config path — the sow trigger (general, manifests is the first consumer)
+
+This is the crux, and it is bigger than manifests: it is THE single path by which
+any policy reaches any scion. The rule (user decision): **one config path, and every
+policy reachable through it.**
+
+=== What exists today (the audit)
+
+* The four shipped scions (bbox/incus/systemd/cluster) have **no policy config path
+  at all**. They resolve only the ambient `RunGate` (the whole-run live/preview
+  fact) and their contacts + the doctor, all from the registry. Every `handle(trigger)`
+  **ignores its trigger** — the sow trigger is empty (`"{}"`) today.
+* Manifests has TWO parallel paths that both produce `ManifestDomainPolicy` from two
+  vocabularies — a duplication that drifts:
++
+[cols="1,2,1",options="header"]
+|===
+| Path | Input → translation | Used by
+| system properties | `-Drke2lab.manifests.policy.enabledDomains=…` →
+  `ManifestSynthesisRequest.fromSystemProperties()` | `manifests-cli`
+| host Pulumi config | `Rke2labConfig.policy().link()` → `ManifestLinkPolicy` →
+  `ManifestDomainPolicy` (+ `toEnvMap` for `RKE2LAB_POLICY_LINK_*`) | seed
+|===
+* The host policies that WOULD target other scions (`ReadinessPolicy`,
+  `PreviewPolicy` → cluster/systemd) are wired to NOTHING — neither the old nor the
+  new path carries them.
+
+So there is no unified path; there is one duplicated path (manifests) and several
+dead-ends. The scion work installs the single path.
+
+=== The single path — a facet per soil, from one host-neutral policy
+
+. **One source of truth, host-side.** `SeedRun` carries ONE host-neutral policy
+  covering all domains — raw booleans/strings keyed by a plain domain string, built
+  once from the Pulumi config (the CLI builds the same shape from its args). No
+  domain type named:
++
+[source,json]
+----
+{ "manifests": { "mesh": false, "cluster-api": true, "storage": true, "debug": {...} },
+  "cluster":   { "readiness-override": {...} },
+  "systemd":   { ... } }
+----
+. **One channel — the sow trigger.** Each `sow(soil)` extracts the soil's facet
+  (the sub-map keyed by `soil`) and puts it in the trigger `SeedEnvelope` (today
+  `"{}"`). A soil with no facet gets `{}` — exactly today's behavior, so the four
+  shipped scions are unaffected until they grow one. This is a `seed-bdd` change
+  (`Gardening.sow` / `SowAndGraftStage` stop sending empty), not manifests-only.
+. **One translator per domain — the scion.** Each scion reads its own facet in
+  `handle(trigger)` and translates it in its OWN vocabulary. The manifests scion
+  owns `ManifestDomainCatalog` + the `RKE2LAB_POLICY_LINK_*` naming, so it derives
+  `ManifestDomainPolicy` + `FloxDebugPolicy` + the link-time seed vars from its facet.
+  A scion sees ONLY its facet (sealed), never another domain's config.
+
+**Consequences.** `fromSystemProperties()` AND `ManifestLinkPolicy.toEnvMap()` both
+dissolve into the manifests scion's one facet-translation. `ManifestLinkPolicy` /
+`ControlplanePolicy` (host, naming `manifests.contract`) go away. `ReadinessPolicy` /
+`PreviewPolicy` stop being dead-ends: they become the `cluster`/`systemd` facets of
+the same policy, reachable the day those scions read their trigger — no new channel.
+Every policy travels one way, for every caller and every domain.
+
+=== The policy has TWO ends — the scion must cover both
+
+The activation choice does not stop at "which domains synthesize". It drives a path
+with two distinct ends, and today they live on opposite sides of the realm boundary
+— which is the whole bug. The scion must own BOTH:
+
+[cols="1,2,2",options="header"]
+|===
+| End | What it decides | Where it lives today
+
+| *synth-time* | which domains are *synthesized* — `ManifestDomainPolicy` filters
+  the domain registry (`applyManifestDomainPolicy`), resolves inter-domain deps,
+  rejects an all-disabled set
+| in-container (manifests-core) — correct already
+
+| *link-time* | which layers the master *links live* — the `RKE2LAB_POLICY_LINK_*`
+  env vars written into the `99-…env-config` overlay
+  (`NodeEnvOverlayService.writeControlplaneOverlay(seedVariables)`), read by
+  `rke2lab-manifests-install.sh` and the per-layer `*-ready.sh` gates on the master
+| **host-side** (`ManifestLinkPolicy.toEnvMap`) — the leak
+|===
+
+Both ends derive from the SAME operator choice. Today the host computes the
+link-time `seedVariables` and hands them to `writeControlplaneOverlay`; the constat's
+delta #6 is exactly that this host→overlay call is orphaned. The scion closes it:
+
+* from its facet (the `manifests` sub-map of the one policy, § the single path), the
+  scion derives BOTH the `ManifestDomainPolicy` (synth-time filter) AND the
+  `RKE2LAB_POLICY_LINK_*` seed variables (link-time overlay) — it owns the
+  `RKE2LAB_POLICY_LINK_<X>_ENABLED` naming, so this is legitimate in-container;
+* the scenario's synthesis step drives `writeControlplaneOverlay` with those
+  seed variables (the call the host used to make), so the `99-…` overlay lands with
+  the right `RKE2LAB_POLICY_LINK_*` — the master's install/ready scripts see exactly
+  what they saw before (the founding rule: invisible at the master frontier).
+
+This is why the scion is the natural home: it is the single point that already knows
+the catalog, and it can satisfy both ends from one payload without any host type
+naming a domain vocabulary.
+
+=== Scope — which of the host policies this scion absorbs
+
+The host's `ControlplanePolicy` aggregates six sub-policies; they do not all route
+to manifests. This scion absorbs the two that are manifests' business; the rest go
+elsewhere or stay host:
+
+[cols="1,2,1",options="header"]
+|===
+| Host sub-policy | Concern | Destination
+
+| `ManifestLinkPolicy` | which domains synthesize + which layers link (the two-ended
+  path above) | *this scion* (activation payload)
+| `DebugPolicy` → `FloxDebugPolicy` | per-layer debug (flox NRI / mesh / networking
+  image-command-env swap) — already a `manifests.contract` input of
+  `ManifestSynthesisRequest` (`floxDebugPolicyFromSystemProperties`) | *this scion*
+  (debug facet of the payload)
+| `NetworkPolicy` (lanBinding) | host-side Incus provisioning (the Pulumi graph) | stays host
+| `ReadinessPolicy` (raw severity overrides) | readiness verdict — cluster/doctor
+  vocabulary; the host already carries it raw ("hands the raw value to the OSGi-side
+  handler") | a *cluster/doctor* scion, not this one
+| `PreviewPolicy` (raw fault simulation) | preview-only fault injection —
+  cluster/doctor vocabulary, raw | a *cluster/doctor* scion, not this one
+|===
+
+So the manifests activation payload has TWO facets — *activation* (which domains,
+from `ManifestLinkPolicy`) and *debug* (per-layer, from `DebugPolicy`→`FloxDebugPolicy`).
+Both are already `manifests.contract` concepts; the scion assembles them from the
+sown payload. `ReadinessPolicy`/`PreviewPolicy` are a separate transposition (a
+cluster/doctor scion), out of scope here — noted so their host records are not
+mistaken for dead when the manifests policies dissolve.
+
+== The scion trio
+
+Mirrors bbox's trio (link:bbox-edge-spec.adoc[bbox-edge-spec]), adapted:
+
+=== `ManifestSynthesisScenario` (the `*Scenario`)
+
+A production jGiven scenario in the MANIFESTS domain's vocabulary. Resolves its
+collaborators from THIS bundle's registry (`FrameworkUtil`): the
+`ManifestSynthesisService` (the SCR-published synthesis), and the ambient `RunGate`
+(whose `cultivating()` decides whether materialization writes to the real target or
+a dry-run temp — the preview inertness the map requires).
+
+[listing]
+----
+GIVEN the activation payload (which domains the operator enabled)
+  AND the synthesis service, resolved from this bundle's registry
+  AND the run gate (cultivate vs survey)
+WHEN the policy is derived from the payload          [the scion builds BOTH ends: ManifestDomainPolicy + the RKE2LAB_POLICY_LINK_* seed vars]
+  AND the manifests are synthesized                  [service.synthesize(request) → the K8s/systemd/rke2-config tree, filtered synth-time]
+  AND the controlplane overlay is written             [writeControlplaneOverlay(seedVars) → the 99-… env-config with RKE2LAB_POLICY_LINK_*]
+THEN every enabled domain produced its units         [domainCount matches the enabled set]
+  AND the materialized tree is complete               [manifestFile + systemdUnitsDir exist, hit count > 0]
+  AND the overlay carries the link-time policy         [RKE2LAB_POLICY_LINK_* match the enabled set — what the master's scripts read]
+----
+
+No doctor consult. A synthesis `IOException` or an empty domain set fails the step —
+jGiven marks it, the runbook shows the failure. The output tree location is the
+run's `outdir` (dry-run: a temp dir; live: the materialization target the host
+mounts — TBD with Family 2/the checksum glue, see the constat). The two synthesis
+beats (units tree + controlplane overlay) are the two policy ends above: the scion
+drives both, so a single sow produces the complete master material.
+
+=== `ManifestsRunbookHandler` (the `*RunbookHandler`)
+
+Identical shape to `BboxRunbookHandler`: `@Component(service = SeedHandler.class)`,
+serves `RunbookCoordinate("manifests")`, and `handle(trigger)` plays the scenario
+in-container via `ManifestsBddScenarios.run(trigger)`. THE one difference: it reads
+the activation payload off `trigger.payload()` and threads it into the run (bbox's
+handler ignores the trigger; this one needs it).
+
+=== `ManifestsBddScenarios` (the `*BddScenarios`)
+
+The in-container front-door, twin of `BboxBddScenarios`: `JUnitLauncherCore` with an
+explicit `selectClass(ManifestSynthesisScenario)`, returning a `RunbookEnvelope`
+(runbook JSON + empty consultations — the manifests scion consults no one) as one
+serialized String across the realm boundary. It accepts the activation payload and
+seeds it where the scenario reads it (a registry service or a scenario static, the
+same scaffolding bbox uses for `lastRunbook`).
+
+== Why this closes several deltas at once
+
+* **The synthesis runs again** — driven as a scion, in-container, where SCR
+  activation is normal (the `awaitService`-from-flat-host puzzle disappears).
+* **`manifests-cli` becomes a sower** — it sows `RunbookCoordinate("manifests")`
+  and names no contract type, so its `NoClassDefFoundError` (host→contract-flat)
+  is gone by construction.
+* **The five materialization targets get their trigger** (constat deltas #2–6) —
+  the scion IS the trigger the demolition removed; the synthesis machinery it drives
+  is intact.
+* **The realm-boundary gate on the manifests policies falls** — the host stops
+  naming `manifests.contract`; the choice travels as a sown payload.
+
+=== Dependency — the CLI's schema discovery needs `shape`
+
+A sower that must KNOW the payload shape a priori is still coupled. For the CLI to
+*discover* it — "broker, what config do you want for the manifests runbook?" — the
+`shape` meta-coordinate must be realized (it is designed but not served, see
+link:seed-broker-spec.adoc#shape-realization[seed-broker-spec § realization status]).
+Its piece 2 (a `@SeedContract("runbook")` input wire-record describing the policy
+facet) is exactly this spec's activation payload given a typed home. So the order is:
+realize `shape` (foundation piece 1) + give the runbook input a wire-record
+(piece 2, here) → the CLI sows `ShapeCoordinate("manifests")` to learn the shape,
+fills it, then sows `RunbookCoordinate("manifests")`. Until then the payload shape
+is known a priori (a temporary a-priori coupling, not the end state).
+
+== Related Documentation
+
+* link:../bootstrap/provisioning-slice-architecture.adoc[The incus bootstrap of master] — the constat this scion answers (deltas #2–6, the activation payload, the corroboration)
+* link:bbox-edge-spec.adoc[bbox-edge-spec] — the trio pattern this mirrors
+* link:seed-broker-spec.adoc#playing-a-scenario-is-a-sow[Seed broker spec § playing a scenario is a sow] — the broker door the scion sits behind
+* link:../bdd/bdd.adoc#clusterseed-scenario-map[The ClusterSeed scenario map] — where "the manifests synthesis is a graft cultivated fresh" is framed

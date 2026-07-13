@@ -174,6 +174,58 @@ THE DOOR, and the shared wire-record class stops being a source of truth (it can
 consumed by `SCHEMA_CONCORD`); the meta-coordinate is that same projection, offered at runtime through
 the door — the OpenAPI endpoint we had described but never served.
 
+[[shape-realization]]
+==== Realization status — designed, described, NOT yet served (the chantier)
+
+The introspection verb above is designed and load-bearing, but **not realized** —
+"the OpenAPI endpoint we had described but never served" is literally true in the
+code. Surfaced 2026-07-13 when `manifests-cli`, becoming a sower, needed to ask the
+broker for the payload it must supply and found no verb to ask with. The audit:
+
+* `ValueCoordinate permits` carries only `SplitCoordinate, RunbookCoordinate` — no
+  `ShapeCoordinate` (nor an `available`/index coordinate).
+* No `RecordSchemaProjector` and no `SCHEMA_CONCORD` gate exist in code (both are
+  spec-only names today).
+* No wire-record describes a runbook *input*: the trigger has always been `"{}"`,
+  so there is nothing to project a schema FROM. `RunbookEnvelope` (the reap/output)
+  is duplicated per domain `*BddScenarios`, none `@SeedContract`-annotated.
+
+So materializing `shape` is a build in **two pieces**, mirroring the shipped
+`SplitCoordinate` trio (coordinate + a domain reflector + broker routing by
+`equals`):
+
+. *Foundation, generic.* Add `ShapeCoordinate(domain)` to the `permits` (the
+  deliberate one-place edit the sealed interface prescribes), and a
+  `RecordSchemaProjector` that emits a JSON Schema from a wire-record's
+  `RecordComponents` — the amont twin of `DoctorSplitReflector` (which walks
+  `@Scion` components aval). A domain contributes a `@Component SeedHandler` serving
+  `new ShapeCoordinate(itsDomain)`, projecting the schema of the wire-record its
+  `@SeedContract(slug)` names; the host reaps an opaque JSON-Schema `String`, holding
+  no domain class.
++
+*Projection engine — victools, wrapped (decided 2026-07-13).* The projector does
+NOT hand-roll schema generation — we do not re-implement a JSON-Schema generator.
+It uses `com.github.victools:jsonschema-generator` (+ `jsonschema-module-jackson`),
+which emits Draft 2020-12 and already handles nested wire-records, seam enums,
+`Optional` → non-`required`, and constraints. victools ships without a
+`Bundle-SymbolicName` (bare MANIFEST, not even an Automatic-Module-Name), so it is
+wrapped as its own bundle module on the exact `osgi/runtime/jgiven-wrap` pattern —
+`Export-Package: com.github.victools.*`, `Import-Package: *`, embed nothing. Its
+transitive tail is already OSGi-ready (`classmate` has a BSN; jackson is already
+bundled), so the wrap stamps only the two victools jars and traily nothing. A
+hand-rolled projector was weighed and rejected: it would re-cover exactly what
+victools does (nested / enum-slug / Optional), for maintenance we would own, to save
+a wrap module the repo already builds routinely.
+. *Domain, per input.* The runbook needs an INPUT wire-record — the facet of policy
+  the scion expects (`@SeedContract("runbook")`, its components the config shape) —
+  for the projector to have something to project. This is where the manifests scion's
+  activation payload gets a typed home (see
+  link:manifests-bdd-spec.adoc[manifests-bdd-spec] § the one config path).
+
+Only piece 1 is broker-generic; piece 2 is what each domain brings. Until piece 1
+ships, a sower cannot discover a payload's shape — it must know it a priori, which
+is the a-priori coupling the whole introspection turn removes.
+
 [[hateoas-the-plant-advertises]]
 === HATEOAS — the plant advertises what can be sown next (the second discovery idiom)
 
