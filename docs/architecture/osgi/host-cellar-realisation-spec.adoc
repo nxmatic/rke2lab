@@ -502,6 +502,15 @@ The three roles do not overlap:
   against the published checksums. A mismatch (corruption, partial write, an interrupted run) is caught
   BEFORE the rsync into `host/`, not discovered inside the instance — it becomes a symptom on incus's
   already-wired doctor channel (the `IMAGE_BUILD_FAILED` twin — a `CONTENT_MISMATCH` kind), fork B.
++
+NOTE: *the re-check is DEFERRED — it earns nothing WITHIN a run.* In the same run, manifests just
+synthesised the tree AND checksummed it (the publish step above); re-verifying those same checksums
+in incus's prep immediately after proves nothing — nothing can have drifted between synthesis and
+validation in one run. The check EARNS its keep only ACROSS runs: reading a staging produced by an
+EARLIER run, or reconciling `host.live`, where corruption/tampering could have happened since. So the
+publish (the checksums at the cellar) SHIPS now; the incus-side re-check is built when a cross-run
+read actually consumes it. This also keeps incus decoupled from manifests (no `manifests-core`/algo
+dependency) until the need is real — the FS access + `HostManifest` decode are wired only then.
 * *The host GROW reconciles then mounts already-validated content* (Shape C, `com.pulumi`): it fetches,
   `rsync -av --delete`s the validated slot into the physical `host/` (mount dirs preserved — R1), and
   binds `host/` into the instance. It does NOT re-validate — re-validating host-side would duplicate
