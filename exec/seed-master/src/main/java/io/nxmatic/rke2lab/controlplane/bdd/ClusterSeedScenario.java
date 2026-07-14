@@ -28,6 +28,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.nio.file.Path;
 import java.util.Hashtable;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,28 @@ public class ClusterSeedScenario
     implements SeedReceiver<SeedRun> {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The driver (Main) renders the runbook AFTER the run from the played model — the launcher
+  // instantiates the scenario, so Main cannot reach `this`; the run stashes the model and the
+  // staging root it materialised into here (the same holder discipline as the scions'
+  // LAST_RUNBOOK).
+  // The staging root is set by the GIVEN (which resolved the slot) so the rotation is read once,
+  // not
+  // recomputed (a second HostSlotSelector call could pick a different N). Never null once played.
+  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
+  private static final AtomicReference<Path> LAST_STAGING_ROOT = new AtomicReference<>();
+
+  /** The played runbook model — for the driver to render after the run. */
+  public static ReportModel lastRunbook() {
+    return Objects.requireNonNull(
+        LAST_RUNBOOK.get(), "the cluster-seed scenario has not played yet — no runbook to render");
+  }
+
+  /** The staging slot the run materialised into — where the driver renders the runbook. */
+  public static Path lastStagingRoot() {
+    return Objects.requireNonNull(
+        LAST_STAGING_ROOT.get(), "the cluster-seed scenario has not played yet — no staging root");
+  }
 
   /** Set once by {@link #receiveSeed} (the {@code SessionSeed} post-processor) before the GIVEN. */
   @MonotonicNonNull private SeedRun run;
@@ -93,6 +116,9 @@ public class ClusterSeedScenario
         .and()
         .the_cluster_becomes_ready(hostTree);
     then().the_harvest_is_stored();
+    // Stash the played model for the driver to render the runbook (adoc + json) into the staging
+    // slot after the run — the two-channel rule: the runbook is narration, rendered post-run.
+    LAST_RUNBOOK.set(hostTree);
   }
 
   /**
@@ -126,6 +152,10 @@ public class ClusterSeedScenario
               run.config().nodeName());
       final Path stagingSlot = new HostSlotSelector(worktreePaths.clusterNodeRoot()).nextStaging();
       this.paths = worktreePaths.asStagingView(stagingSlot);
+      // The slot the run materialises into — stashed for the driver to render the runbook here
+      // after
+      // the run (read once, from the GIVEN's chosen slot, not recomputed).
+      LAST_STAGING_ROOT.set(stagingSlot);
       // Publish the ambient RunGate the scions resolve — projected from the run mode.
       // registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).

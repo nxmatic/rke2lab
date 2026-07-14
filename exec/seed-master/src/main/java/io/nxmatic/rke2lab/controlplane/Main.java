@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane;
 
 import com.pulumi.Pulumi;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedScenario;
+import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.nxmatic.rke2lab.controlplane.bdd.SeedRun;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
@@ -60,6 +61,13 @@ public final class Main {
                       return Boolean.TRUE;
                     },
                     SEED.into(run));
+            // Render the runbook (adoc + json) into the run's staging slot AFTER the play, from the
+            // model the scenario stashed — the two-channel rule: the runbook is narration,
+            // materialised
+            // post-run. Best-effort inside the renderer, so it never fails the provisioning.
+            new RunbookRenderer(
+                    ClusterSeedScenario.lastStagingRoot(), line -> context.log().info(line))
+                .render(ClusterSeedScenario.lastRunbook());
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("the cluster-seed run was interrupted", interrupted);
