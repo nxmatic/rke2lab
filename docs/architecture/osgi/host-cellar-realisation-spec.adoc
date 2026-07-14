@@ -441,6 +441,19 @@ same RunGate axis as the cellar's `up`/`preview` (§ *the cellar consults the Ru
 host tree instead of the cellar store — one axis, two realisations. (The `main` design's `host.preview`
 scratch dir is not needed; the preview `host.N` simply goes unselected.)
 
+=== The runbook `json` has a RUNTIME role INSIDE the node (not only operator narration)
+
+R3 says a `host.N` MAY carry the run's narration; the `json` rendering is more than a consultable
+artefact — it earns a runtime job in the node. Because a live instance is never restarted when the
+mounted content changes (R1: we swap the selected `host.N`, we do not reboot), a content change must
+be reconciled by REFRESHING the affected services in the node (a targeted reload/restart), not a
+reboot. The runbook `json` is what tells WHICH: it carries the mapping *changed content → services
+to refresh*. It pairs exactly with the content validation: the incus prep validates THAT the content
+is conform; the runbook `json` says WHAT to do when it changed — the checksum diff (new `host.N` vs
+the previous) names the changed files, and the runbook maps those to the services to reload. So the
+`json` travels inside `host.N` for the node's own refresh logic, while the `adoc` is the operator's
+read. (Concrete shape — the change→service map, who consumes it in the node — is downstream work.)
+
 === Still open (to resolve when this lands)
 
 * Does incus AGGREGATE every scion's host-manifest, or validate only the manifests arbre it mounts
