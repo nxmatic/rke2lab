@@ -395,6 +395,30 @@ link:../osgi/seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the runbook handl
 consumption into `sow` — the `com.pulumi.*` provisioning graph stays host (Pulumi cannot enter Felix). The manifests/flox synthesis is
 a graft cultivated fresh, not a cellar artifact (no second cellar; a cache could lie on version skew).
 
+*`ResourceManager` dissolves into the SCION's `Cellar.store` (2026-07-14).* The former host `ResourceManager` /
+`ResourceCreationPipeline` built, per scion, a "thin graph mirror + `dependsOn` edge" — which is EXACTLY what
+`PulumiCellar.store` does (an `up()` registering a `CellarEntry` under the coordinate slug). So it is not
+re-created: *every scion, in-container, harvests AND stores* — the host lays the `Cellar` into Felix at boot
+(`registerService`), the scion resolves it (and the ambient current `Parcel`, published like the `RunGate`) and
+stores its own harvest; the host does NOT round-trip a harvest back to re-store it (§
+link:../osgi/host-cellar-realisation-spec.adoc#every-scion-contributes[host Cellar realisation — every scion
+contributes]). The `RunbookEnvelope` keeps `(runbook, consultations)`: consultations cross because the host
+GRAFTS them into the runbook; the harvest does not cross because its destination is the cellar, not the runbook.
+Two natures follow: RESOURCES (graph nodes + the `dependsOn` edge, read CAUSALLY from the amendment graph, not
+the runbook position) and top-level OUTPUTS (a PROJECTION of the resources — the read façade, host, no métier).
+The scion — never the façade — marks what has output value, by the neutral `@Scion(Role.FRUIT)` it already uses;
+the façade lifts what is marked, mechanically. Grain today = the whole fruit part; the finer field-level
+flat-output marking is a planned evolution the top-down migration will hit.
+
+*The cellar consults the RunGate — dry-run does not lose the harvest.* The cellar is a system tool, so like
+every tool it reads the ambient `RunGate` and adapts: gate open → `stack.up()` (the CONSERVED state), gate
+closed → `stack.preview()` (an EPHEMERAL PRE-RESERVE, the plan of this run, rendered PENDING in the runbook via
+E9). The scion holds ONE verb (`store(Parcel, harvest)`) and never picks the mode. This is not a fake harvest
+(`preview` mutates nothing, invents nothing — it is surveying). Note the runbook alone does NOT carry the
+harvest: jGiven's `ReportModel` captures step arguments, not scenario-state — so the runbook is the plan, the
+cellar is the data (two channels). See § link:../osgi/host-cellar-realisation-spec.adoc#every-scion-contributes[
+host Cellar realisation — every scion contributes].
+
 [NOTE]
 .The output gate and the broker-split compose — they are two distinct flows (2026-07-10)
 ====

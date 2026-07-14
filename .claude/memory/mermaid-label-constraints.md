@@ -18,6 +18,9 @@ the whole diagram fails.
   `:` are all safe inside. The specs quote every non-trivial label for this reason.
 + Line breaks in labels: `<br/>` (the specs use it), not `\n`.
 + Edge labels `|"..."|` follow the same quoting rule as node labels `["..."]`.
++ **Never use a Mermaid reserved word as a node ID** — `graph`, `end`, `style`, `class`, `subgraph`,
+  `flowchart`. `graph["…"]` breaks the parse (it reads `graph` as the diagram-type keyword expecting
+  `graph LR`). Rename the node (`pgraph`, `theGraph`). Caught 2026-07-14 on the cellar whiteboard.
 
 **How to apply:** when authoring/editing any Mermaid block, grep the diff for `\"` before saving — a
 nested escaped quote is the classic breaker. Prefer apostrophes for inner quoting. See

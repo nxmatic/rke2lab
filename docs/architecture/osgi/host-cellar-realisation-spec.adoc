@@ -4,17 +4,22 @@
 
 [NOTE]
 ====
-*Status:* DESIGN, ready to implement (2026-07-12). This spec realises the *CELLAR role* of
+*Status:* `PulumiCellar` SHIPPED + `pulumi-edge` GREEN (verified 2026-07-14: the 3 journals fused, no dead
+`doctor.port`/`doctor.records` import, 20 tests pass). The first buildable step below (realise the impl) is
+DONE; what remains is STEP 2 — publish it into Felix by `registerService(Cellar.class)` at boot, the
+prerequisite for § <<every-scion-contributes>> (scions reaching the cellar). This spec realises the *CELLAR role* of
 link:gardening-model-spec.adoc[the gardening model] over the Pulumi backend, *for the seed-master
 gardening* — the *how*, not the model (the model owns the roles, the multiplicity rule, the opacity; this
 doc does not re-derive them). It is one realisation of the cellar role among several: the seed-master
 gardening conserves over Pulumi (this doc); the *cluster gardening will conserve over a git-oriented
 storage* — a separate realisation of the SAME role, not covered here. So this is "the Pulumi cellar",
 never "the cellar". It is the sibling of link:seed-broker-spec.adoc[the seed-broker spec] (which realises
-the GARDENER role): both descend from the model, neither from the other. Concretely it narrows to ONE buildable first step:
-realise the host `Cellar` impl in `pulumi-edge`. It is the keystone we hit while attacking the host
-top-down — `Main`/`pulumi-edge` do not compile because the doctor domain's frontier is half-migrated: the
-OSGi side is shipped, the host impl is missing.
+the GARDENER role): both descend from the model, neither from the other. The first buildable step is the host
+`Cellar` impl in `pulumi-edge` (the keystone hit attacking the host top-down: `Main`/`pulumi-edge` do not
+compile because the doctor frontier is half-migrated — OSGi side shipped, host impl missing). But the cellar's
+role is GENERAL: § <<every-scion-contributes>> extends it from "doctor = first consumer" to "every scion
+contributes its harvest, and on Pulumi `store` PRODUCES the resource" — this is where the host's old
+`ResourceManager` dissolves.
 
 The implementation plan lives at the end (§ <<plan>>); it is the NEXT work session's starting point.
 ====
@@ -220,6 +225,133 @@ recomposition.
 `SeedEnvelope(domain, coordinate, payload)` — the shell (`domain`, `coordinate`: neutral `String`s) is
 what the frontier addresses BY; the `payload` (a JSON `String`) is sealed, never read. Each world uses
 its OWN jackson; no jackson type crosses.
+
+[[every-scion-contributes]]
+== Every scion contributes — the cellar IS the resource producer (the `ResourceManager` dissolution)
+
+The doctor is the cellar's FIRST consumer, not its only one. The general law: *every scion contributes its
+harvest to the cellar, and — on the Pulumi realisation — `store` PRODUCES the Pulumi resource.* This is where
+the host's old `ResourceManager` dissolves.
+
+*The SCION harvests AND stores — it does not return its harvest to the host.* Since the host lays the `Cellar`
+into Felix at boot (`registerService(Cellar.class)`), a scion resolves it in-container via
+`ScenarioRegistry.require(Cellar.class)`, the same way it resolves its contact and the `RunGate`. When it
+harvests, it `store`s — the grower reaps AND puts away (the lexicon law: *the grower draws on the cellar, the
+gardener merely ROUTES*). There is NO harvest field on the `RunbookEnvelope` and no host re-store: routing a
+harvest back out only to call `store` from the host would be an absurd round-trip. The envelope keeps carrying
+`(runbook, consultations)` — the doctor's consultations cross because the host GRAFTS them into the runbook
+(narration); the harvest does not cross because its destination is the cellar, not the runbook (two
+destinations, two channels — do not conflate them, the mistake the doctor's consultation channel invites).
+
+*What the scion needs to store.* Two ambient facts of the run, both resolved from the registry: the `Cellar`
+(the neutral furniture) and the `Parcel` currently being cultivated. The `Parcel` is published into Felix as an
+AMBIENT fact — the twin of `RunGate` — because the run cultivates ONE parcel (the master stack) and only the
+host knows its identity at the GIVEN. The `Cellar` stays NEUTRAL and addressed FROM OUTSIDE (`store(Parcel,
+…)`): it must not hold "the current parcel" as state — the doctor addresses N parcels (one per patient), so a
+mono-parcel or sentinel-resolving cellar would break it. The current parcel lives BESIDE the cellar (an ambient
+fact), never inside it.
+
+*The dissolution.* On the former host bootstrap, a `ResourceManager` ran `ResourceCreationPipeline` and, per
+scion, built a "thin graph mirror of the result + a `dependsOn` edge" (`SystemdAdapterResource`,
+`SeedImageBuildResource`, `SeedManifestSynthResource`, `ClusterReadinessResource`). That is EXACTLY what
+`PulumiCellar.store` already does: an out-of-run `up()` registers a `CellarEntry` (`ComponentResource`) whose
+payload rides `registerOutputs` under the coordinate slug. So there is no `ResourceManager` to re-create in the
+new system — producing a resource per scion IS the scion's `Cellar.store`; the Pulumi realisation turns each
+stored case into a resource.
+
+.C4 L3 Component — the SCION stores its own harvest; export/fetch is the READ
+[mermaid]
+----
+flowchart LR
+  subgraph felix["OSGi — the scion (in-container)"]
+    scion["scion pushes its métier<br/>marks harvest by @Scion(Role)"]
+    resolve["resolve Cellar + current Parcel<br/>(ambient, from the registry)"]
+    scstore["cellar.store(parcel, harvest)<br/>the grower reaps AND puts away"]
+    scion --> resolve --> scstore
+  end
+  subgraph host["Host — Pulumi realisation (the furniture + read façade)"]
+    pgraph["PulumiCellar: up() → CellarEntry<br/>Pulumi graph (resources, history)"]
+    facade["read façade (host)<br/>fetch → ctx.export"]
+    top["top-level exports<br/>(what the commissioner reads)"]
+    pgraph --> facade --> top
+  end
+  scstore -->|"store crosses to the furniture"| pgraph
+
+  style felix fill:#eef,stroke:#88a
+  style scion fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+  style resolve fill:#e1f5ff,stroke:#0066cc
+  style scstore fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+  style pgraph fill:#fff4e6,stroke:#ff9900
+  style facade fill:#fff4e6,stroke:#ff9900
+  style top fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== Two Pulumi natures: RESOURCES (the graph) vs OUTPUTS (top-level exports)
+
+* *Resources* — the graph nodes carrying identity + the `dependsOn` edge. Produced by `store`.
+* *Outputs* — the top-level `ctx.export(name, value)` the commissioner reads. They are a PROJECTION of the
+  resources (the former `OutputBuilder` merely republished the resources' URNs/summaries flat). The cellar
+  already files as outputs-OF-a-resource, *bypassing* top-level `ctx.export` — the top-level is a READ FAÇADE,
+  never the append-only store.
+
+*The read façade stays HOST, carries no métier.* `ctx.export` is the twin of `Cellar.fetch`: the commissioner
+re-reads the façade of the stored cases. The façade is host (like the gRPC mount — the commissioner reads it),
+and holds NO decision — it lifts, it does not decide.
+
+=== The cellar consults the RunGate — two spaces: CONSERVED (`up`) vs PRE-RESERVE (`preview`)
+
+A harvest must not be LOST in dry-run — but preview must touch nothing conserved. The cellar reconciles this
+because it is a system tool: like every tool it consults the ambient `RunGate` and ADAPTS, so the scion holds
+ONE verb (`store(Parcel, harvest)`) and never chooses the mode.
+
+[cols="1,1,1",options="header"]
+|===
+| gate | Pulumi gesture | space
+| open (cultivating) | `stack.up()` | the CONSERVED state — the real resources, the history fold
+| closed (surveying) | `stack.preview()` | the PRE-RESERVE — the plan of what WOULD be produced this run
+|===
+
+This is NOT "fabricate a fake harvest" (the lexicon's red line): `preview()` mutates nothing and invents no
+green — it is the REAL tool computing the plan honestly, which IS the act of surveying (lexicon: *the gardener
+plans without cultivating, nothing is touched*). So a dry-run does not lose the harvest: it lands in the
+pre-reserve (the plan), rendered PENDING in the runbook via E9; a live run folds it into the conserved state.
+
+*The pre-reserve is EPHEMERAL — the plan of THIS run, never an inter-run history.* A preview plan conserved and
+re-read next run would be exactly the cache-that-can-lie the model forbids; `pulumi preview` is ephemeral by
+nature (no `--save-plan`), so this holds. The RunGate decision lives IN the cellar (the `PulumiCellar` reads the
+ambient gate and routes `up`/`preview`) — the twin of every other tool consulting the gate, not a new
+orchestrator.
+
+*Why the runbook alone does not carry the harvest (the trap avoided).* jGiven's `ReportModel` captures STEP
+ARGUMENTS (the `@Quoted` values), NOT the `@ProvidedScenarioState`/`@ExpectedScenarioState` — so a scion's
+harvest held in scenario state is NOT recoverable from the runbook. The runbook carries the narration/plan
+(steps, PENDING, quoted counts), the cellar carries the data (conserved or pre-reserved). Two channels, two
+destinations — never conflate "the plan is in the runbook" with "the data is in the runbook".
+
+=== The `dependsOn` edge is CAUSAL — the amendment graph, not the runbook position
+
+The persisted Pulumi DAG must mirror real causality, not narration order. The edge is read from the AMENDMENT
+graph (amont): if the host amended scion incus WITH the image scion's harvest, then `incus.resource dependsOn
+image.resource` falls out of that. NOT from the scion declaring "I depend on systemd" (that would re-couple the
+scion to sibling soils — forbidden), and NOT merely from the step's position in the runbook tree (that reads a
+POSITION, not a CAUSE). The runbook nesting and the amendment graph converge, but the amendment graph is the
+correct source.
+
+=== The scion — not the façade — decides what has output value
+
+Who knows a harvest field is worth surfacing? The SCION, never the host façade (a façade that "picks the
+fingerprint" would re-take métier knowledge host-side — forbidden). The scion marks its harvest by the neutral
+role it already uses: `@Scion(Role.FRUIT)` = conservable value, `@Scion(Role.SOWING)` = internal expectations.
+The split files each part in its case; the host façade then MECHANICALLY lifts whatever is marked `FRUIT`,
+knowing nothing of its meaning (it never names `seedImageFingerprint`). Sovereignty: *the scion decides the
+value, the host executes the projection.*
+
+*Granularity (current vs planned).* Today the marked grain is the WHOLE FRUIT part — the fruit case becomes one
+output (`stack output <domain>.fruit` → the JSON blob), reusing the existing role, inventing no split
+vocabulary. A FINER grain — the scion marking WHICH fields are flat top-level scalars (recovering
+`seedImageFingerprint = "abc123"` as a named string) — enriches the split vocabulary (a `flat` facet or a
+dedicated role) and is a PLANNED EVOLUTION, expected to land during the top-down migration when a concrete
+`stack output X` flat-scalar need appears. Not deferred-and-forgotten: the migration WILL hit it.
 
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild

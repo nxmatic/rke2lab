@@ -93,7 +93,7 @@ FR-EN reserve it draws from.
 | racine | root | (réserve)
 | tubercule | tuber | (réserve)
 | feuillage | foliage | (réserve)
-| fruit | fruit | **un stade** — une partie récoltée que le commanditaire conserve
+| fruit | fruit | **un stade** — une partie récoltée que le commanditaire conserve. C'est le SCION qui décide ce qui a de la valeur en le marquant `@Scion(Role.FRUIT)` ; sur la réalisation Pulumi, le fruit rangé (`Cellar.store`) DEVIENT la resource/output, et la façade host le hisse mécaniquement, sans nommer le champ métier (§ host-cellar-realisation, every-scion-contributes)
 |===
 
 == Travaux au jardin
