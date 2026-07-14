@@ -13,6 +13,7 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -34,10 +35,14 @@ import org.jspecify.annotations.Nullable;
  * It holds nothing but sealed {@link SeedEnvelope}s addressed by a {@link Parcel}; it never names a
  * doctor type and never opens a payload.
  *
- * <p><b>store</b> — files a sealed envelope append-only: an out-of-run {@code up()} registers an
- * inert component resource carrying the payload under an output whose NAME is the envelope's
- * coordinate slug (the shelf label). A stable resource name per coordinate makes each append a new
- * history entry (the fold), not a churned resource.
+ * <p><b>store</b> — files a sealed envelope append-only, its mode routed by the injected {@link
+ * RunGate} (the cellar consults the gate, the scion never picks the mode — its {@code store} is one
+ * neutral verb): cultivating → an out-of-run {@code up()} CONSERVES it, registering an inert
+ * component resource carrying the payload under an output whose NAME is the envelope's coordinate
+ * slug (the shelf label); a stable resource name per coordinate makes each append a new history
+ * entry (the fold), not a churned resource. Surveying → a {@code preview()} PRE-RESERVES it: the
+ * plan is computed against the same inert program but the state is NOT touched (no history entry),
+ * so a dry-run neither loses the harvest nor lies it into the conserved timeline.
  *
  * <p><b>fetch</b> — collect-all-neutral (the capability-as-service model): it walks the parcel's
  * stack history and, for each entry, rebuilds one opaque {@link SeedEnvelope} per stored output,
@@ -65,15 +70,17 @@ public final class PulumiCellar implements Cellar {
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final Optional<Path> backendDir;
+  private final RunGate gate;
   private final Consumer<String> logger;
 
-  public PulumiCellar(Optional<Path> backendDir, Consumer<String> logger) {
+  public PulumiCellar(Optional<Path> backendDir, RunGate gate, Consumer<String> logger) {
     this.backendDir = backendDir;
+    this.gate = gate;
     this.logger = logger;
   }
 
-  public static PulumiCellar fromEnvironment(Consumer<String> logger) {
-    return new PulumiCellar(backendDirFromUrl(System.getenv(BACKEND_URL_ENV)), logger);
+  public static PulumiCellar fromEnvironment(RunGate gate, Consumer<String> logger) {
+    return new PulumiCellar(backendDirFromUrl(System.getenv(BACKEND_URL_ENV)), gate, logger);
   }
 
   static Optional<Path> backendDirFromUrl(@Nullable String pulumiBackendUrl) {
@@ -122,7 +129,22 @@ public final class PulumiCellar implements Cellar {
     try (WorkspaceStack stack =
         LocalWorkspace.createOrSelectStack(
             parcel.project(), parcel.stack(), options.program(), options)) {
-      stack.up();
+      // The cellar consults the gate: cultivating conserves (up), surveying pre-reserves (preview —
+      // the plan is computed, the state left intact). preview() returns a change summary the caller
+      // has no channel for yet (store is void); the runbook narrates the plan, so we only log it.
+      if (gate.cultivating()) {
+        stack.up();
+      } else {
+        logger.accept(
+            "cellar pre-reserve (preview) for "
+                + parcel.project()
+                + "/"
+                + parcel.stack()
+                + " at "
+                + coordinate
+                + ": "
+                + stack.preview().changeSummary());
+      }
     } catch (Exception e) {
       throw new RuntimeException(
           "failed to store to parcel "

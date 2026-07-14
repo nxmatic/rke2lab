@@ -136,7 +136,7 @@ public class ClusterSeedScenario
       // lives BESIDE it as an ambient fact, never inside it (the doctor addresses N parcels).
       this.parcel = run.parcel();
       final Consumer<String> log = line -> {};
-      this.cellar = PulumiCellar.fromEnvironment(log);
+      this.cellar = PulumiCellar.fromEnvironment(runGate, log);
       gardening.connection().context().registerService(Cellar.class, cellar, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
       final BootedFramework framework =
