@@ -514,66 +514,82 @@ learns a payload's shape from the door instead of knowing it in advance.
 
 == The host tree the instance mounts — publish / validate / mount (design 2026-07-14)
 
-=== Diagram V — the host half: `host.staging.N` → `host.live` → `host.gc.N` + the contract in the cellar
+=== Diagram V — the host half: `host.staging.N` → `host.live` → `host.drift.N` + the two deltas + the contract in the cellar
 
 The scions conserve harvests at the cellar (Diagram R). The OTHER thing a run produces
 is the FILESYSTEM TREE the incus instance binds. Three FIXED places, a pipeline:
-`host.staging.N` (a run materialises here, rotation of 3) → `host.live` (the physical,
-stable bind-mount target, synced by `rsync -av --delete` from a staging) → `host.gc.N`
-(the rsync `--backup-dir`: what a sync evicts from live, rotation of 3). The `main` FS
-mechanism (staging/gc rotation, rsync into the physical `host.live`) is KEPT; what the
-scion/cellar idiom adds is WHERE the contract + validation live, not a replacement of the
-rsync. R1 (never lose what a live instance mounts) holds because rsync syncs CONTENT while
-preserving the mount DIRECTORIES (present in every replica, so `--delete` never removes
-them). ONE host-manifest for the whole collection LIVES AT THE CELLAR (one entry per
-replica): staging entries carry the CONTRACT (checksums + provenance, immutable), the
-`host.live` entry references the `host.staging.{SN}` it mirrors (the ONLY mutable entry),
-each `host.gc.{GN}` references the staging it evicted (frozen until recycled). Because the
-manifest lives at the append-only cellar, the timeline of live promotions is FREE (each live
-mutation is a new store → a new history version); preview-vs-promoted is DEDUCED (a staging
-live never adopted). And because each staging entry carries CHECKSUMS, the cellar DESCRIBES
-the FS in full without holding a byte — authority over the FS state while pure storage of
-facets: validation is FS-vs-checksums, drift is detectable, R2 is a checksum diff between
-manifest versions, a lost replica re-materialises from its description + the SOIL synthesis.
+`host.staging.N` (a run materialises here, rotation of 3, also carries its `change`) →
+`host.live` (the physical, stable bind-mount target, synced from a staging by `jsync`) →
+`host.drift.N` (NOT a `--backup-dir` of bytes — the DRIFT REPORT `host.live ↔ staging.{live.syncedFrom}`
+measured before the sync, rotation of 3). The `main` FS mechanism (staging rotation, a
+`--delete` sync into the physical `host.live`) is KEPT; what CHANGES is that the sync is
+`jsync` (pure-Java, no `rsync` binary) and `main`'s `gc` becomes the drift report. R1 (never
+lose what a live instance mounts) holds because the sync moves CONTENT while preserving the
+mount DIRECTORIES (present in every replica, so `--delete` never removes them). ONE
+host-manifest for the whole collection LIVES AT THE CELLAR (one entry per replica): staging
+entries carry the CONTRACT (checksums + provenance + `change`, immutable), the `host.live`
+entry references the `host.staging.{SN}` it mirrors (the ONLY mutable entry), each
+`host.drift.{DN}` references the staging the live had drifted from (its `live.syncedFrom`, frozen until
+recycled). Because the manifest lives at the append-only cellar, the timeline of live
+promotions is FREE (each live mutation is a new store → a new history version);
+preview-vs-promoted is DEDUCED (a staging live never adopted). And because each staging entry
+carries CHECKSUMS, the cellar DESCRIBES the FS in full without holding a byte — authority over
+the FS state while pure storage of facets.
+
+TWO deltas, both pivoting on `staging.{live.syncedFrom}` (the staging the live mirrors, read
+from the `host.live` entry — NOT the arithmetic N-1, since interleaved previews produce
+stagings the live never adopted; the common reference — OBSERVE before ACT): `change` =
+`staging.N ↔ staging.{live.syncedFrom}` (the run's INTENDED change, computed ALWAYS — in
+preview it IS the value report, travels in `host.staging.N`); `drift` = `host.live ↔
+staging.{live.syncedFrom}` (the live's out-of-band DEVIATION, computed LIVE ONLY before the
+sync — the one delta no staging captures, is `host.drift.N`). `java-diff-utils`
+OBSERVES (walks both trees → per-file ADDED/REMOVED/MODIFIED + line-level unified diff for
+text; each delta IS a `ReportModel`, adoc+json, dogfooding I5); `jsync` (`setDelete(true)`)
+ACTS (the sync). Rollback re-syncs the immutable staging — never an inverse patch, never the
+evicted bytes — which is why drift is a REPORT, not a byte backup. The `live.syncedFrom` slot
+is PINNED out of the rotation while the live reflects it, so the pivot TREE is always present
+for both deltas (the FS face of R1). `jsync` + `java-diff-utils` are HOST-classpath deps (the
+GROW is Shape C, not in-container) — no `*-wrap`, no bundle.
 
 [mermaid]
 ....
 flowchart TB
   subgraph fs["FILESYSTEM (bytes, never in the cellar)"]
-    stg["host.staging.N (immutable, rotation 3)<br/>rke2-manifests.d · k8s-daemonset.d · systemd.d<br/>+ cloud-config + env-overlay + runbook.adoc/json"]
-    live["host.live (physical, stable bind target)<br/>faithful mirror of a staging via rsync -av --delete"]
-    gc["host.gc.N (rotation 3)<br/>rsync --backup-dir: the evicted delta<br/>manifest → host.staging.{SN} it evicted (frozen until GN recycled)"]
+    stg["host.staging.N (immutable, rotation 3 — the live.syncedFrom slot is PINNED)<br/>rke2-manifests.d · k8s-daemonset.d · systemd.d<br/>+ cloud-config + env-overlay + runbook.adoc/json + change"]
+    live["host.live (physical, stable bind target)<br/>intended mirror of a staging via jsync --delete (can DRIFT)"]
+    drift["host.drift.N (rotation 3)<br/>the DRIFT REPORT: delta(host.live, staging.{live.syncedFrom})<br/>manifest → the host.staging it drifted from (frozen until DN recycled)"]
   end
   subgraph cel["CELLIER (the CONTRACT, not the bytes)"]
-    hm["host-manifests<br/>staging: pointer + checksums + provenance<br/>live: syncedFrom host.staging.N"]
+    hm["host-manifests<br/>staging: pointer + checksums + provenance + change<br/>live: syncedFrom host.staging.N"]
   end
   scion["each SCION<br/>materialises its content (SOIL) + PUBLISHES host-manifest"]
   prep["incus PREP<br/>fetch contracts → VALIDATE staging vs checksums<br/>mismatch → doctor (CONTENT_MISMATCH, fork B)"]
-  grow["host GROW (Shape C)<br/>fetch → rsync staging → host.live (mount dirs preserved) → bind<br/>no re-validate"]
+  grow["host GROW (Shape C)<br/>fetch → measure drift → jsync staging → host.live (mount dirs preserved) → bind<br/>no re-validate"]
   scion --> stg
   scion --> hm
   hm --> prep
   stg -. read/checksum .-> prep
   prep --> grow
-  stg -->|"rsync -av --delete (live only)"| live
-  live -->|"--backup-dir"| gc
+  live -->|"OBSERVE: delta(live, syncedFrom) (live only)"| drift
+  stg -->|"ACT: jsync --delete (live only)"| live
   live -. bind .-> grow
   classDef done fill:#dfd,stroke:#2a2;
   classDef todo fill:#fee,stroke:#a22,stroke-width:2px;
-  class scion,prep,grow,stg,hm,live,gc todo;
+  class scion,prep,grow,stg,hm,live,drift todo;
 ....
 
 Publish / validate / reconcile, no overlap: the producer PUBLISHES an availability
 (it knows only its morceau); the incus prep VALIDATES the whole the instance will
 mount (only it sees the ensemble) against the published checksums, catching a bad
-tree BEFORE the rsync on its already-wired doctor channel; the host grow RECONCILES
-(rsync the validated staging into the physical `host.live`, mount dirs preserved) and
+tree BEFORE the rsync on its already-wired doctor channel; the host grow OBSERVES
+(measures the drift into `host.drift.N` so nothing is overwritten blind) then ACTS
+(`jsync` the validated staging into the physical `host.live`, mount dirs preserved) and
 binds, never re-validating (that would leak metier host-side). The cellar carries a
 FACET (checksums + a path), never the files — fetch-not-push, the twin of
-`IncusHarvest.soil`. R2 (the compare cache) is the `host.staging.N` PLUS the `host.gc.N`
-eviction deltas, indexed by the host-manifests; the no-op check is a checksum diff, not a
+`IncusHarvest.soil`. R2 (the compare cache) is the `host.staging.N` PLUS the `host.drift.N`
+reports, indexed by the host-manifests; the no-op check is a checksum diff, not a
 re-read. Preview realises the same RunGate axis as the cellar `up`/`preview` (Diagram R):
-a preview materialises a `host.staging.N` but the gate does NOT fire the rsync — `host.live`
-untouched, and `live.syncedFrom` never names it (traceable from the cellar, no mode-dir on
-the FS). Full model:
+a preview materialises a `host.staging.N` and computes its `change`, but the gate does NOT
+fire the sync — `host.live` untouched, no `drift` measured, and `live.syncedFrom` never names
+it (traceable from the cellar, no mode-dir on the FS). Full model:
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec § The host tree the instance mounts].

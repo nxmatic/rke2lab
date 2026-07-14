@@ -399,38 +399,51 @@ and validation live (below), not a replacement of the rsync.
 
 Three FIXED filesystem places, a pipeline, not variable modes:
 
-  host.staging.N  →  host.live  →  host.gc.N
-    (produced)        (deployed)     (evicted delta)
+  host.staging.N  →  host.live  →  host.drift.N
+    (produced,        (deployed)     (drift measured at reconcile:
+     carries `change`)                live ↔ staging.{live.syncedFrom})
 
 * *`host.staging.N`* — where a run MATERIALISES its replica (the synthesis writes here). A bounded
   rotation over THREE increments (0/1/2); each `host.staging.N` is IMMUTABLE once written (the cache,
-  R2). The rotation recycles positions — a new run overwrites the oldest position with a fresh replica.
+  R2). The rotation recycles positions — a new run overwrites the oldest position with a fresh replica —
+  EXCEPT the slot the live currently mirrors (`live.syncedFrom`), which is PINNED out of the rotation as
+  long as the live reflects it. Pinning it guarantees the deltas' pivot TREE is always present (both
+  `change` and `drift` diff against `staging.{live.syncedFrom}`, and a line-level diff needs the actual
+  bytes, not just the manifest's checksum), and it is the FS face of R1 (never lose what the live
+  mounts). So the effective rotation may hold fewer than 3 free slots while a pinned staging waits.
+  It also CARRIES its `change` — the delta `staging.N ↔ staging.{live.syncedFrom}` (the run's INTENDED
+  change vs the staging the live currently mirrors), a report rendered beside the runbook (§ the two
+  deltas), computed whether the run is preview or live.
 * *`host.live`* — the PHYSICAL directory (not a symlink), the STABLE bind-mount target of the instance.
-  Singular (one mounted tree at a time). It is a FAITHFUL replica of the `host.staging.N` it was
-  `rsync -av --delete`d from — nothing writes into `host.live` except that rsync from a staging, so
-  every byte traces to an identified staging (immutable-as-mirror: a provenance guarantee, not a frozen
-  FS). At LIVE the chosen staging is rsynced in (content synced, mount dirs preserved — R1); at PREVIEW
+  Singular (one mounted tree at a time). It is INTENDED as a faithful replica of the `host.staging.N`
+  it was `rsync -av --delete`d from — but it can DRIFT: the live instance, a corruption, or a tampering
+  may modify files after the rsync, and that drift is written into NO staging (stagings are immutable).
+  At LIVE the chosen staging is rsynced in (content synced, mount dirs preserved — R1); at PREVIEW
   `host.live` is NOT touched (the RunGate closes the rsync, the twin of how it closes the cellar `up()`).
-* *`host.gc.N`* — the `--backup-dir` of the rsync: what a sync EVICTS from `host.live` (files
-  overwritten/deleted as live moves to its new staging) — the negative delta, bounded rotation of 3.
+* *`host.drift.N`* — NOT a `--backup-dir` of evicted bytes (the sync uses `jsync`, which has no
+  backup-dir, and the rollback never needs the evicted bytes — see below). It is the DRIFT REPORT: the
+  delta `host.live ↔ staging.{live.syncedFrom}` (the staging the live mirrored), measured BEFORE the
+  sync overwrites it — the live's out-of-band deviation, the one delta no staging captures. A bounded
+  rotation of 3 (the last 3 drift reports).
 
 *ONE manifest for the whole collection, living at the cellar.* There is a SINGLE host-manifest — the
-index of the replica collection, one entry per replica present on the FS (`staging.0/1/2`, `gc.0/1/2`,
+index of the replica collection, one entry per replica present on the FS (`staging.0/1/2`, `drift.0/1/2`,
 `live`), and it is CONSERVED AT THE CELLAR (a `Cellar.store`), not a file the host keeps on the side.
 Two natures of entry, both referencing a `host.staging.{SN}` (one kind of referent everywhere — never
 an invented live-identity):
 
-  host.staging.{SN}  → its CONTRACT: per-tree checksums + provenance   (IMMUTABLE once written)
-  host.live          → host.staging.{SN} it currently mirrors          (the ONLY mutable entry)
-  host.gc.{GN}       → host.staging.{SN} it evicted from live           (IMMUTABLE until GN recycled)
+  host.staging.{SN}  → its CONTRACT: checksums + provenance + `change` (delta vs syncedFrom)  (IMMUTABLE)
+  host.live          → host.staging.{SN} it currently mirrors                          (the ONLY mutable entry)
+  host.drift.{DN}    → host.staging.{SN} the live drifted from (the drift report)       (IMMUTABLE until DN recycled)
 
-The collection is almost entirely IMMUTABLE — the staging and gc entries never change once written
+The collection is almost entirely IMMUTABLE — the staging and drift entries never change once written
 (until their slot is recycled by the bounded rotation). The SOLE moving part is the `host.live` entry:
 it is overwritten `→ host.staging.{SN}` on each live provisioning. PREVIEW-vs-PROMOTED is DEDUCED from
 it (a staging is preview-only while `host.live` does not name it; promoted once it does — no flag, the
-relation is the reality). A `host.gc.{GN}` records the staging it EVICTED from live and stays frozen on
-it until the GN rotation recycles the slot; so over successive provisionings `host.live` moves and the
-gc entries stay fixed.
+relation is the reality). A `host.drift.{DN}` records the staging the live had drifted from (the
+`live.syncedFrom` it mirrored, against which the drift was measured) and stays frozen on it until the DN
+rotation recycles the slot; so over successive provisionings `host.live` moves and the drift entries stay
+fixed.
 
 *Because the manifest lives at the cellar, the history of live promotions is FREE.* The cellar is
 append-only, versioned by its stack history (`fetch` walks the timeline). Each mutation of the
@@ -447,8 +460,8 @@ staging whose bytes no longer match its checksums has been tampered with); compa
 a checksum diff between two manifest versions in the history, never a re-read of the FS; and a lost
 replica can be re-materialised from its description + the deterministic SOIL synthesis.
 
-R2: the cache is the collection of `host.staging.N` (the last 3 produced) PLUS the `host.gc.N` (the
-last 3 eviction deltas — the evolution history), INDEXED by the cellar's host-manifests. Comparing two
+R2: the cache is the collection of `host.staging.N` (the last 3 produced) PLUS the `host.drift.N` (the
+last 3 drift reports — the live-deviation history), INDEXED by the cellar's host-manifests. Comparing two
 versions is a diff of conserved CHECKSUMS, not a re-read of two arbres; the no-op check (was main's
 byte-for-byte replica-vs-`host/`) becomes a checksum diff.
 
@@ -458,10 +471,11 @@ logical manifest is the FOLD of the parcel's timeline at read. Two writers, neve
 
 * each *SCION* PUBLISHES its own staging entry — `store(parcel, {host.staging.{SN}, checksums,
   provenance})` — it knows only its own morceau (an availability).
-* the *HOST at grow* PROMOTES — and ONLY it, because promoting is `rsync staging → host.live`: once the
-  rsync SUCCEEDS, it appends ONE promotion envelope carrying both linked mutations `{host.live → SN,
-  host.gc.{GN} → SN_evicted}` (the switch is a single atomic fact). Stored only post-rsync-success, so
-  the manifest never lies about the FS.
+* the *HOST at grow* PROMOTES — and ONLY it, because promoting is `rsync staging → host.live`: BEFORE
+  the sync it measures the drift (`host.live ↔ staging.{live.syncedFrom}`) into `host.drift.{DN}`, then
+  once the sync SUCCEEDS it appends ONE promotion envelope carrying both linked mutations `{host.live →
+  SN, host.drift.{DN} → the prior syncedFrom}` (the switch is a single atomic fact). Stored only
+  post-sync-success, so the manifest never lies about the FS.
 
 Two reads, both derived from `fetch` (the whole timeline) — no new port verb, the cellar stays neutral
 at three verbs:
@@ -472,11 +486,13 @@ at three verbs:
 * the *TIMELINE* (all versions) — `fetch` verbatim, for R2 (comparing evolutions, the live-promotion
   history — free from the append-only store, § above).
 
-*What is new vs `main` (the FS mechanism is NOT).* The `rsync -av --delete` into a physical `host.live`,
-the staging/gc rotation — all kept from `main`. What the scion/cellar idiom ADDS: the CONTRACT moves to
-the cellar as host-manifests (not `main`'s slot ConfigMap), PUBLISHED by each scion, VALIDATED by the
-incus prep before the rsync. The manner of syncing bytes is `main`'s; the ownership of the contract and
-the validation is the new idiom.
+*What is new vs `main` (the FS mechanism is NOT).* The `--delete` sync into a physical `host.live`, the
+staging rotation — kept from `main`. What CHANGES: the sync is `jsync` (pure-Java, no `rsync` binary),
+and `main`'s `gc` (a `--backup-dir` of evicted bytes) becomes `host.drift.N`, a DRIFT REPORT (no bytes —
+the rollback re-syncs the immutable staging, never the evicted bytes). What the scion/cellar idiom ADDS:
+the CONTRACT moves to the cellar as host-manifests (not `main`'s slot ConfigMap), PUBLISHED by each scion,
+VALIDATED by the incus prep before the rsync. The ownership of the contract and the validation is the new
+idiom.
 
 *A slot's IDENTITY is its POSITION* (`host.staging.N`), NOT its content hash — so there is no "no-op for
 free by the name"; the no-op check stays an explicit checksum diff. The content hash lives INSIDE the
@@ -512,9 +528,12 @@ publish (the checksums at the cellar) SHIPS now; the incus-side re-check is buil
 read actually consumes it. This also keeps incus decoupled from manifests (no `manifests-core`/algo
 dependency) until the need is real — the FS access + `HostManifest` decode are wired only then.
 * *The host GROW reconciles then mounts already-validated content* (Shape C, `com.pulumi`): it fetches,
-  `rsync -av --delete`s the validated slot into the physical `host/` (mount dirs preserved — R1), and
-  binds `host/` into the instance. It does NOT re-validate — re-validating host-side would duplicate
-  metier logic outside the OSGi world (forbidden ownership leak); it trusts the prep.
+  MEASURES the drift (`host.live ↔ staging.{live.syncedFrom}` → `host.drift.{DN}`) so nothing is
+  overwritten blind,
+  then `jsync` (`setDelete(true)`) syncs the validated slot into the physical `host/` (mount dirs
+  preserved — R1), and binds `host/` into the instance. It does NOT re-validate — re-validating
+  host-side would duplicate metier logic outside the OSGi world (forbidden ownership leak); it trusts
+  the prep.
 
 *Filesystem access is not an obstacle (settled):* the incus scion runs in the SAME place as the host,
 over the same FS — reading/checksumming `host.N` from the scion is free. `BootstrapPaths` already
@@ -532,6 +551,70 @@ host tree instead of the cellar store — one axis, two realisations: the gate c
 as it closes the cellar `up()`. A preview is thus TRACEABLE from the cellar (a produced staging its
 host-manifest records, that live never adopted), with no mode-directory polluting the FS.
 
+=== The two deltas (java-diff-utils OBSERVES) + the sync (jsync ACTS) — I6
+
+The reconcile is TWO gestures with distinct roles: OBSERVE (compute the deltas, decide) then ACT (sync).
+Both pivot on `staging.{live.syncedFrom}` — the staging the live CURRENTLY MIRRORS, read from the
+`host.live` manifest entry — which is the common reference. It is NOT the arithmetic `N-1` (the previous
+slot): previews materialise a staging without promoting (§ Live vs preview), so a preview staging can sit
+at `N-1` while the live still mirrors an earlier promoted one. Comparing against the arithmetic
+predecessor would diff against a tree that never touched the live — a false report. `live.syncedFrom` is
+already materialised in the cellar (no recompute), and deterministic under interleaved previews:
+
+* *`change` = `staging.N ↔ staging.{live.syncedFrom}`* — the run's INTENDED change (what THIS run decides
+  to change vs what is live). Computed ALWAYS (preview AND live), because both stagings are immutable
+  materialisations that exist regardless of the gate. In preview it IS the value report: "here is what
+  this run would change." It travels inside `host.staging.N` (beside the runbook, I5), a facet of the
+  staging entry.
+* *`drift` = `host.live ↔ staging.{live.syncedFrom}`* — the live's out-of-band DEVIATION (what the live
+  instance / corruption / tampering modified since the last sync). Computed LIVE ONLY, before the sync —
+  in preview `host.live` is not touched, so there is nothing to reconcile and no drift to measure. It is
+  `host.drift.N`.
+
+Pivoting BOTH on `live.syncedFrom` is what keeps them PURE: the live was synced FROM that staging, so
+`live ↔ syncedFrom` is drift alone; N and `syncedFrom` are two immutable stagings, so `N ↔ syncedFrom` is
+intended change alone. Comparing the live to N (the new staging) instead would BLEND the two.
+
+*Why compute `drift` at all — the live can drift, and a blind `--delete` would erase it unseen.* The
+drift is the one delta NO staging captures (stagings are immutable; the live's deviation is written
+nowhere else). Measuring it BEFORE the sync lets the grow decide (preserve / report / alert) rather
+than overwrite blind. We do NOT restore the drift (it is an anomaly, not a desired state); the rollback
+"go back" is simply re-syncing a still-present immutable staging (any slot in the rotation) — never
+applying an inverse patch, never the evicted bytes. That is why `host.drift.N` is a REPORT, not a
+`--backup-dir` of bytes.
+
+*The tooling — two bricks, matched to the two roles:*
+
+* *OBSERVE — `java-diff-utils` (`io.github.java-diff-utils:java-diff-utils:4.17`).* A pure-Java tree
+  walk (`Files.walk` → `Map<relPath, {size, mtime, hash}>`) yields the per-file status
+  `ADDED / REMOVED / MODIFIED`; for a MODIFIED TEXT file (the `host/` tree is chiefly generated
+  YAML/JSON/adoc) java-diff-utils produces the line-level unified diff. The tree walk pairs + statuses;
+  java-diff-utils only diffs INSIDE a text file. Dogfooding: each delta IS a `ReportModel`, rendered
+  `json` (runtime) + `adoc` (operator), exactly like the runbook (`RunbookRenderer`, I5).
+* *ACT — `jsync` (`com.fizzed:jsync-engine:1.5.0`, Apache-2.0, JDK 8→25).* After the deltas are computed
+  and (live) the gate is open, `jsync` with `setDelete(true)` / `setForce(true)` syncs
+  `host.staging.N → host.live`. Diff-based, so R1 holds naturally: a mount directory present on both
+  sides is never destroyed, only its content is synced (to be VERIFIED by a test before trusting live
+  mounts). No `rsync` binary on the host; testable/mockable (the instance-passing discipline).
+
+*Packaging — no wrap, no aggregator (YAGNI).* The GROW runs HOST-side (Shape C, `com.pulumi`, in
+seed-master/pulumi-edge), a FLAT classpath where a bare MANIFEST is harmless — so both libs are direct
+Maven deps of the host module, not OSGi bundles: `jsync-engine` ships without a BSN (a nu manifest) but
+never needs one host-side; `java-diff-utils` DOES carry a BSN (`io.github.java-diff-utils` + exports), so
+it is already a first-class bundle IF the OBSERVE ever moves in-container. Neither needs a `*-wrap`
+module. (The victools/BSN closure trap that bit I2 is an IN-CONTAINER concern; it does not apply on the
+host classpath.) Folding the existing `jgiven-wrap` / `victools-wrap` under an `osgi/wrap/` aggregator is
+a separate tidy-up, deferred until a third genuine OSGi wrap appears.
+
+*Rejected (why not):* Apache VFS is a file-ACCESS layer, not a reconciler (one would rewrite the whole
+diff/delete over it); Ant `SyncTask` does delete + `<preserveintarget>` but drags Ant as a runtime dep
+and wants `Project`/`Task` piloting — heavy inside a jGiven `Stage`; a reversible binary patch (jbsdiff)
+is moot — rollback is a re-sync of the immutable staging, and the reconcile is LOCAL (no bytes-on-the-wire
+gain a delta patch would buy).
+
+*First run (no `live.syncedFrom` yet):* `change` is all-ADDED (vs the empty tree), and there is no
+`drift` (no prior live to deviate) — uniform, no special case.
+
 === The runbook `json` has a RUNTIME role INSIDE the node (not only operator narration)
 
 R3 says a replica slot MAY carry the run's narration; the `json` rendering is more than a consultable
@@ -540,10 +623,11 @@ mounted content changes (R1: we rsync fresh content into `host/`, we do not rebo
 must be reconciled by REFRESHING the affected services in the node (a targeted reload/restart), not a
 reboot. The runbook `json` is what tells WHICH: it carries the mapping *changed content → services
 to refresh*. It pairs exactly with the content validation: the incus prep validates THAT the content
-is conform; the runbook `json` says WHAT to do when it changed — the checksum diff (new `host.N` vs
-the previous) names the changed files, and the runbook maps those to the services to reload. So the
-`json` travels inside `host.N` for the node's own refresh logic, while the `adoc` is the operator's
-read. (Concrete shape — the change→service map, who consumes it in the node — is downstream work.)
+is conform; the runbook `json` says WHAT to do when it changed — and the files it names are exactly the
+`change` delta (`staging.N ↔ staging.{live.syncedFrom}`, § the two deltas), which the runbook maps to the services to
+reload. So the `json` travels inside `host.N` for the node's own refresh logic, while the `adoc` is the
+operator's read. (Concrete shape — the change→service map, who consumes it in the node — is downstream
+work.)
 
 *Dogfooding — ONE model, two renderings.* Both artefacts ARE the run's jGiven `ReportModel`: the
 `adoc` is `AsciiDocReportGenerator` over the model (the operator narration); the `json` is
@@ -565,11 +649,12 @@ letting load-bearing facts hide in unrendered state.
 * Does incus AGGREGATE every scion's host-manifest, or validate only the manifests arbre it mounts
   (the instance mounts chiefly the synthesis tree)?
 * `host.N` naming — RESOLVED (2026-07-14): three FIXED places `host.staging.N` / `host.live` /
-  `host.gc.N` (a pipeline, not variable modes), `<N>` a bounded 3-slot rotation; position identifies,
+  `host.drift.N` (a pipeline, not variable modes), `<N>` a bounded 3-slot rotation; position identifies,
   the content hash lives in the host-manifest as a comparison discriminant (not a key). preview-vs-
-  promoted is DEDUCED from the `host.live → host.staging.{SN}` entry; each `host.gc.{GN}` entry
-  references the `host.staging.{SN}` it evicted from live (one kind of referent everywhere), frozen
-  until GN rotation. See the model paragraph above.
+  promoted is DEDUCED from the `host.live → host.staging.{SN}` entry; each `host.drift.{DN}` entry
+  references the `host.staging.{SN}` the live had drifted from (the `live.syncedFrom` it mirrored), frozen
+  until DN rotation. `main`'s `gc` (`--backup-dir` of evicted bytes) is RENAMED `host.drift.N` and
+  REPURPOSED as the drift REPORT — see § the two deltas. See the model paragraph above.
 * The runbook `adoc`/`json` — a file INSIDE each `host.N` (travels with it, immutable), the natural home
   once this model lands (this is where H2-bis — "render the runbook" — folds in).
 * The SOIL wiring — CONNECTED host→incus→manifests (2026-07-14, I2). The host fills the incus SOIL
@@ -581,6 +666,15 @@ letting load-bearing facts hide in unrendered state.
   `host.staging.N/rke2-manifests.d` — a temp dir only when the SOIL is blank (a bare survey). The
   intermediate `manifests.yaml` sits a level ABOVE the synthesis root (sibling of `rke2-manifests.d`),
   outside the checksummed/mounted subtree.
+* The GROW / reconcile (I6, NOT yet built) — DESIGNED (2026-07-14): the two deltas (`change`, `drift`)
+  pivot on `staging.{live.syncedFrom}` (NOT arithmetic N-1), OBSERVED by `java-diff-utils` (rendered
+  `ReportModel`, dogfooding I5) then the sync ACTED by `jsync` (`setDelete(true)`), host-side (Shape C).
+  See § *The two deltas*. Impacts to land at I6: (a) `HostSlotSelector`'s `(max+1)%3` must SKIP the
+  pinned `live.syncedFrom` slot (the rotation protects the live's pivot tree, § the model); (b) `jsync`
+  + `java-diff-utils` are direct HOST-classpath deps (no `*-wrap`, no OSGi bundle — the GROW is not
+  in-container); (c) R1 preservation (a mount dir survives `setDelete(true)`) must be proven by a test
+  before trusting live mounts; (d) the promotion envelope `{host.live → SN, host.drift.{DN} → prior
+  syncedFrom}` is appended ONLY post-sync-success.
 
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild

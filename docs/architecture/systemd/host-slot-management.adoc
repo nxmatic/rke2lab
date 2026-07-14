@@ -5,23 +5,27 @@
 [NOTE]
 ====
 *Status (2026-07-14): the FS mechanism is KEPT; the scion/cellar idiom adds WHERE the contract +
-validation live.* This document describes the `main` host-tree mechanism, which STANDS, re-named to the
-final vocabulary: three FIXED places `host.staging.N` (a run materialises here, rotation of 3) →
-`host.live` (the PHYSICAL, stable bind-mount target, synced by `rsync -av --delete` from a staging) →
-`host.gc.N` (the rsync `--backup-dir`: the evicted delta, rotation of 3). (The layout diagram below
-still shows `main`'s original names — `host/`, `host.staging.N`, `host.backup.N` — read `host/` as
-`host.live` and `host.backup.N` as `host.gc.N`.) R1 (never lose what a live instance mounts) holds
-because rsync syncs CONTENT while preserving the mount DIRECTORIES — present in every replica, so
-`--delete` never removes them; at preview `host.live` is left untouched. What the scion/cellar idiom
-ADDS on top (not a replacement): the CONTRACT moves to the cellar as host-manifests instead of `main`'s
-slot ConfigMap, PUBLISHED by each scion and VALIDATED by the incus prep BEFORE the rsync. The manifest
-is ONE document living at the cellar (entries per replica, folded at read): `host.live → host.staging.{SN}`
-is the sole mutable entry (preview-vs-promoted deduced from it), each `host.gc.{GN} → host.staging.{SN}`
-references the staging it evicted (frozen until recycled). A slot's identity is its POSITION, not a
-content hash (the hash lives in the host-manifest as a comparison discriminant). See
+validation live, and the sync + gc CHANGE.* This document describes the `main` host-tree mechanism,
+which STANDS in its rotation shape, re-named to the final vocabulary: three FIXED places
+`host.staging.N` (a run materialises here, rotation of 3) → `host.live` (the PHYSICAL, stable
+bind-mount target, synced from a staging by `jsync` — pure-Java, `setDelete(true)`, no `rsync` binary) →
+`host.drift.N` (NOT a `--backup-dir` of bytes — the DRIFT REPORT `delta(host.live, staging.{live.syncedFrom})` measured
+before the sync, rotation of 3). (The layout diagram below still shows `main`'s original names — `host/`,
+`host.staging.N`, `host.backup.N` — read `host/` as `host.live` and `host.backup.N` as `host.drift.N`.)
+R1 (never lose what a live instance mounts) holds because the sync moves CONTENT while preserving the
+mount DIRECTORIES — present in every replica, so `--delete` never removes them; at preview `host.live` is
+left untouched. What the scion/cellar idiom ADDS on top (not a replacement): the CONTRACT moves to the
+cellar as host-manifests instead of `main`'s slot ConfigMap, PUBLISHED by each scion and VALIDATED by the
+incus prep BEFORE the sync. The manifest is ONE document living at the cellar (entries per replica,
+folded at read): `host.live → host.staging.{SN}` is the sole mutable entry (preview-vs-promoted deduced
+from it), each `host.drift.{DN} → host.staging.{SN}` references the staging the live drifted from (the
+its `live.syncedFrom`, frozen until recycled). The `change` delta (`staging.N ↔ staging.{live.syncedFrom}`)
+travels in the staging. A
+slot's identity is its POSITION, not a content hash (the hash lives in the host-manifest as a comparison
+discriminant). See
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec §
-The host tree the instance mounts] for the added contract/validation layer; the rotation + rsync
-described below stand.
+The host tree the instance mounts] for the added contract/validation layer + the two deltas (jsync ACTS,
+java-diff-utils OBSERVES); the rotation described below stands.
 ====
 
 == Overview
