@@ -20,6 +20,7 @@ import io.nxmatic.rke2lab.seed.bdd.CellarStage;
 import io.nxmatic.rke2lab.seed.bdd.PreflightGate;
 import io.nxmatic.rke2lab.seed.bdd.PreflightStage;
 import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
+import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
@@ -35,6 +36,7 @@ import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The ClusterSeed root scenario — the host runbook, spoken in the gardening register, composed on
@@ -60,6 +62,17 @@ public class ClusterSeedScenario
     extends ScenarioTestBase<
         ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then>
     implements SeedReceiver<SeedRun> {
+
+  /**
+   * The inbound channel the driver ({@code Main}) seeds the {@link SeedRun} through and this
+   * scenario receives it from (§ the amorce). It is single-sourced here — the receiver owns the key
+   * + type — and referenced by {@code Main} for the seeding end. Registered as a {@link
+   * RegisterExtension} so its {@code TestInstancePostProcessor} fires before the test body reads
+   * {@link #run}; a field-based registration is needed because the channel carries constructor
+   * state (type + key) that {@code @ExtendWith} cannot supply.
+   */
+  @RegisterExtension
+  public static final SessionSeed<SeedRun> SEED = new SessionSeed<>(SeedRun.class, "seed-run");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 

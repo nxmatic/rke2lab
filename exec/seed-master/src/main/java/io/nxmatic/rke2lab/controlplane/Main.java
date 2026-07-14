@@ -9,7 +9,6 @@ import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
-import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import java.util.List;
 import org.junit.jupiter.engine.JupiterTestEngine;
@@ -30,9 +29,6 @@ import org.junit.platform.engine.discovery.DiscoverySelectors;
  * it can know and hands it across.
  */
 public final class Main {
-
-  /** The session-store channel carrying the run's facts from Main to the scenario's GIVEN. */
-  private static final SessionSeed<SeedRun> SEED = new SessionSeed<>(SeedRun.class, "seed-run");
 
   private Main() {}
 
@@ -60,7 +56,7 @@ public final class Main {
                       launcher.execute(request);
                       return Boolean.TRUE;
                     },
-                    SEED.into(run));
+                    ClusterSeedScenario.SEED.into(run));
             // Render the runbook (adoc + json) into the run's staging slot AFTER the play, from the
             // model the scenario stashed — the two-channel rule: the runbook is narration,
             // materialised
