@@ -454,6 +454,21 @@ the previous) names the changed files, and the runbook maps those to the service
 `json` travels inside `host.N` for the node's own refresh logic, while the `adoc` is the operator's
 read. (Concrete shape — the change→service map, who consumes it in the node — is downstream work.)
 
+*Dogfooding — ONE model, two renderings.* Both artefacts ARE the run's jGiven `ReportModel`: the
+`adoc` is `AsciiDocReportGenerator` over the model (the operator narration); the `json` is
+`ScenarioJsonWriter(model)` — the model's raw serialisation, the SAME format the scions already cross
+the realm boundary with today, round-tripped by `ScenarioJsonReader`. The `json` runbook is therefore
+NOT a bespoke artefact — it is the `ReportModel` itself, so the node reads it with machinery we
+already have. This is the dogfooding: the jGiven model serves as narration AND as runtime artifact.
+
+*The hard consequence.* A `ReportModel` captures only the `@Quoted` STEP ARGUMENTS (+ step names and
+statuses), NOT `@ProvidedScenarioState`/`@ExpectedScenarioState` (§ the two channels — the runbook is
+narration, the cellar is data). So for the node to read WHAT to refresh out of the `json`, that fact
+must be NARRATED — exposed as a `@Quoted` step argument, not held in scenario state. A scion touching
+content must SAY so in its step (e.g. "… refreshing `foo.service`"), so the affected service survives
+into the serialised model. Healthy pressure: it forces the narration to be complete rather than
+letting load-bearing facts hide in unrendered state.
+
 === Still open (to resolve when this lands)
 
 * Does incus AGGREGATE every scion's host-manifest, or validate only the manifests arbre it mounts
