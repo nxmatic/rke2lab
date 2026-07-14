@@ -19,11 +19,14 @@ import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
+import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
@@ -39,23 +42,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The incus provisioning checkpoint, a production jGiven scenario told in the INCUS DOMAIN's own
- * vocabulary — it PREPARES the instance's material: the seed image built through {@link ImageBuilder}
- * and the manifests tree cultivated by consulting the manifests scion through the broker, no
- * host/Pulumi type. It does NOT make the instance grow nor probe its reachability: creating the
- * instance is the {@code com.pulumi} graph, which stays HOST (Shape C — the scion asks the host to
- * grow it through the broker), and verifying reachability is the responsibility of whoever grows it
- * (the host, post-push). Played IN-CONTAINER by the engine so the runbook shows a real node of the
- * OSGi world; it lives in {@code incus-bdd} (only the {@code incus-contract} seam, no {@code
- * incus-core} — the heavy Pulumi-bound provisioning stays host-side), not a {@code -test} fragment
- * (it is live seeding logic).
+ * vocabulary — it PREPARES the instance's material: the seed image built through {@link
+ * ImageBuilder} and the manifests tree cultivated by consulting the manifests scion through the
+ * broker, no host/Pulumi type. It does NOT make the instance grow nor probe its reachability:
+ * creating the instance is the {@code com.pulumi} graph, which stays HOST (Shape C — the scion asks
+ * the host to grow it through the broker), and verifying reachability is the responsibility of
+ * whoever grows it (the host, post-push). Played IN-CONTAINER by the engine so the runbook shows a
+ * real node of the OSGi world; it lives in {@code incus-bdd} (only the {@code incus-contract} seam,
+ * no {@code incus-core} — the heavy Pulumi-bound provisioning stays host-side), not a {@code -test}
+ * fragment (it is live seeding logic).
  *
  * <p>The bbox/systemd/cluster twin: it resolves its collaborators from its OWN bundle's registry
  * ({@link ScenarioRegistry}) — the {@link ImageBuilder}, the {@link
- * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (to consult manifests), the ambient {@link RunGate}
- * (whose {@link RunGate#cultivating() cultivating} decides build-for-real vs plan-only), and, on a
- * failure, the doctor's {@link ConsultingService}. The scenario is identical live and in test; only
- * who published the collaborators differs (the live {@code DistrobuilderImageBuilder} + the real
- * broker + the host's RunGate, or the mocks a test seeds).
+ * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (to consult manifests), the ambient {@link
+ * RunGate} (whose {@link RunGate#cultivating() cultivating} decides build-for-real vs plan-only),
+ * and, on a failure, the doctor's {@link ConsultingService}. The scenario is identical live and in
+ * test; only who published the collaborators differs (the live {@code DistrobuilderImageBuilder} +
+ * the real broker + the host's RunGate, or the mocks a test seeds).
  *
  * <p>Preview inertness — the SCION consults the RunGate: under a closed gate it does NOT build the
  * image nor consult manifests (the real edge would ssh/build), it records the plan and the step
@@ -127,7 +130,10 @@ public class IncusProvisionScenario
         .the_image_is_built()
         .and()
         .the_manifests_are_cultivated();
-    then().the_instance_is_prepared();
+    then()
+        .the_instance_is_prepared()
+        .and()
+        .the_prep_is_stored(imageBuilder, soil, resolveCellar(), resolveParcel());
     LAST_RUNBOOK.set(getScenario().getModel());
     LAST_CONSULTATIONS.set(consultOnFailure(observations));
   }
@@ -199,6 +205,28 @@ public class IncusProvisionScenario
     return require(
         SeedBroker.class,
         "no SeedBroker in the registry (the framework publishes DefaultSeedBroker; a test mocks it)");
+  }
+
+  /**
+   * Resolve the {@link Cellar} the host laid into the registry — the neutral furniture the scion
+   * stores its prep harvest at. Required: the host publishes it at the GIVEN, a test registers a
+   * mock (the twin of the bbox scion's resolve).
+   */
+  private Cellar resolveCellar() {
+    return require(
+        Cellar.class,
+        "no Cellar in the registry (the host lays it in at boot, a test registers a mock)");
+  }
+
+  /**
+   * Resolve the current {@link Parcel} — the one plot this run cultivates, published as an ambient
+   * fact beside the Cellar (the twin of the RunGate). The scion stores under it without ever
+   * computing the stack identity.
+   */
+  private Parcel resolveParcel() {
+    return require(
+        Parcel.class,
+        "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
   }
 
   private <T> T require(Class<T> type, String message) {
@@ -335,7 +363,31 @@ public class IncusProvisionScenario
    */
   public static class Then extends Stage<Then> {
 
+    private final SeedCodec codec = new SeedCodec();
+
     public Then the_instance_is_prepared() {
+      return self();
+    }
+
+    /**
+     * The scion harvests AND stores — the reversal made concrete (§ host-cellar-realisation,
+     * every-scion-contributes), the twin of the bbox scion's {@code the_harvest_is_stored}. It
+     * folds the prep INTENTION into an {@link IncusHarvest} — the {@link
+     * ImageBuilder#recipeDigest() recipe digest} (stable across a closed gate, the host's
+     * image-cache key) and the {@code soil} the manifests tree was cultivated under — and stores it
+     * at the {@code incus-prep} coordinate under the current {@link Parcel}. On the Pulumi
+     * realisation this store PRODUCES the incus-prep resource; the host FETCHES the harvest and
+     * grows the instance (Shape C). The store is unconditional: the cellar consults the RunGate
+     * itself to route conserve ({@code up}) vs pre-reserve ({@code preview}), so the scion never
+     * picks the mode.
+     */
+    public Then the_prep_is_stored(
+        @Hidden ImageBuilder imageBuilder,
+        @Hidden String soil,
+        @Hidden Cellar cellar,
+        @Hidden Parcel parcel) {
+      final IncusHarvest harvest = new IncusHarvest(imageBuilder.recipeDigest(), soil);
+      cellar.store(parcel, new SeedEnvelope("incus", "incus-prep", codec.encode(harvest)));
       return self();
     }
   }

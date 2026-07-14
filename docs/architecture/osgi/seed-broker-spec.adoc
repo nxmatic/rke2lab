@@ -327,7 +327,9 @@ metier scion→scion) holds a plot under role `soil` and sows `AmendCoordinate("
 in the manifests runbook handler (which receives an already-filled input). The scion input wire-records
 carry these amendments: `ManifestsRunbookInput` (its `@Amendment(SOIL) materializationRoot`),
 `IncusRunbookInput` (incus's own SOIL, forwarded to manifests). A scion's conserved harvest is a wire-record
-too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the scion harvests and stores).
+too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the scion harvests and stores) and
+`IncusHarvest` (the prep intention incus stores — the image recipe digest + the soil the tree was cultivated
+under — that the host fetches to grow the instance, Shape C).
 
 [[hateoas-the-plant-advertises]]
 === HATEOAS — the plant advertises what can be sown next (the second discovery idiom)

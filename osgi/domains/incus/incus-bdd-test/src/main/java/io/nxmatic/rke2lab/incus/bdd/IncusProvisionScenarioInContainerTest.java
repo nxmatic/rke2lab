@@ -16,6 +16,8 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
@@ -54,7 +56,8 @@ public class IncusProvisionScenarioInContainerTest {
   void a_live_prepare_builds_and_consults_manifests_green() throws Exception {
     // cultivating() true → the scion builds the image and consults manifests; the mocks succeed. It
     // does NOT probe reachability — the host makes the instance grow and verifies it (Shape C).
-    final String envelope = playWith(cultivatingGate(true), builds(), null);
+    final RecordingCellar cellar = new RecordingCellar();
+    final String envelope = playWith(cultivatingGate(true), builds(), null, cellar);
     final ReportModel runbook = rebuild(envelope);
 
     assertNotNull(runbook, "the front-door harvested the played model");
@@ -66,6 +69,17 @@ public class IncusProvisionScenarioInContainerTest {
     assertTrue(
         consultationsOf(envelope).isEmpty(),
         "a clean prepare raised no symptom, so consults no one");
+
+    // The reversal, proven: the SCION harvested AND stored its prep — one store under the current
+    // parcel, at the incus-prep coordinate, carrying the recipe digest + the soil the tree was
+    // cultivated under (the intention the host fetches to grow the instance, Shape C).
+    assertEquals(1, cellar.stored.size(), "the scion stored its prep harvest once");
+    final SeedEnvelope harvest = cellar.stored.get(0);
+    assertEquals("incus-prep", harvest.coordinate(), "stored at the incus-prep coordinate");
+    assertEquals(
+        "test-recipe",
+        CODEC.decode(harvest.payload()).path("recipeDigest").asText(),
+        "the harvest carries the image builder's recipe digest");
   }
 
   @Test
@@ -73,7 +87,7 @@ public class IncusProvisionScenarioInContainerTest {
     // cultivating() false → the scion builds NOTHING; the mock records whether it was called, and
     // must not have been.
     final RecordingImageBuilder builder = recordingBuilder();
-    final String envelope = playWith(cultivatingGate(false), builder, null);
+    final String envelope = playWith(cultivatingGate(false), builder, null, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.SUCCESS,
@@ -88,7 +102,8 @@ public class IncusProvisionScenarioInContainerTest {
     // A failed image build is a symptom; the scion resolves the doctor from its OWN registry and
     // consults — the consultation rides the envelope back (fork B).
     final RecordingDoctor doctor = new RecordingDoctor();
-    final String envelope = playWith(cultivatingGate(true), failsToBuild(), doctor);
+    final String envelope =
+        playWith(cultivatingGate(true), failsToBuild(), doctor, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.FAILED,
@@ -112,7 +127,8 @@ public class IncusProvisionScenarioInContainerTest {
    * through the front-door, and return its serialized envelope. Registrations are removed in the
    * {@code finally} so each test plays against exactly its own mocks.
    */
-  private static String playWith(RunGate gate, ImageBuilder builder, ConsultingService doctor)
+  private static String playWith(
+      RunGate gate, ImageBuilder builder, ConsultingService doctor, Cellar cellar)
       throws Exception {
     final BundleContext context = FrameworkUtil.getBundle(IncusBddTests.class).getBundleContext();
     final List<ServiceRegistration<?>> registrations = new ArrayList<>();
@@ -124,6 +140,11 @@ public class IncusProvisionScenarioInContainerTest {
     // recorder proves incus sowed amend THEN runbook toward manifests.
     registrations.add(
         context.registerService(SeedBroker.class, new RecordingBroker(), new Hashtable<>()));
+    // The two ambient facts the scion needs to store its own prep harvest — the host publishes them
+    // at the GIVEN in prod; here the passenger seeds a recording cellar and a fixed current parcel.
+    registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
+    registrations.add(
+        context.registerService(Parcel.class, new Parcel("bioskop", "dev"), new Hashtable<>()));
     if (doctor != null) {
       registrations.add(
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
@@ -249,6 +270,30 @@ public class IncusProvisionScenarioInContainerTest {
     public SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed) {
       sown.add(wanted);
       return seed;
+    }
+  }
+
+  /**
+   * A neutral cellar that records every {@code store} — the twin of the host's {@code PulumiCellar}
+   * for the test, minus the Pulumi backend. It proves the SCION reached the cellar and stored its
+   * own prep harvest; {@code fetch}/{@code neighbours} are unused on this path.
+   */
+  private static final class RecordingCellar implements Cellar {
+    final List<SeedEnvelope> stored = new ArrayList<>();
+
+    @Override
+    public void store(Parcel parcel, SeedEnvelope vegetal) {
+      stored.add(vegetal);
+    }
+
+    @Override
+    public List<SeedEnvelope> fetch(Parcel parcel) {
+      return List.of();
+    }
+
+    @Override
+    public List<Parcel> neighbours(Parcel parcel) {
+      return List.of(parcel);
     }
   }
 }
