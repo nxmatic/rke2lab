@@ -25,6 +25,10 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

@@ -10,6 +10,7 @@ import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
+import io.nxmatic.rke2lab.bbox.contract.BboxHarvest;
 import io.nxmatic.rke2lab.bbox.contract.BboxReconciler;
 import io.nxmatic.rke2lab.bbox.contract.BboxReservationRequest;
 import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
@@ -22,6 +23,8 @@ import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.net.URI;
@@ -100,7 +103,12 @@ public class BboxReconciliationScenario
         .and()
         .reconciled_through(contact, gate, outcomes);
     when().the_run_condition_is_read().and().the_reservations_are_reconciled_against_the_router();
-    then().every_row_has_an_outcome().and().no_failed_row_is_silently_dropped();
+    then()
+        .every_row_has_an_outcome()
+        .and()
+        .no_failed_row_is_silently_dropped()
+        .and()
+        .the_harvest_is_stored(resolveCellar(), resolveParcel());
     LAST_RUNBOOK.set(getScenario().getModel());
     LAST_CONSULTATIONS.set(consultOnRefusal(outcomes));
   }
@@ -180,6 +188,29 @@ public class BboxReconciliationScenario
   }
 
   /**
+   * Resolve the {@link Cellar} the host laid into the registry — the neutral furniture the scion
+   * stores its harvest at. Required: the host publishes it at the GIVEN, a test registers a mock.
+   */
+  private Cellar resolveCellar() {
+    return ScenarioRegistry.of(this)
+        .require(
+            Cellar.class,
+            "no Cellar in the registry (the host lays it in at boot, a test registers a mock)");
+  }
+
+  /**
+   * Resolve the current {@link Parcel} — the one plot this run cultivates, published as an ambient
+   * fact beside the Cellar (the twin of the RunGate). The scion stores under it without ever
+   * computing the stack identity.
+   */
+  private Parcel resolveParcel() {
+    return ScenarioRegistry.of(this)
+        .require(
+            Parcel.class,
+            "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
+  }
+
+  /**
    * Given: the desired reservations, the reconciler contact, the run gate, and the outcome sink.
    */
   public static class Given extends Stage<Given> {
@@ -241,6 +272,9 @@ public class BboxReconciliationScenario
 
     @ExpectedScenarioState int desiredCount;
     @ExpectedScenarioState List<BboxRowOutcome> outcomes;
+    @ExpectedScenarioState boolean dryRun;
+
+    private final SeedCodec codec = new SeedCodec();
 
     public Then every_row_has_an_outcome() {
       if (outcomes.size() != desiredCount) {
@@ -254,6 +288,20 @@ public class BboxReconciliationScenario
       if (failed > 0) {
         throw new AssertionError(failed + " reservation row(s) refused by the router");
       }
+      return self();
+    }
+
+    /**
+     * The scion harvests AND stores — the reversal made concrete (§ host-cellar-realisation,
+     * every-scion-contributes). It folds the outcomes into a {@link BboxHarvest} and stores it at
+     * the {@code bbox-reservations} coordinate under the current {@link Parcel}; on the Pulumi
+     * realisation this store PRODUCES the bbox resource. The scion holds ONE verb ({@code store}) —
+     * the cellar consults the RunGate itself to route conserve ({@code up}) vs pre-reserve ({@code
+     * preview}), so the scion never picks the mode.
+     */
+    public Then the_harvest_is_stored(@Hidden Cellar cellar, @Hidden Parcel parcel) {
+      final BboxHarvest harvest = BboxHarvest.of(dryRun, outcomes);
+      cellar.store(parcel, new SeedEnvelope("bbox", "bbox-reservations", codec.encode(harvest)));
       return self();
     }
   }

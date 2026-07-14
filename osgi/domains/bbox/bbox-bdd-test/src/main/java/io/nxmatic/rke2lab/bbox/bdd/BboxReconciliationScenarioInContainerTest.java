@@ -17,6 +17,8 @@ import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.File;
@@ -57,7 +59,8 @@ public class BboxReconciliationScenarioInContainerTest {
   @Test
   void a_live_run_reconciles_every_row_green() throws Exception {
     // cultivating() true → the scion asks for a live apply; the mock reconciler matches every row.
-    final String envelope = playWith(cultivatingGate(true), allMatching(), null);
+    final RecordingCellar cellar = new RecordingCellar();
+    final String envelope = playWith(cultivatingGate(true), allMatching(), null, cellar);
     final ReportModel runbook = rebuild(envelope);
 
     assertNotNull(runbook, "the front-door harvested the played model");
@@ -68,6 +71,20 @@ public class BboxReconciliationScenarioInContainerTest {
         "every desired row reconciled → the scenario plays green");
     assertTrue(
         consultationsOf(envelope).isEmpty(), "a healthy run refused no row, so it consults no one");
+
+    // The reversal, proven: the SCION harvested AND stored itself — one store under the current
+    // parcel, at the bbox-reservations coordinate, carrying the folded summary (12 MATCHING rows).
+    assertEquals(1, cellar.stored.size(), "the scion stored its harvest once");
+    final SeedEnvelope harvest = cellar.stored.get(0);
+    assertEquals(
+        "bbox-reservations", harvest.coordinate(), "stored at the bbox-reservations coordinate");
+    final JsonNode summary = CODEC.decode(harvest.payload());
+    assertEquals(
+        DESIRED_COUNT, summary.path("desiredCount").asInt(), "the summary counts every row");
+    assertEquals(
+        DESIRED_COUNT,
+        summary.path("matchingCount").asInt(),
+        "a live all-matching run: all matched");
   }
 
   @Test
@@ -76,7 +93,8 @@ public class BboxReconciliationScenarioInContainerTest {
     // with and returns WOULD_* outcomes (the router is never mutated). The recorder proves the
     // SCION consulted the gate (A2) and passed the dry-run down.
     final RecordingReconciler reconciler = wouldCreate();
-    final String envelope = playWith(cultivatingGate(false), reconciler, null);
+    final String envelope =
+        playWith(cultivatingGate(false), reconciler, null, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.SUCCESS,
@@ -93,7 +111,8 @@ public class BboxReconciliationScenarioInContainerTest {
     // A FAILED row is a symptom; the scion resolves the doctor from its OWN registry and consults —
     // the consultation rides the envelope back, the host no longer computes it (fork B).
     final RecordingDoctor doctor = new RecordingDoctor();
-    final String envelope = playWith(cultivatingGate(true), oneRefused(), doctor);
+    final String envelope =
+        playWith(cultivatingGate(true), oneRefused(), doctor, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.FAILED,
@@ -117,12 +136,18 @@ public class BboxReconciliationScenarioInContainerTest {
    * through the front-door, and return its serialized envelope. Registrations are removed in the
    * {@code finally} so each test plays against exactly its own mocks.
    */
-  private static String playWith(RunGate gate, BboxReconciler reconciler, ConsultingService doctor)
+  private static String playWith(
+      RunGate gate, BboxReconciler reconciler, ConsultingService doctor, Cellar cellar)
       throws Exception {
     final BundleContext context = FrameworkUtil.getBundle(BboxBddTests.class).getBundleContext();
     final List<ServiceRegistration<?>> registrations = new ArrayList<>();
     registrations.add(context.registerService(RunGate.class, gate, new Hashtable<>()));
     registrations.add(context.registerService(BboxReconciler.class, reconciler, new Hashtable<>()));
+    // The two ambient facts the scion needs to store its own harvest — the host publishes them at
+    // the GIVEN in prod; here the passenger seeds a recording cellar and a fixed current parcel.
+    registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
+    registrations.add(
+        context.registerService(Parcel.class, new Parcel("bioskop", "dev"), new Hashtable<>()));
     if (doctor != null) {
       registrations.add(
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
@@ -238,5 +263,29 @@ public class BboxReconciliationScenarioInContainerTest {
 
     @Override
     public void reviewDrift() {}
+  }
+
+  /**
+   * A neutral cellar that records every {@code store} — the twin of the host's {@code PulumiCellar}
+   * for the test, minus the Pulumi backend. It proves the SCION reached the cellar and stored its
+   * own harvest; {@code fetch}/{@code neighbours} are unused on this path.
+   */
+  private static final class RecordingCellar implements Cellar {
+    final List<SeedEnvelope> stored = new ArrayList<>();
+
+    @Override
+    public void store(Parcel parcel, SeedEnvelope vegetal) {
+      stored.add(vegetal);
+    }
+
+    @Override
+    public List<SeedEnvelope> fetch(Parcel parcel) {
+      return List.of();
+    }
+
+    @Override
+    public List<Parcel> neighbours(Parcel parcel) {
+      return List.of(parcel);
+    }
   }
 }
