@@ -619,6 +619,52 @@ gain a delta patch would buy).
 *First run (no `live.syncedFrom` yet):* `change` is all-ADDED (vs the empty tree), and there is no
 `drift` (no prior live to deviate) — uniform, no special case.
 
+=== CORRECTION (2026-07-14): the host-tree belongs to INCUS, and its CRUD is OSGi-side — NOT host-flat
+
+The publish/validate/mount split above (and the "two reads, two writers" § earlier) said the HOST at
+grow reads the head and writes `HostLiveEntry`/`HostDriftEntry`, with `HostTreeHead` folding the
+timeline *host-side*. Playing the first preview PROVED that wrong: `HostTreeHead` lived flat in
+`seed-master` and decoded `HostStagingEntry`/`HostLiveEntry`/`HostDriftEntry` — types in
+`manifests-contract`, a `type=contract` bundle (staged, NOT flat). A flat class touching a bundle-only
+contract type is a REALM leak; at runtime it is a `NoClassDefFoundError`. It is the SAME anti-pattern
+as the pre-existing `EntryGatePolicyEnforcer → ManifestUpdateGate` leak — host-flat code reading a
+domain's typed contract.
+
+*Who OWNS the host tree — incus, not manifests.* The first reflex was to give the host-tree CRUD to
+manifests (that is where `Host*Entry` sat). WRONG. The HOST TREE (`host.N.staging.d` entire —
+`rke2-manifests.d` + `k8s-daemonset.d` + `systemd.d` + cloud-config + env-overlay …) is what the INCUS
+INSTANCE MOUNTS. incus owns the mount, picks the rotation slot, triggers the grow, measures the drift
+of the WHOLE tree; `rke2-manifests.d` is just ONE folder among many — manifests CONTRIBUTES content,
+it does not own the tree. This is the same reasoning already stated on the validate side ("only incus
+sees the WHOLE of what the instance will mount, so only it can validate global coherence"): the tree's
+CRUD/fold/rotation/drift is incus's, exactly as its validation is.
+
+*The correction (the CRUD moves OSGi-side, into incus).* The whole host-entry CRUD — publish the
+staging entry, fold the timeline into the head, choose the rotation slot (`HostSlotSelector`), compute
+the two deltas (`HostTreeDiffer`), promote (live + drift) — runs INSIDE the OSGi world, in incus, never
+host-flat. incus already TRIGGERS the grow (it consults manifests under the SOIL, harvests and stores
+its prep OSGi-side) and already runs over the same FS as the host, so reading/checksumming `host.N`
+from the scion is free (§ *Filesystem access is not an obstacle*). The `Host*Entry` records move to
+`incus-contract` (host-tree vocabulary is incus's; incus already carries its own contract) — leaving
+`manifests-contract` to the synthesis vocabulary alone, and no host-flat reader to leak. manifests
+keeps its role: materialise CONTENT into the SOIL subfolder incus hands it.
+
+*The shape — dedicated incus scenarios, not one overflowing flow.* The host-entry lifecycle is CRUD
+over the host tree incus owns. Rather than swell `IncusProvisionScenario`, incus carries DEDICATED
+scenarios for the host-tree CRUD/fold, contributed through the same multi-scenario front-door pattern
+(`IncusBddScenarios` selects a scenario; a domain hosts N scenarios exactly as doctor does), triggered
+at the grow.
+
+*What this deletes.* `HostTreeHead`, `HostSlotSelector`, `HostTreeDiffer`, `HostTreeDelta`,
+`HostTreeDeltaRenderer` in `seed-master` (host-flat, the I6a/b/c code) — moved into the incus domain
+OSGi-side. The host keeps ONLY the Pulumi bind (mount `host.live.d` into the instance, I6e) — no domain
+vocabulary crosses to the flat realm. The REALM_BOUNDARY gate (fixed the same day to see
+`type=contract`, not only `type=domain`) now WARNs on every such leak, so the migration has a ratchet:
+the leak count must go to zero, then the gate rises to ERROR.
+
+Everywhere ABOVE that says "`HostTreeHead` (host-side)" or "the host … reads the head / promotes /
+writes the drift" is superseded by this: read OSGi-side (an incus scenario), the tree being incus's.
+
 === The runbook `json` has a RUNTIME role INSIDE the node (not only operator narration)
 
 R3 says a replica slot MAY carry the run's narration; the `json` rendering is more than a consultable

@@ -593,3 +593,19 @@ a preview materialises a `host.N.staging.d` and computes its `change`, but the g
 fire the sync — `host.live.d` untouched, no `drift` measured, and `live.syncedFrom` never names
 it (traceable from the cellar, no mode-dir on the FS). Full model:
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec § The host tree the instance mounts].
+
+CAUTION: *CORRECTION (2026-07-14) — the host tree belongs to INCUS, and the "host GROW" box is
+OSGi-side, not host-flat.* The first preview proved the host-entry CRUD cannot sit in a host-flat
+reader: `HostTreeHead` (flat, in `seed-master`) decoded `Host*Entry` from `manifests-contract` (a
+`type=contract`, bundle-only bundle) — a realm leak that is a `NoClassDefFoundError` at runtime, the
+same anti-pattern as `EntryGatePolicyEnforcer → ManifestUpdateGate`. And the OWNER is incus, not
+manifests: the host tree (`host.N.staging.d` entire) is what the INCUS INSTANCE MOUNTS — incus picks
+the slot, triggers the grow, measures the drift of the WHOLE tree; `rke2-manifests.d` is just one
+folder in it (manifests CONTRIBUTES content, does not own the tree — the same reason only incus can
+VALIDATE the ensemble). So the whole CRUD (publish · fold the head · pick the slot · the two deltas ·
+promote) moves INSIDE the OSGi world as DEDICATED INCUS scenarios (`IncusBddScenarios`, a domain hosts
+N scenarios like doctor), and `Host*Entry` move to `incus-contract`. manifests keeps materialising
+content into the SOIL incus hands it. The host keeps ONLY the Pulumi bind (mount `host.live.d`). The
+`grow` box above is thus an incus OSGi scenario, not a flat gesture; the REALM_BOUNDARY gate (fixed the
+same day to see `type=contract`) WARNs on every remaining leak as the migration ratchet. Full note:
+link:../osgi/host-cellar-realisation-spec.adoc[host-cellar-realisation-spec § CORRECTION (2026-07-14)].
