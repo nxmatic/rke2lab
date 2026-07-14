@@ -369,6 +369,89 @@ vocabulary. A FINER grain — the scion marking WHICH fields are flat top-level 
 dedicated role) and is a PLANNED EVOLUTION, expected to land during the top-down migration when a concrete
 `stack output X` flat-scalar need appears. Not deferred-and-forgotten: the migration WILL hit it.
 
+[[host-tree-provisioning]]
+== The host tree the instance mounts — publish / validate / mount (2026-07-14)
+
+The scions conserve harvests at the cellar (above). This section is the twin question on the OTHER
+matter a run produces: the FILESYSTEM TREE the incus instance mounts (the former `host/` — its
+`rke2-manifests.d` / `k8s-daemonset.d` / `systemd.d`, the cloud-config, the env-overlay). It is a
+DISTINCT concern from a conserved harvest — a harvest is a value in the cellar; this is bytes on the
+host filesystem the instance binds. The former host (`main`) solved it with an FS slot-rotation
+(`docs/architecture/systemd/host-slot-management.adoc` — scratch → `rsync -a --delete` → paired
+`host.backup.N`). That RESULT is kept; that MANNER is superseded here by the scion/cellar idiom.
+
+=== The invariants (the result, non-negotiable)
+
+* *R1 — never lose what a live instance mounts.* A live instance binds host paths; those paths are
+  IMMUTABLE for its lifetime. We never mutate a mounted directory (no in-place `rsync --delete`, no
+  Pulumi resource-replace that could delete-before-recreate a mounted dir).
+* *R2 — a cache of the produced host trees,* to compare and validate evolutions/corrections.
+* *R3 — a host tree IS the root that materialises the instance's assets* (and MAY later carry the
+  run's narration: the runbook rendered `adoc` for the operator, `json` for the runtime).
+* *R4 — at LIVE provisioning, reconcile the live tree with the one produced this run;* at PREVIEW,
+  show the plan, mutate nothing.
+
+=== The model — immutable `host.N` on the FS, the CONTRACT in the cellar
+
+R1 is resolved STRUCTURALLY, not by careful mutation: *each run materialises a NEW immutable
+`host.N`* on the filesystem (fresh content, never retouched). A live instance keeps its root path
+on ITS `host.N` for its lifetime — we never write into a mounted directory, we materialise a new one
+beside it. "Reconciliation" (R4) is therefore not a mutation but a SELECTION: which `host.N` becomes
+the mount source at the NEXT provisioning; the running instance stays on its `N` until a new instance
+is grown against a new `N`.
+
+The cellar does NOT hold the tree's bytes (certain — a cellar never holds host-tree content). It
+holds the CONTRACT: a *host-manifest* — the pointer to `host.N`, the per-tree checksums, the
+provenance (which seed/run produced it). This obeys fetch-not-push exactly (§ *a harvest is fetched*):
+the cellar carries a FACET (checksums + a path), never the cultivated files. It is the twin of
+`IncusHarvest.soil` — a pointer, not the arbre.
+
+R2 falls out for free: the cache of produced trees is the collection of `host.N` on the FS, INDEXED
+by the cellar's host-manifests. Comparing two versions is a diff of conserved CHECKSUMS, not a re-read
+of two arbres; the no-op check (was main's byte-for-byte scratch-vs-`host/`) becomes a checksum diff.
+
+=== Publish (each scion) vs VALIDATE (incus prep) vs mount (host grow)
+
+The three roles do not overlap:
+
+* *Each scion PUBLISHES what it makes available* — it materialises its own content under the SOIL and
+  stores its host-manifest (pointer + checksums) at the cellar. It publishes an availability; it
+  validates nothing beyond its own morceau (it only knows its own).
+* *The incus PREP VALIDATES the content made available to the instance.* incus is already the prep
+  (it consults manifests, assembles what the instance mounts) — validating that content is the natural
+  conclusion of preparing, and only incus sees the WHOLE of what the instance will mount, so only it
+  can validate global coherence. It fetches the published host-manifests and confronts the FS `host.N`
+  against the published checksums. A mismatch (corruption, partial write, an interrupted run) is caught
+  BEFORE the mount, not discovered inside the instance — it becomes a symptom on incus's already-wired
+  doctor channel (the `IMAGE_BUILD_FAILED` twin — a `CONTENT_MISMATCH` kind), fork B.
+* *The host GROW mounts already-validated content* (Shape C, `com.pulumi`): it fetches, sets the device
+  source to the selected `host.N`, and grows. It does NOT re-validate — re-validating host-side would
+  duplicate metier logic outside the OSGi world (forbidden ownership leak); it trusts the prep.
+
+*Filesystem access is not an obstacle (settled):* the incus scion runs in the SAME place as the host,
+over the same FS — reading/checksumming `host.N` from the scion is free. `BootstrapPaths` already
+offers place-dependent VIEWS (host / node) and new views can be added, so resolving `host.N` is a view,
+not new plumbing.
+
+=== Live vs preview
+
+Preview needs no second directory: a preview run MATERIALISES its `host.N` and its host-manifest but
+does NOT select it as a mount source — it produces and shows the plan, it does not grow. This is the
+same RunGate axis as the cellar's `up`/`preview` (§ *the cellar consults the RunGate*), realised on the
+host tree instead of the cellar store — one axis, two realisations. (The `main` design's `host.preview`
+scratch dir is not needed; the preview `host.N` simply goes unselected.)
+
+=== Still open (to resolve when this lands)
+
+* Does incus AGGREGATE every scion's host-manifest, or validate only the manifests arbre it mounts
+  (the instance mounts chiefly the synthesis tree)?
+* `host.N` naming — `host.<tree-hash>` makes the name the identity (two identical runs → same `N` →
+  no-op for free), the leading candidate.
+* The runbook `adoc`/`json` — a file INSIDE each `host.N` (travels with it, immutable), the natural home
+  once this model lands (this is where H2-bis — "render the runbook" — folds in).
+* The SOIL wiring is not yet connected in production (synthesis writes a temp dir today, not
+  `assetsRoot`/`host.N`); connecting it is part of this work.
+
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild
 

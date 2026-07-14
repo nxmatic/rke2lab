@@ -511,3 +511,50 @@ build — foundation (`ShapeCoordinate` in the `permits`, a `RecordSchemaProject
 over victools-wrapped) + domain (a `@SeedContract("runbook")` input wire-record,
 the typed home of the config facet). It is the a-priori-coupling eraser: a sower
 learns a payload's shape from the door instead of knowing it in advance.
+
+== The host tree the instance mounts — publish / validate / mount (design 2026-07-14)
+
+=== Diagram V — the host half: immutable `host.N` + the contract in the cellar
+
+The scions conserve harvests at the cellar (Diagram R). The OTHER thing a run
+produces is the FILESYSTEM TREE the incus instance binds (the former `host/`). The
+`main` era rotated it in place (`rsync -a --delete` + `host.backup.N`); the RESULT is
+kept, the MANNER superseded by the scion/cellar idiom. R1 (never lose what a live
+instance mounts) is structural: a live instance keeps its `host.N`, immutable for its
+lifetime; a run materialises a NEW `host.N` beside it, never mutates a mounted dir —
+so "reconciliation" is SELECTION of the mount source at the next grow, not mutation.
+
+[mermaid]
+....
+flowchart TB
+  subgraph fs["FILESYSTEM (bytes, never in the cellar)"]
+    hn["host.N (immutable)<br/>rke2-manifests.d · k8s-daemonset.d · systemd.d<br/>+ cloud-config + env-overlay + runbook.adoc/json"]
+  end
+  subgraph cel["CELLIER (the CONTRACT, not the bytes)"]
+    hm["host-manifest<br/>pointer→host.N + checksums + provenance"]
+  end
+  scion["each SCION<br/>materialises its content (SOIL) + PUBLISHES host-manifest"]
+  prep["incus PREP<br/>fetch contracts → VALIDATE host.N vs checksums<br/>mismatch → doctor (CONTENT_MISMATCH, fork B)"]
+  grow["host GROW (Shape C)<br/>fetch → set device source = host.N → up<br/>mounts already-validated content (no re-validate)"]
+  scion --> hn
+  scion --> hm
+  hm --> prep
+  hn -. read/checksum .-> prep
+  prep --> grow
+  hn -. bind .-> grow
+  classDef done fill:#dfd,stroke:#2a2;
+  classDef todo fill:#fee,stroke:#a22,stroke-width:2px;
+  class scion,prep,grow,hn,hm todo;
+....
+
+Publish / validate / mount, no overlap: the producer PUBLISHES an availability
+(it knows only its morceau); the incus prep VALIDATES the whole the instance will
+mount (only it sees the ensemble) against the published checksums, catching a bad
+tree BEFORE the mount on its already-wired doctor channel; the host grow MOUNTS
+already-validated content and never re-validates (that would leak metier host-side).
+The cellar carries a FACET (checksums + a path), never the files — fetch-not-push,
+the twin of `IncusHarvest.soil`. R2 (the compare cache) is the collection of `host.N`
+indexed by the host-manifests; the no-op check is a checksum diff, not a re-read.
+Preview realises the same RunGate axis as the cellar `up`/`preview` (Diagram R): a
+preview run materialises its `host.N` but leaves it UNSELECTED — produced, planned,
+not grown. Full model: link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec § The host tree the instance mounts].
