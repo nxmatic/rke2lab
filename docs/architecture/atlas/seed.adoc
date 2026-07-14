@@ -514,12 +514,15 @@ learns a payload's shape from the door instead of knowing it in advance.
 
 == The host tree the instance mounts — publish / validate / mount (design 2026-07-14)
 
-=== Diagram V — the host half: immutable `host.N` + the contract in the cellar
+=== Diagram V — the host half: immutable `host.<mode>.<N>` + the contract in the cellar
 
 The scions conserve harvests at the cellar (Diagram R). The OTHER thing a run
 produces is the FILESYSTEM TREE the incus instance binds (the former `host/`). The
-`main` era rotated it in place (`rsync -a --delete` + `host.backup.N`); the RESULT is
-kept, the MANNER superseded by the scion/cellar idiom. R1 (never lose what a live
+`main` era rotated it in place (`rsync -a --delete` + `host.backup.N`); the RESULT and
+the `host.<mode>.<N>` naming (a bounded 3-slot rotation) are kept, the sync MANNER
+superseded by the scion/cellar idiom. `host.N` below is shorthand for a `host.<mode>.<N>`
+slot; a slot's identity is its POSITION, not a content hash (the hash lives in the
+host-manifest as a comparison discriminant). R1 (never lose what a live
 instance mounts) is structural: a live instance keeps its `host.N`, immutable for its
 lifetime; a run materialises a NEW `host.N` beside it, never mutates a mounted dir —
 so "reconciliation" is SELECTION of the mount source at the next grow, not mutation.

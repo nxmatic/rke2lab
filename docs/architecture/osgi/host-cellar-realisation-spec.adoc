@@ -410,6 +410,19 @@ R2 falls out for free: the cache of produced trees is the collection of `host.N`
 by the cellar's host-manifests. Comparing two versions is a diff of conserved CHECKSUMS, not a re-read
 of two arbres; the no-op check (was main's byte-for-byte scratch-vs-`host/`) becomes a checksum diff.
 
+*Naming and rotation — inherited from `main`, not the content-hash.* A `host.N` is named by the
+PATTERN `host.<mode>.<N>` (the layout `main` used: the live current tree is plain `host/`; the others
+carry a mode — `staging`, `backup`, `preview` — and a sequence `N`). `<N>` is a bounded rotation over
+THREE increments (0/1/2) — so the cache R2 is not unbounded, it slides: three rolling slots per mode.
+Each `host.<mode>.<N>` is individually IMMUTABLE (R1 holds — we never rewrite a slot in place); the
+rotation only recycles the SLOTS, it never mutates a live-mounted one. What is kept from `main` is
+therefore the NAMING + the bounded 3-slot rotation (the sliding cache); what is dropped is the manner
+(`rsync -a --delete` in place). A slot's IDENTITY is its POSITION (`host.<mode>.<N>`), NOT its content
+hash — so there is no "no-op for free by the name"; the no-op check stays an explicit checksum diff.
+The content hash lives INSIDE the host-manifest (a comparison discriminant, correspondence hash→slot
+possible) but is NOT a key: the same hash may map to SEVERAL slots (identical content re-materialised
+across the rotation), so the hash discriminates, the position identifies.
+
 === Publish (each scion) vs VALIDATE (incus prep) vs mount (host grow)
 
 The three roles do not overlap:
@@ -473,8 +486,9 @@ letting load-bearing facts hide in unrendered state.
 
 * Does incus AGGREGATE every scion's host-manifest, or validate only the manifests arbre it mounts
   (the instance mounts chiefly the synthesis tree)?
-* `host.N` naming — `host.<tree-hash>` makes the name the identity (two identical runs → same `N` →
-  no-op for free), the leading candidate.
+* `host.N` naming — RESOLVED (2026-07-14): the `main` pattern `host.<mode>.<N>`, `<N>` a bounded
+  3-slot rotation; position identifies, the content hash lives in the host-manifest as a comparison
+  discriminant (not a key — a hash may map to several slots). See the naming paragraph above.
 * The runbook `adoc`/`json` — a file INSIDE each `host.N` (travels with it, immutable), the natural home
   once this model lands (this is where H2-bis — "render the runbook" — folds in).
 * The SOIL wiring is not yet connected in production (synthesis writes a temp dir today, not

@@ -4,16 +4,19 @@
 
 [NOTE]
 ====
-*Status (2026-07-14): the RESULT is kept, this MANNER is superseded.* This document describes the
-former host (`main`) mechanism — an FS slot-rotation (scratch → `rsync -a --delete` → paired
-`host.backup.N`, byte-for-byte no-op detection, a slot ConfigMap). The invariants it served (never
-lose what a live instance mounts; a cache of produced trees to compare; audit/provenance) are
-retained, but the mechanism is re-thought in the scion/cellar idiom: immutable `host.N` trees on the
-FS + a CONTRACT (host-manifest: pointer + checksums + provenance) conserved at the cellar, published
-by each scion, VALIDATED by the incus prep, mounted by the host grow. See
+*Status (2026-07-14): the RESULT + the NAMING/rotation are kept, only the sync MANNER is superseded.*
+This document describes the former host (`main`) mechanism — an FS slot-rotation (scratch →
+`rsync -a --delete` → paired `host.backup.N`, byte-for-byte no-op detection, a slot ConfigMap). What
+is RETAINED: the invariants (never lose what a live instance mounts; a cache of produced trees to
+compare; audit/provenance) AND the `host.<mode>.<N>` naming with a bounded 3-slot rotation (the
+sliding cache). What is SUPERSEDED: the manner — no `rsync -a --delete` in place; instead immutable
+`host.<mode>.<N>` trees on the FS + a CONTRACT (host-manifest: pointer + checksums + provenance)
+conserved at the cellar, published by each scion, VALIDATED by the incus prep, mounted by the host
+grow. A slot's identity is its POSITION, not a content hash (the hash lives in the host-manifest as a
+comparison discriminant). See
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec §
-The host tree the instance mounts]. This file is kept as the reference for the invariants and the
-"avant"; do not implement the rsync rotation as described here.
+The host tree the instance mounts]. This file is kept as the reference for the invariants, the naming,
+and the "avant"; do not implement the rsync-in-place rotation as described here.
 ====
 
 == Overview
