@@ -21,6 +21,7 @@ import io.nxmatic.rke2lab.seed.bdd.PreflightStage;
 import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.util.Hashtable;
@@ -118,21 +119,28 @@ public class ClusterSeedScenario
               run.config().localWorktreePath(),
               run.config().clusterName(),
               run.config().nodeName());
-      // Publish the ambient RunGate the scions resolve — projected from the run mode.
-      // registerService,
+      // Publish the ambient RunGate the scions resolve — projected from the run mode. registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).
       final RunGate runGate = run.runMode()::playsLive;
       gardening.connection().context().registerService(RunGate.class, runGate, new Hashtable<>());
 
+      // The two ambient facts a scion needs to STORE its own harvest (§ host-cellar-realisation,
+      // every-scion-contributes): the Cellar (the neutral furniture the host lays into Felix) and the
+      // current Parcel (the one plot this run cultivates). Both published like the RunGate — a scion
+      // resolves them via ScenarioRegistry.require and stores itself; the host never round-trips a
+      // harvest back to re-store it. The Cellar stays NEUTRAL (store(Parcel, …)); the current parcel
+      // lives BESIDE it as an ambient fact, never inside it (the doctor addresses N parcels).
+      this.parcel = run.parcel();
       final Consumer<String> log = line -> {};
       this.cellar = PulumiCellar.fromEnvironment(log);
+      gardening.connection().context().registerService(Cellar.class, cellar, new Hashtable<>());
+      gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
       final BootedFramework framework =
           BootedFramework.attached(gardening.connection().framework());
       this.preflightGate =
           () ->
               EntryGatePolicyEnforcer.enforceAll(
                   run.config().localWorktreePath(), run.cleanWorktreeRequired(), framework);
-      this.parcel = run.parcel();
       return self();
     }
   }

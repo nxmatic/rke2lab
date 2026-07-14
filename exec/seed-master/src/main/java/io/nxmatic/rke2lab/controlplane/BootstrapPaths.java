@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.controlplane;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig.WorktreeHost;
 import java.nio.file.Path;
+import java.util.Objects;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * The provisioning topology of the control node — every root the bootstrap materialises into,
@@ -107,7 +109,12 @@ public record BootstrapPaths(
         .scriptsRoot(scriptsRoot)
         .systemdLibexecRoot(systemdLibexecRoot)
         .systemdRoot(systemdRoot)
-        .gitRoot(worktreeRoot.getParent().getParent())
+        .gitRoot(
+            Objects.requireNonNull(
+                Objects.requireNonNull(
+                        worktreeRoot.getParent(), "worktree has no parent: " + worktreeRoot)
+                    .getParent(),
+                "worktree has no grandparent (git root): " + worktreeRoot))
         .shareRoot(stateRoot.resolve("share"))
         .kubeconfigRoot(clusterRoot)
         .cloudSeedRoot(nodeRoot.resolve("cloud.d"))
@@ -163,23 +170,25 @@ public record BootstrapPaths(
   }
 
   private static final class Builder {
-    private Path worktreeRoot;
-    private Path stateRoot;
-    private Path clusterNodeRoot;
-    private Path manifestsRoot;
-    private Path runtimeRke2ConfigRoot;
-    private Path runtimeCloudConfigRoot;
-    private Path runtimeEnvConfigRoot;
-    private Path secretsFile;
-    private Path assetsRoot;
-    private Path daemonsetRoot;
-    private Path scriptsRoot;
-    private Path systemdLibexecRoot;
-    private Path systemdRoot;
-    private Path gitRoot;
-    private Path shareRoot;
-    private Path kubeconfigRoot;
-    private Path cloudSeedRoot;
+    // Set-once by the fluent setters, all read together in build(); monotone, never re-nulled — the
+    // builder is fully populated by fromLocalWorktree / asHostView / asStagingView before build().
+    @MonotonicNonNull private Path worktreeRoot;
+    @MonotonicNonNull private Path stateRoot;
+    @MonotonicNonNull private Path clusterNodeRoot;
+    @MonotonicNonNull private Path manifestsRoot;
+    @MonotonicNonNull private Path runtimeRke2ConfigRoot;
+    @MonotonicNonNull private Path runtimeCloudConfigRoot;
+    @MonotonicNonNull private Path runtimeEnvConfigRoot;
+    @MonotonicNonNull private Path secretsFile;
+    @MonotonicNonNull private Path assetsRoot;
+    @MonotonicNonNull private Path daemonsetRoot;
+    @MonotonicNonNull private Path scriptsRoot;
+    @MonotonicNonNull private Path systemdLibexecRoot;
+    @MonotonicNonNull private Path systemdRoot;
+    @MonotonicNonNull private Path gitRoot;
+    @MonotonicNonNull private Path shareRoot;
+    @MonotonicNonNull private Path kubeconfigRoot;
+    @MonotonicNonNull private Path cloudSeedRoot;
 
     private Builder worktreeRoot(Path value) {
       this.worktreeRoot = value;
@@ -267,24 +276,28 @@ public record BootstrapPaths(
     }
 
     private BootstrapPaths build() {
+      // The factories (fromLocalWorktree / asHostView / asStagingView) set every root before
+      // build();
+      // requireNonNull affirms the monotone→non-null transition NullAway cannot prove across
+      // setters.
       return new BootstrapPaths(
-          worktreeRoot,
-          stateRoot,
-          clusterNodeRoot,
-          manifestsRoot,
-          runtimeRke2ConfigRoot,
-          runtimeCloudConfigRoot,
-          runtimeEnvConfigRoot,
-          secretsFile,
-          assetsRoot,
-          daemonsetRoot,
-          scriptsRoot,
-          systemdLibexecRoot,
-          systemdRoot,
-          gitRoot,
-          shareRoot,
-          kubeconfigRoot,
-          cloudSeedRoot);
+          Objects.requireNonNull(worktreeRoot),
+          Objects.requireNonNull(stateRoot),
+          Objects.requireNonNull(clusterNodeRoot),
+          Objects.requireNonNull(manifestsRoot),
+          Objects.requireNonNull(runtimeRke2ConfigRoot),
+          Objects.requireNonNull(runtimeCloudConfigRoot),
+          Objects.requireNonNull(runtimeEnvConfigRoot),
+          Objects.requireNonNull(secretsFile),
+          Objects.requireNonNull(assetsRoot),
+          Objects.requireNonNull(daemonsetRoot),
+          Objects.requireNonNull(scriptsRoot),
+          Objects.requireNonNull(systemdLibexecRoot),
+          Objects.requireNonNull(systemdRoot),
+          Objects.requireNonNull(gitRoot),
+          Objects.requireNonNull(shareRoot),
+          Objects.requireNonNull(kubeconfigRoot),
+          Objects.requireNonNull(cloudSeedRoot));
     }
   }
 }
