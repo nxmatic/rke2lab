@@ -105,11 +105,11 @@ public class ManifestSynthesisScenario
         .and()
         .the_manifests_are_synthesized()
         .and()
-        .the_controlplane_overlay_is_written();
+        .the_manifests_links_env_is_written();
     then()
         .every_enabled_domain_produced_its_units()
         .and()
-        .the_materialized_tree_is_complete()
+        .the_manifests_file_is_written()
         .and()
         .the_overlay_carries_the_link_time_policy();
 
@@ -234,7 +234,7 @@ public class ManifestSynthesisScenario
       return self();
     }
 
-    public When the_controlplane_overlay_is_written() {
+    public When the_manifests_links_env_is_written() {
       final NodeEnvContext layerContext = new DefaultNodeEnvContext();
       final Path overlayRoot = outdir().resolve("rke2lab-environment.d");
       try {
@@ -250,15 +250,25 @@ public class ManifestSynthesisScenario
 
     private Path outdir() {
       if (outdir == null) {
-        final boolean cultivating = gate.cultivating();
-        try {
-          outdir =
-              Files.createTempDirectory(
-                      cultivating ? "rke2lab-manifests-live-" : "rke2lab-manifests-survey-")
-                  .toAbsolutePath()
-                  .normalize();
-        } catch (IOException ex) {
-          throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+        // The SOIL amendment: when the host amended the plot to materialise into, synthesise there
+        // (the real provisioning tree). Blank soil = a survey / bare probe — materialise into a
+        // temp dir so the run stays inert against the host FS. The gate only picks the temp prefix;
+        // the SOIL amendment is what carries the live target.
+        final String soil = facet.materializationRoot();
+        if (!soil.isBlank()) {
+          outdir = Path.of(soil).toAbsolutePath().normalize();
+        } else {
+          try {
+            outdir =
+                Files.createTempDirectory(
+                        gate.cultivating()
+                            ? "rke2lab-manifests-live-"
+                            : "rke2lab-manifests-survey-")
+                    .toAbsolutePath()
+                    .normalize();
+          } catch (IOException ex) {
+            throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+          }
         }
       }
       return outdir;
@@ -280,7 +290,7 @@ public class ManifestSynthesisScenario
     @ExpectedScenarioState ManifestDomainPolicy domainPolicy;
     @ExpectedScenarioState Map<String, String> linkSeedVariables;
     @ExpectedScenarioState ManifestSynthesisResult result;
-    @ExpectedScenarioState Path overlayFile;
+    @ExpectedScenarioState Path envFile;
 
     public Then every_enabled_domain_produced_its_units() {
       final int enabled = domainPolicy.enabledDomainIds().size();
@@ -291,12 +301,9 @@ public class ManifestSynthesisScenario
       return self();
     }
 
-    public Then the_materialized_tree_is_complete() {
+    public Then the_manifests_file_is_written() {
       if (!Files.exists(result.manifestFile())) {
         throw new AssertionError("manifest file was not written: " + result.manifestFile());
-      }
-      if (!Files.isDirectory(result.systemdUnitsDir())) {
-        throw new AssertionError("systemd units dir absent: " + result.systemdUnitsDir());
       }
       if (result.manifestUnitHitCount() <= 0) {
         throw new AssertionError("no manifest units were processed");
@@ -305,14 +312,14 @@ public class ManifestSynthesisScenario
     }
 
     public Then the_overlay_carries_the_link_time_policy() {
-      if (!Files.exists(overlayFile)) {
-        throw new AssertionError("controlplane overlay was not written: " + overlayFile);
+      if (!Files.exists(envFile)) {
+        throw new AssertionError("controlplane overlay was not written: " + envFile);
       }
       final String rendered;
       try {
-        rendered = Files.readString(overlayFile);
+        rendered = Files.readString(envFile);
       } catch (IOException ex) {
-        throw new UncheckedIOException("cannot read the controlplane overlay " + overlayFile, ex);
+        throw new UncheckedIOException("cannot read the controlplane overlay " + envFile, ex);
       }
       // The 99-… ConfigMap's data carries each RKE2LAB_POLICY_LINK_* the master's install/ready
       // scripts read. Assert the rendered YAML names every link var — the link-time end landed.

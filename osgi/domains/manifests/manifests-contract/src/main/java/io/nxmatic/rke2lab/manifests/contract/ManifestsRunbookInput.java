@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.manifests.contract;
 
+import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 
 /**
@@ -9,32 +10,43 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
  * broker door rather than compiling the class (see docs/architecture/osgi/seed-broker-spec.adoc §
  * introspection).
  *
- * <p>Its top-level components ARE the {@code rke2lab:policy:} concern keys of {@code
- * Pulumi.dev.yaml} — {@code link} and {@code debug} — and each nested record mirrors that concern's
- * yaml sub-map EXACTLY, nesting and all. This is the design constraint the config path rests on
- * (see docs/architecture/osgi/manifests-bdd-spec.adoc § the single path): the host (seed AND CLI)
- * plucks {@code policy.link} / {@code policy.debug} from the yaml VERBATIM — a blind subtree copy
- * guided by the schema's top-level names — so the pluck stays generic, naming no manifests
- * vocabulary. The schema matching the yaml is what makes the copy blind.
+ * <p>Its components carry two kinds of {@link Amendment}, distinguished by role — the amont mapping
+ * the schema alone cannot express (see seed-broker-spec § @Amendment):
  *
- * <p>Because the host only forwards subtrees, ALL the domain knowledge lives in the scion
- * (OSGi-side): it decodes this record (jackson coerces the yaml's string {@code "true"} to {@code
- * boolean}), flattens the nesting, and translates into its own vocabulary — {@link
- * ManifestDomainPolicy} (synth-time filter) + {@code FloxDebugPolicy} (per-layer debug) + the
- * {@code RKE2LAB_POLICY_LINK_*} link-time overlay, the projection {@code HostSlotManifest} used to
- * make host-side before the demolition orphaned it. The host names no {@code manifests.contract}
- * translation type.
+ * <ul>
+ *   <li>{@link Amendment#FACET} — {@link #link} and {@link #debug} ARE the {@code rke2lab:policy:}
+ *       concern keys of {@code Pulumi.dev.yaml}, each nested record mirroring that concern's yaml
+ *       sub-map EXACTLY. The host (seed AND CLI) plucks {@code policy.link} / {@code policy.debug}
+ *       VERBATIM — a blind subtree copy guided by the schema's names, naming no manifests
+ *       vocabulary. The schema matching the yaml is what makes the copy blind.
+ *   <li>{@link Amendment#SOIL} — {@link #materializationRoot} is NOT in the yaml: it is the plot
+ *       the scion materialises into, which only the host knows (it holds {@code BootstrapPaths}).
+ *       The host fills it by role — the SOIL amendment — from its provisioning state (the
+ *       staging-view {@code manifestsRoot}), never from a yaml key. Blank when unamended (a bare
+ *       {@code shape} probe, or a survey run) — the scion then materialises into a temp dir.
+ * </ul>
+ *
+ * <p>Because the host only forwards subtrees + fills amendments by role, ALL the domain knowledge
+ * lives in the scion (OSGi-side): it decodes this record (jackson coerces the yaml's string {@code
+ * "true"} to {@code boolean}), flattens the nesting, and translates into its own vocabulary —
+ * {@link ManifestDomainPolicy} (synth-time filter) + {@code FloxDebugPolicy} (per-layer debug) +
+ * the {@code RKE2LAB_POLICY_LINK_*} link-time env contributions. The host names no {@code
+ * manifests.contract} translation type.
  */
 @SeedContract("runbook")
-public record ManifestsRunbookInput(LinkFacet link, DebugFacet debug) {
+public record ManifestsRunbookInput(
+    @Amendment(Amendment.FACET) LinkFacet link,
+    @Amendment(Amendment.FACET) DebugFacet debug,
+    @Amendment(Amendment.SOIL) String materializationRoot) {
 
   /**
-   * The complete facet with every concern at its default — the operator's usual posture, debug off.
+   * The complete facet with every concern at its default — the operator's usual posture, debug off,
+   * and an UNAMENDED soil (blank {@code materializationRoot} → the scion surveys into a temp dir).
    * The seed a scion holds before a sow arrives (never a partial instance): every component is a
    * complete sub-facet, so no incomplete state ever exists.
    */
   public static ManifestsRunbookInput defaults() {
-    return new ManifestsRunbookInput(LinkFacet.defaults(), DebugFacet.disabled());
+    return new ManifestsRunbookInput(LinkFacet.defaults(), DebugFacet.disabled(), "");
   }
 
   /**
