@@ -7,7 +7,7 @@ import java.util.TreeMap;
 /**
  * The STAGING entry of the host-manifest family — one of the three natures the cellar folds into
  * the host tree's HEAD (see docs/architecture/osgi/host-cellar-realisation-spec.adoc § The host
- * tree the instance mounts). A scion PUBLISHES it for the {@code host.staging.N} replica it
+ * tree the instance mounts). A scion PUBLISHES it for the {@code host.N.staging.d} replica it
  * materialised: the CONTRACT of what that staging must contain. It carries only FACETS, never the
  * tree's bytes — the {@code stagingRoot} PATH it materialised into (the SOIL the host handed it —
  * the scion echoes the path it knows, it never parses a host slot name), the per-file {@code

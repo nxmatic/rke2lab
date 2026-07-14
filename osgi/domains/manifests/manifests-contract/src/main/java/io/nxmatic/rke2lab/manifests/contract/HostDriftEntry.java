@@ -7,8 +7,8 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
  * rollback re-syncs a still-present immutable staging, never the evicted bytes) but the record of a
  * DRIFT the live had accumulated before a sync overwrote it (see
  * docs/architecture/osgi/host-cellar-realisation-spec.adoc § The two deltas). The HOST writes it at
- * the grow (I6d), for a {@code host.drift.N} rotation position: {@code driftRoot} is the drift
- * REPORT's PATH on the FS (the {@code host.drift.N} tree carrying the {@code ReportModel},
+ * the grow (I6d), for a {@code host.N.drift} rotation position: {@code driftRoot} is the drift
+ * REPORT's PATH on the FS (the {@code host.N.drift} tree carrying the {@code ReportModel},
  * adoc+json), and {@code evictedSyncedFrom} names the staging PATH the live had drifted from (the
  * {@code live.syncedFrom} the sync replaced). IMMUTABLE until its slot is recycled by the bounded
  * rotation.

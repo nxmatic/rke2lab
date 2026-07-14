@@ -50,9 +50,11 @@ class HostTreeHeadTest {
     final HostTreeHead head =
         HostTreeHead.fold(
             List.of(
-                staging("/host.staging.0", "a"), live("/host.staging.0"), live("/host.staging.2")),
+                staging("/host.0.staging.d", "a"),
+                live("/host.0.staging.d"),
+                live("/host.2.staging.d")),
             CODEC);
-    assertEquals("/host.staging.2", head.liveSyncedFrom().orElseThrow(), "last live entry wins");
+    assertEquals("/host.2.staging.d", head.liveSyncedFrom().orElseThrow(), "last live entry wins");
   }
 
   @Test
@@ -60,9 +62,10 @@ class HostTreeHeadTest {
     // The same path re-materialised (bounded rotation) — the later checksum must win.
     final HostTreeHead head =
         HostTreeHead.fold(
-            List.of(staging("/host.staging.0", "old"), staging("/host.staging.0", "new")), CODEC);
+            List.of(staging("/host.0.staging.d", "old"), staging("/host.0.staging.d", "new")),
+            CODEC);
     assertEquals(1, head.stagings().size(), "one entry per path");
-    assertEquals("new", head.stagings().get("/host.staging.0").checksums().get("f"), "last-wins");
+    assertEquals("new", head.stagings().get("/host.0.staging.d").checksums().get("f"), "last-wins");
   }
 
   @Test
@@ -70,15 +73,15 @@ class HostTreeHeadTest {
     final HostTreeHead head =
         HostTreeHead.fold(
             List.of(
-                staging("/host.staging.0", "a"),
-                staging("/host.staging.1", "b"),
-                live("/host.staging.1"),
-                drift("/host.drift.0", "/host.staging.0")),
+                staging("/host.0.staging.d", "a"),
+                staging("/host.1.staging.d", "b"),
+                live("/host.1.staging.d"),
+                drift("/host.0.drift", "/host.0.staging.d")),
             CODEC);
-    assertEquals("/host.staging.1", head.liveSyncedFrom().orElseThrow());
+    assertEquals("/host.1.staging.d", head.liveSyncedFrom().orElseThrow());
     assertEquals(2, head.stagings().size());
     assertEquals(1, head.drifts().size());
-    assertEquals("/host.staging.0", head.drifts().get("/host.drift.0").evictedSyncedFrom());
+    assertEquals("/host.0.staging.d", head.drifts().get("/host.0.drift").evictedSyncedFrom());
   }
 
   @Test
@@ -86,7 +89,7 @@ class HostTreeHeadTest {
     final HostTreeHead head =
         HostTreeHead.fold(
             List.of(
-                new SeedEnvelope("bbox", "some-harvest", "{}"), staging("/host.staging.0", "a")),
+                new SeedEnvelope("bbox", "some-harvest", "{}"), staging("/host.0.staging.d", "a")),
             CODEC);
     assertEquals(1, head.stagings().size(), "a non-host-tree envelope is not this fold's concern");
     assertFalse(head.stagings().isEmpty());

@@ -24,7 +24,8 @@ class IncusAmendReflectorTest {
 
   @Test
   void it_binds_the_soil_role_onto_the_materialization_root() {
-    final String plot = "/srv/host/.local.d/bioskop/bioskop-master/host.staging.1/rke2-manifests.d";
+    final String plot =
+        "/srv/host/.local.d/bioskop/bioskop-master/host.1.staging.d/rke2-manifests.d";
     final SeedEnvelope roleValues =
         new SeedEnvelope("incus", "runbook", CODEC.encode(Map.of(Amendment.SOIL, plot)));
 

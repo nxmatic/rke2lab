@@ -144,8 +144,9 @@ public class ClusterSeedScenario
       // WHEN reads (the manifests scion's outdir, the systemd/rke2-config roots). The DARWIN-local
       // view is where the provisioner writes; asHostView(NIXOS) is the mounted-assets view. This is
       // PathStage.resolve() transposed onto the scenario's GIVEN. The run materialises into a fresh
-      // host.staging.N replica slot (§ host-cellar-realisation, the three fixed places), never the
-      // live host/ directly — the slot is later rsynced into host.live at the grow. The FS is the
+      // host.N.staging.d replica slot (§ host-cellar-realisation, the three fixed places), never
+      // the
+      // live host/ directly — the slot is later rsynced into host.live.d at the grow. The FS is the
       // rotation state: HostSlotSelector reads the present slots and picks (max+1) mod 3.
       final BootstrapPaths worktreePaths =
           BootstrapPaths.fromLocalWorktree(
@@ -229,7 +230,7 @@ public class ClusterSeedScenario
     public When the_instance_is_provisioned(@Hidden ReportModel hostTree) {
       // The SOIL amendment: hand incus the plot the instance's assets materialise into (the
       // staging-view manifests root), which incus forwards to the manifests scion it consults —
-      // the fresh tree the instance will mount is thus materialised under host.staging.N, not a
+      // the fresh tree the instance will mount is thus materialised under host.N.staging.d, not a
       // temp dir. The host names only the neutral SOIL role, never an incus field.
       sowAndGraft
           .sowing(

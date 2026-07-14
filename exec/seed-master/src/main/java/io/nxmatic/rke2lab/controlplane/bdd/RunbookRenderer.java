@@ -18,7 +18,8 @@ import java.util.stream.Stream;
  * renderings the model already affords (§ host-cellar-realisation, dogfooding — ONE model, two
  * renderings): {@code runbook.json} ({@link ScenarioJsonWriter} — the raw serialisation the node
  * reads at runtime) and an {@code adoc/} directory ({@link AsciiDocReportGenerator} — the operator
- * narration). Both travel inside {@code host.staging.N}, so the runbook rides the slot's lifecycle.
+ * narration). Both travel inside {@code host.N.staging.d}, so the runbook rides the slot's
+ * lifecycle.
  *
  * <p>Best-effort: rendering NEVER throws back into the pipeline — a runbook that fails to render
  * must not fail the provisioning it documents (that failure is exactly what the runbook would

@@ -10,11 +10,11 @@ import java.util.List;
  * Then-step asserts it, so it still appears in the runbook by reference (the runbook names the
  * delta, it does not embed it).
  *
- * <p>Two instances serve the grow, both pivoting on {@code staging.{live.syncedFrom}}: the {@code
- * change} ({@code staging.N} vs the pivot — the run's intended change) and the {@code drift} (the
- * physical {@code host.live} vs the pivot — the live's out-of-band deviation). Each is the same
- * shape: per-file {@link Entry entries}, each a {@link Status} and, for a MODIFIED text file, the
- * unified-diff lines.
+ * <p>Two instances serve the grow, both pivoting on {@code host.{live.syncedFrom}.staging.d}: the
+ * {@code change} ({@code staging.N} vs the pivot — the run's intended change) and the {@code drift}
+ * (the physical {@code host.live.d} vs the pivot — the live's out-of-band deviation). Each is the
+ * same shape: per-file {@link Entry entries}, each a {@link Status} and, for a MODIFIED text file,
+ * the unified-diff lines.
  */
 public record HostTreeDelta(String fromRoot, String toRoot, List<Entry> entries) {
 

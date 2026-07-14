@@ -10,8 +10,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Picks the next {@code host.staging.N} replica slot a run materialises into — the fondation of the
- * host-tree model (docs/architecture/osgi/host-cellar-realisation-spec.adoc § The host tree the
+ * Picks the next {@code host.<N>.staging.d} replica slot a run materialises into — the fondation of
+ * the host-tree model (docs/architecture/osgi/host-cellar-realisation-spec.adoc § The host tree the
  * instance mounts). A run always materialises into a staging slot; the live {@code host.live} is
  * later {@code rsync}ed from a chosen staging (the grow, not this class).
  *
@@ -33,8 +33,15 @@ public final class HostSlotSelector {
   /** The bounded rotation width — three rolling staging slots (the sliding cache). */
   static final int ROTATION = 3;
 
-  private static final String STAGING_PREFIX = "host.staging.";
-  private static final Pattern SLOT = Pattern.compile(Pattern.quote(STAGING_PREFIX) + "(\\d+)");
+  // Generation-uniform naming: host.<N>.staging.d is the replica tree of generation N (its change /
+  // drift deltas are sibling files host.<N>.change.{diff,json} / host.<N>.drift.{diff,json}); the
+  // .d suffix marks a directory (the project convention, as in rke2-manifests.d). host.live.d is
+  // the deployed tree, singular, not a generation.
+  private static final Pattern SLOT = Pattern.compile("host\\.(\\d+)\\.staging\\.d");
+
+  private static String stagingDir(int n) {
+    return "host." + n + ".staging.d";
+  }
 
   private final Path nodeRoot;
 
@@ -43,9 +50,8 @@ public final class HostSlotSelector {
   }
 
   /**
-   * The next staging slot to materialise into, with no slot pinned — {@code
-   * nodeRoot/host.staging.<(max+1) mod 3>}. For the first run (no live yet) or any caller that does
-   * not pin.
+   * The next staging slot to materialise into, with no slot pinned — {@code nodeRoot/host.<(max+1)
+   * mod 3>.staging.d}. For the first run (no live yet) or any caller that does not pin.
    */
   public Path nextStaging() {
     return nextStaging(OptionalInt.empty());
@@ -53,10 +59,10 @@ public final class HostSlotSelector {
 
   /**
    * The next staging slot to materialise into, PINNING the slot the live currently mirrors. {@code
-   * pinnedSlotRoot} is the {@code host.staging.N} root the {@code live.syncedFrom} names (the host
-   * knows the slot; parsing its N here is legitimate — host vocabulary, host-side). When the naive
-   * {@code (max+1) mod 3} would land on the pinned slot, step forward until a free position — so
-   * the pivot tree the deltas need is never overwritten.
+   * pinnedSlotRoot} is the {@code host.<N>.staging.d} root the {@code live.syncedFrom} names (the
+   * host knows the slot; parsing its N here is legitimate — host vocabulary, host-side). When the
+   * naive {@code (max+1) mod 3} would land on the pinned slot, step forward until a free position —
+   * so the pivot tree the deltas need is never overwritten.
    */
   public Path nextStaging(Path pinnedSlotRoot) {
     return nextStaging(slotOf(pinnedSlotRoot));
@@ -69,10 +75,10 @@ public final class HostSlotSelector {
     if (pinned.isPresent() && next == pinned.getAsInt()) {
       next = (next + 1) % ROTATION;
     }
-    return nodeRoot.resolve(STAGING_PREFIX + next);
+    return nodeRoot.resolve(stagingDir(next));
   }
 
-  /** The slot number a {@code host.staging.N} root names, or empty if it is not such a root. */
+  /** The slot number a {@code host.<N>.staging.d} root names, or empty if it is not such a root. */
   private static OptionalInt slotOf(Path stagingSlotRoot) {
     final Matcher matcher = SLOT.matcher(stagingSlotRoot.getFileName().toString());
     return matcher.matches()

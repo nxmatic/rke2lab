@@ -90,17 +90,18 @@ class HostTreeDifferTest {
   }
 
   @Test
-  void the_renderer_lands_both_json_and_adoc(@TempDir Path dir) throws IOException {
+  void the_renderer_lands_sibling_json_and_diff(@TempDir Path dir) throws IOException {
     final Path from = tree(dir.resolve("from"), Map.of("edit.yaml", "one\ntwo\n"));
     final Path to = tree(dir.resolve("to"), Map.of("edit.yaml", "one\nTWO\n"));
     final HostTreeDelta delta = differ.diff(from, to);
 
-    final Path deltaRoot = new HostTreeDeltaRenderer().render(dir.resolve("host.drift.0"), delta);
+    // base = nodeRoot/host.0.drift → siblings host.0.drift.json + host.0.drift.diff
+    final Path base = dir.resolve("host.0.drift");
+    final Path diff = new HostTreeDeltaRenderer().render(base, delta);
 
-    assertTrue(Files.exists(deltaRoot.resolve("json/delta.json")), "the runtime json lands");
-    assertTrue(Files.exists(deltaRoot.resolve("adoc/delta.adoc")), "the operator adoc lands");
-    assertTrue(
-        Files.readString(deltaRoot.resolve("adoc/delta.adoc")).contains("MODIFIED"),
-        "the adoc narrates the modified file");
+    assertEquals(dir.resolve("host.0.drift.diff"), diff, "render returns the .diff path");
+    assertTrue(Files.exists(dir.resolve("host.0.drift.json")), "the runtime json sibling lands");
+    assertTrue(Files.exists(dir.resolve("host.0.drift.diff")), "the applicable diff sibling lands");
+    assertTrue(Files.readString(diff).contains("TWO"), "the diff carries the modified file's hunk");
   }
 }

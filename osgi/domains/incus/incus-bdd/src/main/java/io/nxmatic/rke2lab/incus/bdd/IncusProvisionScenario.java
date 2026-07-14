@@ -283,9 +283,9 @@ public class IncusProvisionScenario
    * <p>The gate splits by NATURE of effect (§ host-cellar-realisation, Live vs preview): the image
    * build is an edge effect, so a closed gate builds nothing (the plan renders PENDING via E9, no
    * edge contacted); the manifests synthesis is a pure FS materialisation into {@code
-   * host.staging.N}, inert against the live instance, so it runs at preview too — a preview run
+   * host.N.staging.d}, inert against the live instance, so it runs at preview too — a preview run
    * materialises its staging replica and its host-manifest (traceable from the cellar), only the
-   * rsync into {@code host.live} is gated (I6). So consulting manifests is NOT gated.
+   * rsync into {@code host.live.d} is gated (I6). So consulting manifests is NOT gated.
    */
   public static class When extends Stage<When> {
 
@@ -322,9 +322,9 @@ public class IncusProvisionScenario
      * {@code @Amendment(SOIL)} as the manifests SOIL (a plot, never a fingerprint — a harvest is
      * fetched, not pushed). Two sows: AMEND reconciles the neutral role into the manifests input at
      * the door (incus names no manifests field), then RUNBOOK plays the synthesis with the amended
-     * input. NOT gated: the synthesis writes {@code host.staging.N}, a pure FS materialisation the
-     * host-tree model wants at preview too (only the rsync into {@code host.live} is gated). The
-     * manifests scion picks a temp dir itself when the SOIL is blank (a bare survey).
+     * input. NOT gated: the synthesis writes {@code host.N.staging.d}, a pure FS materialisation
+     * the host-tree model wants at preview too (only the rsync into {@code host.live.d} is gated).
+     * The manifests scion picks a temp dir itself when the SOIL is blank (a bare survey).
      */
     public When the_manifests_are_cultivated() {
       // AMEND: hand the broker {soil → path} by neutral role; the manifests amend reflector binds
