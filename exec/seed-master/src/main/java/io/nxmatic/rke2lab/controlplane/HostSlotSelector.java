@@ -20,6 +20,13 @@ import java.util.stream.Stream;
  * yields slot 0; {@code {0,1}} present yields 2; {@code {0,1,2}} present wraps to 0 (the oldest
  * position is overwritten by the fresh replica). The slot's identity is its POSITION, never its
  * content — the content hash lives in the host-manifest as a comparison discriminant.
+ *
+ * <p>The slot the live currently mirrors ({@code live.syncedFrom}) is PINNED out of the rotation: a
+ * fresh run must not overwrite the pivot tree the two deltas ({@code change}, {@code drift}) diff
+ * against, and it is the FS face of R1 (never lose what the live mounts). {@link
+ * #nextStaging(Path)} takes that pinned slot root and, when the naive {@code (max+1) mod 3} would
+ * land on it, steps forward to the next free position. Callers with no live yet use {@link
+ * #nextStaging()}.
  */
 public final class HostSlotSelector {
 
@@ -36,14 +43,41 @@ public final class HostSlotSelector {
   }
 
   /**
-   * The next staging slot to materialise into: {@code nodeRoot/host.staging.<(max+1) mod 3>}. Reads
-   * the present slots off the filesystem (the state), so successive runs rotate without any stored
-   * counter.
+   * The next staging slot to materialise into, with no slot pinned — {@code
+   * nodeRoot/host.staging.<(max+1) mod 3>}. For the first run (no live yet) or any caller that does
+   * not pin.
    */
   public Path nextStaging() {
-    final int next =
+    return nextStaging(OptionalInt.empty());
+  }
+
+  /**
+   * The next staging slot to materialise into, PINNING the slot the live currently mirrors. {@code
+   * pinnedSlotRoot} is the {@code host.staging.N} root the {@code live.syncedFrom} names (the host
+   * knows the slot; parsing its N here is legitimate — host vocabulary, host-side). When the naive
+   * {@code (max+1) mod 3} would land on the pinned slot, step forward until a free position — so
+   * the pivot tree the deltas need is never overwritten.
+   */
+  public Path nextStaging(Path pinnedSlotRoot) {
+    return nextStaging(slotOf(pinnedSlotRoot));
+  }
+
+  private Path nextStaging(OptionalInt pinned) {
+    final int start =
         maxPresentSlot().stream().map(max -> (max + 1) % ROTATION).findFirst().orElse(0);
+    int next = start;
+    if (pinned.isPresent() && next == pinned.getAsInt()) {
+      next = (next + 1) % ROTATION;
+    }
     return nodeRoot.resolve(STAGING_PREFIX + next);
+  }
+
+  /** The slot number a {@code host.staging.N} root names, or empty if it is not such a root. */
+  private static OptionalInt slotOf(Path stagingSlotRoot) {
+    final Matcher matcher = SLOT.matcher(stagingSlotRoot.getFileName().toString());
+    return matcher.matches()
+        ? OptionalInt.of(Integer.parseInt(matcher.group(1)))
+        : OptionalInt.empty();
   }
 
   /** The highest staging slot N present on the FS, or empty when none exists yet. */

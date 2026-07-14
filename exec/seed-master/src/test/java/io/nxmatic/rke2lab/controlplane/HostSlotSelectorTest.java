@@ -71,6 +71,32 @@ class HostSlotSelectorTest {
   }
 
   @Test
+  void pinnedSlot_isSkipped_whenTheRotationWouldLandOnIt(@TempDir Path nodeRoot)
+      throws IOException {
+    // {0,1} present → naive next is 2; but if the live mirrors slot 2, materialising there would
+    // overwrite the deltas' pivot tree. The selector steps forward to the next free position (0).
+    mkSlots(nodeRoot, 0, 1);
+    final Path pinned = nodeRoot.resolve("host.staging.2");
+    assertEquals(
+        nodeRoot.resolve("host.staging.0"),
+        new HostSlotSelector(nodeRoot).nextStaging(pinned),
+        "the pinned live.syncedFrom slot is never overwritten — the rotation steps past it");
+  }
+
+  @Test
+  void pinnedSlot_isIgnored_whenTheRotationDoesNotLandOnIt(@TempDir Path nodeRoot)
+      throws IOException {
+    // {0,1} present → naive next is 2; the live mirrors slot 0, which the rotation would not touch
+    // anyway, so pinning changes nothing.
+    mkSlots(nodeRoot, 0, 1);
+    final Path pinned = nodeRoot.resolve("host.staging.0");
+    assertEquals(
+        nodeRoot.resolve("host.staging.2"),
+        new HostSlotSelector(nodeRoot).nextStaging(pinned),
+        "pinning a slot the rotation avoids anyway leaves the choice unchanged");
+  }
+
+  @Test
   void stagingView_rebasesEveryRootUnderTheSlot(@TempDir Path worktree) {
     final BootstrapPaths base = BootstrapPaths.fromLocalWorktree(worktree, "bioskop", "master");
     final Path slot = base.clusterNodeRoot().resolve("host.staging.0");
