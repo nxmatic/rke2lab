@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.incus.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -37,15 +38,17 @@ public final class IncusBddScenarios {
   public record RunbookEnvelope(String runbook, List<SeedEnvelope> consultations) {}
 
   /**
-   * Play {@link IncusProvisionScenario} in-container and return its {@link RunbookEnvelope}
-   * serialized to JSON. The collaborators (the {@link
-   * io.nxmatic.rke2lab.incus.contract.ImageBuilder}, the {@link
-   * io.nxmatic.rke2lab.incus.contract.IncusInstanceContact}, the ambient {@link
+   * Play {@link IncusProvisionScenario} in-container with the given activation input and return its
+   * {@link RunbookEnvelope} serialized to JSON. The input (carrying the {@code @Amendment(SOIL)}
+   * the scenario forwards to the manifests scion it consults) is seeded before the launcher selects
+   * the class. The collaborators (the {@link io.nxmatic.rke2lab.incus.contract.ImageBuilder}, the
+   * {@link io.nxmatic.rke2lab.incus.contract.IncusInstanceContact}, the ambient {@link
    * io.nxmatic.rke2lab.seed.broker.port.RunGate}, the doctor's {@code ConsultingService} on
    * failure) are resolved by the scenario from this bundle's registry — a caller seeds mocks before
    * invoking, or the live edges + the host's gate published them.
    */
-  public static String run() throws InterruptedException {
+  public static String run(IncusRunbookInput input) throws InterruptedException {
+    IncusProvisionScenario.seedInput(input);
     final SeedCodec codec = new SeedCodec();
     return new JUnitLauncherCore<String>()
         .run(

@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.incus.bdd;
 
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -21,6 +23,8 @@ public final class IncusRunbookHandler implements SeedHandler {
 
   private static final RunbookCoordinate COORDINATE = new RunbookCoordinate("incus");
 
+  private final SeedCodec codec = new SeedCodec();
+
   @Override
   public SeedCoordinate serves() {
     return COORDINATE;
@@ -28,8 +32,9 @@ public final class IncusRunbookHandler implements SeedHandler {
 
   @Override
   public SeedEnvelope handle(SeedEnvelope trigger) {
+    final IncusRunbookInput input = codec.decode(trigger.payload(), IncusRunbookInput.class);
     try {
-      return SeedEnvelope.of(COORDINATE, IncusBddScenarios.run());
+      return SeedEnvelope.of(COORDINATE, IncusBddScenarios.run(input));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(

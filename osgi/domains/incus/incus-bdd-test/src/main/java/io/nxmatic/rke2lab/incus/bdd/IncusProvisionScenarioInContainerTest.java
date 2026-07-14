@@ -16,6 +16,7 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
 import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -124,7 +125,7 @@ public class IncusProvisionScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return IncusBddScenarios.run();
+      return IncusBddScenarios.run(IncusRunbookInput.defaults());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

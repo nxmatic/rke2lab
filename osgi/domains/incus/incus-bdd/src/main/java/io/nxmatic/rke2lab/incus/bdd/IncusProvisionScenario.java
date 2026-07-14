@@ -19,6 +19,7 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
 import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
@@ -60,12 +61,24 @@ public class IncusProvisionScenario
 
   private static final String NODE = "bioskop-master";
 
+  // The handler seeds the activation input here before the launcher plays (same-loader static, the
+  // input twin of the manifests scion's INPUT); it carries the @Amendment(SOIL) the scenario
+  // forwards to the manifests scion it consults. Initialized (never null) so the null-hygiene gate
+  // stays green.
+  private static final AtomicReference<IncusRunbookInput> INPUT =
+      new AtomicReference<>(IncusRunbookInput.defaults());
+
   // The front-door harvests the played model + any consultations off these holders (the same
   // scaffolding as the other scions). Initialized (never null) so the null-hygiene gate stays
   // green.
   private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
   private static final AtomicReference<List<SeedEnvelope>> LAST_CONSULTATIONS =
       new AtomicReference<>(List.of());
+
+  /** The handler sets the sown input here before selecting this class into the launcher. */
+  public static void seedInput(IncusRunbookInput input) {
+    INPUT.set(input);
+  }
 
   static ReportModel lastRunbook() {
     return Objects.requireNonNull(
