@@ -14,10 +14,11 @@ still shows `main`'s original names — `host/`, `host.staging.N`, `host.backup.
 because rsync syncs CONTENT while preserving the mount DIRECTORIES — present in every replica, so
 `--delete` never removes them; at preview `host.live` is left untouched. What the scion/cellar idiom
 ADDS on top (not a replacement): the CONTRACT moves to the cellar as host-manifests instead of `main`'s
-slot ConfigMap, PUBLISHED by each scion and VALIDATED by the incus prep BEFORE the rsync; one truth
-`live.syncedFrom: host.staging.N` (preview-vs-promoted deduced), each gc stores its `fromStaging`
-(previous live source). A slot's identity is its POSITION, not a content hash (the hash lives in the
-host-manifest as a comparison discriminant). See
+slot ConfigMap, PUBLISHED by each scion and VALIDATED by the incus prep BEFORE the rsync. The manifest
+is ONE document living at the cellar (entries per replica, folded at read): `host.live → host.staging.{SN}`
+is the sole mutable entry (preview-vs-promoted deduced from it), each `host.gc.{GN} → host.staging.{SN}`
+references the staging it evicted (frozen until recycled). A slot's identity is its POSITION, not a
+content hash (the hash lives in the host-manifest as a comparison discriminant). See
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec §
 The host tree the instance mounts] for the added contract/validation layer; the rotation + rsync
 described below stand.

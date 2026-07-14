@@ -525,11 +525,16 @@ mechanism (staging/gc rotation, rsync into the physical `host.live`) is KEPT; wh
 scion/cellar idiom adds is WHERE the contract + validation live, not a replacement of the
 rsync. R1 (never lose what a live instance mounts) holds because rsync syncs CONTENT while
 preserving the mount DIRECTORIES (present in every replica, so `--delete` never removes
-them). ONE truth: the `host.live` manifest's `syncedFrom: host.staging.N` — preview-vs-
-promoted is DEDUCED from it (a preview is a staging live never adopted); each gc stores ONE
-reference, its `fromStaging` (the previous live source, "live-1"), and `toStaging`
-reconstructs by the gc chain + the current live pointer (the overwrite of `syncedFrom` would
-lose the previous source otherwise).
+them). ONE host-manifest for the whole collection LIVES AT THE CELLAR (one entry per
+replica): staging entries carry the CONTRACT (checksums + provenance, immutable), the
+`host.live` entry references the `host.staging.{SN}` it mirrors (the ONLY mutable entry),
+each `host.gc.{GN}` references the staging it evicted (frozen until recycled). Because the
+manifest lives at the append-only cellar, the timeline of live promotions is FREE (each live
+mutation is a new store → a new history version); preview-vs-promoted is DEDUCED (a staging
+live never adopted). And because each staging entry carries CHECKSUMS, the cellar DESCRIBES
+the FS in full without holding a byte — authority over the FS state while pure storage of
+facets: validation is FS-vs-checksums, drift is detectable, R2 is a checksum diff between
+manifest versions, a lost replica re-materialises from its description + the SOIL synthesis.
 
 [mermaid]
 ....
@@ -537,7 +542,7 @@ flowchart TB
   subgraph fs["FILESYSTEM (bytes, never in the cellar)"]
     stg["host.staging.N (immutable, rotation 3)<br/>rke2-manifests.d · k8s-daemonset.d · systemd.d<br/>+ cloud-config + env-overlay + runbook.adoc/json"]
     live["host.live (physical, stable bind target)<br/>faithful mirror of a staging via rsync -av --delete"]
-    gc["host.gc.N (rotation 3)<br/>rsync --backup-dir: the evicted delta<br/>stores fromStaging (live-1); toStaging deduced by chain"]
+    gc["host.gc.N (rotation 3)<br/>rsync --backup-dir: the evicted delta<br/>manifest → host.staging.{SN} it evicted (frozen until GN recycled)"]
   end
   subgraph cel["CELLIER (the CONTRACT, not the bytes)"]
     hm["host-manifests<br/>staging: pointer + checksums + provenance<br/>live: syncedFrom host.staging.N"]
