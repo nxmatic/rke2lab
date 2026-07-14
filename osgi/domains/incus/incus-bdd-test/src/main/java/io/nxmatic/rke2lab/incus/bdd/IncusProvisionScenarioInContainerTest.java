@@ -19,6 +19,8 @@ import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.File;
 import java.nio.file.Files;
@@ -120,6 +122,12 @@ public class IncusProvisionScenarioInContainerTest {
     registrations.add(context.registerService(ImageBuilder.class, builder, new Hashtable<>()));
     registrations.add(
         context.registerService(IncusInstanceContact.class, contact, new Hashtable<>()));
+    // The broker incus consults manifests through — mocked here (incus-bdd has no broker-runtime
+    // nor
+    // manifests; the real routing to the manifests amend/runbook handlers is a fact of prod). The
+    // recorder proves incus sowed amend THEN runbook toward manifests.
+    registrations.add(
+        context.registerService(SeedBroker.class, new RecordingBroker(), new Hashtable<>()));
     if (doctor != null) {
       registrations.add(
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
@@ -250,5 +258,21 @@ public class IncusProvisionScenarioInContainerTest {
 
     @Override
     public void reviewDrift() {}
+  }
+
+  /**
+   * A broker that records the coordinates it was sown toward — the twin of the real {@code
+   * DefaultSeedBroker} for the test, minus the SCR handler roster. It proves incus consulted
+   * manifests through the door (AMEND then RUNBOOK); it echoes the seed back (the scenario does not
+   * consume the manifests runbook on this path — the tree is a fresh graft, used by the instance).
+   */
+  private static final class RecordingBroker implements SeedBroker {
+    final List<SeedCoordinate> sown = new ArrayList<>();
+
+    @Override
+    public SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed) {
+      sown.add(wanted);
+      return seed;
+    }
   }
 }

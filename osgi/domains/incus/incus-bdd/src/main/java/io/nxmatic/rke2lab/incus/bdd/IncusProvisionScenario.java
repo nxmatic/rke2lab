@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.incus.bdd;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.Hidden;
@@ -22,7 +24,11 @@ import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,6 +107,8 @@ public class IncusProvisionScenario
     final ImageBuilder imageBuilder = resolveImageBuilder();
     final IncusInstanceContact instanceContact = resolveInstanceContact();
     final RunGate gate = resolveGate();
+    final SeedBroker broker = resolveBroker();
+    final String soil = INPUT.get().materializationRoot();
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build/probe still reaches the consult.
@@ -108,8 +116,17 @@ public class IncusProvisionScenario
     given()
         .the_seed_node(NODE)
         .and()
-        .provisioned_through(imageBuilder, instanceContact, gate, observations);
-    when().the_run_condition_is_read().and().the_image_is_built().and().the_instance_is_reachable();
+        .provisioned_through(imageBuilder, instanceContact, gate, observations)
+        .and()
+        .consulting_manifests_through(broker, soil);
+    when()
+        .the_run_condition_is_read()
+        .and()
+        .the_image_is_built()
+        .and()
+        .the_manifests_are_cultivated()
+        .and()
+        .the_instance_is_reachable();
     then().the_instance_is_provisioned();
     LAST_RUNBOOK.set(getScenario().getModel());
     LAST_CONSULTATIONS.set(consultOnFailure(observations));
@@ -183,6 +200,18 @@ public class IncusProvisionScenario
         "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
   }
 
+  /**
+   * Resolve the {@link SeedBroker} from THIS bundle's registry — the door incus sows toward to
+   * consult the manifests scion (amend → runbook). Required: the broker is an SCR
+   * {@code @Component} the framework publishes; a run without it is a wiring bug (a test registers
+   * a mock broker).
+   */
+  private SeedBroker resolveBroker() {
+    return require(
+        SeedBroker.class,
+        "no SeedBroker in the registry (the framework publishes DefaultSeedBroker; a test mocks it)");
+  }
+
   private <T> T require(Class<T> type, String message) {
     return ScenarioRegistry.of(this).require(type, message);
   }
@@ -196,13 +225,17 @@ public class IncusProvisionScenario
     return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
-  /** Given: the seed node, both incus contacts, the run gate, and the observation sink. */
+  /**
+   * Given: the seed node, both incus contacts, the run gate, the observation sink, and the door.
+   */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState ImageBuilder imageBuilder;
     @ProvidedScenarioState IncusInstanceContact instanceContact;
     @ProvidedScenarioState RunGate gate;
     @ProvidedScenarioState List<ObservationWire> observations;
+    @ProvidedScenarioState SeedBroker broker;
+    @ProvidedScenarioState String soil;
 
     public Given the_seed_node(@Quoted String name) {
       return self();
@@ -220,6 +253,13 @@ public class IncusProvisionScenario
       this.observations = observations;
       return self();
     }
+
+    @Hidden
+    public Given consulting_manifests_through(SeedBroker broker, String soil) {
+      this.broker = broker;
+      this.soil = soil;
+      return self();
+    }
   }
 
   /**
@@ -235,7 +275,11 @@ public class IncusProvisionScenario
     @ExpectedScenarioState IncusInstanceContact instanceContact;
     @ExpectedScenarioState RunGate gate;
     @ExpectedScenarioState List<ObservationWire> observations;
+    @ExpectedScenarioState SeedBroker broker;
+    @ExpectedScenarioState String soil;
     @ProvidedScenarioState boolean cultivating;
+
+    private final SeedCodec codec = new SeedCodec();
 
     public When the_run_condition_is_read() {
       this.cultivating = gate.cultivating();
@@ -252,6 +296,38 @@ public class IncusProvisionScenario
         throw new AssertionError("incus image build failed: " + failure.get());
       }
       record("incus image", true, SymptomKind.IMAGE_BUILD_FAILED, null);
+      return self();
+    }
+
+    /**
+     * incus consults the manifests scion through the broker — the first metier scion→scion. The
+     * instance mounts a materialised tree, which manifests cultivates; incus forwards its OWN
+     * {@code @Amendment(SOIL)} as the manifests SOIL (a plot, never a fingerprint — a harvest is
+     * fetched, not pushed). Two sows: AMEND reconciles the neutral role into the manifests input at
+     * the door (incus names no manifests field), then RUNBOOK plays the synthesis with the amended
+     * input. Only when cultivating; under a closed gate the plan renders PENDING, nothing sown.
+     */
+    public When the_manifests_are_cultivated() {
+      if (!cultivating) {
+        return self();
+      }
+      // AMEND: hand the broker {soil → path} by neutral role; the manifests amend reflector binds
+      // it
+      // onto ManifestsRunbookInput and returns the reconciled input, still under the runbook
+      // coordinate.
+      final ObjectNode roleValues = JsonNodeFactory.instance.objectNode();
+      roleValues.put(Amendment.SOIL, soil);
+      final SeedEnvelope amended =
+          broker.sow(
+              new AmendCoordinate("manifests"),
+              new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)));
+      // RUNBOOK: play the manifests synthesis with the reconciled input; the fresh tree is the
+      // graft
+      // the instance will mount (consumed at once, never cellared — cultivated fresh). No
+      // observation
+      // recorded here: the consult sink is for probe symptoms (build/reachability), not for the
+      // sub-scenario's own outcome — a manifests failure surfaces as the sow throwing.
+      broker.sow(new RunbookCoordinate("manifests"), amended);
       return self();
     }
 
