@@ -328,14 +328,30 @@ harvest held in scenario state is NOT recoverable from the runbook. The runbook 
 (steps, PENDING, quoted counts), the cellar carries the data (conserved or pre-reserved). Two channels, two
 destinations — never conflate "the plan is in the runbook" with "the data is in the runbook".
 
+=== A harvest is FETCHED from the cellar, never pushed as an input (amont ≠ récolte)
+
+Now that harvests are conserved at the cellar, a scion that needs ANOTHER scion's harvest FETCHES it from the
+cellar — it is never pushed into an input/amendment. The SOIL (and any amendment) carries only the *where* / the
+*policy facet* — a plot path, a boolean posture — NEVER a cultivated value (a fingerprint, a urn, a checksum).
+Those are harvests; they live at the cellar and are re-read by address.
+
+The trap this forbids (a vestige of the former host bootstrap): `ManifestSynthesisRequest` still has an
+`imageState` field (carrying `imageFingerprint`, a Stage-A image harvest). In the scion world it is NOT wired
+into `ManifestsRunbookInput` — the synthesis scion defaults it to `ImageState.unknown()`. It must STAY unwired:
+when the synthesis genuinely needs the fingerprint, the manifests scion FETCHES the image scion's harvest from
+the cellar (`Cellar.fetch`), it does not receive it amended. So incus, consulting manifests, forwards the SOIL
+(the plot) — never the fingerprint. The ordering that makes this sound is the causal `dependsOn` below: the
+image is cultivated and stored BEFORE the synthesis that fetches it.
+
 === The `dependsOn` edge is CAUSAL — the amendment graph, not the runbook position
 
 The persisted Pulumi DAG must mirror real causality, not narration order. The edge is read from the AMENDMENT
-graph (amont): if the host amended scion incus WITH the image scion's harvest, then `incus.resource dependsOn
-image.resource` falls out of that. NOT from the scion declaring "I depend on systemd" (that would re-couple the
-scion to sibling soils — forbidden), and NOT merely from the step's position in the runbook tree (that reads a
-POSITION, not a CAUSE). The runbook nesting and the amendment graph converge, but the amendment graph is the
-correct source.
+graph (amont) AND the fetch graph: if scion incus FETCHED the image scion's harvest from the cellar (or was
+amended from provisioning state that depends on it), then `incus.resource dependsOn image.resource` falls out of
+that consumption. NOT from the scion declaring "I depend on systemd" (that would re-couple the scion to sibling
+soils — forbidden), and NOT merely from the step's position in the runbook tree (that reads a POSITION, not a
+CAUSE). The runbook nesting and the causal graph converge, but the causal graph (what a scion fetched / was
+amended with) is the correct source.
 
 === The scion — not the façade — decides what has output value
 

@@ -64,6 +64,14 @@ Parcel ambiante) et `store(parcel, harvest)`. Idée sentinelle écartée : elle 
 - *le runbook seul NE porte PAS la récolte* : jGiven `ReportModel` capture les ARGUMENTS de step (`@Quoted`),
   pas le `@Provided/@ExpectedScenarioState`. Donc la récolte en scenario-state n'est PAS récupérable du runbook.
   Deux canaux : runbook = narration/plan ; cellier = donnée (conservée ou pré-réservée). Ne pas confondre.
+- *une récolte se FETCH au cellier, jamais poussée en input/amendement* (règle 2026-07-14). Le SOIL/amendement
+  porte le *où* (un chemin) ou une facette de policy (bool), JAMAIS une valeur cultivée (fingerprint, urn,
+  checksum). Un scion qui a besoin de la récolte d'un autre fait `Cellar.fetch`. Le piège vestige :
+  `ManifestSynthesisRequest.imageState` (porte `imageFingerprint`, récolte Stage-A) n'est PAS reliée à
+  `ManifestsRunbookInput` dans le monde scion (défaut `ImageState.unknown()`) — elle doit le RESTER : quand la
+  synthèse a besoin du fingerprint, manifests le FETCH au cellier (récolte du scion image), incus ne le
+  transporte pas. Donc au fil CONSULT, incus forwarde le SOIL (le plot), jamais le fingerprint. L'ordre causal
+  (dependsOn) le rend sain : image cultivée+rangée AVANT la synthèse qui la fetch.
 
 **Granularité — (a) maintenant, (b) évolution PLANIFIÉE (pas oubliettes):**
 - (a) grain gros: le FRUIT entier est l'output (`stack output <domain>.fruit`→blob), rôle existant, rien à
