@@ -14,8 +14,6 @@ import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
-import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
-import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
@@ -37,10 +35,12 @@ import org.osgi.framework.ServiceRegistration;
 /**
  * The in-container proof of the incus scion, run WHERE the scenario lives (this passenger shares
  * the incus-bdd host loader through the fragment). It registers the scion's collaborators — a mock
- * {@link ImageBuilder} + {@link IncusInstanceContact} + a mock {@link RunGate} (and, for the
- * failure case, a mock {@link ConsultingService}) — into the SAME registry the scenario resolves
- * from, then plays {@link IncusBddScenarios#run()} (the production front-door) and asserts on the
- * harvested envelope.
+ * {@link ImageBuilder}, a mock {@link RunGate}, a recording {@link
+ * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (and, for the failure case, a mock {@link
+ * ConsultingService}) — into the SAME registry the scenario resolves from, then plays {@link
+ * IncusBddScenarios#run} (the production front-door) and asserts on the harvested envelope. The
+ * scion PREPARES the instance (image + manifests); the host makes it grow and probes reachability
+ * (Shape C), so no instance contact is registered here.
  *
  * <p>No seam, no system-export: because the fragment shares the bundle's classloader, the mock this
  * passenger registers is the same {@code Class} the scenario reads. The {@code
@@ -51,9 +51,10 @@ public class IncusProvisionScenarioInContainerTest {
   private static final SeedCodec CODEC = new SeedCodec();
 
   @Test
-  void a_live_provision_builds_and_reaches_green() throws Exception {
-    // cultivating() true → the scion builds + probes; the mocks succeed.
-    final String envelope = playWith(cultivatingGate(true), builds(), reachable(), null);
+  void a_live_prepare_builds_and_consults_manifests_green() throws Exception {
+    // cultivating() true → the scion builds the image and consults manifests; the mocks succeed. It
+    // does NOT probe reachability — the host makes the instance grow and verifies it (Shape C).
+    final String envelope = playWith(cultivatingGate(true), builds(), null);
     final ReportModel runbook = rebuild(envelope);
 
     assertNotNull(runbook, "the front-door harvested the played model");
@@ -61,26 +62,24 @@ public class IncusProvisionScenarioInContainerTest {
     assertEquals(
         ExecutionStatus.SUCCESS,
         runbook.getScenarios().get(0).getExecutionStatus(),
-        "a built image + reachable instance provisions cleanly");
+        "a built image + cultivated manifests prepares the instance cleanly");
     assertTrue(
         consultationsOf(envelope).isEmpty(),
-        "a clean provision raised no symptom, so consults no one");
+        "a clean prepare raised no symptom, so consults no one");
   }
 
   @Test
-  void a_preview_run_touches_neither_edge() throws Exception {
-    // cultivating() false → the scion builds/probes NOTHING; the mocks record whether they were
-    // called, and must not have been.
+  void a_preview_run_builds_nothing() throws Exception {
+    // cultivating() false → the scion builds NOTHING; the mock records whether it was called, and
+    // must not have been.
     final RecordingImageBuilder builder = recordingBuilder();
-    final RecordingInstanceContact contact = recordingContact();
-    final String envelope = playWith(cultivatingGate(false), builder, contact, null);
+    final String envelope = playWith(cultivatingGate(false), builder, null);
 
     assertEquals(
         ExecutionStatus.SUCCESS,
         rebuild(envelope).getScenarios().get(0).getExecutionStatus(),
         "a preview run plans cleanly without touching the incus host");
     assertTrue(!builder.built, "under a closed gate the scion must NOT build the image");
-    assertTrue(!contact.probed, "under a closed gate the scion must NOT probe the instance");
     assertTrue(consultationsOf(envelope).isEmpty(), "a preview raised no symptom");
   }
 
@@ -89,7 +88,7 @@ public class IncusProvisionScenarioInContainerTest {
     // A failed image build is a symptom; the scion resolves the doctor from its OWN registry and
     // consults — the consultation rides the envelope back (fork B).
     final RecordingDoctor doctor = new RecordingDoctor();
-    final String envelope = playWith(cultivatingGate(true), failsToBuild(), reachable(), doctor);
+    final String envelope = playWith(cultivatingGate(true), failsToBuild(), doctor);
 
     assertEquals(
         ExecutionStatus.FAILED,
@@ -113,15 +112,12 @@ public class IncusProvisionScenarioInContainerTest {
    * through the front-door, and return its serialized envelope. Registrations are removed in the
    * {@code finally} so each test plays against exactly its own mocks.
    */
-  private static String playWith(
-      RunGate gate, ImageBuilder builder, IncusInstanceContact contact, ConsultingService doctor)
+  private static String playWith(RunGate gate, ImageBuilder builder, ConsultingService doctor)
       throws Exception {
     final BundleContext context = FrameworkUtil.getBundle(IncusBddTests.class).getBundleContext();
     final List<ServiceRegistration<?>> registrations = new ArrayList<>();
     registrations.add(context.registerService(RunGate.class, gate, new Hashtable<>()));
     registrations.add(context.registerService(ImageBuilder.class, builder, new Hashtable<>()));
-    registrations.add(
-        context.registerService(IncusInstanceContact.class, contact, new Hashtable<>()));
     // The broker incus consults manifests through — mocked here (incus-bdd has no broker-runtime
     // nor
     // manifests; the real routing to the manifests amend/runbook handlers is a fact of prod). The
@@ -195,17 +191,8 @@ public class IncusProvisionScenarioInContainerTest {
     };
   }
 
-  /** An instance contact that reports reachable (empty = reachable). */
-  private static IncusInstanceContact reachable() {
-    return request -> Optional.empty();
-  }
-
   private static RecordingImageBuilder recordingBuilder() {
     return new RecordingImageBuilder();
-  }
-
-  private static RecordingInstanceContact recordingContact() {
-    return new RecordingInstanceContact();
   }
 
   /** An ImageBuilder that records whether it was called — proves preview inertness. */
@@ -221,17 +208,6 @@ public class IncusProvisionScenarioInContainerTest {
     @Override
     public String recipeDigest() {
       return "test-recipe";
-    }
-  }
-
-  /** An instance contact that records whether it was probed — proves preview inertness. */
-  private static final class RecordingInstanceContact implements IncusInstanceContact {
-    boolean probed;
-
-    @Override
-    public Optional<String> isReachable(IncusExecRequest request) {
-      this.probed = true;
-      return Optional.empty();
     }
   }
 

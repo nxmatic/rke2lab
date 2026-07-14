@@ -19,8 +19,6 @@ import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
-import io.nxmatic.rke2lab.incus.contract.IncusExecRequest;
-import io.nxmatic.rke2lab.incus.contract.IncusInstanceContact;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -41,22 +39,27 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The incus provisioning checkpoint, a production jGiven scenario told in the INCUS DOMAIN's own
- * vocabulary — the seed image built through {@link ImageBuilder}, then the launched instance's
- * reachability probed through {@link IncusInstanceContact}, no host/Pulumi type. Played
- * IN-CONTAINER by the engine so the runbook shows a real node of the OSGi world; it lives in {@code
- * incus-bdd} (only the {@code incus-contract} seam, no {@code incus-core} — the heavy Pulumi-bound
- * provisioning stays host-side), not a {@code -test} fragment (it is live seeding logic).
+ * vocabulary — it PREPARES the instance's material: the seed image built through {@link ImageBuilder}
+ * and the manifests tree cultivated by consulting the manifests scion through the broker, no
+ * host/Pulumi type. It does NOT make the instance grow nor probe its reachability: creating the
+ * instance is the {@code com.pulumi} graph, which stays HOST (Shape C — the scion asks the host to
+ * grow it through the broker), and verifying reachability is the responsibility of whoever grows it
+ * (the host, post-push). Played IN-CONTAINER by the engine so the runbook shows a real node of the
+ * OSGi world; it lives in {@code incus-bdd} (only the {@code incus-contract} seam, no {@code
+ * incus-core} — the heavy Pulumi-bound provisioning stays host-side), not a {@code -test} fragment
+ * (it is live seeding logic).
  *
  * <p>The bbox/systemd/cluster twin: it resolves its collaborators from its OWN bundle's registry
- * ({@link ScenarioRegistry}) — both incus contacts, the ambient {@link RunGate} (whose {@link
- * RunGate#cultivating() cultivating} decides build-for-real vs plan-only), and, on a failure, the
- * doctor's {@link ConsultingService}. The scenario is identical live and in test; only who
- * published the collaborators differs (the live {@code DistrobuilderImageBuilder} + {@code
- * ProcessBuilderIncusInstanceContact} + the host's RunGate, or the mocks a test seeds).
+ * ({@link ScenarioRegistry}) — the {@link ImageBuilder}, the {@link
+ * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (to consult manifests), the ambient {@link RunGate}
+ * (whose {@link RunGate#cultivating() cultivating} decides build-for-real vs plan-only), and, on a
+ * failure, the doctor's {@link ConsultingService}. The scenario is identical live and in test; only
+ * who published the collaborators differs (the live {@code DistrobuilderImageBuilder} + the real
+ * broker + the host's RunGate, or the mocks a test seeds).
  *
- * <p>Preview inertness — the SCION consults the RunGate: under a closed gate it does NOT build or
- * probe (the real edge would ssh/build/create), it records the plan and the step renders PENDING
- * via E9. The image/instance/exec markers are fixed (the offline mock ignores them; the live
+ * <p>Preview inertness — the SCION consults the RunGate: under a closed gate it does NOT build the
+ * image nor consult manifests (the real edge would ssh/build), it records the plan and the step
+ * renders PENDING via E9. The image markers are fixed (the offline mock ignores them; the live
  * config-derived plumbing is the same deferral the cluster/systemd twins make for their kubeconfig
  * / endpoint).
  */
@@ -103,20 +106,19 @@ public class IncusProvisionScenario
   }
 
   @Test
-  void the_instance_is_provisioned() {
+  void the_instance_is_prepared() {
     final ImageBuilder imageBuilder = resolveImageBuilder();
-    final IncusInstanceContact instanceContact = resolveInstanceContact();
     final RunGate gate = resolveGate();
     final SeedBroker broker = resolveBroker();
     final String soil = INPUT.get().materializationRoot();
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
-    // after a fail-fast step, so a failed build/probe still reaches the consult.
+    // after a fail-fast step, so a failed build still reaches the consult.
     final List<ObservationWire> observations = new ArrayList<>();
     given()
         .the_seed_node(NODE)
         .and()
-        .provisioned_through(imageBuilder, instanceContact, gate, observations)
+        .prepared_through(imageBuilder, gate, observations)
         .and()
         .consulting_manifests_through(broker, soil);
     when()
@@ -124,10 +126,8 @@ public class IncusProvisionScenario
         .and()
         .the_image_is_built()
         .and()
-        .the_manifests_are_cultivated()
-        .and()
-        .the_instance_is_reachable();
-    then().the_instance_is_provisioned();
+        .the_manifests_are_cultivated();
+    then().the_instance_is_prepared();
     LAST_RUNBOOK.set(getScenario().getModel());
     LAST_CONSULTATIONS.set(consultOnFailure(observations));
   }
@@ -172,21 +172,10 @@ public class IncusProvisionScenario
         "distrobuilder", "/srv/host/incus-build", "config.yaml", "artifacts", "", "", "", "");
   }
 
-  /** The reachability request the scion probes the launched instance with (fixed marker). */
-  private static IncusExecRequest execRequest() {
-    return new IncusExecRequest("localhost", "default", NODE);
-  }
-
   private ImageBuilder resolveImageBuilder() {
     return require(
         ImageBuilder.class,
         "no ImageBuilder in the registry (live edge or test mock must publish one)");
-  }
-
-  private IncusInstanceContact resolveInstanceContact() {
-    return require(
-        IncusInstanceContact.class,
-        "no IncusInstanceContact in the registry (live edge or test mock must publish one)");
   }
 
   /**
@@ -225,13 +214,10 @@ public class IncusProvisionScenario
     return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
-  /**
-   * Given: the seed node, both incus contacts, the run gate, the observation sink, and the door.
-   */
+  /** Given: the seed node, the image builder, the run gate, the observation sink, and the door. */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState ImageBuilder imageBuilder;
-    @ProvidedScenarioState IncusInstanceContact instanceContact;
     @ProvidedScenarioState RunGate gate;
     @ProvidedScenarioState List<ObservationWire> observations;
     @ProvidedScenarioState SeedBroker broker;
@@ -242,13 +228,9 @@ public class IncusProvisionScenario
     }
 
     @Hidden
-    public Given provisioned_through(
-        ImageBuilder imageBuilder,
-        IncusInstanceContact instanceContact,
-        RunGate gate,
-        List<ObservationWire> observations) {
+    public Given prepared_through(
+        ImageBuilder imageBuilder, RunGate gate, List<ObservationWire> observations) {
       this.imageBuilder = imageBuilder;
-      this.instanceContact = instanceContact;
       this.gate = gate;
       this.observations = observations;
       return self();
@@ -264,15 +246,15 @@ public class IncusProvisionScenario
 
   /**
    * When: the scion reads the run condition (the {@link RunGate}), then — only when cultivating —
-   * builds the image and probes the instance, recording each facet's {@link ObservationWire} (ok,
-   * or failed with a typed {@link SymptomKind}) into the shared sink, fail-fast on the first
-   * failure. Under a closed gate it records neither touch (the plan renders PENDING via E9, no edge
-   * contacted).
+   * builds the image and consults manifests, recording each facet's {@link ObservationWire} (ok, or
+   * failed with a typed {@link SymptomKind}) into the shared sink, fail-fast on the first failure.
+   * It PREPARES the instance's material (image + manifests); the host makes the instance grow and
+   * verifies its reachability (Shape C — the gRPC push and its post-push probe are host-side).
+   * Under a closed gate it builds nothing (the plan renders PENDING via E9, no edge contacted).
    */
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState ImageBuilder imageBuilder;
-    @ExpectedScenarioState IncusInstanceContact instanceContact;
     @ExpectedScenarioState RunGate gate;
     @ExpectedScenarioState List<ObservationWire> observations;
     @ExpectedScenarioState SeedBroker broker;
@@ -331,19 +313,6 @@ public class IncusProvisionScenario
       return self();
     }
 
-    public When the_instance_is_reachable() {
-      if (!cultivating) {
-        return self();
-      }
-      final Optional<String> failure = instanceContact.isReachable(execRequest());
-      if (failure.isPresent()) {
-        record("incus instance", false, SymptomKind.INSTANCE_UNREACHABLE, failure.get());
-        throw new AssertionError("incus instance unreachable: " + failure.get());
-      }
-      record("incus instance", true, SymptomKind.INSTANCE_UNREACHABLE, null);
-      return self();
-    }
-
     private void record(String facet, boolean ok, SymptomKind failureSymptom, String detail) {
       if (ok) {
         observations.add(
@@ -360,12 +329,13 @@ public class IncusProvisionScenario
   }
 
   /**
-   * Then: the instance is provisioned — reached only once the image built and the instance answered
-   * (a failure throws in the When), the readable closing line, not where evaluation happens.
+   * Then: the instance's material is prepared — reached only once the image built and manifests
+   * were cultivated (a failure throws in the When). The readable closing line; the host then makes
+   * the instance grow (Shape C) and verifies its reachability, not this scion.
    */
   public static class Then extends Stage<Then> {
 
-    public Then the_instance_is_provisioned() {
+    public Then the_instance_is_prepared() {
       return self();
     }
   }
