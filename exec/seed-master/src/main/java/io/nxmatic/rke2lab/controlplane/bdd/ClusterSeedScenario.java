@@ -12,6 +12,7 @@ import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.BootstrapPaths;
+import io.nxmatic.rke2lab.controlplane.HostSlotSelector;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
@@ -24,6 +25,7 @@ import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import java.nio.file.Path;
 import java.util.Hashtable;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -113,12 +115,17 @@ public class ClusterSeedScenario
       // The provisioning topology, resolved once from the worktree — the state every materialising
       // WHEN reads (the manifests scion's outdir, the systemd/rke2-config roots). The DARWIN-local
       // view is where the provisioner writes; asHostView(NIXOS) is the mounted-assets view. This is
-      // PathStage.resolve() transposed onto the scenario's GIVEN.
-      this.paths =
+      // PathStage.resolve() transposed onto the scenario's GIVEN. The run materialises into a fresh
+      // host.staging.N replica slot (§ host-cellar-realisation, the three fixed places), never the
+      // live host/ directly — the slot is later rsynced into host.live at the grow. The FS is the
+      // rotation state: HostSlotSelector reads the present slots and picks (max+1) mod 3.
+      final BootstrapPaths worktreePaths =
           BootstrapPaths.fromLocalWorktree(
               run.config().localWorktreePath(),
               run.config().clusterName(),
               run.config().nodeName());
+      final Path stagingSlot = new HostSlotSelector(worktreePaths.clusterNodeRoot()).nextStaging();
+      this.paths = worktreePaths.asStagingView(stagingSlot);
       // Publish the ambient RunGate the scions resolve — projected from the run mode.
       // registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).

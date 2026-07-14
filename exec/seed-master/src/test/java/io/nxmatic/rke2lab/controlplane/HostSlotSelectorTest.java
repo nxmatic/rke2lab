@@ -1,0 +1,89 @@
+package io.nxmatic.rke2lab.controlplane;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Pins the {@code host.staging.N} rotation: the filesystem is the state, the next slot is {@code
+ * (max present + 1) mod 3} — an empty node yields 0, a partial set fills the gap upward, and a full
+ * set wraps to overwrite the oldest position. Plus the staging view rebases every root under the
+ * chosen slot.
+ */
+class HostSlotSelectorTest {
+
+  private static void mkSlots(Path nodeRoot, int... slots) throws IOException {
+    for (int slot : slots) {
+      Files.createDirectories(nodeRoot.resolve("host.staging." + slot));
+    }
+  }
+
+  @Test
+  void emptyNode_yieldsSlotZero(@TempDir Path nodeRoot) {
+    assertEquals(
+        nodeRoot.resolve("host.staging.0"),
+        new HostSlotSelector(nodeRoot).nextStaging(),
+        "a fresh node materialises into slot 0");
+  }
+
+  @Test
+  void nonExistentNode_yieldsSlotZero(@TempDir Path parent) {
+    final Path nodeRoot = parent.resolve("never-created");
+    assertEquals(
+        nodeRoot.resolve("host.staging.0"),
+        new HostSlotSelector(nodeRoot).nextStaging(),
+        "an absent node dir is a legitimate empty rotation → slot 0");
+  }
+
+  @Test
+  void slotsZeroAndOnePresent_yieldsSlotTwo(@TempDir Path nodeRoot) throws IOException {
+    mkSlots(nodeRoot, 0, 1);
+    assertEquals(
+        nodeRoot.resolve("host.staging.2"),
+        new HostSlotSelector(nodeRoot).nextStaging(),
+        "with {0,1} present the next is 2");
+  }
+
+  @Test
+  void fullRotation_wrapsToZero(@TempDir Path nodeRoot) throws IOException {
+    mkSlots(nodeRoot, 0, 1, 2);
+    assertEquals(
+        nodeRoot.resolve("host.staging.0"),
+        new HostSlotSelector(nodeRoot).nextStaging(),
+        "with {0,1,2} present the rotation wraps to overwrite the oldest position (0)");
+  }
+
+  @Test
+  void ignoresNonStagingSiblings(@TempDir Path nodeRoot) throws IOException {
+    mkSlots(nodeRoot, 0);
+    Files.createDirectories(nodeRoot.resolve("host.live"));
+    Files.createDirectories(nodeRoot.resolve("host.gc.2"));
+    Files.createDirectories(nodeRoot.resolve("cloud.d"));
+    assertEquals(
+        nodeRoot.resolve("host.staging.1"),
+        new HostSlotSelector(nodeRoot).nextStaging(),
+        "only host.staging.N counts — live, gc, and unrelated dirs are ignored");
+  }
+
+  @Test
+  void stagingView_rebasesEveryRootUnderTheSlot(@TempDir Path worktree) {
+    final BootstrapPaths base = BootstrapPaths.fromLocalWorktree(worktree, "bioskop", "master");
+    final Path slot = base.clusterNodeRoot().resolve("host.staging.0");
+
+    final BootstrapPaths staged = base.asStagingView(slot);
+
+    assertEquals(slot, staged.assetsRoot(), "the assets root becomes the slot");
+    assertTrue(
+        staged.manifestsRoot().startsWith(slot), "the manifests tree materialises under the slot");
+    assertTrue(
+        staged.systemdRoot().startsWith(slot), "the systemd tree materialises under the slot");
+    assertTrue(
+        staged.runtimeCloudConfigRoot().startsWith(slot),
+        "the cloud-config tree materialises under the slot");
+  }
+}
