@@ -17,6 +17,11 @@
     project; the host reaps the String and never binds victools. So this bundle carries victools (via
     victools-wrap) and stays out of the host uber-jar.</description>
   <dependencies>
+    <!-- @Amendment: the binder maps a {role → value} map onto a wire-record's @Amendment components. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
     <!-- victools as compile deps: the projector IS a SchemaGenerator call. At runtime these packages
          resolve to the victools-wrap bundle, pulled into the live world by this bundle's import
          closure — exactly jGiven's compile-against-artifact / resolve-to-wrap arrangement. -->
