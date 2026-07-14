@@ -10,7 +10,7 @@ import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.HostTreeChecksummer;
-import io.nxmatic.rke2lab.manifests.contract.HostManifest;
+import io.nxmatic.rke2lab.manifests.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
@@ -387,19 +387,20 @@ public class ManifestSynthesisScenario
     }
 
     /**
-     * The scion PUBLISHES the host-manifest of the replica it materialised (§
-     * host-cellar-realisation, publish/validate/mount). It checksums the staging tree and stores a
-     * {@link HostManifest} at the {@code host-manifest} coordinate under the current {@link Parcel}
-     * — the CONTRACT the incus prep validates the FS against before the grow's rsync. It publishes
-     * only its OWN availability (the checksums + the staging root), never the bytes —
-     * fetch-not-push. The store is unconditional: the cellar consults the RunGate itself to route
-     * conserve vs pre-reserve, so the scion never picks the mode.
+     * The scion PUBLISHES the staging entry of the host-manifest family for the replica it
+     * materialised (§ host-cellar-realisation, publish/validate/mount). It checksums the staging
+     * tree and stores a {@link HostStagingEntry} at the {@code host-staging} coordinate under the
+     * current {@link Parcel} — the CONTRACT the incus prep validates the FS against before the
+     * grow's sync. It publishes only its OWN availability (the checksums + the staging root it
+     * materialised into), never the bytes — fetch-not-push. The store is unconditional: the cellar
+     * consults the RunGate itself to route conserve vs pre-reserve, so the scion never picks the
+     * mode.
      */
     public Then the_host_manifest_is_published(@Hidden Cellar cellar, @Hidden Parcel parcel) {
       final Map<String, String> checksums = new HostTreeChecksummer().checksum(stagingRoot);
-      final HostManifest manifest =
-          HostManifest.of(stagingRoot.toString(), checksums, "manifests-synthesis");
-      cellar.store(parcel, new SeedEnvelope("manifests", "host-manifest", codec.encode(manifest)));
+      final HostStagingEntry entry =
+          HostStagingEntry.of(stagingRoot.toString(), checksums, "manifests-synthesis");
+      cellar.store(parcel, new SeedEnvelope("manifests", "host-staging", codec.encode(entry)));
       return self();
     }
   }

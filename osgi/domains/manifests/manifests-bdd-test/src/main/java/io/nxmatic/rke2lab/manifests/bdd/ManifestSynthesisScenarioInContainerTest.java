@@ -59,20 +59,20 @@ public class ManifestSynthesisScenarioInContainerTest {
         runbook.getScenarios().get(0).getExecutionStatus(),
         "the facet was translated, synthesised, and the overlay written — the policy plays green");
 
-    // I3: the scion PUBLISHED the host-manifest of the replica it materialised — one store at the
-    // host-manifest coordinate, carrying the per-file checksums of the synthesised tree.
-    assertEquals(1, cellar.stored.size(), "the scion published its host-manifest once");
+    // I3: the scion PUBLISHED its staging entry of the host-manifest family for the replica it
+    // materialised — one store at the host-staging coordinate, carrying the per-file checksums.
+    assertEquals(1, cellar.stored.size(), "the scion published its staging entry once");
     final SeedEnvelope published = cellar.stored.get(0);
     assertEquals(
-        "host-manifest", published.coordinate(), "published at the host-manifest coordinate");
-    final JsonNode manifest = CODEC.decode(published.payload());
+        "host-staging", published.coordinate(), "published at the host-staging coordinate");
+    final JsonNode entry = CODEC.decode(published.payload());
     assertFalse(
-        manifest.path("checksums").isEmpty(),
-        "the host-manifest carries the synthesised tree's per-file checksums");
+        entry.path("checksums").isEmpty(),
+        "the staging entry carries the synthesised tree's per-file checksums");
     assertEquals(
         "manifests-synthesis",
-        manifest.path("provenance").asText(),
-        "the host-manifest names its provenance");
+        entry.path("provenance").asText(),
+        "the staging entry names its provenance");
   }
 
   /**

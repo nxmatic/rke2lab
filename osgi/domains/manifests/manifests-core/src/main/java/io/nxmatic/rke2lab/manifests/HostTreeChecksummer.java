@@ -13,10 +13,11 @@ import java.util.stream.Stream;
 
 /**
  * Walks a materialised replica tree and reduces it to per-file checksums — the FACET a {@code
- * HostManifest} publishes to the cellar (docs/architecture/osgi/host-cellar-realisation-spec.adoc §
- * The host tree the instance mounts). It reads bytes but keeps none: the map is {@code relative
- * path → SHA-256}, the complete description the cellar holds so the incus prep can validate the FS
- * without the cellar ever storing content.
+ * HostStagingEntry} publishes to the cellar
+ * (docs/architecture/osgi/host-cellar-realisation-spec.adoc § The host tree the instance mounts).
+ * It reads bytes but keeps none: the map is {@code relative path → SHA-256}, the complete
+ * description the cellar holds so the incus prep can validate the FS without the cellar ever
+ * storing content.
  *
  * <p>Keys are the tree-relative POSIX path (forward slashes, stable across OSes) so the manifest is
  * comparable regardless of where the tree was rooted; the map is sorted so the serialised form is

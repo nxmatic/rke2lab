@@ -509,8 +509,12 @@ The three roles do not overlap:
   validates nothing beyond its own morceau (it only knows its own). Concretely the manifests scion
   (the sole scion that materialises an FS tree — the instance mounts chiefly the synthesis tree)
   checksums its staging replica with `HostTreeChecksummer` (relpath → SHA-256) and stores a
-  `HostManifest` (`@SeedContract("host-manifest")`: the staging root, the checksums, the provenance)
-  under the current parcel.
+  `HostStagingEntry` (`@SeedContract("host-staging")`: the staging root, the checksums, the
+  provenance) under the current parcel. It is one of THREE natures of the host-manifest family, all
+  in `manifests-contract`: `HostStagingEntry` (published by the scion), `HostLiveEntry`
+  (`host-live` — which staging the live mirrors, the sole mutable entry, written by the host at the
+  grow), and `HostDriftEntry` (`host-drift` — the drift report the host writes at the grow). The
+  reader-side fold of the three is `HostTreeHead` (host-side, § the two reads).
 * *The incus PREP VALIDATES the content made available to the instance.* incus is already the prep
   (it consults manifests, assembles what the instance mounts) — validating that content is the natural
   conclusion of preparing, and only incus sees the WHOLE of what the instance will mount, so only it
@@ -526,7 +530,7 @@ validation in one run. The check EARNS its keep only ACROSS runs: reading a stag
 EARLIER run, or reconciling `host.live`, where corruption/tampering could have happened since. So the
 publish (the checksums at the cellar) SHIPS now; the incus-side re-check is built when a cross-run
 read actually consumes it. This also keeps incus decoupled from manifests (no `manifests-core`/algo
-dependency) until the need is real — the FS access + `HostManifest` decode are wired only then.
+dependency) until the need is real — the FS access + `HostStagingEntry` decode are wired only then.
 * *The host GROW reconciles then mounts already-validated content* (Shape C, `com.pulumi`): it fetches,
   MEASURES the drift (`host.live ↔ staging.{live.syncedFrom}` → `host.drift.{DN}`) so nothing is
   overwritten blind,
