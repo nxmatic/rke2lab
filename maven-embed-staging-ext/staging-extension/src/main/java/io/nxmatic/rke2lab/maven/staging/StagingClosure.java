@@ -111,6 +111,7 @@ public record StagingClosure(
       seed();
       seedRealmLibraries();
       close();
+      propagateRealmLibraries();
       return new StagingClosure(
           new ArrayList<>(stagedByGa.values()), trace, Set.copyOf(realmLibraryByGa.keySet()));
     }
@@ -173,6 +174,48 @@ public record StagingClosure(
         if (isRealmLibrary(b, domainImports, bootStackExports)) {
           realmLibraryByGa.put(b.ga(), b);
           stage(b, "seed: realm library (a domain bundle imports its export)");
+        }
+      }
+    }
+
+    /**
+     * Close the realm-library set over MANDATORY imports: a realm library is kept FLAT, and a flat
+     * class can only load if every type it touches is also flat. So each package a realm library
+     * imports must itself be served flat — and when a STAGED bundle is that package's exporter,
+     * that exporter must become a realm library too (flat AND staged), transitively. This is what
+     * carries the whole junit-platform stack flat: {@code junit-jupiter-engine} is a realm library
+     * (a direct dep), it imports {@code org.junit.platform.engine.support.hierarchical}, exported
+     * by {@code junit-platform-engine} — which is only transitive, so the seed pass left it
+     * staged-only. The flat {@code JupiterTestEngine} then fails to load its superclass {@code
+     * HierarchicalTestEngine} host-side. Promoting the exporter closes the gap. Guards mirror
+     * {@code close()}: optional imports do not force it, a host-flat package (already served by the
+     * exec's own flat tail) needs no promotion, and the boot-stack guard still forbids a second
+     * in-framework exporter.
+     */
+    private void propagateRealmLibraries() {
+      final Set<String> bootStackExports = bootStackExportedPackages();
+      final Deque<ResolvedBundle> pending = new ArrayDeque<>(realmLibraryByGa.values());
+      while (!pending.isEmpty()) {
+        final ResolvedBundle library = pending.removeFirst();
+        for (Clause imported : library.imports().clauses()) {
+          final String pkg = imported.name();
+          if (isOptional(imported) || hostFlatPackages.contains(pkg)) {
+            continue; // optional, or already served by the host's own flat tail — nothing to keep.
+          }
+          for (ResolvedBundle exporter : exportersByPackage.getOrDefault(pkg, List.of())) {
+            if (realmLibraryByGa.containsKey(exporter.ga())
+                || !stagedByGa.containsKey(exporter.ga())
+                || exporter.launcher()
+                || exporter.embed().isPresent()
+                || exporter.exports().names().stream().anyMatch(bootStackExports::contains)) {
+              // already a realm library / not staged / the framework / one of ours / a second
+              // in-framework exporter the boot-stack forbids — none becomes a new flat copy.
+              continue;
+            }
+            realmLibraryByGa.put(exporter.ga(), exporter);
+            trace.add(exporter.ga() + "  <-  realm-library: " + library.ga() + " imports " + pkg);
+            pending.addLast(exporter);
+          }
         }
       }
     }
