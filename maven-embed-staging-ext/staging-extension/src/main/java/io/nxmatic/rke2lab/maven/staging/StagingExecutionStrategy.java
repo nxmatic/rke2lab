@@ -183,9 +183,15 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     }
 
     // ---- REALM_BOUNDARY: no class references a type unreachable in its realm ----
+    // The bundle-only packages: everything a bundle-SIDE carrier exports — a domain (model/edge) OR
+    // a contract. A contract is staged, not flat, and not a seam, so its exported vocabulary
+    // (manifests.contract, …) is exactly as unreachable from the flat host as a domain's. Deciding
+    // "forbidden" on isDomain() alone left contracts out, so a flat class naming a contract type
+    // (EntryGatePolicyEnforcer → ManifestUpdateGate) leaked past the gate to a runtime
+    // NoClassDefFoundError. isDomain() || isContract() closes that hole.
     final Set<String> forbidden = new java.util.LinkedHashSet<>();
     for (ResolvedBundle b : resolved) {
-      if (b.embed().map(EmbedCapability::isDomain).orElse(false)) {
+      if (isBundleSide(b)) {
         forbidden.addAll(b.ourExportedPackages());
       }
     }
@@ -199,9 +205,8 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
           java.nio.file.Path.of(session.getCurrentProject().getBuild().getOutputDirectory());
       flatClasses.addAll(ResolvedBundle.classEntriesOf(ownClasses));
       for (ResolvedBundle b : resolved) {
-        final boolean domain = b.embed().map(EmbedCapability::isDomain).orElse(false);
-        if (b.launcher() || domain) {
-          continue; // the framework, and bundle-side domains, are not in the flat realm.
+        if (b.launcher() || isBundleSide(b)) {
+          continue; // the framework, and bundle-side carriers (domain + contract), are not flat.
         }
         flatVisible.addAll(b.ourExportedPackages());
         flatClasses.addAll(b.classEntries()); // includes the seams (type=seam) — they are flat too.
@@ -220,10 +225,10 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
           flatViolations,
           "flat-realm classes reference bundle-only packages (host/seam leak)");
 
-      // Bundle realms: each isDomain carrier may reference only its own + imported + system
-      // packages.
+      // Bundle realms: each bundle-side carrier (domain + contract) may reference only its own +
+      // imported + system packages.
       for (ResolvedBundle b : resolved) {
-        if (!b.embed().map(EmbedCapability::isDomain).orElse(false)) {
+        if (!isBundleSide(b)) {
           continue;
         }
         final Set<String> visible = new java.util.LinkedHashSet<>(b.ourExportedPackages());
@@ -314,6 +319,17 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     }
 
     report.flush();
+  }
+
+  /**
+   * A BUNDLE-SIDE carrier — one whose exported packages live only in a staged bundle, never flat: a
+   * domain (model/edge) or a contract. Both are the "forbidden" set the flat realm may not reach
+   * and are themselves excluded from the flat realm. A seam ({@code type=seam}) is NOT bundle-side
+   * (it is host-flat), a library is dual (flat too), the launcher is the framework — none belong
+   * here.
+   */
+  private static boolean isBundleSide(ResolvedBundle b) {
+    return b.embed().map(e -> e.isDomain() || e.isContract()).orElse(false);
   }
 
   /**
