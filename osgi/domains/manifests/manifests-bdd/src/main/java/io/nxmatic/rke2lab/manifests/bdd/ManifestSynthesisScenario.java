@@ -4,10 +4,13 @@ import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
+import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.manifests.HostTreeChecksummer;
+import io.nxmatic.rke2lab.manifests.contract.HostManifest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
@@ -19,7 +22,11 @@ import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvOverlayService;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -111,9 +118,31 @@ public class ManifestSynthesisScenario
         .and()
         .the_manifests_file_is_written()
         .and()
-        .the_overlay_carries_the_link_time_policy();
+        .the_overlay_carries_the_link_time_policy()
+        .and()
+        .the_host_manifest_is_published(resolveCellar(), resolveParcel());
 
     LAST_RUNBOOK.set(getScenario().getModel());
+  }
+
+  /**
+   * Resolve the {@link Cellar} the host laid into the registry — where this scion publishes the
+   * host-manifest of the replica tree it materialised. Required (the host publishes it at the
+   * GIVEN, a test registers a mock), the twin of the other scions' cellar resolve.
+   */
+  private Cellar resolveCellar() {
+    return ScenarioRegistry.of(this)
+        .require(
+            Cellar.class,
+            "no Cellar in the registry (the host lays it in at boot, a test registers a mock)");
+  }
+
+  /** Resolve the current {@link Parcel} — the plot this run cultivates, an ambient fact. */
+  private Parcel resolveParcel() {
+    return ScenarioRegistry.of(this)
+        .require(
+            Parcel.class,
+            "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
   }
 
   private <T> T resolve(Class<T> type) {
@@ -171,7 +200,14 @@ public class ManifestSynthesisScenario
     @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
     @ProvidedScenarioState Map<String, String> linkSeedVariables;
     @ProvidedScenarioState ManifestSynthesisResult result;
-    @ProvidedScenarioState Path overlayFile;
+
+    // Two Paths in one stage: jGiven shares state BY TYPE by default, so name-resolve both to avoid
+    // an AmbiguousResolutionException (the receiving stage picks each by field name, not type).
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    Path overlayFile;
+
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    Path stagingRoot;
 
     // The run's one output tree — created once, reused by both synthesis beats (units + overlay),
     // so
@@ -270,6 +306,9 @@ public class ManifestSynthesisScenario
             throw new UncheckedIOException("cannot create the synthesis outdir", ex);
           }
         }
+        // Expose the resolved replica root so the Then checksums it and publishes the
+        // host-manifest.
+        this.stagingRoot = outdir;
       }
       return outdir;
     }
@@ -290,7 +329,16 @@ public class ManifestSynthesisScenario
     @ExpectedScenarioState ManifestDomainPolicy domainPolicy;
     @ExpectedScenarioState Map<String, String> linkSeedVariables;
     @ExpectedScenarioState ManifestSynthesisResult result;
-    @ExpectedScenarioState Path envFile;
+
+    // Two Paths in this stage too: name-resolve both to match the When's field names (overlayFile,
+    // stagingRoot) — a bare TYPE resolution would be ambiguous and mis-wire them.
+    @ExpectedScenarioState(resolution = Resolution.NAME)
+    Path overlayFile;
+
+    @ExpectedScenarioState(resolution = Resolution.NAME)
+    Path stagingRoot;
+
+    private final SeedCodec codec = new SeedCodec();
 
     public Then every_enabled_domain_produced_its_units() {
       final int enabled = domainPolicy.enabledDomainIds().size();
@@ -312,14 +360,14 @@ public class ManifestSynthesisScenario
     }
 
     public Then the_overlay_carries_the_link_time_policy() {
-      if (!Files.exists(envFile)) {
-        throw new AssertionError("controlplane overlay was not written: " + envFile);
+      if (!Files.exists(overlayFile)) {
+        throw new AssertionError("controlplane overlay was not written: " + overlayFile);
       }
       final String rendered;
       try {
-        rendered = Files.readString(envFile);
+        rendered = Files.readString(overlayFile);
       } catch (IOException ex) {
-        throw new UncheckedIOException("cannot read the controlplane overlay " + envFile, ex);
+        throw new UncheckedIOException("cannot read the controlplane overlay " + overlayFile, ex);
       }
       // The 99-… ConfigMap's data carries each RKE2LAB_POLICY_LINK_* the master's install/ready
       // scripts read. Assert the rendered YAML names every link var — the link-time end landed.
@@ -329,6 +377,23 @@ public class ManifestSynthesisScenario
               "overlay does not carry the link-time policy var " + key + "\n" + rendered);
         }
       }
+      return self();
+    }
+
+    /**
+     * The scion PUBLISHES the host-manifest of the replica it materialised (§
+     * host-cellar-realisation, publish/validate/mount). It checksums the staging tree and stores a
+     * {@link HostManifest} at the {@code host-manifest} coordinate under the current {@link Parcel}
+     * — the CONTRACT the incus prep validates the FS against before the grow's rsync. It publishes
+     * only its OWN availability (the checksums + the staging root), never the bytes —
+     * fetch-not-push. The store is unconditional: the cellar consults the RunGate itself to route
+     * conserve vs pre-reserve, so the scion never picks the mode.
+     */
+    public Then the_host_manifest_is_published(@Hidden Cellar cellar, @Hidden Parcel parcel) {
+      final Map<String, String> checksums = new HostTreeChecksummer().checksum(stagingRoot);
+      final HostManifest manifest =
+          HostManifest.of(stagingRoot.toString(), checksums, "manifests-synthesis");
+      cellar.store(parcel, new SeedEnvelope("manifests", "host-manifest", codec.encode(manifest)));
       return self();
     }
   }

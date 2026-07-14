@@ -490,7 +490,11 @@ The three roles do not overlap:
 
 * *Each scion PUBLISHES what it makes available* — it materialises its own content under the SOIL and
   stores its host-manifest (pointer + checksums) at the cellar. It publishes an availability; it
-  validates nothing beyond its own morceau (it only knows its own).
+  validates nothing beyond its own morceau (it only knows its own). Concretely the manifests scion
+  (the sole scion that materialises an FS tree — the instance mounts chiefly the synthesis tree)
+  checksums its staging replica with `HostTreeChecksummer` (relpath → SHA-256) and stores a
+  `HostManifest` (`@SeedContract("host-manifest")`: the staging root, the checksums, the provenance)
+  under the current parcel.
 * *The incus PREP VALIDATES the content made available to the instance.* incus is already the prep
   (it consults manifests, assembles what the instance mounts) — validating that content is the natural
   conclusion of preparing, and only incus sees the WHOLE of what the instance will mount, so only it
