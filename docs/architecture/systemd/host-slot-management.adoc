@@ -5,15 +5,19 @@
 [NOTE]
 ====
 *Status (2026-07-14): the FS mechanism is KEPT; the scion/cellar idiom adds WHERE the contract +
-validation live.* This document describes the `main` host-tree mechanism, which STANDS: replica slots
-`host.<mode>.<N>`, a bounded 3-slot rotation (the sliding cache), and `rsync -av --delete` from the
-chosen replica into the PHYSICAL `host/` (the stable bind-mount target). R1 (never lose what a live
-instance mounts) holds because rsync syncs CONTENT while preserving the mount DIRECTORIES — present in
-every replica, so `--delete` never removes them; at preview `host/` is left untouched. What the
-scion/cellar idiom ADDS on top (not a replacement): the CONTRACT moves to the cellar as a host-manifest
-(pointer + checksums + provenance) instead of `main`'s slot ConfigMap, PUBLISHED by each scion and
-VALIDATED by the incus prep BEFORE the rsync. A slot's identity is its POSITION, not a content hash
-(the hash lives in the host-manifest as a comparison discriminant). See
+validation live.* This document describes the `main` host-tree mechanism, which STANDS, re-named to the
+final vocabulary: three FIXED places `host.staging.N` (a run materialises here, rotation of 3) →
+`host.live` (the PHYSICAL, stable bind-mount target, synced by `rsync -av --delete` from a staging) →
+`host.gc.N` (the rsync `--backup-dir`: the evicted delta, rotation of 3). (The layout diagram below
+still shows `main`'s original names — `host/`, `host.staging.N`, `host.backup.N` — read `host/` as
+`host.live` and `host.backup.N` as `host.gc.N`.) R1 (never lose what a live instance mounts) holds
+because rsync syncs CONTENT while preserving the mount DIRECTORIES — present in every replica, so
+`--delete` never removes them; at preview `host.live` is left untouched. What the scion/cellar idiom
+ADDS on top (not a replacement): the CONTRACT moves to the cellar as host-manifests instead of `main`'s
+slot ConfigMap, PUBLISHED by each scion and VALIDATED by the incus prep BEFORE the rsync; one truth
+`live.syncedFrom: host.staging.N` (preview-vs-promoted deduced), each gc stores its `fromStaging`
+(previous live source). A slot's identity is its POSITION, not a content hash (the hash lives in the
+host-manifest as a comparison discriminant). See
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec §
 The host tree the instance mounts] for the added contract/validation layer; the rotation + rsync
 described below stand.

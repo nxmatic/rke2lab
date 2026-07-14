@@ -514,54 +514,61 @@ learns a payload's shape from the door instead of knowing it in advance.
 
 == The host tree the instance mounts — publish / validate / mount (design 2026-07-14)
 
-=== Diagram V — the host half: immutable `host.<mode>.<N>` + the contract in the cellar
+=== Diagram V — the host half: `host.staging.N` → `host.live` → `host.gc.N` + the contract in the cellar
 
-The scions conserve harvests at the cellar (Diagram R). The OTHER thing a run
-produces is the FILESYSTEM TREE the incus instance binds. `host/` is a PHYSICAL
-directory, the stable bind-mount target, a faithful replica of the chosen
-`host.<mode>.<N>` slot obtained by `rsync -av --delete`. The `main` FS mechanism
-(replica slots, bounded 3-slot rotation, rsync into `host/`) is KEPT; what the
-scion/cellar idiom adds is WHERE the contract + validation live, not a replacement of
-the rsync. A slot's identity is its POSITION, not a content hash (the hash lives in
-the host-manifest as a comparison discriminant). R1 (never lose what a live instance
-mounts) holds because rsync syncs CONTENT while preserving the mount DIRECTORIES
-(present in every replica, so `--delete` never removes them); at preview the slot is
-produced but `host/` is left untouched.
+The scions conserve harvests at the cellar (Diagram R). The OTHER thing a run produces
+is the FILESYSTEM TREE the incus instance binds. Three FIXED places, a pipeline:
+`host.staging.N` (a run materialises here, rotation of 3) → `host.live` (the physical,
+stable bind-mount target, synced by `rsync -av --delete` from a staging) → `host.gc.N`
+(the rsync `--backup-dir`: what a sync evicts from live, rotation of 3). The `main` FS
+mechanism (staging/gc rotation, rsync into the physical `host.live`) is KEPT; what the
+scion/cellar idiom adds is WHERE the contract + validation live, not a replacement of the
+rsync. R1 (never lose what a live instance mounts) holds because rsync syncs CONTENT while
+preserving the mount DIRECTORIES (present in every replica, so `--delete` never removes
+them). ONE truth: the `host.live` manifest's `syncedFrom: host.staging.N` — preview-vs-
+promoted is DEDUCED from it (a preview is a staging live never adopted); each gc stores ONE
+reference, its `fromStaging` (the previous live source, "live-1"), and `toStaging`
+reconstructs by the gc chain + the current live pointer (the overwrite of `syncedFrom` would
+lose the previous source otherwise).
 
 [mermaid]
 ....
 flowchart TB
   subgraph fs["FILESYSTEM (bytes, never in the cellar)"]
-    hn["host.&lt;mode&gt;.&lt;N&gt; replica (immutable)<br/>rke2-manifests.d · k8s-daemonset.d · systemd.d<br/>+ cloud-config + env-overlay + runbook.adoc/json"]
-    live["host/ (physical, stable bind target)<br/>faithful replica via rsync -av --delete"]
+    stg["host.staging.N (immutable, rotation 3)<br/>rke2-manifests.d · k8s-daemonset.d · systemd.d<br/>+ cloud-config + env-overlay + runbook.adoc/json"]
+    live["host.live (physical, stable bind target)<br/>faithful mirror of a staging via rsync -av --delete"]
+    gc["host.gc.N (rotation 3)<br/>rsync --backup-dir: the evicted delta<br/>stores fromStaging (live-1); toStaging deduced by chain"]
   end
   subgraph cel["CELLIER (the CONTRACT, not the bytes)"]
-    hm["host-manifest<br/>pointer→slot + checksums + provenance"]
+    hm["host-manifests<br/>staging: pointer + checksums + provenance<br/>live: syncedFrom host.staging.N"]
   end
   scion["each SCION<br/>materialises its content (SOIL) + PUBLISHES host-manifest"]
-  prep["incus PREP<br/>fetch contracts → VALIDATE slot vs checksums<br/>mismatch → doctor (CONTENT_MISMATCH, fork B)"]
-  grow["host GROW (Shape C)<br/>fetch → rsync slot → host/ (mount dirs preserved) → bind<br/>no re-validate"]
-  scion --> hn
+  prep["incus PREP<br/>fetch contracts → VALIDATE staging vs checksums<br/>mismatch → doctor (CONTENT_MISMATCH, fork B)"]
+  grow["host GROW (Shape C)<br/>fetch → rsync staging → host.live (mount dirs preserved) → bind<br/>no re-validate"]
+  scion --> stg
   scion --> hm
   hm --> prep
-  hn -. read/checksum .-> prep
+  stg -. read/checksum .-> prep
   prep --> grow
-  hn -->|"rsync -av --delete (live only)"| live
+  stg -->|"rsync -av --delete (live only)"| live
+  live -->|"--backup-dir"| gc
   live -. bind .-> grow
   classDef done fill:#dfd,stroke:#2a2;
   classDef todo fill:#fee,stroke:#a22,stroke-width:2px;
-  class scion,prep,grow,hn,hm,live todo;
+  class scion,prep,grow,stg,hm,live,gc todo;
 ....
 
 Publish / validate / reconcile, no overlap: the producer PUBLISHES an availability
 (it knows only its morceau); the incus prep VALIDATES the whole the instance will
 mount (only it sees the ensemble) against the published checksums, catching a bad
 tree BEFORE the rsync on its already-wired doctor channel; the host grow RECONCILES
-(rsync the validated slot into the physical `host/`, mount dirs preserved) and binds,
-never re-validating (that would leak metier host-side). The cellar carries a FACET
-(checksums + a path), never the files — fetch-not-push, the twin of `IncusHarvest.soil`.
-R2 (the compare cache) is the collection of replica slots indexed by the host-manifests;
-the no-op check is a checksum diff, not a re-read. Preview realises the same RunGate axis
-as the cellar `up`/`preview` (Diagram R): a preview run materialises its replica slot but
-does NOT rsync into `host/` — produced, planned, `host/` untouched. Full model:
+(rsync the validated staging into the physical `host.live`, mount dirs preserved) and
+binds, never re-validating (that would leak metier host-side). The cellar carries a
+FACET (checksums + a path), never the files — fetch-not-push, the twin of
+`IncusHarvest.soil`. R2 (the compare cache) is the `host.staging.N` PLUS the `host.gc.N`
+eviction deltas, indexed by the host-manifests; the no-op check is a checksum diff, not a
+re-read. Preview realises the same RunGate axis as the cellar `up`/`preview` (Diagram R):
+a preview materialises a `host.staging.N` but the gate does NOT fire the rsync — `host.live`
+untouched, and `live.syncedFrom` never names it (traceable from the cellar, no mode-dir on
+the FS). Full model:
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec § The host tree the instance mounts].

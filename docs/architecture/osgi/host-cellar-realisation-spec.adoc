@@ -395,44 +395,59 @@ and validation live (below), not a replacement of the rsync.
 * *R4 — at LIVE provisioning, reconcile the live `host/` with the replica produced this run* (rsync);
   at PREVIEW, produce the replica but do NOT touch `host/`.
 
-=== The model — physical `host/` live + immutable replica slots + the CONTRACT in the cellar
+=== The model — the three fixed places + the CONTRACT in the cellar
 
-`host/` is a PHYSICAL directory (not a symlink), the STABLE bind-mount target of the instance — a
-FAITHFUL replica of the `host.<mode>.<N>` slot that was the source of the operation, obtained by
-`rsync -av --delete` from that slot. Each run materialises a NEW immutable replica slot
-`host.<mode>.<N>`; the slots are the cache/history (R2). At LIVE provisioning the chosen slot is
-rsynced into `host/` (content synced, mount dirs preserved — R1); at PREVIEW the slot is produced but
-`host/` is NOT touched (the RunGate closes the rsync, the twin of how it closes the cellar `up()`).
+Three FIXED filesystem places, a pipeline, not variable modes:
+
+  host.staging.N  →  host.live  →  host.gc.N
+    (produced)        (deployed)     (evicted delta)
+
+* *`host.staging.N`* — where a run MATERIALISES its replica (the synthesis writes here). A bounded
+  rotation over THREE increments (0/1/2); each `host.staging.N` is IMMUTABLE once written (the cache,
+  R2). The rotation recycles positions — a new run overwrites the oldest position with a fresh replica.
+* *`host.live`* — the PHYSICAL directory (not a symlink), the STABLE bind-mount target of the instance.
+  Singular (one mounted tree at a time). It is a FAITHFUL replica of the `host.staging.N` it was
+  `rsync -av --delete`d from — nothing writes into `host.live` except that rsync from a staging, so
+  every byte traces to an identified staging (immutable-as-mirror: a provenance guarantee, not a frozen
+  FS). At LIVE the chosen staging is rsynced in (content synced, mount dirs preserved — R1); at PREVIEW
+  `host.live` is NOT touched (the RunGate closes the rsync, the twin of how it closes the cellar `up()`).
+* *`host.gc.N`* — the `--backup-dir` of the rsync: what a sync EVICTS from `host.live` (files
+  overwritten/deleted as live moves to its new staging) — the negative delta, bounded rotation of 3.
+
+*One source of truth, the rest deduced — plus ONE stored fact per gc.* The `host.live` host-manifest
+carries `syncedFrom: host.staging.N` — the single truth of what live currently mirrors. From it:
+PREVIEW-vs-PROMOTED is DEDUCED (a staging is preview-only while `live.syncedFrom` does not name it;
+promoted once it does — no flag to maintain, the live→staging relation says all, and it is the FS
+reality, unforgeable). The gc needs ONE stored reference: each `host.gc.N` records its `fromStaging`
+(the PREVIOUS live source — "live-1" — that the sync overwrote in `live.syncedFrom` and would otherwise
+be lost). The `toStaging` is NOT stored: it reconstructs by the CHAIN — gc_k's `toStaging` is gc_{k+1}'s
+`fromStaging`, and the latest transition's `toStaging` is the current `live.syncedFrom`. So walking the
+gc chain + the current live pointer rebuilds every transition after the fact. We store only what the
+overwrite makes irrecoverable (the previous source); everything else deduces. (Bounded honestly: the
+chain reconstructs within the retained window — gc rotates over 3 — which is what R2's sliding cache is.)
 
 The cellar does NOT hold the tree's bytes (certain — a cellar never holds host-tree content). It
-holds the CONTRACT: a *host-manifest* — the pointer to the slot, the per-tree checksums, the
-provenance (which seed/run produced it). This obeys fetch-not-push exactly (§ *a harvest is fetched*):
-the cellar carries a FACET (checksums + a path), never the cultivated files. It is the twin of
-`IncusHarvest.soil` — a pointer, not the arbre.
+holds the CONTRACT: a *host-manifest* — the pointer to the staging, the per-tree checksums, the
+provenance. This obeys fetch-not-push exactly (§ *a harvest is fetched*): the cellar carries a FACET
+(checksums + a path), never the cultivated files. It is the twin of `IncusHarvest.soil` — a pointer,
+not the arbre.
 
-R2: the cache of produced trees is the collection of replica slots on the FS, INDEXED by the cellar's
-host-manifests. Comparing two versions is a diff of conserved CHECKSUMS, not a re-read of two arbres;
-the no-op check (was main's byte-for-byte replica-vs-`host/`) becomes a checksum diff.
+R2: the cache is the collection of `host.staging.N` (the last 3 produced) PLUS the `host.gc.N` (the
+last 3 eviction deltas — the evolution history), INDEXED by the cellar's host-manifests. Comparing two
+versions is a diff of conserved CHECKSUMS, not a re-read of two arbres; the no-op check (was main's
+byte-for-byte replica-vs-`host/`) becomes a checksum diff.
 
-*What is new vs `main` (the FS mechanism is NOT).* The `rsync -av --delete` into a physical `host/`,
-the replica slots, the bounded rotation — all kept from `main`. What the scion/cellar idiom ADDS: the
-CONTRACT moves to the cellar as a host-manifest (not `main`'s slot ConfigMap), PUBLISHED by each scion,
-VALIDATED by the incus prep before the rsync. The manner of syncing bytes is `main`'s; the ownership
-of the contract and the validation is the new idiom.
+*What is new vs `main` (the FS mechanism is NOT).* The `rsync -av --delete` into a physical `host.live`,
+the staging/gc rotation — all kept from `main`. What the scion/cellar idiom ADDS: the CONTRACT moves to
+the cellar as host-manifests (not `main`'s slot ConfigMap), PUBLISHED by each scion, VALIDATED by the
+incus prep before the rsync. The manner of syncing bytes is `main`'s; the ownership of the contract and
+the validation is the new idiom.
 
-*Naming and rotation — inherited from `main`, not the content-hash.* A slot is named by the PATTERN
-`host.<mode>.<N>` (the layout `main` used: the live current tree is the physical `host/`; the replicas
-carry a mode — `staging`, `backup`, `preview` — and a sequence `N`). `<N>` is a bounded rotation over
-THREE increments (0/1/2) — so the cache R2 is not unbounded, it slides: three rolling slots per mode.
-Each replica slot `host.<mode>.<N>` is individually IMMUTABLE (a produced replica is never rewritten);
-the rotation recycles the SLOT POSITIONS (a new run overwrites the oldest slot's position with a fresh
-replica), and the live `host/` is synced FROM the chosen slot by `rsync -av --delete`. What is kept
-from `main` is the NAMING + the bounded 3-slot rotation + the rsync-into-`host/`. A slot's IDENTITY is
-its POSITION (`host.<mode>.<N>`), NOT its content
-hash — so there is no "no-op for free by the name"; the no-op check stays an explicit checksum diff.
-The content hash lives INSIDE the host-manifest (a comparison discriminant, correspondence hash→slot
-possible) but is NOT a key: the same hash may map to SEVERAL slots (identical content re-materialised
-across the rotation), so the hash discriminates, the position identifies.
+*A slot's IDENTITY is its POSITION* (`host.staging.N`), NOT its content hash — so there is no "no-op for
+free by the name"; the no-op check stays an explicit checksum diff. The content hash lives INSIDE the
+host-manifest (a comparison discriminant, correspondence hash→slot possible) but is NOT a key: the same
+hash may map to SEVERAL slots (identical content re-materialised across the rotation), so the hash
+discriminates, the position identifies.
 
 === Publish (each scion) vs VALIDATE (incus prep) vs mount (host grow)
 
@@ -460,11 +475,14 @@ not new plumbing.
 
 === Live vs preview
 
-A preview run MATERIALISES its replica slot (mode `preview`) and its host-manifest but does NOT rsync
-it into `host/` — it produces and shows the plan, `host/` is left untouched (so the live instance is
-unaffected). This is the same RunGate axis as the cellar's `up`/`preview` (§ *the cellar consults the
-RunGate*), realised on the host tree instead of the cellar store — one axis, two realisations: the gate
-closes the rsync exactly as it closes the cellar `up()`.
+There is NO separate preview directory: a preview run materialises `host.staging.N` (the SAME place a
+live run does) and its host-manifest, but the gate does NOT fire the rsync into `host.live` — so
+`live.syncedFrom` never comes to name this staging, and PREVIEW-vs-PROMOTED is exactly that deduced
+distinction (§ the model). `host.live` is left untouched (the live instance is unaffected). This is the
+same RunGate axis as the cellar's `up`/`preview` (§ *the cellar consults the RunGate*), realised on the
+host tree instead of the cellar store — one axis, two realisations: the gate closes the rsync exactly
+as it closes the cellar `up()`. A preview is thus TRACEABLE from the cellar (a produced staging its
+host-manifest records, that live never adopted), with no mode-directory polluting the FS.
 
 === The runbook `json` has a RUNTIME role INSIDE the node (not only operator narration)
 
@@ -498,9 +516,12 @@ letting load-bearing facts hide in unrendered state.
 
 * Does incus AGGREGATE every scion's host-manifest, or validate only the manifests arbre it mounts
   (the instance mounts chiefly the synthesis tree)?
-* `host.N` naming — RESOLVED (2026-07-14): the `main` pattern `host.<mode>.<N>`, `<N>` a bounded
-  3-slot rotation; position identifies, the content hash lives in the host-manifest as a comparison
-  discriminant (not a key — a hash may map to several slots). See the naming paragraph above.
+* `host.N` naming — RESOLVED (2026-07-14): three FIXED places `host.staging.N` / `host.live` /
+  `host.gc.N` (a pipeline, not variable modes), `<N>` a bounded 3-slot rotation; position identifies,
+  the content hash lives in the host-manifest as a comparison discriminant (not a key). preview-vs-
+  promoted is DEDUCED from `live.syncedFrom`; each gc entry stores ONE reference — its `fromStaging`
+  (the previous live source the sync overwrote) — and the `toStaging` reconstructs by the gc chain +
+  the current live pointer. See the model paragraph above.
 * The runbook `adoc`/`json` — a file INSIDE each `host.N` (travels with it, immutable), the natural home
   once this model lands (this is where H2-bis — "render the runbook" — folds in).
 * The SOIL wiring is not yet connected in production (synthesis writes a temp dir today, not
