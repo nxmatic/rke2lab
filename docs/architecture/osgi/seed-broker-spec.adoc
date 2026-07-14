@@ -310,6 +310,25 @@ Only piece 1 is broker-generic; piece 2 is what each domain brings. Until piece 
 ships, a sower cannot discover a payload's shape — it must know it a priori, which
 is the a-priori coupling the whole introspection turn removes.
 
+==== The AMEND verb — realising the fill-by-role (SHIPPED 2026-07-14)
+
+Shape DESCRIBES the input; a third amont verb FILLS it by role, so a sower holds a value under a neutral
+role and never names the target's field. `AmendCoordinate(domain)` (in `ValueCoordinate permits`, beside
+Shape/Split/Runbook) is the verb; `AmendmentBinder` (module `seed-broker-shape`, the twin of
+`RecordSchemaProjector`) is the broker-generic role→field bridge, working on JSON: given a record's
+`defaults` and a `{role → value}` map, it binds each offered role onto the `@Amendment` component that role
+names (loud on absent/ambiguous; a role borne by several components — `ManifestsRunbookInput` marks both
+`link` and `debug` FACET — is fine unless offered). A domain contributes a `@Component` amend reflector
+(`ManifestsAmendReflector` serves `AmendCoordinate("manifests")`, binding onto `ManifestsRunbookInput`).
+
+This is where the broker earns its role as the door that RECONCILES two points of view: incus (the first
+metier scion→scion) holds a plot under role `soil` and sows `AmendCoordinate("manifests")` then
+`RunbookCoordinate("manifests")` — it names no manifests field, the reconciliation lives at the door, not
+in the manifests runbook handler (which receives an already-filled input). The scion input wire-records
+carry these amendments: `ManifestsRunbookInput` (its `@Amendment(SOIL) materializationRoot`),
+`IncusRunbookInput` (incus's own SOIL, forwarded to manifests). A scion's conserved harvest is a wire-record
+too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the scion harvests and stores).
+
 [[hateoas-the-plant-advertises]]
 === HATEOAS — the plant advertises what can be sown next (the second discovery idiom)
 
