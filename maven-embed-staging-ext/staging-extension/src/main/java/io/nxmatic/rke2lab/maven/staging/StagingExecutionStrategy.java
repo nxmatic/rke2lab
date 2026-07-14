@@ -469,14 +469,39 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       throw new LifecycleExecutionException(
           "osgi-staging could not resolve dependencies of " + project.getArtifactId(), ex);
     }
+    final Set<String> directGas = directlyDeclaredGas(result);
     final List<ResolvedBundle> bundles = new ArrayList<>();
     for (Dependency dependency : result.getResolvedDependencies()) {
       final org.eclipse.aether.artifact.Artifact a = dependency.getArtifact();
-      bundles.add(
-          ResolvedBundle.read(a.getGroupId(), a.getArtifactId(), a.getVersion(), a.getFile()));
+      final ResolvedBundle bundle =
+          ResolvedBundle.read(a.getGroupId(), a.getArtifactId(), a.getVersion(), a.getFile());
+      bundles.add(directGas.contains(bundle.ga()) ? bundle.asDirectlyDeclared() : bundle);
     }
     bundles.addAll(resolveBootStack(session, project));
     return bundles;
+  }
+
+  /**
+   * The {@code groupId:artifactId} keys the exec-module declares DIRECTLY — the root graph node's
+   * immediate children. A direct third-party dependency is the developer's explicit "I need this
+   * host-flat" intent (the parallel of a {@code type=library} self-declaring its dual nature); the
+   * closure treats such a bundle as a realm library so it is staged AND kept flat. The jar carries
+   * no directness signal — only the graph shape does — so it is read here, once, from the
+   * resolution result.
+   */
+  private static Set<String> directlyDeclaredGas(DependencyResolutionResult result) {
+    final org.eclipse.aether.graph.DependencyNode root = result.getDependencyGraph();
+    if (root == null) {
+      return Set.of();
+    }
+    final Set<String> direct = new LinkedHashSet<>();
+    for (org.eclipse.aether.graph.DependencyNode child : root.getChildren()) {
+      final org.eclipse.aether.artifact.Artifact a = child.getArtifact();
+      if (a != null) {
+        direct.add(a.getGroupId() + ":" + a.getArtifactId());
+      }
+    }
+    return direct;
   }
 
   /**

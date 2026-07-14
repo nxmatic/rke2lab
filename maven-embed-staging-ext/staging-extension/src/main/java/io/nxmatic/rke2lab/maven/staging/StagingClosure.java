@@ -197,12 +197,16 @@ public record StagingClosure(
      *   <li>OUR OWN dual-realm library: a bundle self-declaring {@code embed; type=library} (e.g.
      *       {@code gateway-document-codec}). It states its dual nature explicitly, so it is a realm
      *       library by declaration — no import analysis needed.
-     *   <li>a THIRD-PARTY OSGi bundle (not ours, not a seam, not the launcher) exporting a domain
-     *       import the boot-stack does NOT already provide (jackson). A domain import already
-     *       served by a boot-stack bundle (pax-logging-api exports {@code org.slf4j}) needs no
-     *       realm-library copy — staging one would add a second in-framework exporter and break the
-     *       slf4j 2.x ServiceLoader-processor resolution. So that package is not a staging trigger;
-     *       the bundle stays host-flat only.
+     *   <li>a THIRD-PARTY OSGi bundle (not ours, not a seam, not the launcher) that EITHER exports
+     *       a domain import OR is DIRECTLY DECLARED by the exec-module. A direct declaration is the
+     *       developer's explicit "keep it host-flat" intent — the parallel of a {@code
+     *       type=library} self-declaring its dual nature — so a directly-declared third-party
+     *       bundle that also gets staged (e.g. {@code gson}: the exec declares it compile AND the
+     *       bbox client pulls it into the staging closure) is kept flat too. Either signal is
+     *       subject to the SAME boot-stack guard: a package already served in-framework by a
+     *       boot-stack bundle (pax-logging-api exports {@code org.slf4j}) needs no realm-library
+     *       copy — staging one would add a second in-framework exporter and break slf4j 2.x
+     *       resolution.
      * </ul>
      */
     private static boolean isRealmLibrary(
@@ -214,10 +218,16 @@ public record StagingClosure(
         // Ours: only a type=library is dual (staged + flat); model/edge/record/seam are not.
         return b.embed().orElseThrow().isLibrary();
       }
+      // A third-party bundle whose exports the boot-stack already serves in-framework is never a
+      // realm library — a second exporter would break resolution (slf4j). This guards BOTH signals.
+      if (b.exports().names().stream().anyMatch(bootStackExports::contains)) {
+        return false;
+      }
+      if (b.directlyDeclared()) {
+        return true;
+      }
       for (String exported : b.exports().names()) {
-        if (!ResolvedBundle.isOurs(exported)
-            && domainImports.contains(exported)
-            && !bootStackExports.contains(exported)) {
+        if (!ResolvedBundle.isOurs(exported) && domainImports.contains(exported)) {
           return true;
         }
       }

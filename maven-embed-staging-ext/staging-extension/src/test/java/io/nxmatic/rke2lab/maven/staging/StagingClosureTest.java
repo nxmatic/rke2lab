@@ -22,6 +22,7 @@ class StagingClosureTest {
             EmbedCapability.of(OsgiHeader.parse("io.nxmatic.rke2lab.embed;type=" + type))),
         OsgiHeader.parse(imports),
         OsgiHeader.parse(exports),
+        false,
         false);
   }
 
@@ -35,7 +36,13 @@ class StagingClosureTest {
         Optional.empty(),
         OsgiHeader.parse(null),
         OsgiHeader.parse(exports),
+        false,
         false);
+  }
+
+  /** A third-party bundle the exec-module declares as a DIRECT dependency (a root graph child). */
+  private static ResolvedBundle directThirdParty(String g, String a, String exports) {
+    return thirdParty(g, a, exports).asDirectlyDeclared();
   }
 
   /** A third-party bundle carrying an explicit symbolic name (e.g. a boot-stack member). */
@@ -49,6 +56,7 @@ class StagingClosureTest {
         Optional.empty(),
         OsgiHeader.parse(null),
         OsgiHeader.parse(exports),
+        false,
         false);
   }
 
@@ -109,6 +117,53 @@ class StagingClosureTest {
     assertTrue(
         !closure.stagedGas().contains("org.slf4j:slf4j-api"),
         "slf4j-api is not staged — staging it would add a second org.slf4j exporter");
+  }
+
+  @Test
+  void aDirectlyDeclaredThirdPartyIsARealmLibraryEvenWhenNoDomainImportsIt() {
+    // gson: seed-master declares it a DIRECT compile dep (com.pulumi needs it host-flat at
+    // startup), and the bbox edge's client pulls it into the staging closure — but no domain
+    // Import-Package: com.google.gson, so the import-signal alone would exclude it from flat. The
+    // direct declaration IS the developer's keep-flat intent, so gson must be staged AND flat.
+    final ResolvedBundle edge =
+        bundle(
+            "io.nxmatic.rke2lab",
+            "bbox-edge",
+            "edge",
+            /*imports*/ "io.nxmatic.rke2lab.bbox.port",
+            /*exports*/ "io.nxmatic.rke2lab.bbox.edge");
+    final ResolvedBundle gson =
+        directThirdParty("com.google.code.gson", "gson", /*exports*/ "com.google.gson");
+
+    final StagingClosure closure = StagingClosure.compute(List.of(edge, gson));
+
+    assertTrue(
+        closure.realmLibraryGas().contains("com.google.code.gson:gson"),
+        "a directly-declared third-party bundle is a realm library (flat AND staged)");
+    assertTrue(
+        !closure.shadeExcludeGas().contains("com.google.code.gson:gson"),
+        "so it is NOT excluded from the flat uber-jar — com.pulumi finds it at startup");
+  }
+
+  @Test
+  void aDirectlyDeclaredThirdPartyIsNotARealmLibraryWhenTheBootStackServesItsPackage() {
+    // Even a DIRECT declaration cannot make a bundle a realm library when the boot-stack already
+    // exports its package in-framework — a second exporter would break resolution (slf4j 2.x). The
+    // boot-stack guard trumps the direct-declaration signal.
+    final ResolvedBundle slf4j =
+        directThirdParty("org.slf4j", "slf4j-api", /*exports*/ "org.slf4j");
+    final ResolvedBundle pax =
+        named(
+            "org.ops4j.pax.logging",
+            "pax-logging-api",
+            "org.ops4j.pax.logging.pax-logging-api",
+            /*exports*/ "org.slf4j");
+
+    final StagingClosure closure = StagingClosure.compute(List.of(slf4j, pax));
+
+    assertTrue(
+        !closure.realmLibraryGas().contains("org.slf4j:slf4j-api"),
+        "the boot-stack guard trumps direct declaration — slf4j-api stays host-flat only");
   }
 
   @Test

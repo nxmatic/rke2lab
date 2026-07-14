@@ -22,6 +22,7 @@ class DuplicateRealmClassTest {
         Optional.empty(),
         OsgiHeader.parse(null),
         OsgiHeader.parse(exportHeader),
+        false,
         false);
   }
 

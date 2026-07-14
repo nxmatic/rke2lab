@@ -29,7 +29,8 @@ public record ResolvedBundle(
     Optional<EmbedCapability> embed,
     OsgiHeader imports,
     OsgiHeader exports,
-    boolean launcher) {
+    boolean launcher,
+    boolean directlyDeclared) {
 
   /**
    * The service file a launchable OSGi framework declares — how the runtime finds it, so we do too.
@@ -52,6 +53,7 @@ public record ResolvedBundle(
           Optional.empty(),
           OsgiHeader.parse(null),
           OsgiHeader.parse(null),
+          false,
           false);
     }
     try (JarFile jar = new JarFile(file)) {
@@ -71,7 +73,8 @@ public record ResolvedBundle(
           Optional.ofNullable(EmbedCapability.of(provide)),
           imports,
           exports,
-          launcher);
+          launcher,
+          false);
     } catch (IOException ex) {
       throw new UncheckedIOException("cannot read jar of " + groupId + ":" + artifactId, ex);
     }
@@ -90,6 +93,16 @@ public record ResolvedBundle(
   /** The {@code groupId:artifactId} key — the pom-side identity the shade/staging lists name. */
   public String ga() {
     return groupId + ":" + artifactId;
+  }
+
+  /**
+   * This bundle with {@link #directlyDeclared} set — the exec-module names it as a DIRECT
+   * dependency (a root child in the resolution graph). The jar itself carries no such signal, so
+   * directness is grafted on from the graph after the frontier {@link #read}.
+   */
+  public ResolvedBundle asDirectlyDeclared() {
+    return new ResolvedBundle(
+        groupId, artifactId, version, file, symbolicName, embed, imports, exports, launcher, true);
   }
 
   /**
