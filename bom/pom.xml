@@ -36,6 +36,7 @@
     <asm.version>9.10.1</asm.version>
     <networknt.json-schema.version>1.5.6</networknt.json-schema.version>
     <victools.version>4.38.0</victools.version>
+    <java-diff-utils.version>4.17</java-diff-utils.version>
     <jgit.version>7.7.0.202606012155-r</jgit.version>
     <software.constructs.version>10.6.0</software.constructs.version>
     <cdk8s.version>2.70.76</cdk8s.version>
@@ -243,6 +244,15 @@
         <groupId>com.github.victools</groupId>
         <artifactId>jsonschema-module-jackson</artifactId>
         <version>${victools.version}</version>
+      </dependency>
+      <!-- java-diff-utils: the OBSERVE brick of the host-tree grow (I6c) — line-level unified diffs
+           for the text files of the two deltas (change / drift). A HOST-classpath dep (the grow is
+           Shape C, host-side), already a first-class OSGi bundle should the OBSERVE ever move
+           in-container (BSN io.github.java-diff-utils). -->
+      <dependency>
+        <groupId>io.github.java-diff-utils</groupId>
+        <artifactId>java-diff-utils</artifactId>
+        <version>${java-diff-utils.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.felix</groupId>
