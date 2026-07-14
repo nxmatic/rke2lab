@@ -273,12 +273,19 @@ public class IncusProvisionScenario
   }
 
   /**
-   * When: the scion reads the run condition (the {@link RunGate}), then — only when cultivating —
-   * builds the image and consults manifests, recording each facet's {@link ObservationWire} (ok, or
-   * failed with a typed {@link SymptomKind}) into the shared sink, fail-fast on the first failure.
-   * It PREPARES the instance's material (image + manifests); the host makes the instance grow and
-   * verifies its reachability (Shape C — the gRPC push and its post-push probe are host-side).
-   * Under a closed gate it builds nothing (the plan renders PENDING via E9, no edge contacted).
+   * When: the scion reads the run condition (the {@link RunGate}), builds the image ONLY when
+   * cultivating (an edge effect — distrobuilder/ssh), and ALWAYS consults manifests, recording each
+   * facet's {@link ObservationWire} (ok, or failed with a typed {@link SymptomKind}) into the
+   * shared sink, fail-fast on the first failure. It PREPARES the instance's material (image +
+   * manifests); the host makes the instance grow and verifies its reachability (Shape C — the gRPC
+   * push and its post-push probe are host-side).
+   *
+   * <p>The gate splits by NATURE of effect (§ host-cellar-realisation, Live vs preview): the image
+   * build is an edge effect, so a closed gate builds nothing (the plan renders PENDING via E9, no
+   * edge contacted); the manifests synthesis is a pure FS materialisation into {@code
+   * host.staging.N}, inert against the live instance, so it runs at preview too — a preview run
+   * materialises its staging replica and its host-manifest (traceable from the cellar), only the
+   * rsync into {@code host.live} is gated (I6). So consulting manifests is NOT gated.
    */
   public static class When extends Stage<When> {
 
@@ -315,12 +322,11 @@ public class IncusProvisionScenario
      * {@code @Amendment(SOIL)} as the manifests SOIL (a plot, never a fingerprint — a harvest is
      * fetched, not pushed). Two sows: AMEND reconciles the neutral role into the manifests input at
      * the door (incus names no manifests field), then RUNBOOK plays the synthesis with the amended
-     * input. Only when cultivating; under a closed gate the plan renders PENDING, nothing sown.
+     * input. NOT gated: the synthesis writes {@code host.staging.N}, a pure FS materialisation the
+     * host-tree model wants at preview too (only the rsync into {@code host.live} is gated). The
+     * manifests scion picks a temp dir itself when the SOIL is blank (a bare survey).
      */
     public When the_manifests_are_cultivated() {
-      if (!cultivating) {
-        return self();
-      }
       // AMEND: hand the broker {soil → path} by neutral role; the manifests amend reflector binds
       // it
       // onto ManifestsRunbookInput and returns the reconciled input, still under the runbook

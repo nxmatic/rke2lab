@@ -22,11 +22,13 @@ import io.nxmatic.rke2lab.seed.bdd.PreflightStage;
 import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.nio.file.Path;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -197,6 +199,7 @@ public class ClusterSeedScenario
     @ScenarioState PulumiCellar cellarRealisation;
     @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
+    @ScenarioState BootstrapPaths paths;
 
     @NestedSteps
     @As("the entry gates are enforced")
@@ -224,8 +227,16 @@ public class ClusterSeedScenario
     @NestedSteps
     @As("the instance is provisioned")
     public When the_instance_is_provisioned(@Hidden ReportModel hostTree) {
+      // The SOIL amendment: hand incus the plot the instance's assets materialise into (the
+      // staging-view manifests root), which incus forwards to the manifests scion it consults —
+      // the fresh tree the instance will mount is thus materialised under host.staging.N, not a
+      // temp dir. The host names only the neutral SOIL role, never an incus field.
       sowAndGraft
-          .sowing("incus", gardening, hostTree)
+          .sowing(
+              "incus",
+              gardening,
+              hostTree,
+              Map.of(Amendment.SOIL, paths.manifestsRoot().toString()))
           .the_scion_is_sown_and_grafted("the instance is provisioned");
       return self();
     }

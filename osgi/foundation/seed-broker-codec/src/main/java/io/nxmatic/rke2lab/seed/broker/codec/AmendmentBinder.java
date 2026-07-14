@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.seed.broker.shape;
+package io.nxmatic.rke2lab.seed.broker.codec;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;

@@ -257,8 +257,14 @@ public class ManifestSynthesisScenario
               debug.networking().enabled(),
               debug.nriPlugins().flox().enabled());
       final Path root = outdir();
+      // manifests.yaml is the INTERMEDIATE aggregate, not part of the mounted/checksummed tree — it
+      // sits a level ABOVE the synthesis root (sibling of rke2-manifests.d), so the staging replica
+      // the scion checksums holds only the manifest units, never the merged file. Falls back into
+      // the root when the SOIL is a bare temp dir with no usable parent.
+      final Path parent = root.getParent();
+      final Path manifestFile = (parent == null ? root : parent).resolve("manifests.yaml");
       final ManifestSynthesisRequest request =
-          ManifestSynthesisRequest.builder(root, root.resolve("manifests.yaml"))
+          ManifestSynthesisRequest.builder(root, manifestFile)
               .manifestDomainPolicy(java.util.Optional.of(domainPolicy))
               .floxDebugPolicy(floxDebug)
               .build();

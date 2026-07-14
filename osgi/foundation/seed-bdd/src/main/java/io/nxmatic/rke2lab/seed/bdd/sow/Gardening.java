@@ -2,9 +2,11 @@ package io.nxmatic.rke2lab.seed.bdd.sow;
 
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.util.Map;
 
 /**
  * The open gardening — the framework as the gardener works it. An INSTANCE holding what it opened
@@ -51,9 +53,29 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
    * reaped {@code RunbookEnvelope} is pulled — read GENERICALLY, never a domain wire-record.
    */
   public String sow(String soil) {
+    return sow(soil, Map.of());
+  }
+
+  /**
+   * Sow {@code soil} with {@code amendments} — a {@code {role → value}} map the host holds under
+   * NEUTRAL {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles (e.g. {@code soil} → the
+   * plot to materialise into). When non-empty, a first sow at {@link AmendCoordinate} reconciles
+   * the roles onto the target's runbook input at the DOOR — the host names no domain field — and
+   * the reconciled payload feeds the runbook sow; when empty, the runbook is sown with the empty
+   * trigger (the scion falls back to its own defaults). Only the {@code runbook} field of the
+   * reaped envelope is pulled, read generically.
+   */
+  public String sow(String soil, Map<String, String> amendments) {
     final RunbookCoordinate coordinate = new RunbookCoordinate(soil);
-    final SeedEnvelope reaped = gardener.sow(coordinate, SeedEnvelope.of(coordinate, "{}"));
-    return new SeedCodec().decode(reaped.payload()).path("runbook").asText();
+    final SeedCodec codec = new SeedCodec();
+    final SeedEnvelope trigger =
+        amendments.isEmpty()
+            ? SeedEnvelope.of(coordinate, "{}")
+            : gardener.sow(
+                new AmendCoordinate(soil),
+                new SeedEnvelope(soil, coordinate.slug(), codec.encode(amendments)));
+    final SeedEnvelope reaped = gardener.sow(coordinate, trigger);
+    return codec.decode(reaped.payload()).path("runbook").asText();
   }
 
   /** Close the gardening — stop the framework the connection owns. */

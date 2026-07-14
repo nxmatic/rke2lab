@@ -572,8 +572,15 @@ letting load-bearing facts hide in unrendered state.
   until GN rotation. See the model paragraph above.
 * The runbook `adoc`/`json` — a file INSIDE each `host.N` (travels with it, immutable), the natural home
   once this model lands (this is where H2-bis — "render the runbook" — folds in).
-* The SOIL wiring is not yet connected in production (synthesis writes a temp dir today, not
-  `assetsRoot`/`host.N`); connecting it is part of this work.
+* The SOIL wiring — CONNECTED host→incus→manifests (2026-07-14, I2). The host fills the incus SOIL
+  by NEUTRAL role at the door: the cluster-seed `When`, holding the staging-view `BootstrapPaths`,
+  hands `{soil → manifestsRoot}` to the incus crossing; `Gardening.sow(soil, amendments)` sows a
+  first AMEND at `AmendCoordinate("incus")` (an `IncusAmendReflector`, twin of the manifests one,
+  binds the role onto `IncusRunbookInput.materializationRoot`) then the reconciled RUNBOOK. Incus
+  forwards that SOIL to the manifests scion it consults, so the synthesis materialises under
+  `host.staging.N/rke2-manifests.d` — a temp dir only when the SOIL is blank (a bare survey). The
+  intermediate `manifests.yaml` sits a level ABOVE the synthesis root (sibling of `rke2-manifests.d`),
+  outside the checksummed/mounted subtree.
 
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild

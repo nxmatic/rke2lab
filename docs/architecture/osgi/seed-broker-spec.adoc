@@ -314,8 +314,10 @@ is the a-priori coupling the whole introspection turn removes.
 
 Shape DESCRIBES the input; a third amont verb FILLS it by role, so a sower holds a value under a neutral
 role and never names the target's field. `AmendCoordinate(domain)` (in `ValueCoordinate permits`, beside
-Shape/Split/Runbook) is the verb; `AmendmentBinder` (module `seed-broker-shape`, the twin of
-`RecordSchemaProjector`) is the broker-generic role→field bridge, working on JSON: given a record's
+Shape/Split/Runbook) is the verb; `AmendmentBinder` (module `seed-broker-codec` — its jackson+reflection
+home, so an amend reflector needs no schema-generator closure; the twin of `RecordSchemaProjector`, which
+stays in `seed-broker-shape` with its victools weight) is the broker-generic role→field bridge, working on
+JSON: given a record's
 `defaults` and a `{role → value}` map, it binds each offered role onto the `@Amendment` component that role
 names (loud on absent/ambiguous; a role borne by several components — `ManifestsRunbookInput` marks both
 `link` and `debug` FACET — is fine unless offered). A domain contributes a `@Component` amend reflector

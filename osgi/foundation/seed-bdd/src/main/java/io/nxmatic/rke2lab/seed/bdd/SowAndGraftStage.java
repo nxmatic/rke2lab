@@ -6,6 +6,7 @@ import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import java.util.Map;
 
 /**
  * The gardening gesture behind every crossing step: sow a soil's runbook through the open
@@ -35,17 +36,33 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
   @ScenarioState private String soil;
   @ScenarioState private Gardening gardening;
   @ScenarioState private ReportModel hostTree;
+  @ScenarioState private Map<String, String> amendments;
 
   /**
    * Hand in the crossing's collaborators: the {@code soil} name to sow toward, the open {@link
    * Gardening}, and the root scenario's own {@link ReportModel} to graft into. Hidden — it carries
-   * wiring, not narration.
+   * wiring, not narration. The crossing sows with no amendment (the scion falls back to its own
+   * defaults); a crossing that must fill an amendment role uses {@link #sowing(String, Gardening,
+   * ReportModel, Map)}.
    */
   @Hidden
   public SowAndGraftStage sowing(String soil, Gardening gardening, ReportModel hostTree) {
+    return sowing(soil, gardening, hostTree, Map.of());
+  }
+
+  /**
+   * The amending variant: {@code amendments} is a {@code {role → value}} map the host holds under
+   * neutral {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles (e.g. the incus crossing
+   * fills {@code soil} with the plot to materialise into). Empty behaves exactly like {@link
+   * #sowing(String, Gardening, ReportModel)}.
+   */
+  @Hidden
+  public SowAndGraftStage sowing(
+      String soil, Gardening gardening, ReportModel hostTree, Map<String, String> amendments) {
     this.soil = soil;
     this.gardening = gardening;
     this.hostTree = hostTree;
+    this.amendments = amendments;
     return self();
   }
 
@@ -54,7 +71,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    * rootStepName} — the name of the root step that stands for this crossing.
    */
   public SowAndGraftStage the_scion_is_sown_and_grafted(@Hidden String rootStepName) {
-    final String runbookJson = gardening.sow(soil);
+    final String runbookJson = gardening.sow(soil, amendments);
     graft.graftUnder(hostTree, rootStepName, graft.rebuild(runbookJson));
     return self();
   }
