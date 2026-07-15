@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

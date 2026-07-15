@@ -28,6 +28,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
     </dependency>
+    <!-- The incus domain's host-tree logic: BootstrapPaths (the scion reconstructs the provisioning
+         topology from the worktree scalars) + HostSlotSelector (it picks its own rotation slot). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-core</artifactId>
+    </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a build/exec failure. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

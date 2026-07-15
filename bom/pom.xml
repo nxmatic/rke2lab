@@ -37,6 +37,7 @@
     <networknt.json-schema.version>1.5.6</networknt.json-schema.version>
     <victools.version>4.38.0</victools.version>
     <java-diff-utils.version>4.17</java-diff-utils.version>
+    <jsync.version>1.5.0</jsync.version>
     <jgit.version>7.7.0.202606012155-r</jgit.version>
     <software.constructs.version>10.6.0</software.constructs.version>
     <cdk8s.version>2.70.76</cdk8s.version>
@@ -190,6 +191,18 @@
         <groupId>org.eclipse.jgit</groupId>
         <artifactId>org.eclipse.jgit</artifactId>
         <version>${jgit.version}</version>
+      </dependency>
+      <!-- ACT of the host-tree reconcile: jsync syncs a staging into host.live.d (setDelete + a
+           .flox exclude). Nu manifest (no BSN) → embedded in incus-core's Bundle-ClassPath. -->
+      <dependency>
+        <groupId>com.fizzed</groupId>
+        <artifactId>jsync-engine</artifactId>
+        <version>${jsync.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fizzed</groupId>
+        <artifactId>jsync-vfs</artifactId>
+        <version>${jsync.version}</version>
       </dependency>
       <dependency>
         <groupId>software.constructs</groupId>

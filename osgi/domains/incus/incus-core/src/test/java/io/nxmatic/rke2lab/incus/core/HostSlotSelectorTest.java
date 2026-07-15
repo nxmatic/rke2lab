@@ -1,7 +1,6 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,8 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Pins the {@code host.<N>.staging.d} rotation: the filesystem is the state, the next slot is
  * {@code (max present + 1) mod 3} — an empty node yields 0, a partial set fills the gap upward, and
- * a full set wraps to overwrite the oldest position. Plus the staging view rebases every root under
- * the chosen slot.
+ * a full set wraps to overwrite the oldest position.
  */
 class HostSlotSelectorTest {
 
@@ -98,22 +96,5 @@ class HostSlotSelectorTest {
         stagingDir(nodeRoot, 2),
         new HostSlotSelector(nodeRoot).nextStaging(pinned),
         "pinning a slot the rotation avoids anyway leaves the choice unchanged");
-  }
-
-  @Test
-  void stagingView_rebasesEveryRootUnderTheSlot(@TempDir Path worktree) {
-    final BootstrapPaths base = BootstrapPaths.fromLocalWorktree(worktree, "bioskop", "master");
-    final Path slot = base.clusterNodeRoot().resolve("host.0.staging.d");
-
-    final BootstrapPaths staged = base.asStagingView(slot);
-
-    assertEquals(slot, staged.assetsRoot(), "the assets root becomes the slot");
-    assertTrue(
-        staged.manifestsRoot().startsWith(slot), "the manifests tree materialises under the slot");
-    assertTrue(
-        staged.systemdRoot().startsWith(slot), "the systemd tree materialises under the slot");
-    assertTrue(
-        staged.runtimeCloudConfigRoot().startsWith(slot),
-        "the cloud-config tree materialises under the slot");
   }
 }

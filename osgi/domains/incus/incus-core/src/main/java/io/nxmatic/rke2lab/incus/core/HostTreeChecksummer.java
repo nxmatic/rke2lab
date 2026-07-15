@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.manifests;
+package io.nxmatic.rke2lab.incus.core;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

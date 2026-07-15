@@ -1,24 +1,17 @@
 package io.nxmatic.rke2lab.manifests.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
-import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.File;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Hashtable;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -47,9 +40,7 @@ public class ManifestSynthesisScenarioInContainerTest {
   void the_scion_synthesizes_from_the_activation_facet() throws Exception {
     // The operator's usual posture (everything on except mesh, debug off) — a complete facet, the
     // same shape a sower plucks from Pulumi.dev.yaml.
-    final RecordingCellar cellar = new RecordingCellar();
-    final String envelope =
-        playWith(cultivatingGate(true), ManifestsRunbookInput.defaults(), cellar);
+    final String envelope = playWith(cultivatingGate(true), ManifestsRunbookInput.defaults());
     final ReportModel runbook = rebuild(envelope);
 
     assertNotNull(runbook, "the front-door harvested the played model");
@@ -58,63 +49,26 @@ public class ManifestSynthesisScenarioInContainerTest {
         ExecutionStatus.SUCCESS,
         runbook.getScenarios().get(0).getExecutionStatus(),
         "the facet was translated, synthesised, and the overlay written — the policy plays green");
-
-    // I3: the scion PUBLISHED its staging entry of the host-manifest family for the replica it
-    // materialised — one store at the host-staging coordinate, carrying the per-file checksums.
-    assertEquals(1, cellar.stored.size(), "the scion published its staging entry once");
-    final SeedEnvelope published = cellar.stored.get(0);
-    assertEquals(
-        "host-staging", published.coordinate(), "published at the host-staging coordinate");
-    final JsonNode entry = CODEC.decode(published.payload());
-    assertFalse(
-        entry.path("checksums").isEmpty(),
-        "the staging entry carries the synthesised tree's per-file checksums");
-    assertEquals(
-        "manifests-synthesis",
-        entry.path("provenance").asText(),
-        "the staging entry names its provenance");
+    // manifests only MATERIALISES content now; it no longer publishes a host-tree entry (incus owns
+    // the host tree and publishes HostStagingEntry after grafting — § the I6 correction). So this
+    // scion registers no Cellar and asserts nothing about the cellar.
   }
 
   /**
-   * Register the mock {@link RunGate} plus the ambient {@link Cellar} + {@link Parcel} into THIS
-   * bundle's registry (the synthesis + overlay services are real SCR components, already
-   * published), play the scenario in-container through the front-door with the given facet, and
-   * return its serialized envelope. Registrations are removed in the {@code finally} so the shared
-   * framework does not leak across tests.
+   * Register the mock {@link RunGate} into THIS bundle's registry (the synthesis + overlay services
+   * are real SCR components, already published), play the scenario in-container through the
+   * front-door with the given facet, and return its serialized envelope. The registration is
+   * removed in the {@code finally} so the shared framework does not leak across tests.
    */
-  private static String playWith(RunGate gate, ManifestsRunbookInput facet, Cellar cellar)
-      throws Exception {
+  private static String playWith(RunGate gate, ManifestsRunbookInput facet) throws Exception {
     final BundleContext context =
         FrameworkUtil.getBundle(ManifestsBddTests.class).getBundleContext();
-    final List<ServiceRegistration<?>> registrations = new ArrayList<>();
-    registrations.add(context.registerService(RunGate.class, gate, new Hashtable<>()));
-    registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
-    registrations.add(
-        context.registerService(Parcel.class, new Parcel("bioskop", "dev"), new Hashtable<>()));
+    final ServiceRegistration<RunGate> registration =
+        context.registerService(RunGate.class, gate, new Hashtable<>());
     try {
       return ManifestsBddScenarios.run(facet);
     } finally {
-      registrations.forEach(ServiceRegistration::unregister);
-    }
-  }
-
-  /** A neutral cellar recording every store — proves the scion published its host-manifest. */
-  private static final class RecordingCellar implements Cellar {
-    final List<SeedEnvelope> stored = new ArrayList<>();
-
-    @Override
-    public void store(Parcel parcel, SeedEnvelope vegetal) {
-      stored.add(vegetal);
-    }
-
-    @Override
-    public List<SeedEnvelope> fetch(Parcel parcel) {
-      return List.of();
-    }
-
-    @Override
-    public List<Parcel> neighbours(Parcel parcel) {
-      return List.of(parcel);
+      registration.unregister();
     }
   }
 

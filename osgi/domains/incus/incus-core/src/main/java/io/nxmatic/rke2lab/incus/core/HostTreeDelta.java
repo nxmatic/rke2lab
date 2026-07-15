@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
 import java.util.List;
 

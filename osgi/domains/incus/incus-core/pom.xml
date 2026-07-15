@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>incus-core</artifactId>
+  <name>osgi/domains/incus/incus-core</name>
+  <description>The incus domain's host-tree logic: the tree incus mounts is incus's (rke2-manifests.d
+    is one folder among many), so the slot rotation (HostSlotSelector), the cellar-timeline fold
+    (HostTreeHead), the two deltas (HostTreeDiffer / HostTreeDelta / HostTreeDeltaRenderer) and the
+    per-file checksum (HostTreeChecksummer) live here — pure Java driven by the incus scenarios.
+    type=model — installed as a bundle, wired bundle-to-bundle to the scion. The host-tree
+    vocabulary (Host*Entry) lives in incus-contract; this module holds only the logic.</description>
+
+  <dependencies>
+    <!-- The host-tree wire-records the fold decodes + the entries the CRUD writes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-contract</artifactId>
+    </dependency>
+    <!-- The codec the fold uses to decode the cellar-timeline envelopes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+    </dependency>
+    <!-- OBSERVE: the per-file line-level unified diff of a modified text file (HostTreeDiffer). -->
+    <dependency>
+      <groupId>io.github.java-diff-utils</groupId>
+      <artifactId>java-diff-utils</artifactId>
+    </dependency>
+    <!-- The staging's provenance: GitProvenanceReader reads the worktree HEAD sha + dirty. JGit
+         carries a BSN (org.eclipse.jgit), so it is imported as a bundle, no embed. -->
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit</artifactId>
+    </dependency>
+    <!-- ACT: HostTreePromoter jsyncs a staging into host.live.d. jsync ships a nu manifest (no BSN),
+         so it cannot be imported as a bundle — it is EMBEDDED in this bundle's Bundle-ClassPath
+         (bnd -includeresource;lib:=true), one consumer, no *-wrap module. -->
+    <dependency>
+      <groupId>com.fizzed</groupId>
+      <artifactId>jsync-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fizzed</groupId>
+      <artifactId>jsync-vfs</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

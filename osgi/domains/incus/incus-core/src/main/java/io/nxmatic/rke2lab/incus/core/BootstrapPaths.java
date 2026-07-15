@@ -1,20 +1,19 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig.WorktreeHost;
 import java.nio.file.Path;
 import java.util.Objects;
-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The provisioning topology of the control node — every root the bootstrap materialises into,
- * resolved once from the worktree and carried through the run as the provisioning state. Three
- * projections of one layout: {@link #fromLocalWorktree} builds the DARWIN-local view (where the
- * provisioner writes under {@code .local.d/<cluster>/<node>/host}); {@link #asHostView} rebases it
- * onto a {@link WorktreeHost} (the NIXOS host that mounts the assets); {@link #asStagingView}
- * rebases every root under a rotation slot so a run materialises there before rsyncing onto the
- * final tree. The container paths the node itself sees ({@code /srv/host/...}) are the {@link
- * HostPathCatalog}, the single source of truth distinct from these materialisation roots.
+ * resolved once from the worktree and carried through the run as the provisioning state. The tree
+ * incus mounts is incus's (§ CORRECTION 2026-07-14), and Felix is embedded in the host JVM, so the
+ * scion sees the same filesystem — the whole topology is computed OSGi-side, here. Two projections
+ * of one layout: {@link #fromLocalWorktree} builds the DARWIN-local view (where the provisioner
+ * writes under {@code .local.d/<cluster>/<node>/host}); {@link #asStagingView} rebases every root
+ * under a rotation slot so a run materialises there before rsyncing onto the final tree. The
+ * container paths the node itself sees ({@code /srv/host/...}) are the {@link HostPathCatalog}, the
+ * single source of truth distinct from these materialisation roots — the mount plan's targets.
  */
 public record BootstrapPaths(
     Path worktreeRoot,
@@ -121,29 +120,6 @@ public record BootstrapPaths(
         .build();
   }
 
-  /** The same layout rebased onto {@code host} (e.g. the NIXOS host that mounts the assets). */
-  public BootstrapPaths asHostView(BootstrapConfig config, WorktreeHost host) {
-    return builder()
-        .worktreeRoot(config.pathOn(host, worktreeRoot))
-        .stateRoot(config.pathOn(host, stateRoot))
-        .clusterNodeRoot(config.pathOn(host, clusterNodeRoot))
-        .manifestsRoot(config.pathOn(host, manifestsRoot))
-        .runtimeRke2ConfigRoot(config.pathOn(host, runtimeRke2ConfigRoot))
-        .runtimeCloudConfigRoot(config.pathOn(host, runtimeCloudConfigRoot))
-        .runtimeEnvConfigRoot(config.pathOn(host, runtimeEnvConfigRoot))
-        .secretsFile(config.pathOn(host, secretsFile))
-        .assetsRoot(config.pathOn(host, assetsRoot))
-        .daemonsetRoot(config.pathOn(host, daemonsetRoot))
-        .scriptsRoot(config.pathOn(host, scriptsRoot))
-        .systemdLibexecRoot(config.pathOn(host, systemdLibexecRoot))
-        .systemdRoot(config.pathOn(host, systemdRoot))
-        .gitRoot(config.pathOn(host, gitRoot))
-        .shareRoot(config.pathOn(host, shareRoot))
-        .kubeconfigRoot(config.pathOn(host, kubeconfigRoot))
-        .cloudSeedRoot(config.pathOn(host, cloudSeedRoot))
-        .build();
-  }
-
   /** Every materialisation root rebased under {@code stagingRoot} (the rotation slot). */
   public BootstrapPaths asStagingView(Path stagingRoot) {
     final Path originalRoot = assetsRoot;
@@ -169,26 +145,96 @@ public record BootstrapPaths(
         .build();
   }
 
+  /**
+   * The deployed tree the instance mounts — the fixed {@code host.live.d} the promotion rsyncs a
+   * chosen staging slot into (singular, not a rotation slot). The host writes the run's narration
+   * (the runbook) here DIRECTLY, post-run: the runbook is rendered from the complete played model,
+   * so it cannot travel through the promotion (which runs mid-scenario) — it is a LIVE mutation,
+   * the twin of the instance mutating its mounted content at runtime, seen as drift at the next
+   * rotation (§ host-cellar-realisation, the two deltas). A fixed path off {@code clusterNodeRoot},
+   * so the host derives it from the flat scalars alone — the scion need not return the slot it
+   * chose.
+   */
+  public Path liveRoot() {
+    return clusterNodeRoot.resolve("host.live.d");
+  }
+
+  /**
+   * The layout rebased onto the NFS automount view the remote NIXOS host mounts the assets from.
+   * Provisioning is BI-MACHINE: Felix (on the Mac) WRITES the assets under the DARWIN-local paths,
+   * the remote NIXOS host MOUNTS them over its NFS automount to grow the instance. This view yields
+   * the SOURCES of the instance's disk mounts (each paired with its {@link HostPathCatalog}
+   * target). When {@code nfsAutomount} is off the paths are unchanged (same machine); otherwise
+   * each absolute path is rebased under {@code netPrefix} (e.g. {@code /net/<cluster>.local}).
+   */
+  public BootstrapPaths asAutomountView(boolean nfsAutomount, String netPrefix) {
+    return builder()
+        .worktreeRoot(automountPath(worktreeRoot, nfsAutomount, netPrefix))
+        .stateRoot(automountPath(stateRoot, nfsAutomount, netPrefix))
+        .clusterNodeRoot(automountPath(clusterNodeRoot, nfsAutomount, netPrefix))
+        .manifestsRoot(automountPath(manifestsRoot, nfsAutomount, netPrefix))
+        .runtimeRke2ConfigRoot(automountPath(runtimeRke2ConfigRoot, nfsAutomount, netPrefix))
+        .runtimeCloudConfigRoot(automountPath(runtimeCloudConfigRoot, nfsAutomount, netPrefix))
+        .runtimeEnvConfigRoot(automountPath(runtimeEnvConfigRoot, nfsAutomount, netPrefix))
+        .secretsFile(automountPath(secretsFile, nfsAutomount, netPrefix))
+        .assetsRoot(automountPath(assetsRoot, nfsAutomount, netPrefix))
+        .daemonsetRoot(automountPath(daemonsetRoot, nfsAutomount, netPrefix))
+        .scriptsRoot(automountPath(scriptsRoot, nfsAutomount, netPrefix))
+        .systemdLibexecRoot(automountPath(systemdLibexecRoot, nfsAutomount, netPrefix))
+        .systemdRoot(automountPath(systemdRoot, nfsAutomount, netPrefix))
+        .gitRoot(automountPath(gitRoot, nfsAutomount, netPrefix))
+        .shareRoot(automountPath(shareRoot, nfsAutomount, netPrefix))
+        .kubeconfigRoot(automountPath(kubeconfigRoot, nfsAutomount, netPrefix))
+        .cloudSeedRoot(automountPath(cloudSeedRoot, nfsAutomount, netPrefix))
+        .build();
+  }
+
+  /**
+   * Rebase one absolute path onto the NFS automount view — the pure translation formerly {@code
+   * BootstrapConfig.pathOn}. With automount off (or a path already under {@code /net/}) the path is
+   * returned unchanged; a {@code /private/...} path gets {@code netPrefix} prepended, any other
+   * absolute path gets {@code netPrefix + /private} prepended (the automount root the NIXOS host
+   * exports the Mac's {@code /private} tree under).
+   */
+  static Path automountPath(Path rawPath, boolean nfsAutomount, String netPrefix) {
+    final Path normalized = rawPath.toAbsolutePath().normalize();
+    if (!nfsAutomount) {
+      return normalized;
+    }
+    final String path = normalized.toString();
+    if (path.startsWith("/net/")) {
+      return normalized;
+    }
+    if (path.startsWith("/private/")) {
+      return Path.of(netPrefix + path).normalize();
+    }
+    if (path.startsWith("/")) {
+      return Path.of(netPrefix + "/private" + path).normalize();
+    }
+    return Path.of(netPrefix + "/private/" + path).normalize();
+  }
+
   private static final class Builder {
-    // Set-once by the fluent setters, all read together in build(); monotone, never re-nulled — the
-    // builder is fully populated by fromLocalWorktree / asHostView / asStagingView before build().
-    @MonotonicNonNull private Path worktreeRoot;
-    @MonotonicNonNull private Path stateRoot;
-    @MonotonicNonNull private Path clusterNodeRoot;
-    @MonotonicNonNull private Path manifestsRoot;
-    @MonotonicNonNull private Path runtimeRke2ConfigRoot;
-    @MonotonicNonNull private Path runtimeCloudConfigRoot;
-    @MonotonicNonNull private Path runtimeEnvConfigRoot;
-    @MonotonicNonNull private Path secretsFile;
-    @MonotonicNonNull private Path assetsRoot;
-    @MonotonicNonNull private Path daemonsetRoot;
-    @MonotonicNonNull private Path scriptsRoot;
-    @MonotonicNonNull private Path systemdLibexecRoot;
-    @MonotonicNonNull private Path systemdRoot;
-    @MonotonicNonNull private Path gitRoot;
-    @MonotonicNonNull private Path shareRoot;
-    @MonotonicNonNull private Path kubeconfigRoot;
-    @MonotonicNonNull private Path cloudSeedRoot;
+    // Set-once by the fluent setters, all read together in build(); never re-nulled — the builder
+    // is
+    // fully populated by fromLocalWorktree / asStagingView before build().
+    @Nullable private Path worktreeRoot;
+    @Nullable private Path stateRoot;
+    @Nullable private Path clusterNodeRoot;
+    @Nullable private Path manifestsRoot;
+    @Nullable private Path runtimeRke2ConfigRoot;
+    @Nullable private Path runtimeCloudConfigRoot;
+    @Nullable private Path runtimeEnvConfigRoot;
+    @Nullable private Path secretsFile;
+    @Nullable private Path assetsRoot;
+    @Nullable private Path daemonsetRoot;
+    @Nullable private Path scriptsRoot;
+    @Nullable private Path systemdLibexecRoot;
+    @Nullable private Path systemdRoot;
+    @Nullable private Path gitRoot;
+    @Nullable private Path shareRoot;
+    @Nullable private Path kubeconfigRoot;
+    @Nullable private Path cloudSeedRoot;
 
     private Builder worktreeRoot(Path value) {
       this.worktreeRoot = value;

@@ -3,6 +3,10 @@
 target/
 # Alternate build directory used by the `nxmatic` Maven profile (parallel builds)
 target~nxmatic/
+# jGiven report JSON emitted by scenario runs (regenerable)
+jgiven-reports/
+# Claude scratch working area (never committed)
+.claude/scratch/
 
 # OS
 .DS_Store

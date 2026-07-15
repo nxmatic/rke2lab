@@ -1,12 +1,13 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.manifests.contract.HostDriftEntry;
-import io.nxmatic.rke2lab.manifests.contract.HostLiveEntry;
-import io.nxmatic.rke2lab.manifests.contract.HostStagingEntry;
+import io.nxmatic.rke2lab.incus.contract.HostDriftEntry;
+import io.nxmatic.rke2lab.incus.contract.HostLiveEntry;
+import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
+import io.nxmatic.rke2lab.incus.contract.HostStagingEntry.Provenance;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
@@ -25,7 +26,8 @@ class HostTreeHeadTest {
     return new SeedEnvelope(
         "manifests",
         "host-staging",
-        CODEC.encode(HostStagingEntry.of(root, Map.of("f", hash), "manifests-synthesis")));
+        CODEC.encode(
+            HostStagingEntry.of(root, Map.of("f", hash), new Provenance("abc123", false))));
   }
 
   private static SeedEnvelope live(String syncedFrom) {

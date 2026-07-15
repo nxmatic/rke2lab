@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import java.io.IOException;

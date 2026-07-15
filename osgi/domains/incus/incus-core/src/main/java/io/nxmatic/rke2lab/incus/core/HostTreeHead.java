@@ -1,8 +1,8 @@
-package io.nxmatic.rke2lab.controlplane;
+package io.nxmatic.rke2lab.incus.core;
 
-import io.nxmatic.rke2lab.manifests.contract.HostDriftEntry;
-import io.nxmatic.rke2lab.manifests.contract.HostLiveEntry;
-import io.nxmatic.rke2lab.manifests.contract.HostStagingEntry;
+import io.nxmatic.rke2lab.incus.contract.HostDriftEntry;
+import io.nxmatic.rke2lab.incus.contract.HostLiveEntry;
+import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.LinkedHashMap;
@@ -18,10 +18,10 @@ import java.util.Optional;
  * convenience fold on the reader side (the doctor folds its timeline the same way), not a new port
  * verb; the cellar stays neutral at three verbs.
  *
- * <p>The host reads it to PROMOTE (it needs {@link #liveSyncedFrom} — the staging PATH the live
- * currently mirrors, the deltas' pivot). Built host-side because folding decodes the {@link
- * SeedEnvelope} payloads, which needs the codec + the wire-record classes; incus's cross-run
- * validation reads the same head when built (deferred, I4).
+ * <p>INCUS reads it to PROMOTE (it needs {@link #liveSyncedFrom} — the staging PATH the live
+ * currently mirrors, the deltas' pivot). Folded OSGi-side, in the incus domain: the tree is incus's
+ * (it is what the instance mounts), and folding decodes the {@link SeedEnvelope} payloads with the
+ * codec + the wire-record classes — bundle-side, never host-flat (§ CORRECTION 2026-07-14).
  *
  * <p>Fold rules: the {@code host-live} coordinate has a single logical key (there is one live), so
  * the LAST {@code HostLiveEntry} in the timeline wins. {@code host-staging} / {@code host-drift}

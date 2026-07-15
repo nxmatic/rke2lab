@@ -9,8 +9,6 @@ import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.manifests.HostTreeChecksummer;
-import io.nxmatic.rke2lab.manifests.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
@@ -22,11 +20,7 @@ import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvOverlayService;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
-import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
-import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -118,31 +112,9 @@ public class ManifestSynthesisScenario
         .and()
         .the_manifests_file_is_written()
         .and()
-        .the_overlay_carries_the_link_time_policy()
-        .and()
-        .the_host_manifest_is_published(resolveCellar(), resolveParcel());
+        .the_overlay_carries_the_link_time_policy();
 
     LAST_RUNBOOK.set(getScenario().getModel());
-  }
-
-  /**
-   * Resolve the {@link Cellar} the host laid into the registry — where this scion publishes the
-   * host-manifest of the replica tree it materialised. Required (the host publishes it at the
-   * GIVEN, a test registers a mock), the twin of the other scions' cellar resolve.
-   */
-  private Cellar resolveCellar() {
-    return ScenarioRegistry.of(this)
-        .require(
-            Cellar.class,
-            "no Cellar in the registry (the host lays it in at boot, a test registers a mock)");
-  }
-
-  /** Resolve the current {@link Parcel} — the plot this run cultivates, an ambient fact. */
-  private Parcel resolveParcel() {
-    return ScenarioRegistry.of(this)
-        .require(
-            Parcel.class,
-            "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
   }
 
   private <T> T resolve(Class<T> type) {
@@ -344,8 +316,6 @@ public class ManifestSynthesisScenario
     @ExpectedScenarioState(resolution = Resolution.NAME)
     Path stagingRoot;
 
-    private final SeedCodec codec = new SeedCodec();
-
     public Then every_enabled_domain_produced_its_units() {
       final int enabled = domainPolicy.enabledDomainIds().size();
       if (result.domainCount() < enabled) {
@@ -383,24 +353,6 @@ public class ManifestSynthesisScenario
               "overlay does not carry the link-time policy var " + key + "\n" + rendered);
         }
       }
-      return self();
-    }
-
-    /**
-     * The scion PUBLISHES the staging entry of the host-manifest family for the replica it
-     * materialised (§ host-cellar-realisation, publish/validate/mount). It checksums the staging
-     * tree and stores a {@link HostStagingEntry} at the {@code host-staging} coordinate under the
-     * current {@link Parcel} — the CONTRACT the incus prep validates the FS against before the
-     * grow's sync. It publishes only its OWN availability (the checksums + the staging root it
-     * materialised into), never the bytes — fetch-not-push. The store is unconditional: the cellar
-     * consults the RunGate itself to route conserve vs pre-reserve, so the scion never picks the
-     * mode.
-     */
-    public Then the_host_manifest_is_published(@Hidden Cellar cellar, @Hidden Parcel parcel) {
-      final Map<String, String> checksums = new HostTreeChecksummer().checksum(stagingRoot);
-      final HostStagingEntry entry =
-          HostStagingEntry.of(stagingRoot.toString(), checksums, "manifests-synthesis");
-      cellar.store(parcel, new SeedEnvelope("manifests", "host-staging", codec.encode(entry)));
       return self();
     }
   }
