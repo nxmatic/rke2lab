@@ -271,6 +271,51 @@ host AMENDS the soil by filling those roles from `BootstrapPaths` + the facet. T
 topology knowledge is the host's, irreducibly, the same knowledge `IncusResourceBootstrap`
 carried on main. The schema VALIDATES the amended payload; the role SELECTS the state.
 
+=== The two natures of a SOIL — intra-world vs CROSSING (the pattern, generalised)
+
+The `@Amendment(SOIL)` above is a soil the host hands DOWN and the scion CONSUMES —
+it materialises into the plot and the plot never comes back. Call that an *intra-world
+SOIL*: it crosses host→scion once (amont), is spent in-container, nothing returns. Most
+soils are this.
+
+But a soil can also be RESOLVED by the scion and read back by the host — a *CROSSING
+SOIL*. The incus mounts are the archetype: only the scion knows the container layout
+(`HostPathCatalog`, bundle-side) and the staging structure, so it COMPUTES the
+mount plan (`{name, source, target}` per mount); the host must read it back to build the
+`com.pulumi.incus.Instance.devices(...)`. The host cannot hold the scion's record (a
+bundle type does not cross the flat seam — that is the D5 leak), and it must not learn
+the domain's field names.
+
+*The pattern: a crossing SOIL rides the AVAL mechanism, not a new contract.* It is
+exactly `@Scion`/`@Rootstock` + the domain `SplitReflector` (§ the AVAL split above,
+`DoctorSplitReflector`) — the "mechanism the whole opacity turn rests on". The scion
+marks its resolved-soil components `@Scion(role)` under a `@Rootstock`; its
+`SplitReflector` (OSGi-side, where the record's class lives) decomposes the reaped record
+into `{ rootstock → { role → value } }` — FLAT sub-trees (JDK String/Map); the host FETCHES
+and NESTS them verbatim, holding no domain class. So:
+
+* *intra-world SOIL* = `@Amendment(SOIL)` — amont, host fills, scion consumes, nothing returns.
+* *crossing SOIL* = `@Scion(role)` + `SplitReflector` — aval, scion resolves, host reads flat.
+
+*What the broker KNOWS and VERIFIES.* The broker needs no new machinery to tell the two
+apart: the ANNOTATIONS carry it — `@Amendment` marks an amont growth-need, `@Scion`/`@Rootstock`
+mark an aval fruit/resolved-soil. A soil that never returns simply bears no aval marker. And
+the existing gates already guard it: `RECORD_PURITY`/`CONTRACT_PURITY` keep these wire-records
+pure, `REALM_BOUNDARY` forbids a flat class naming a bundle-only type — so a host reading a
+scion's record directly (instead of the split flat sub-trees) fails the build. No `CROSSING_SOIL`
+gate is needed at N=1; the invariant is already machine-checked by the pair (annotations + REALM_BOUNDARY).
+
+*Corollary for `HostPathCatalog` (and the whole topology).* The realm boundary is a CLASSLOADER
+boundary, not a resource one — Felix is embedded in the host JVM, so the scion sees the same
+filesystem. So the WHOLE topology is computed OSGi-side, uniformly (it reads better than a host/scion
+split): `HostPathCatalog` + `fromLocalWorktree` + the slot + the pure `pathOn` NFS translation all live
+bundle-side; the scion produces the resolved mount plan; the host reads it flat via Split and holds no
+catalog, no roots. The host keeps only the Pulumi engine (irreducible) + a handful of flat scalars it
+hands the scion by `@Amendment` (worktree, cluster, node, nfsAutomount). No D5 leak, because the
+crossing SOIL is flat and `BootstrapConfig` never crosses. See
+link:host-cellar-realisation-spec.adoc[host-cellar] § "BootstrapPaths — the WHOLE topology is computed
+OSGi-side".
+
 This closes the amont side: Shape gives the form, `@Amendment` gives the mapping, the
 sower needs no a-priori knowledge of either the domain's fields or its own state names.
 
@@ -483,6 +528,66 @@ The host ACTS only on the verdict (machine → Pulumi); it grafts-and-renders th
 AsciiDoc) WITHOUT interpreting it. So an `Exchange`'s RESPONSE is the verdict, NOT the `ReportModel` —
 the runbook rides a separate observability channel (serialized, grafted, never read to decide). REST's
 own split: status/headers for the machine, a log body for the human.
+
+[[two-cellars-durable-vs-ephemeral]]
+=== Three channels for a crossing fact — decide / persist / render (2026-07-15)
+
+A fact travelling scion→host takes ONE of THREE channels, each answering a DIFFERENT question, with
+zero overlap. Confusing them is what tempts a fact into the wrong carrier (routing a decision through
+a tag short-circuits the assessment; routing an ephemeral render path through the Cellar
+over-durabilises it).
+
+[cols="1,2,1,1"]
+|===
+| channel | question it answers | lifetime | carrier
+
+| ASSESSMENT | "must we ACT, and what to materialise?" — the ONLY channel the host acts on | the run's response | verdict / `VerificationResult` → Pulumi
+| CELLAR | "where do we START FROM?" | DURABLE, cross-run | `Cellar.store`/`fetch` → a Pulumi resource
+| tagMap | "where/how do we RENDER this run?" (non-decisional) | EPHEMERAL, within-run | the graft (ReportModel serialized + rebuilt)
+|===
+
+The two lower rows are two CELLARS distinguished by LIFETIME; the `tagMap` IS a cellar SCOPED TO THE
+SCENARIO — a `{key → value}` map that rides the ReportModel across the realm. AUDIT (2026-07-15):
+nothing ephemeral transits the durable `Cellar` today — its uses are all cross-run (doctor
+record/ledger, incus/bbox harvests, `CellarStage`'s resume state "where we start from"); the inputs
+brought to the soil (the amendments) come from host config / in-world compute, never the Cellar. The
+`tagMap` filled a HOLE (the within-run non-decisional fact had no channel), it took nothing from the
+other two — which is why the assessment stays the sole DECISION channel.
+
+The choice rule: **a fact reread at a LATER run → the durable `Cellar`; a fact consumed WITHIN this
+run → the `tagMap`; a decision the host acts on → the verdict; and a fact crosses AT ALL only if the
+host cannot derive it itself.** Routing an ephemeral within-run fact through the `Cellar`
+across the realm. The choice rule: **a fact reread at a LATER run → the durable `Cellar`; a fact
+consumed WITHIN this run → the `tagMap`; and a fact crosses AT ALL only if the host cannot derive it
+itself.** Routing an ephemeral within-run fact through the `Cellar` over-durabilises it (a Pulumi
+resource for a value that dies with the run); holding a fact the scion computed on the host
+re-derives a convention the scion owns (a single-source-of-truth leak).
+
+The `Cellar` row is itself TRANSACTIONAL (§ the cellar is transactional): `store` accumulates, `commit`
+persists at the run boundary. And a fact can be BOTH durable and narrated — the tag then PROJECTS the
+Cellar entry (computed from it), never a second capture, so the two renderings cannot diverge. So the
+three rows are not exclusive silos: the axis is lifetime + visibility, and a host-tree entry is
+committed to the Cellar AND projected as a runbook tag.
+
+Canonical case — `liveRoot` (where the host renders the runbook, § the runbook has a runtime role in
+host-cellar-realisation-spec): a WITHIN-RUN path the host consumes right after the graft, whose
+`.local.d/<cluster>/<node>` layout convention lives ONLY in incus-core (the whole topology is
+OSGi-side) — so the host cannot derive it without re-encoding the convention. → it rides the
+`tagMap`, scion→host.
+
+Mechanism (verified, jGiven 2.0.3): a `Tag` serializes with the ReportModel and its value survives
+the Writer→rebuild round-trip (keyed in `tagMap` by `type + "-" + value` at model level; the scenario
+carries only `tagIds`). BUT `ScenarioGraft.graftUnder` today grafts only the scion's STEPS — for
+"take it from the root" to work it must ALSO merge the scion `tagMap` into the host tree (a small,
+generic addition; the host then reads `hostTree.getTagMap()` filtered by `type`). The tag stays
+NARRATION (it renders in the runbook) — it is not a data smuggler; it carries a within-run meta the
+host reads, never a decision input (those are the verdict + the amendment).
+
+The SYMMETRY (deferred): the graft is one-way scion→host. The inverse — the host POSTS on the root
+what it brings to the terrain, the scion reads it at sow — is the natural pendant, same map other
+direction. But that host→scion sense competes with the `@Amendment` (which has discipline the tag
+lacks: a neutral role, a projected schema, the host names no field), NOT with the `Cellar` — so it is
+a separate, larger step, not to be improvised alongside the ephemeral read.
 
 [[playing-a-scenario-is-a-sow]]
 === Playing a scion scenario is a `sow` — the runbook handler, not reflection
@@ -925,8 +1030,8 @@ flowchart TB
   subgraph update["UPDATE — append a history entry"]
     u["a new up() files a new envelope<br/>stable resource name<br/>the timeline IS the update log"]
   end
-  subgraph delete["DELETE — n/a"]
-    d["append-only ledger / record<br/>nothing is ever removed"]
+  subgraph delete["DELETE — withdraw a case (the fridge)"]
+    d["take one coordinate out<br/>it is no longer there until re-stored<br/>NOT a global law — an USAGE (§ frigo below)"]
   end
 ....
 
@@ -936,12 +1041,59 @@ Read the four operations: *CREATE* files one envelope under its coordinate slug,
 not by field — today's `outputsNamed("consultationReport")` becomes `outputsNamed(<coordinate-slug>)`;
 the cross-resource collection (one element per rootstock) is unchanged, returning a list of opaque
 envelopes. *UPDATE* is already opaque — a new `up()` appends a history entry under the stable resource
-name; the timeline is the update log. *DELETE* does not apply — both stores are append-only, so nothing
-is ever addressed for removal. The one mechanical change that makes CRUD opaque is that
-`StackSnapshot.outputsNamed` stops being keyed on a domain field and starts being keyed on a coordinate
-slug — that single reshape kills both leak names (`SeedBrokerCatalog.FIELD_*`, the `OUTPUT_KEY`
-constants). The stored unit is the sealed payload `String` under a slot name the broker supplied: store
-the sealed String, return the sealed String, the name comes from the plant.
+name; the timeline is the update log. *DELETE* is `withdraw` — take one coordinate's case out; it is no
+longer there until re-stored (correction 2026-07-15: the earlier "DELETE n/a, append-only" was an USAGE —
+the doctor's — mistaken for a LAW of the cellar; see § the fridge below). The one mechanical change that
+makes CRUD opaque is that `StackSnapshot.outputsNamed` stops being keyed on a domain field and starts
+being keyed on a coordinate slug — that single reshape kills both leak names (`SeedBrokerCatalog.FIELD_*`,
+the `OUTPUT_KEY` constants). The stored unit is the sealed payload `String` under a slot name the broker
+supplied: store the sealed String, return the sealed String, the name comes from the plant.
+
+[[the-cellar-is-a-fridge]]
+==== The cellar is a FRIDGE (put / peek / take), not an append-only journal (correction 2026-07-15)
+
+The spec above promoted ONE usage (the doctor's — accumulate visits, never remove) into a LAW of the
+cellar ("append-only, DELETE n/a"). The user's real-life intuition debunks it: a fridge is CURRENT STATE
+— you PUT something in, you PEEK at what is there, and you TAKE it out to consume it (once taken, it is no
+longer there until you put it back). The cellar carries BOTH needs, made EXPLICIT.
+
+Two axes the old model conflated, both realised natively by Pulumi:
+
+* *CURRENT STATE — the fridge (MUTABLE, a Map per coordinate).* `store`(put) / `fetch`(peek) /
+  `withdraw`(take). This is the stack's CURRENT state — a resource dropped from the program disappears
+  from the state. Addressed by `(Parcel, coordinate)`.
+* *HISTORY — the audit (append-only, kept by Pulumi itself).* Every `up()` is a revision: the trace of
+  who put/took what. A SEPARATE axis — the `fetch(Parcel)` timeline walk reads this. It is the AUDIT, not
+  the live content.
+
+*One primitive, three usages — each names the verbs it needs (the segregation the interface tree gave,
+then simplified to one generic `Cellar`):*
+
+[cols="1,2,2",options="header"]
+|===
+| usage | shape | verbs
+| *journal* (doctor) | accumulated timeline | `store` + `fetch`-list ; NEVER `withdraw` (discipline, not a compile guard) — its append-only EMERGES from its usage (distinct coordinate per visit), it is not a law
+| *current-state* (live) | one case, last-wins | `store` / `<T> fetch` unitaire
+| *ring / pointer* (staging rotation) | bounded position mod N | `fetch` occupancy → `withdraw` the wrapped case + `store` the fresh one
+|===
+
+The RING usage is what JUSTIFIES `withdraw` (without it, `withdraw` was a solution seeking a problem). The
+bounded staging rotation already exists as `HostSlotSelector` (incus-core, N=3 `ROTATION`, hard-coded — not
+yet a Pulumi-config knob): the next slot is `(max present + 1) mod 3`, the wrapped position overwritten by
+the fresh replica (the identity is the POSITION, not the age), the `live.syncedFrom` slot PINNED out of
+rotation (R1). DECISION (2026-07-15): the position's truth MOVES from the filesystem to the cellar —
+`HostSlotSelector` consults the cellar (`fetch` the `host-staging` entries → occupancy → `(max+1) mod N`)
+instead of `Files.list(nodeRoot)`; its logic (position, wrap, pin) is unchanged, only the source of
+occupancy. FS↔cellar reconciliation (an orphan dir with no entry, or the reverse) is EXPLICITLY DEFERRED.
+
+*Two orthogonal selectors — do NOT conflate (the LDAP filter does not restrict the API, it picks the
+object):* the TYPE answers "which verbs?" (a compile guarantee); an OSGi LDAP filter
+(`@Reference(target="(cellar.kind=durable)")`) answers "which instance?" (runtime, when several instances
+of the same type coexist). Today there is ONE impl (`PulumiCellar`, published with no properties), so the
+LDAP filter is READY-FOR, not yet needed. It becomes load-bearing when other durable natures arrive — in
+the CLUSTER version the durable cellar will be GIT-based, not Pulumi; what makes that substitution possible
+without touching a consumer is precisely the FLAT NEUTRAL SEAM (`Cellar` carries only
+`SeedEnvelope`/`Parcel`/`SeedCoordinate` — no Pulumi type leaks).
 
 [[middle-speaks-gardening]]
 == pulumi ↔ seed ↔ doctor — the middle speaks gardening, each side projects onto it
@@ -1001,21 +1153,43 @@ word. A port named `MedicalRecordJournal` means the FRONTIER knows the doctor: t
 payload to the interface NAME. But naming matters in a subtler way too (correction 2026-07-11b): the port
 is NOT in the gardening register at all — `pulumi-edge` grows nothing, it is the COMMISSIONER's storage
 (the conservation register, adjacent to gardening). So the neutral port is a *`Cellar`* — the
-commissioner's append-only store, addressed by a neutral `Parcel`:
+commissioner's addressable store (a FRIDGE: put / peek / take — § the cellar is a fridge below), addressed
+by a neutral `Parcel` (the fridge) and a `SeedCoordinate` (the case):
 
 [cols="1,2",options="header"]
 |===
 | `Cellar` (in `seed-broker-port`) | gesture
-| `store(Parcel, SeedEnvelope)` | put a végétal away in the parcel's cellar (append-only — never overwrite)
-| `fetch(Parcel) : List<SeedEnvelope>` | go get what is stored (re-read by key). NOT `harvest` — harvest is the field's hand-over; fetch is the cellar's retrieval
+| `store(Parcel, SeedEnvelope)` | file a sealed végétal at its coordinate (the case) — the envelope's coordinate IS the address
+| `fetch(Parcel) : List<SeedEnvelope>` | open the fridge, list what is there — one opaque envelope per readable case. NOT `harvest`
+| `<T> T fetch(Parcel, SeedCoordinate, Class<T>)` | peek ONE precise case (current-state, last-wins) and hand back the decoded type
+| `<T> T withdraw(Parcel, SeedCoordinate, Class<T>)` | TAKE a precise case out — consume it: it is no longer there until re-stored (the fridge, not a journal)
 | `neighbours(Parcel) : List<Parcel>` | the neighbouring cellars (sibling parcels under the same soil — was `cohort`)
 |===
 
+The address is HIERARCHICAL: the `Parcel` is the FRIDGE (the whole furniture — `fetch(Parcel)` opens it
+and lists all), the `SeedCoordinate` is the CASE within it (the "carrots" slot — what `withdraw` empties).
+You never remove "from the collection of furniture"; you remove from a case addressed by its coordinate.
+The coordinate was always in the model (`SeedEnvelope.coordinate`, the output key) but was never exposed
+as a REMOVAL address — the missing link the frigo model restores.
+
 Why a cellar and not a garden: a cellar is a NEUTRAL addressable store — it holds crops OR tools, and is
 never typed by its contents. This mirrors the envelope's opacity exactly: the cellar never looks inside
-(the végétal is sealed — the genus); it knows only the parcel (the shelf) and the gesture (store / fetch).
-`harvest` STAYS a gardening verb attached to the grower (in-container), explicitly not a cellar operation
-— so the two registers share no word, the decorrelation stated as vocabulary.
+(the végétal is sealed — the genus); it knows only the parcel (the fridge), the coordinate (the case), and
+the gesture. `harvest` STAYS a gardening verb attached to the grower (in-container), explicitly not a
+cellar operation — so the two registers share no word, the decorrelation stated as vocabulary.
+
+[NOTE]
+.The generic `<T>` is a BUNDLE-side courtesy; host-side never opens an envelope
+====
+The generic overloads (`<T> fetch`/`withdraw`) are SIGNATURE-safe on the neutral port (`Class<T>`, `T`,
+`SeedEnvelope`/`Parcel`/`SeedCoordinate` are all flat JDK types — nothing a bundle owns crosses). But the
+HOST impl (`PulumiCellar`) *cannot* materialise a bundle type (`VisitWire`, `HostLiveEntry` are absent from
+the host classpath — the `LinkageError` the seam exists to prevent), so host-side stays OPAQUE: it honours
+only `T = SeedEnvelope` and throws otherwise. The real decode is honoured REALM-BUNDLE (the cellar the
+scion/doctor resolves decodes via `SeedCodec`), on an envelope already in hand. So the consumer says the
+type it expects (`fetch(parcel, VisitWire.class)`); the decode moved OUT of the `*Reader` classes INTO the
+cellar, but it still happens where the codec and the type are legal — bundle-side, never on the host.
+====
 
 The three doctor-named host ports (`MedicalRecordJournal.historyOf`/`cohort`, `InterventionJournal.entries`,
 `InterventionLedgerWriter.append`) FUSE into this one `Cellar`: `historyOf` and `entries` are the same
@@ -1032,12 +1206,57 @@ neutral port, as its projection: `Patient ↔ Parcel` 1:1.)
 [NOTE]
 .Open question — the freshness/versioning of what is stored
 ====
-`store`/`fetch` are append-only and opaque; the cellar says nothing about whether a `fetch`ed végétal is
+`store`/`fetch` are opaque; the cellar says nothing about whether a `fetch`ed végétal is
 still TRUE against the source that grew it. A stored artifact can go stale — so a cellar read is a cache,
 and a cache can lie (version skew). This is why material that must be current (e.g. the manifests/flox
 synthesis) is a graft *cultivated fresh*, not fetched. When freshness matters, the cellar's contract
 needs a versioning/staleness answer — not yet designed, and not required by the current consumers.
 ====
+
+[[cellar-transactional]]
+==== The cellar is TRANSACTIONAL via a SUBTYPE — the ReportModel IS the transaction (2026-07-15, revised)
+
+A run must be able to accumulate stores and persist them atomically at a boundary. The FIRST design put a
+transient buffer + a read-through CLEAN cache INSIDE the service; the user debunked BOTH (revised
+2026-07-15):
+
+* *No read-through CLEAN cache.* A second cache in the service is invisible to the consumer and illegitimate
+  — `fetch` reads the durable backend directly. Called twice in a run it re-hits the backend; correct and
+  negligible at our scale. There is NO DIRTY/CLEAN split (that distinction only existed to re-sort what a
+  read-through polluted the buffer with).
+* *No `Transaction` type wrapping the ReportModel.* "The ReportModel IS the transaction" is a FIGURE, not a
+  type to materialise. The within-run write set already lives on the scenario's `ReportModel`, and its
+  isolation comes FREE from sow-and-graft (a scenario sees only what it itself wrote; the graft folds the
+  scion into the root). We invent no buffer.
+
+*The shape — a SUBTYPE, not a param.* The neutral `Cellar` (`seed-broker-port`) stays flat — it can NOT
+name `ReportModel` (a jGiven type; passing one to the host `PulumiCellar` would be the cross-loader
+`LinkageError`). A `ScenarioCellar extends Cellar`, homed in `scenario-engine` (jGiven-aware, loadable in
+BOTH realms), adds `commit()`. The role is encoded BY THE INJECTED TYPE, a compile fact: a scenario handed
+a plain `Cellar` cannot commit (no method); the root plant, handed a `ScenarioCellar`, can. The
+`ScenarioCellar` HOLDS the run's ReportModel (handed at wiring, the way `CellarStage.conserving(cellar,
+parcel)` already receives its collaborators — a `Stage` has no `getScenario()`, only the `@Test` does, so
+the model is threaded from the `@Test` body). It centralises ALL tag-posting: no scion calls
+`getScenario().getModel().addTag` anymore (the dispersed gesture the user wanted ranged in one place).
+
+* *store* accumulates by posting on the model (the single `addTag`/attachment of the system).
+* *commit* is RESERVED to the root plant (it alone knows it is the transaction; a grafted scion does not
+  know if it is root-plant or fragment). It drains the FOLDED model's envelopes to `super`'s durable
+  `store`. Failure before commit → the model dies with the run, nothing persisted (atomicity, FREE — the
+  buffer is the disposable model, no `AutoCloseable`/rollback needed).
+
+*Narration vs persistence — complementary, the tag PROJECTS the entry (never a second source).* The
+Cellar persists to the durable backend, invisible in the runbook; a `tag` is visible in the runbook
+(operator narration) but not durable. A host-tree fact that must be BOTH seen and kept is posed as a tag
+AND committed as an entry — but the tag is a PROJECTION of the entry (computed from it: "promoted from
+staging.N, sha abc, dirty"), never a separately-captured fact. One truth (the entry, the Cellar's), two
+renderings (the durable envelope + the narrated tag) — the "ONE model, two renderings" discipline, so the
+two cannot diverge. `liveRoot` stays a pure tag (a within-run render path, no durable entry behind it).
+
+NOTE: the OPEN sub-point — whether a durable envelope rides the ReportModel as a `Tag` (round-trip
+verified, but narrated in the runbook) or an `Attachment` (opaque, out of narration) — is still to be
+decided at `ScenarioCellar` implementation time. `liveRoot` is a tag (it is MEANT to be narrated); an
+opaque durable envelope leans toward an attachment.
 
 [[edge-reaches-osgi]]
 === How the host EDGE reaches an OSGi consumer — registerService, not a handler

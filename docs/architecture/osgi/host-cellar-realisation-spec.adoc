@@ -51,10 +51,10 @@ Two facts the reading settled, both load-bearing and both places I had it wrong 
   the cellar is the COMMISSIONER's conservation organ (not a third actor, not the gardener's); one
   gardening = one cellar; the végétal is opaque, addressed by a neutral `Parcel`, never read. What THIS
   realisation adds — the *how* over the Pulumi backend:
-  ** the three verbs are pure Pulumi-backend gestures: `store`/`fetch` = write/read a `végétal` as a stack
-     OUTPUT keyed by coordinate slug (`createOrSelectStack(project, stack)`), `neighbours` = enumerate the
-     sibling stacks under the same soil. `Parcel(project, stack)` IS a Pulumi stack reference said in
-     gardening words.
+  ** the verbs are pure Pulumi-backend gestures: `store`/`fetch` = write/read a `végétal` as a stack
+     OUTPUT keyed by coordinate slug (`createOrSelectStack(project, stack)`), `withdraw` = drop that
+     output from the current state (§ the fridge), `neighbours` = enumerate the sibling stacks under the
+     same soil. `Parcel(project, stack)` IS a Pulumi stack reference said in gardening words.
   ** the INTERFACE (`Cellar`, `Parcel`) is homed in `seed-broker-port` (the neutral fondation seam)
      because its face must speak gardening; the IMPL is a host object in `pulumi-edge`, laid into Felix at
      boot by `registerService` (§ open question #4, resolved) — because THIS system realises the gardener
@@ -151,7 +151,7 @@ by `doctor-core` `@Reference`. For a composite `store` the edge is itself a brok
 ----
 flowchart LR
   subgraph seam["seed-broker-port (type=seam — shared Class both sides)"]
-    Cellar["«interface» Cellar<br/>store / fetch / neighbours"]
+    Cellar["«interface» Cellar<br/>store / fetch / withdraw / neighbours"]
     Parcel["«record» Parcel<br/>(project, stack)"]
     Envelope["«record» SeedEnvelope<br/>(domain, coordinate, payload)"]
     Role["«const» Role<br/>FRUIT / SOWING (cases)"]
@@ -212,19 +212,35 @@ neutral cases opaque, and `MedicalRecordReader` (where `VisitWire` now lives) as
 code step (§ <<plan>>), prerequisite to the host Cellar emerging without re-incarnating the host-side
 recomposition.
 
-== The `Cellar` contract (already in `seed-broker-port`, `type=seam`)
+== The `Cellar` contract (a FRIDGE — put / peek / take; `seed-broker-port`, `type=seam`)
+
+The cellar is CURRENT STATE (put / peek / take), not an append-only journal — the "append-only" the older
+draft named was the DOCTOR's usage mistaken for a law (correction 2026-07-15, § seed-broker-spec "the
+cellar is a fridge"). The `Parcel` is the fridge (the whole furniture), the `SeedCoordinate` the case
+within it.
 
 [cols="1,2",options="header"]
 |===
 | verb | gesture
-| `store(Parcel, SeedEnvelope)` | append-only: file the sealed envelope under its coordinate slug; never overwrite, never read the payload
-| `fetch(Parcel) : List<SeedEnvelope>` | re-read by key: collect the stored envelopes (oldest first), one opaque envelope per readable entry
+| `store(Parcel, SeedEnvelope)` | file the sealed envelope at its coordinate (the case); never reads the payload
+| `fetch(Parcel) : List<SeedEnvelope>` | open the fridge, list what is there — one opaque envelope per readable case
+| `<T> T fetch(Parcel, SeedCoordinate, Class<T>)` | peek ONE case (last-wins) — decode is realm-BUNDLE (see note)
+| `<T> T withdraw(Parcel, SeedCoordinate, Class<T>)` | TAKE one case out — consume it: gone until re-stored (the ring usage justifies this)
 | `neighbours(Parcel) : List<Parcel>` | the sibling parcels under the same backend soil (the parcel's own first)
 |===
 
 `SeedEnvelope(domain, coordinate, payload)` — the shell (`domain`, `coordinate`: neutral `String`s) is
 what the frontier addresses BY; the `payload` (a JSON `String`) is sealed, never read. Each world uses
 its OWN jackson; no jackson type crosses.
+
+NOTE: `PulumiCellar` is a HOST object and stays OPAQUE — it honours the generic `<T>` only for
+`T = SeedEnvelope` and throws otherwise (it cannot materialise a bundle type — the `LinkageError` the
+seam prevents). The real typed decode happens REALM-BUNDLE, on the opaque envelope the host handed back
+(the doctor already does `codec.decode(entry, VisitWire.class)`; that decode moves from the `*Reader`
+into the bundle-side cellar). The three usages — journal (doctor: `store`+`fetch`-list, never
+`withdraw`), current-state (live: `<T> fetch`), ring (staging rotation: `fetch`→`withdraw`+`store`) —
+share this one primitive; only the ring needs `withdraw` (and `HostSlotSelector`'s position truth moves
+FS→cellar, § seed-broker-spec).
 
 [[every-scion-contributes]]
 == Every scion contributes — the cellar IS the resource producer (the `ResourceManager` dissolution)
@@ -445,10 +461,23 @@ relation is the reality). A `host.{DN}.drift` records the staging the live had d
 rotation recycles the slot; so over successive provisionings `host.live.d` moves and the drift entries stay
 fixed.
 
-*Because the manifest lives at the cellar, the history of live promotions is FREE.* The cellar is
-append-only, versioned by its stack history (`fetch` walks the timeline). Each mutation of the
-`host.live.d` entry is a new `Cellar.store` → a new history version → the timeline of "which staging was
-live when" falls out of the cellar, no separate transition log. R2's sliding cache IS that timeline.
+[NOTE]
+.Superseded in part by the FRIDGE model (2026-07-15) — two axes, not one append-only store
+====
+The passage below describes the staging rotation as an APPEND-ONLY store with a HEAD read = a fold
+last-wins. The fridge correction (§ seed-broker-spec "the cellar is a fridge") splits this into TWO axes:
+the CURRENT STATE (mutable — the ring pointer + the live case, reached by `<T> fetch`/`withdraw`) and the
+HISTORY (append-only — Pulumi's own revision log, the AUDIT). The ring's position truth MOVES FS→cellar:
+`HostSlotSelector` will `fetch` the `host-staging` occupancy and `withdraw` the wrapped case rather than
+fold an infinite timeline. The "HEAD = fold" reading below still holds as the AUDIT view; the CURRENT
+state is now the mutable fridge. FS↔cellar reconciliation is DEFERRED. Read the below as the audit axis.
+====
+
+*Because the manifest lives at the cellar, the history of live promotions is FREE.* The cellar's HISTORY
+axis (Pulumi's revision log) is append-only, versioned by its stack history (`fetch` walks the timeline).
+Each mutation of the `host.live.d` entry is a new `Cellar.store` → a new history version → the timeline of
+"which staging was live when" falls out of the cellar, no separate transition log. R2's sliding cache IS
+that timeline.
 
 *And because each staging entry carries CHECKSUMS, the cellar describes the FS in full — without ever
 holding a byte of it.* The manifest is the complete, authoritative description of what each replica
@@ -465,7 +494,7 @@ last 3 drift reports — the live-deviation history), INDEXED by the cellar's ho
 versions is a diff of conserved CHECKSUMS, not a re-read of two arbres; the no-op check (was main's
 byte-for-byte replica-vs-`host/`) becomes a checksum diff.
 
-*Who reads and writes it — two reads, two writers, all on the neutral 3-verb cellar.* The manifest is
+*Who reads and writes it — two reads, two writers, all on the neutral cellar (the audit axis).* The manifest is
 NOT one document mutated in place: it is ENTRIES PER REPLICA, each an append-only `Cellar.store`; the
 logical manifest is the FOLD of the parcel's timeline at read. Two writers, never in conflict (append):
 
@@ -601,14 +630,35 @@ applying an inverse patch, never the evicted bytes. That is why `host.N.drift` i
   sides is never destroyed, only its content is synced (to be VERIFIED by a test before trusting live
   mounts). No `rsync` binary on the host; testable/mockable (the instance-passing discipline).
 
-*Packaging — no wrap, no aggregator (YAGNI).* The GROW runs HOST-side (Shape C, `com.pulumi`, in
-seed-master/pulumi-edge), a FLAT classpath where a bare MANIFEST is harmless — so both libs are direct
-Maven deps of the host module, not OSGi bundles: `jsync-engine` ships without a BSN (a nu manifest) but
-never needs one host-side; `java-diff-utils` DOES carry a BSN (`io.github.java-diff-utils` + exports), so
-it is already a first-class bundle IF the OBSERVE ever moves in-container. Neither needs a `*-wrap`
-module. (The victools/BSN closure trap that bit I2 is an IN-CONTAINER concern; it does not apply on the
-host classpath.) Folding the existing `jgiven-wrap` / `victools-wrap` under an `osgi/wrap/` aggregator is
-a separate tidy-up, deferred until a third genuine OSGi wrap appears.
+*Packaging — CORRECTED 2026-07-15 (the reconcile is a SCION, not host-side).* The earlier note said the
+GROW/reconcile runs host-side, so both libs were plain host Maven deps. That was WRONG: the reconcile is
+an INCUS SCION (played in-container), and its promoter (`HostTreePromoter`) lives in `incus-core` (a
+`type=model` bundle) — the host tree is incus's, and putting the promoter host-side would re-open the
+realm leak §1-§3 closed. So the tooling is IN-CONTAINER: `java-diff-utils` carries a BSN
+(`io.github.java-diff-utils`), a first-class bundle incus-core imports normally; `jsync-engine` +
+`jsync-vfs` (1.5.0) ship WITHOUT a BSN (nu manifests), so a bundle cannot import them — they are EMBEDDED
+in incus-core's `Bundle-ClassPath` (`-includeresource: jsync-*.jar;lib:=true`, the manifests-cdk8s
+pattern), their packages NOT imported. One consumer (incus-core) → Bundle-ClassPath embed, NOT a `*-wrap`
+module (the settled rule: wrap only at the third genuine reuse). The victools/BSN closure trap DOES apply
+here (in-container) — the embed avoids it (the jars are internal to the bundle, never a resolution edge).
+
+*The reconcile scenario — the cycle: fetch the cellar, decide on checksums, commit only if promoted.*
+The reconcile is a DISTINCT incus scion (`IncusReconcileScenario`), not a beat of `prepare` — prepare
+answers "is the material ready?" (image + manifests), reconcile answers "must the live flip, and onto
+what?". Its GIVEN FETCHES the cellar and folds `HostTreeHead` → the `pivot` (`liveSyncedFrom`) and the
+`source` (the staging to promote, determined FROM the folded entries, never guessed). Prepare must have
+published a `HostStagingEntry(stagingRoot, checksums)` for the source to exist — that publish is
+prepare's own new Then (`HostTreeChecksummer.checksum(staging)` → `cellar.store`). The WHEN decides on
+ONE comparison — `change = diff(pivot, source)` (checksum maps, no FS touch to decide): empty → NO-OP;
+gate closed (preview) → PENDING (nothing flips, cellar not written); else → `HostTreePromoter.promote`.
+The drift (`live ↔ pivot`) is OBSERVED and reported, NEVER a decision gate — if the source changed we
+promote (the staging is authoritative, the drift is overwritten); the report is its only role. The THEN
+commits `HostLiveEntry(syncedFrom=source)` to the cellar ONLY on a real promotion — the cellar is the
+committed truth, written once at the end when the flip is actually done. So `HostTreePromoter` is ALLEVIATED:
+no no-op-detect (the WHEN already decided by checksums), it only syncs — `jsync.setDelete(true)
+.addExclude(".flox").sync(source, live, MERGE)`, the skip-flox the manual walk needed, native here.
+Ordering: the reconcile's sow-and-graft WHEN sits in `ClusterSeedScenario` BEFORE the grow (the live must
+be current before the VM mounts it).
 
 *Rejected (why not):* Apache VFS is a file-ACCESS layer, not a reconciler (one would rewrite the whole
 diff/delete over it); Ant `SyncTask` does delete + `<preserveintarget>` but drags Ant as a runtime dep
@@ -642,28 +692,104 @@ CRUD/fold/rotation/drift is incus's, exactly as its validation is.
 *The correction (the CRUD moves OSGi-side, into incus).* The whole host-entry CRUD — publish the
 staging entry, fold the timeline into the head, choose the rotation slot (`HostSlotSelector`), compute
 the two deltas (`HostTreeDiffer`), promote (live + drift) — runs INSIDE the OSGi world, in incus, never
-host-flat. incus already TRIGGERS the grow (it consults manifests under the SOIL, harvests and stores
-its prep OSGi-side) and already runs over the same FS as the host, so reading/checksumming `host.N`
-from the scion is free (§ *Filesystem access is not an obstacle*). The `Host*Entry` records move to
-`incus-contract` (host-tree vocabulary is incus's; incus already carries its own contract) — leaving
-`manifests-contract` to the synthesis vocabulary alone, and no host-flat reader to leak. manifests
-keeps its role: materialise CONTENT into the SOIL subfolder incus hands it.
+host-flat. incus already runs over the same FS as the host, so reading/checksumming `host.N` from the
+scion is free (§ *Filesystem access is not an obstacle*). The logic lives in a new `incus-core`
+(`type=model`, uniform with the six other domains' `-core`); the `Host*Entry` records move to
+`incus-contract` (host-tree vocabulary is incus's) — leaving `manifests-contract` to the synthesis
+vocabulary alone, and no host-flat reader to leak.
 
-*The shape — dedicated incus scenarios, not one overflowing flow.* The host-entry lifecycle is CRUD
-over the host tree incus owns. Rather than swell `IncusProvisionScenario`, incus carries DEDICATED
-scenarios for the host-tree CRUD/fold, contributed through the same multi-scenario front-door pattern
-(`IncusBddScenarios` selects a scenario; a domain hosts N scenarios exactly as doctor does), triggered
-at the grow.
+*The flow INVERTS — incus chooses the slot, then hands the SOIL.* Before, the host-flat GIVEN chose the
+slot (`HostSlotSelector(nodeRoot)`) then handed `manifestsRoot` to incus. After, INCUS chooses the slot
+(it owns the tree), creates `host.N.staging.d`, then hands the subfolder `rke2-manifests.d` as the SOIL
+to manifests. The host only passes `nodeRoot` to incus.
+
+*INCUS publishes ALL the host-entries — manifests never touches the cellar host-tree.* manifests
+produces only ONE folder, so it cannot publish `HostStagingEntry` (a whole-tree contract); it only
+materialises content into the SOIL. incus publishes — after grafting, when the tree is complete. And
+the tree IS complete at the graft: `DefaultManifestSynthesisService` writes the WHOLE tree under one
+root (`systemdOutdir = synthOutdir.resolve("systemd")` — rke2-manifests.d + systemd.d + daemonset… all
+from the synthesis, one gesture); the systemd and cluster scions that run later only PROBE readiness,
+they write nothing. So one checksum of the root covers everything.
+
+*The ordering — promotion BEFORE the instance grows.* "grow" conflated two gestures: the host-tree grow
+(the PROMOTION — `jsync staging → host.live.d`, writing the entries, OSGi/FS) and the INSTANCE grow
+(Shape C / `com.pulumi` — starting the container, which MOUNTS `host.live.d`). The promotion MUST finish
+before the instance starts, or the instance mounts stale (or empty, first run) content. So ALL the
+host-entries are published in the incus `prepare` scenario, upstream of the instance grow:
+`HostStagingEntry` right after the graft, then `HostDriftEntry` + `HostLiveEntry` at the promotion; the
+instance grow (`com.pulumi`) is the SEPARATE, LATER gesture that mounts an already-current `host.live.d`.
+
+*The shape — dedicated incus scenarios, distinct from the instance grow.* The host-entry lifecycle is
+CRUD over the host tree incus owns. incus carries DEDICATED scenarios (via `IncusBddScenarios`, a domain
+hosts N scenarios like doctor): a `prepare` scenario grafts → publishes `HostStagingEntry` → folds →
+promotes (the twin structure of `IncusProvisionScenario`'s graft → harvest → store today). `prepare` and
+the instance grow stay DISTINCT — `prepare` will gain its own steps (cross-run validation, multi-scion
+aggregation) and diverge; the shared trio shape is today's coincidence, not an invariant.
 
 *What this deletes.* `HostTreeHead`, `HostSlotSelector`, `HostTreeDiffer`, `HostTreeDelta`,
-`HostTreeDeltaRenderer` in `seed-master` (host-flat, the I6a/b/c code) — moved into the incus domain
-OSGi-side. The host keeps ONLY the Pulumi bind (mount `host.live.d` into the instance, I6e) — no domain
-vocabulary crosses to the flat realm. The REALM_BOUNDARY gate (fixed the same day to see
-`type=contract`, not only `type=domain`) now WARNs on every such leak, so the migration has a ratchet:
-the leak count must go to zero, then the gate rises to ERROR.
+`HostTreeDeltaRenderer` in `seed-master` (host-flat, the I6a/b/c code) + `HostTreeChecksummer` in
+`manifests-core` — all moved into `incus-core`. The host keeps ONLY the Pulumi bind (mount
+`host.live.d` into the instance, I6e) — no domain vocabulary crosses to the flat realm. The
+REALM_BOUNDARY gate (fixed the same day to see `type=contract`, not only `type=domain`) now WARNs on
+every such leak, so the migration has a ratchet: the leak count must go to zero, then the gate rises to
+ERROR.
 
 Everywhere ABOVE that says "`HostTreeHead` (host-side)" or "the host … reads the head / promotes /
 writes the drift" is superseded by this: read OSGi-side (an incus scenario), the tree being incus's.
+
+==== BootstrapPaths — the WHOLE topology is computed OSGi-side (the realm criterion, not the resource one)
+
+The inversion ("incus chooses the slot, then hands the SOIL") forces a decision on `BootstrapPaths`
+(the 17-root provisioning topology, `seed-master`). An earlier draft split it BY ROLE (layout → incus,
+host-view stays), on the belief that `fromLocalWorktree` (the DARWIN-local view, where the Mac writes)
+and `pathOn` (the NFS DARWIN→NIXOS translation) were host-IRREDUCIBLE. *That belief used the wrong
+criterion.* The host↔OSGi boundary is a CLASSLOADER REALM (which TYPES you may name), NOT a resource
+boundary: Felix is embedded IN the host JVM (on the Mac), so the incus scion sees the SAME filesystem
+and system resources through the same `java.nio.file` API (the spec already says as much — § *Filesystem
+access is not an obstacle*). Nothing about touching the Mac FS, resolving the local view, or applying
+the NFS prefix is beyond the scion.
+
+*So the whole topology is computed OSGi-side, uniformly — it reads better than a host/scion split.*
+`incus-core` holds `HostPathCatalog` (the container targets), `fromLocalWorktree` (the DARWIN-local
+view), `HostSlotSelector` + `asStagingView` (the slot), AND `pathOn` **extracted as a pure function**
+(the NFS `/net/` · `/private/` · `netPrefix` translation, formerly a `BootstrapConfig` method). From
+these the scion produces the three PREPARE outputs in-container:
+
+. the staging slot — `HostSlotSelector(nodeRoot).nextStaging()`, `nodeRoot` = `.local.d/<cluster>/<node>`;
+. the SOIL `rke2-manifests.d` — the slot + the `MANIFESTS` catalog name, handed to manifests by coordinate;
+. the mount plan — `{name, source (NIXOS-translated via the pure `pathOn`), target (`HostPathCatalog.path()`)}`
+  per mount, the crossing SOIL (§ seed-broker-spec, the two natures of a SOIL).
+
+*The host keeps only TWO gestures.* (a) the Pulumi engine (`com.pulumi.incus`, the sole host-irreducible
+— the control flow cannot enter Felix, shape B); (b) extracting a HANDFUL of FLAT SCALARS from
+`BootstrapConfig` — `worktreeRoot`, `clusterName`, `nodeName`, `nfsAutomount` (netPrefix derives from
+cluster) — and handing them to the scion by `@Amendment`. `BootstrapConfig` itself NEVER crosses
+(consistent with "the flat host fills it from BootstrapConfig", the SystemdProbeRequest pattern). The
+host reads the resolved mount plan back (flat, via Split) to build the `InstanceDeviceArgs`.
+
+*The SOIL crosses by COORDINATE, never a typed field.* `IncusProvisionScenario.the_manifests_are_cultivated`
+already sows `broker.sow(new AmendCoordinate("manifests"), …)` (the reflector maps the SOIL role onto
+`ManifestsRunbookInput.materializationRoot`) then `broker.sow(new RunbookCoordinate("manifests"), …)`. So
+the computed `rke2-manifests.d` is handed through that SAME amend-by-coordinate — neutral JSON, ZERO
+added typed cross-domain dependency. That is what keeps the boundary clean.
+
+*The NFS translation, and WHY it survives.* `BootstrapPaths.asAutomountView(nfsAutomount, netPrefix)`
+(the pure `automountPath` helper, ex-`BootstrapConfig.pathOn`, extracted into incus-core 2026-07-15)
+rewrites a DARWIN path into its NFS-automount NIXOS view (`/private/x` → `/net/<cluster>.local/private/x`)
+because provisioning is BI-MACHINE: the Mac WRITES the assets (Felix runs there), the remote NIXOS host
+MOUNTS them over NFS to grow the instance. It is dormant in the feature branch (its only caller,
+`seedInstanceDevices`, was deleted with the grow) but NOT dead — it returns with the mount plan. As a
+pure method on the record (fed `nfsAutomount` + `netPrefix`) the scion applies it without naming
+`BootstrapConfig`, which never crosses.
+
+*The true consumer of the 17 roots is the GROW, not the two phantom reads.* Today's scenario reads only
+`clusterNodeRoot()` (feed the slot) and `manifestsRoot()` (the SOIL) — vestiges. The real client is
+`seedInstanceDevices` (the deleted grow body, `342b7c327`): it pairs EACH host-view root
+(`hostPaths.systemdRoot()`, …) with a `HostPathCatalog.path()` (the container mount). The cut is drawn
+against that grow returning (I6e). But the grow no longer needs the host to hold BOTH halves: the scion
+computes both (target from the catalog, source from the pure `pathOn`) and hands the resolved
+`{source, target}` pairs across flat. The host names neither the roots nor the catalog — it reads the
+mount plan and builds `InstanceDeviceArgs`. The vestigial reads dissolve with the inversion.
 
 === The runbook `json` has a RUNTIME role INSIDE the node (not only operator narration)
 
@@ -675,8 +801,16 @@ reboot. The runbook `json` is what tells WHICH: it carries the mapping *changed 
 to refresh*. It pairs exactly with the content validation: the incus prep validates THAT the content
 is conform; the runbook `json` says WHAT to do when it changed — and the files it names are exactly the
 `change` delta (`staging.N ↔ host.{live.syncedFrom}.staging.d`, § the two deltas), which the runbook maps to the services to
-reload. So the `json` travels inside `host.N` for the node's own refresh logic, while the `adoc` is the
-operator's read. (Concrete shape — the change→service map, who consumes it in the node — is downstream
+reload. So the `json` lives in `host.live.d` for the node's own refresh logic, while the `adoc` is the
+operator's read. WHERE it is rendered (CORRECTED 2026-07-15): NOT inside a staging slot, and NOT
+promoted. The runbook is rendered from the COMPLETE played `ReportModel`, which only exists AFTER the
+whole scenario (all WHENs) has run — i.e. AFTER the promotion, which is a mid-scenario beat of the
+incus scion. So it cannot travel through the promotion. The host writes it into `host.live.d`
+DIRECTLY, post-run — a LIVE mutation, the twin of the instance mutating its own mounted content at
+runtime. At the next rotation the `drift` delta (`host.live.d ↔ the staging it was synced from`) sees
+the runbook as drift versus the static staging tree — expected, not an anomaly. The live root is a
+fixed path off the worktree scalars the host already holds (`BootstrapPaths.liveRoot()`), so the host
+need not learn back the slot the scion chose. (Concrete shape — the change→service map, who consumes it in the node — is downstream
 work.)
 
 *Dogfooding — ONE model, two renderings.* Both artefacts ARE the run's jGiven `ReportModel`: the
@@ -705,26 +839,34 @@ letting load-bearing facts hide in unrendered state.
   references the `host.{SN}.staging.d` the live had drifted from (the `live.syncedFrom` it mirrored), frozen
   until DN rotation. `main`'s `gc` (`--backup-dir` of evicted bytes) is RENAMED `host.N.drift` and
   REPURPOSED as the drift REPORT — see § the two deltas. See the model paragraph above.
-* The runbook `adoc`/`json` — a file INSIDE each `host.N` (travels with it, immutable), the natural home
-  once this model lands (this is where H2-bis — "render the runbook" — folds in).
-* The SOIL wiring — CONNECTED host→incus→manifests (2026-07-14, I2). The host fills the incus SOIL
-  by NEUTRAL role at the door: the cluster-seed `When`, holding the staging-view `BootstrapPaths`,
-  hands `{soil → manifestsRoot}` to the incus crossing; `Gardening.sow(soil, amendments)` sows a
-  first AMEND at `AmendCoordinate("incus")` (an `IncusAmendReflector`, twin of the manifests one,
-  binds the role onto `IncusRunbookInput.materializationRoot`) then the reconciled RUNBOOK. Incus
-  forwards that SOIL to the manifests scion it consults, so the synthesis materialises under
-  `host.N.staging.d/rke2-manifests.d` — a temp dir only when the SOIL is blank (a bare survey). The
+* The runbook `adoc`/`json` — RESOLVED (2026-07-15): rendered into `host.live.d` DIRECTLY, post-run,
+  a live mutation (NOT inside a staging slot, NOT immutable, NOT promoted — see § the runbook `json`
+  has a runtime role, the CORRECTED paragraph). This is where H2-bis — "render the runbook" — folds in.
+* The worktree wiring — INVERTED host→incus→manifests (I2 connected 2026-07-14, INVERTED 2026-07-15).
+  The host no longer pre-computes the SOIL: it hands incus only the flat provisioning SCALARS and the
+  scion derives the plot itself (§ the whole topology is computed OSGi-side). The cluster-seed `When`
+  hands `{worktree → {worktreeRoot, clusterName, nodeName, nfsAutomount}}` to the incus crossing;
+  `Gardening.sow(soil, amendments)` sows a first AMEND at `AmendCoordinate("incus")` (an
+  `IncusAmendReflector`, twin of the manifests one, binds the role onto `IncusRunbookInput.worktree` —
+  a bundle-only sub-record the host fills blind by the schema, naming no path). The scion then does
+  `fromLocalWorktree → HostSlotSelector.nextStaging → asStagingView.manifestsRoot()` to resolve the
+  SOIL and forwards THAT to the manifests scion it consults, so the synthesis materialises under
+  `host.N.staging.d/rke2-manifests.d` — a temp dir only when the scalars are blank (a bare survey). The
   intermediate `manifests.yaml` sits a level ABOVE the synthesis root (sibling of `rke2-manifests.d`),
   outside the checksummed/mounted subtree.
-* The GROW / reconcile (I6, NOT yet built) — DESIGNED (2026-07-14): the two deltas (`change`, `drift`)
-  pivot on `host.{live.syncedFrom}.staging.d` (NOT arithmetic N-1), OBSERVED by `java-diff-utils` (rendered
-  `ReportModel`, dogfooding I5) then the sync ACTED by `jsync` (`setDelete(true)`), host-side (Shape C).
-  See § *The two deltas*. Impacts to land at I6: (a) `HostSlotSelector`'s `(max+1)%3` must SKIP the
-  pinned `live.syncedFrom` slot (the rotation protects the live's pivot tree, § the model); (b) `jsync`
-  + `java-diff-utils` are direct HOST-classpath deps (no `*-wrap`, no OSGi bundle — the GROW is not
-  in-container); (c) R1 preservation (a mount dir survives `setDelete(true)`) must be proven by a test
-  before trusting live mounts; (d) the promotion envelope `{host.live.d → SN, host.{DN}.drift → prior
-  syncedFrom}` is appended ONLY post-sync-success.
+* The reconcile (I6, NOT yet built) — DESIGNED 2026-07-14, CORRECTED 2026-07-15 (it is a SCION, not
+  host-side): a DISTINCT incus scion `IncusReconcileScenario`, its promoter `HostTreePromoter` in
+  `incus-core`. The two deltas (`change`, `drift`) pivot on `host.{live.syncedFrom}.staging.d` (NOT
+  arithmetic N-1); the DECISION is `change = diff(pivot, source)` on checksum maps (no FS touch);
+  `drift` is observed/reported, never a gate. See § *The two deltas* (the corrected Packaging + reconcile
+  cycle paragraphs). Impacts to land at I6: (a) `HostSlotSelector`'s `(max+1)%3` must SKIP the pinned
+  `live.syncedFrom` slot (the rotation protects the live's pivot tree, § the model); (b) `jsync-engine`
+  + `jsync-vfs` are EMBEDDED in incus-core's `Bundle-ClassPath` (nu manifests, one consumer → embed not
+  `*-wrap`); `java-diff-utils` carries a BSN, imported normally; (c) prepare must publish
+  `HostStagingEntry(stagingRoot, checksums)` so reconcile has a source to fold; (d) R1 preservation (a
+  mount dir survives `setDelete(true)` + the `.flox` exclude) proven by a test before trusting live
+  mounts; (e) the promotion envelope `{host.live.d → SN, host.{DN}.drift → prior syncedFrom}` committed
+  to the cellar ONLY post-sync-success (the cellar is written once, at the end, when the flip is done).
 
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild

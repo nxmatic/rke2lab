@@ -530,11 +530,14 @@ host-manifest for the whole collection LIVES AT THE CELLAR (one entry per replic
 entries carry the CONTRACT (checksums + provenance + `change`, immutable), the `host.live.d`
 entry references the `host.{SN}.staging.d` it mirrors (the ONLY mutable entry), each
 `host.{DN}.drift` references the staging the live had drifted from (its `live.syncedFrom`, frozen until
-recycled). Because the manifest lives at the append-only cellar, the timeline of live
-promotions is FREE (each live mutation is a new store → a new history version);
+recycled). The cellar is a FRIDGE (put / peek / take — § seed-broker-spec "the cellar is a
+fridge", 2026-07-15): CURRENT state is mutable (the live case, the ring pointer — reached by
+`<T> fetch`/`withdraw`), while its HISTORY axis (Pulumi's revision log) is append-only and gives
+the timeline of live promotions FREE (each live mutation a new store → a new history version);
 preview-vs-promoted is DEDUCED (a staging live never adopted). And because each staging entry
 carries CHECKSUMS, the cellar DESCRIBES the FS in full without holding a byte — authority over
-the FS state while pure storage of facets.
+the FS state while pure storage of facets. (The staging-rotation position truth moves FS→cellar:
+`HostSlotSelector` will `fetch` occupancy + `withdraw` the wrapped case; FS↔cellar reconciliation deferred.)
 
 TWO deltas, both pivoting on `host.{live.syncedFrom}.staging.d` (the staging the live mirrors, read
 from the `host.live.d` entry — NOT the arithmetic N-1, since interleaved previews produce
@@ -604,8 +607,21 @@ the slot, triggers the grow, measures the drift of the WHOLE tree; `rke2-manifes
 folder in it (manifests CONTRIBUTES content, does not own the tree — the same reason only incus can
 VALIDATE the ensemble). So the whole CRUD (publish · fold the head · pick the slot · the two deltas ·
 promote) moves INSIDE the OSGi world as DEDICATED INCUS scenarios (`IncusBddScenarios`, a domain hosts
-N scenarios like doctor), and `Host*Entry` move to `incus-contract`. manifests keeps materialising
-content into the SOIL incus hands it. The host keeps ONLY the Pulumi bind (mount `host.live.d`). The
-`grow` box above is thus an incus OSGi scenario, not a flat gesture; the REALM_BOUNDARY gate (fixed the
-same day to see `type=contract`) WARNs on every remaining leak as the migration ratchet. Full note:
-link:../osgi/host-cellar-realisation-spec.adoc[host-cellar-realisation-spec § CORRECTION (2026-07-14)].
+N scenarios like doctor), homed in a new `incus-core` (`type=model`, uniform with the other domains'
+`-core`); `Host*Entry` move to `incus-contract`. The FLOW INVERTS: incus chooses the slot then hands
+`rke2-manifests.d` as the SOIL (the host only passes `nodeRoot`). And incus publishes ALL the entries —
+manifests produces one folder, so it never touches the cellar host-tree; incus checksums the WHOLE tree
+after the graft (the synthesis writes it under one root, systemd.d included — the later systemd/cluster
+scions only PROBE). ORDERING: the two "grow"s are distinct — the PROMOTION (`jsync staging → host.live.d`,
+the entries) runs in a DEDICATED incus `reconcile` scenario BEFORE the INSTANCE grow (`com.pulumi`), else
+the instance mounts stale content. The host keeps ONLY the Pulumi bind. The REALM_BOUNDARY gate (fixed the
+same day to see `type=contract`) WARNs on every remaining leak as the migration ratchet.
+
+CORRECTED 2026-07-15: the CRUD splits into TWO distinct incus scions, not one — `prepare` (image +
+manifests → publishes `HostStagingEntry`) and `reconcile` (folds the head → decides `change = diff(pivot,
+source)` on checksums → `HostTreePromoter` in incus-core `jsync`s staging → `host.live.d` with a `.flox`
+exclude → commits `HostLiveEntry` only on a real promotion). The promoter is IN incus (OSGi), never
+host-side; `jsync-engine`/`jsync-vfs` (nu manifests) are EMBEDDED in incus-core's Bundle-ClassPath (one
+consumer). The drift is reported, never a decision gate. Diagram V's `host GROW (Shape C)` box is the
+scion reconcile's work for the fetch/measure/jsync part; the host keeps only the final bind. Full note:
+link:../osgi/host-cellar-realisation-spec.adoc[host-cellar-realisation-spec § The two deltas + reconcile cycle].

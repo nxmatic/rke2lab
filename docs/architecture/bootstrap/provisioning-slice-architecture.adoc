@@ -282,11 +282,77 @@ the replacement scions existed. The result is seven open deltas:
 | 7
 | **checksum→reload glue** — `TargetChecksumPipeline`, `TargetReloadPolicy`, the
   STATIC/DYNAMIC partition, and the `replaceOnChanges` + `user.rke2lab.provisioning.slice.*`
-  instance-config wiring. Deleted whole. Without it, a re-synthesis cannot decide
-  renew-vs-hot-reload — the master neither recreates nor reconciles.
-| split: checksum computation in-container (scion); partition + `replaceOnChanges`
+  instance-config wiring. RESOLVED 2026-07-15 (see note below): the DYNAMIC half is
+  DISSOLVED by the I6 model, only the single STATIC target (cloud-init) survives as a
+  real replace-trigger.
+| DYNAMIC → dissolved (I6 `json` refresh); STATIC/cloud-init → the ONE replace-on-change,
   host (Pulumi Instance)
+
+| 8
+| **the 13 MOUNTS** — `seedInstanceDevices` + `DeviceMountPipeline`: each host-view
+  root paired with a `HostPathCatalog` container path (+ the lan/vmnet NICs, kmsg/zfs
+  unix-char). This is the `.devices(...)` of the `Instance` — part of the graph, but
+  worth its own delta: it is the physical realisation of the host-tree the instance
+  mounts, and its two halves are the BootstrapPaths split (host-view source + layout
+  target).
+| host (`seed-master`) — restore, reads `HostPathCatalog` (incus-core) + `asHostView`
+
+| 9
+| **the PROMOTION** — `HostAssetRootLifecycle` → a new `HostTreePromoter`: the no-op
+  detector, `jsync staging → host.live.d` with `--delete`, the flox-volatile skip.
+  The ACT half of the host-tree grow (I6). §2 descended only the OBSERVE bricks
+  (slot/fold/diff/checksum); this ACT was never migrated.
+| incus-core (I6, § host-cellar CORRECTION)
+
+| 10
+| **the SECRETS write** — `LaunchSecretsUpdater.ensureTokensPresent`: upsert the
+  gh/flox token into `.secrets` (YAML upsert preserving comments, env-var precedence).
+  The token READING is dissolved (`CliAuthTokenContact`, auth-edge); the WRITE is
+  absent from all specs — the `AuthTokenContact` javadoc explicitly leaves it to "the
+  host launch-secrets updater", which does not exist in the feature branch.
+| host-only (H1)
+
+| 11
+| **`HostMountSourceVerifier`** — assert the mount sources exist before the grow binds
+  them (`ensureSources`: a missing required dir fails loud, not a silent empty mount).
+| incus scion (verify, OSGi-side over the same FS)
 |===
+
+Deltas #8–11 were not in the original seven: they surfaced reading the DELETED grow body
+against the I6 correction (2026-07-14/15). #9 and #11 already live (dispersed) in
+link:../osgi/host-cellar-realisation-spec.adoc[host-cellar]; #8 and #10 had no home.
+
+=== Delta #7 resolved — the DYNAMIC half dissolves, only cloud-init survives
+
+The checksum→reload glue looked like the subtlest hole (what decides renew-vs-hot-reload
+after a re-synthesis?). Reading main against the I6 model resolves it, and it is SMALLER
+than it looked. main had **exactly one STATIC target — `cloud-init`** ("Cloud-init reads
+it once at first boot, so the only STATIC target"); the other four (`k8s`, `rke2-config`,
+`systemd`, `rke2lab-env`) are DYNAMIC.
+
+* *The DYNAMIC half is DISSOLVED by I6, not restored.* R1 (host-cellar) already states a
+  live instance is **never restarted when mounted content changes** — a change is
+  reconciled by REFRESHING the affected services, driven by the runbook `json` runtime
+  role (the `change` delta → services-to-reload map). That IS main's hot-reload, in the
+  I6 vocabulary. So the DYNAMIC targets need no `TargetReloadPolicy`/outputs machinery;
+  the promotion (delta #9) + the `json` refresh map replace it whole.
+* *Only the STATIC target survives as a real replace-trigger.* cloud-init reads its seed
+  ONCE at first boot; if `user-data` changes, a running instance never re-reads it → the
+  instance MUST be recreated. This is the sole case where a content change forces an
+  instance-replace, and it is exactly the nocloud material (delta #8 mount + the transcode
+  step). So the surviving glue is narrow: a change to the promoted `cloud.d/` (equivalently,
+  a `HostDriftEntry` touching the nocloud paths) must flip `replaceOnChanges` on the host
+  `Instance`. The per-file checksums to detect it already live in `HostStagingEntry`
+  (incus-contract) — the DATA exists; only the wiring "nocloud drift → instance-replace"
+  is to build, host-side, when the grow (delta #1/#8) is restored.
+
+*What this deletes from the restore list.* `TargetChecksumPipeline`, `TargetReloadPolicy`,
+the STATIC/DYNAMIC partition, `user.rke2lab.provisioning.slice.*` — NOT restored (the
+5-target registry was main's way to route hot-reload-vs-renew; I6 routes it by drift-entry
++ `json` refresh instead). The four `*Metadata` records + `HostSlotManifest` +
+`GitMetadataExtractor` — their PROVENANCE role (git commit, policy, flox envs) folds into
+the `Host*Entry` provenance field, not restored as standalone types. Only the single
+nocloud→replace wire is a genuine host residue.
 
 There is no `manifests-bdd` yet: nothing in the seed flow triggers synthesis or
 materialization. The only live entry point is `manifests-cli` (outside the seed
@@ -358,7 +424,29 @@ computation in-container (scion, reads materialized paths), partition +
 graph to wire `replaceOnChanges` onto, materializations to checksum), so it comes
 last.
 
-Order: Family 1 and Family 2 are independent (either first); Family 3 follows both.
+**Family 4 — the host-tree promotion + bind (deltas #8–11), scion-then-host.** The
+materialisation (Family 2) writes a staging slot; the PROMOTION (delta #9,
+`HostTreePromoter`, incus-core) then `jsync`s it onto `host.live.d`, publishing the
+live/drift entries; only THEN does the host GROW bind the 13 mounts (delta #8) onto
+that already-current tree. `HostMountSourceVerifier` (#11) guards the sources before
+the bind; the secrets write (#10) is a host-only sidecar. This family is what
+surfaced the ordering correction below — it did not exist when the "either first"
+order was written.
+
+*Order (corrected 2026-07-15, was "Family 1 and Family 2 are independent, either
+first").* The naive "either first" is WRONG once the promotion (Family 4) is in the
+picture. The instance MOUNTS `host.live.d`; so the tree must be materialised (F2)
+AND promoted (F4) BEFORE the host graph (F1) starts the VM with `running=true`, or
+it mounts stale/empty content (first run). The hard sequence:
+
+  F2 (materialise the slot) → F4-promote (jsync → host.live.d) → F1 (grow the VM,
+  bind the mounts) → F4-verify (probe) ; F3 (checksum glue) wires across F2+F1.
+
+This is the I6 correction (link:../osgi/host-cellar-realisation-spec.adoc[host-cellar]
+§ CORRECTION) folded in: the SCION prepares+promotes first, the HOST grows last. It
+does NOT reverse shape (A) — shape (A) settled WHO (the host owns the Pulumi graph,
+a scion cannot; see the crux below); I6 settles WHEN (after the promotion). The two
+compose: two beats, *ordered by the mount*, not two free beats.
 
 === The crux — the "instance provisioned" WHEN, and its resolution
 
@@ -381,59 +469,80 @@ scion has no engine around it. Pulumi crosses the frontier and directs the
 operations, never the reverse. (B) inverts the direction of control and is
 physically impossible.
 
-So the WHEN is two-beat:
+So the WHEN is THREE-beat (was drafted as two; the promotion, Family 4, forces a
+prepare beat in front — corrected 2026-07-15):
 
-. **(pure-host beat) the instance is provisioned** — the host declares the resource
-  graph (Project/Network/Profile/Image/Instance) and the Pulumi engine drives the
-  Incus provider over gRPC to create the VM. This sits in the *pure-host* register,
-  exactly like `Cellar.fetch` and preflight — no domain metier, no sow.
-. **(sow-and-graft beat) the instance is verified** — the host sow-and-grafts the
-  incus scion, which builds the image and probes reachability in-container, and
-  grafts its verdict.
+. **(sow-and-graft beat) the instance is PREPARED** — the host sows the incus scion,
+  which in-container: builds/caches the image, grafts the manifests material into the
+  staging slot (incl. the nocloud transcode), publishes `HostStagingEntry`, then
+  PROMOTES (`jsync staging → host.live.d`, Family 4 delta #9) and publishes the
+  live/drift entries. It produces `IncusHarvest` (recipe digest + soil) — the request
+  the host fetches. No VM yet.
+. **(pure-host beat) the instance GROWS** — the host fetches `IncusHarvest`, declares
+  the resource graph (Project/Network/Profile/Image/Instance) and the Pulumi engine
+  drives the Incus provider over gRPC to create the VM with `running=true`, binding
+  the 13 mounts (delta #8) onto the already-promoted `host.live.d`. Pure-host register,
+  like `Cellar.fetch` — no metier, no sow. MUST come after PREPARE (the mount rule).
+. **(sow-and-graft beat) the instance is VERIFIED** — the host sow-and-grafts the incus
+  scion, which probes reachability in-container (the VM now runs) and grafts its verdict.
 
-This keeps the map's regularity honest: a root step is *pure-host gardening* OR a
-*sow-and-graft caller*. The provisioning is the former (a host beat), the
-verification is the latter — two steps, each in one register, rather than one WHEN
-straddling both. The map's current single "the instance is provisioned (incus) —
-sow-and-graft" line splits into these two.
+This keeps the map's regularity honest: every root step is *pure-host gardening* OR a
+*sow-and-graft caller*. PREPARE and VERIFY are sow-and-graft; GROW is pure-host. The
+map's current single "the instance is provisioned (incus) — sow-and-graft" line splits
+into these THREE, ordered by the mount (prepare+promote → grow → verify) — not into two
+free beats. It does trade "one domain = one root line" for correctness; incus is now two
+sow-and-graft callers bracketing one pure-host beat.
+
+NOTE: *verify is a DISTINCT root beat after grow, not the tail of prepare* — the
+reachability probe needs the VM running, which only happens in the grow beat. The scion
+today (`IncusProvisionScenario`) fuses prepare-material + probe in one scenario; the
+split pulls the probe out to run post-grow.
 
 === Figure 3 — the resolved shape of the "instance provisioned" WHEN
 
 [mermaid]
 ----
 flowchart TB
-  subgraph host["pure-host beat — provisioning (no metier, no sow)"]
-    a1["declare resource graph<br/>Project·Network·Profile·Image·Instance"]
+  subgraph prep["beat 1 — PREPARE (sow-and-graft, in-container)"]
+    p1["sow incus scion"]
+    p2["image · graft manifests · nocloud transcode · publish HostStagingEntry"]
+    p3["PROMOTE: jsync staging → host.live.d · publish live/drift entries"]
+    p4["produce IncusHarvest (recipe digest + soil)"]
+    p1 --> p2 --> p3 --> p4
+  end
+
+  subgraph host["beat 2 — GROW (pure-host, com.pulumi) — after PREPARE (the mount rule)"]
+    a1["fetch IncusHarvest · declare graph Project·Network·Profile·Image·Instance"]
     a2["Pulumi engine → gRPC → Incus provider"]
-    a3["VM created"]
+    a3["VM created · running=true · 13 mounts bind host.live.d (already current)"]
     a1 --> a2 --> a3
   end
 
-  subgraph sow["sow-and-graft beat — verification"]
+  subgraph verify["beat 3 — VERIFY (sow-and-graft, in-container)"]
     b1["sow incus scion"]
-    b2["in-container: build image + probe reachability"]
+    b2["probe reachability (VM now runs)"]
     b3["graft verdict"]
     b1 --> b2 --> b3
   end
 
-  a3 --> b1
+  p4 --> a1 --> b1
 
   classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef s fill:#def,stroke:#25a,stroke-width:2px;
   class a1,a2,a3 h;
-  class b1,b2,b3 s;
+  class p1,p2,p3,p4,b1,b2,b3 s;
 ----
 
-The provisioning beat is host (like `Cellar.fetch` precedes the grafts); the
-verification beat is the uniform sow-and-graft caller. Direction of control flows
-one way only — host provisions, then sows; Pulumi never runs from inside a scion.
+The order is fixed by the mount, not free: PREPARE materialises + promotes
+`host.live.d`, GROW binds it, VERIFY probes the running VM. Direction of control
+still flows one way — the host owns the Pulumi engine; Pulumi never runs from inside
+a scion (shape A). What I6 adds is only the WHEN: the promote beat precedes the grow.
 
-The materialization half is already half-answered by the map (bdd.adoc): the
-manifests/flox synthesis is a *graft cultivated fresh*, sown-reaped-consumed at
-once, never a cellar artifact. Family 2's `manifests-bdd` scion IS that fresh
-graft — sown during (or after) the provisioning beat, its material written to the
-master. The Pulumi-provisioning half is settled here as the pure-host beat above;
-Family 1 code follows this shape.
+The materialization is the map's *graft cultivated fresh* (bdd.adoc): Family 2's
+`manifests-bdd` scion IS that fresh graft — but sown in the PREPARE beat (before the
+grow), its material promoted into `host.live.d` so the grow mounts a current tree.
+Family 1 (the Pulumi graph) is the GROW beat; Family 4 (promotion + mounts) straddles
+prepare (promote) and grow (bind).
 
 == Related Documentation
 

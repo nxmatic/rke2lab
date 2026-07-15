@@ -401,25 +401,28 @@ flowchart TB
     r0["the entry gates are enforced (preflight) — pure host"]
     rc["the parcel's state is fetched (Cellar.fetch) — pure host"]
     r1["the network reservations are settled (bbox) — sow-and-graft"]
-    r2["the instance is provisioned (incus) — sow-and-graft"]
+    r2a["the instance is prepared (incus) — sow-and-graft"]
+    r2b["the instance grows — PURE-HOST (com.pulumi)"]
+    r2c["the instance is verified (incus) — sow-and-graft"]
     r3["the systemd adapter is launched — sow-and-graft"]
     r4["the cluster becomes ready (cluster) — sow-and-graft"]
     r5["the harvest is stored (Cellar.store) — pure host"]
-    r0 --> rc --> r1 --> r2 --> r3 --> r4 --> r5
+    r0 --> rc --> r1 --> r2a --> r2b --> r2c --> r3 --> r4 --> r5
   end
   subgraph scions["DOMAIN scions (in-container, metier register)"]
     s1["bbox: reservation·diff·outcome"]
-    s2["incus: image·instance·exec"]
+    s2["incus: prepare (image·graft·nocloud·promote·harvest) + verify (probe)"]
     s3["systemd: adapter·endpoint·symptom"]
     s4["cluster: readiness·phase·observation"]
   end
   doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
   r1 -."sow(RUNBOOK)".-> s1
-  r2 -."sow(RUNBOOK)".-> s2
+  r2a -."sow(RUNBOOK)".-> s2
+  r2c -."sow(RUNBOOK)".-> s2
   r3 -."sow(RUNBOOK)".-> s3
   r4 -."sow(RUNBOOK)".-> s4
   s1 -.graft JSON (host).-> r1
-  s2 -.graft JSON (host).-> r2
+  s2 -.graft JSON (host).-> r2a
   s3 -.graft JSON (host).-> r3
   s4 -.graft JSON (host).-> r4
   s3 -.consults.-> doctor
@@ -428,7 +431,8 @@ flowchart TB
   classDef host fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef dom fill:#def,stroke:#25a,stroke-width:2px;
   classDef doc fill:#fef,stroke:#a2a,stroke-width:2px;
-  class root,r0,rc,r1,r2,r3,r4,r5 host;
+  class root,r0,rc,r1,r2a,r2c,r3,r4,r5 host;
+  class r2b host;
   class scions,s1,s2,s3,s4 dom;
   class doctor doc;
 ....
@@ -443,16 +447,29 @@ SCENARIO: the cluster seed grows to a ready cluster
   WHEN the entry gates are enforced       THEN we have the right to sow (clean worktree, flake lock)  [preflight, pure host]
   WHEN the parcel's state is fetched      THEN I know where I start from (idempotent sowing)   [Cellar.fetch, pure host]
   WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]
-  WHEN the instance is provisioned           THEN sow incus's scenario, graft its scion    [incus, graft-caller]
+  WHEN the instance is prepared              THEN sow incus's scenario (image·graft·nocloud·PROMOTE·harvest), graft it  [incus, graft-caller]
+  WHEN the instance grows                    THEN fetch the harvest, declare the Pulumi graph, bind host.live.d, running=true  [PURE-HOST, com.pulumi]
+  WHEN the instance is verified              THEN sow incus's probe scenario (VM now runs), graft its verdict  [incus, graft-caller]
   WHEN the systemd adapter is launched       THEN sow systemd's scenario, graft its scion  [systemd, graft-caller]
   WHEN the cluster becomes ready             THEN sow cluster's scenario, graft its scion  [cluster, graft-caller]
   WHEN the harvest is stored               THEN each reaped végétal is stored to its parcel's cellar  [Cellar.store, pure host]
 ----
 
+*The incus WHEN splits into THREE, ordered by the mount (settled 2026-07-15, see
+link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] § the crux).* The old single
+"the instance is provisioned (incus) — sow-and-graft" conflated three natures. Corrected: PREPARE (scion:
+image + graft manifests + nocloud + PROMOTE `staging → host.live.d` + produce `IncusHarvest`) → GROW
+(pure-host: `com.pulumi` fetches the harvest, declares Project/Network/Profile/Image/Instance, binds the
+13 mounts onto the already-promoted tree, `running=true`) → VERIFY (scion: probe reachability once the VM
+runs). The order is HARD: the VM mounts `host.live.d`, so the promote must finish before the grow, else it
+mounts stale/empty content. This trades "one domain = one root line" for correctness — incus is now two
+graft-callers bracketing one pure-host beat — while keeping every line of a single nature (the regularity).
+
 *The cellar bookends the runbook:* `fetch` opens (read the parcel's state — where we start), `store`
 closes (file the harvest). Between them everything is cultivated FRESH — no scion reads the cellar (the
 cluster scion probes the live cluster; the manifests graft is grown fresh, never cached). The two
-pure-host ends touch the cellar; the four graft-callers only sow and graft.
+pure-host ends touch the cellar; the graft-callers only sow and graft; the GROW beat is pure-host but
+fetches the prepare harvest (the one exception that reads a fresh-this-run intention, not a cached one).
 
 *The sow-and-graft caller shape is UNIFORM — one pattern, four times (the two halves annotated):*
 
@@ -475,7 +492,7 @@ link:../osgi/seed-broker-spec.adoc[the seed-broker spec].
 |===
 | scion (host step) | full G/W/T defined in | status
 | bbox (network reservations) | link:../osgi/bbox-edge-spec.adoc[bbox-edge-spec] | ships (`bbox-bdd`, `BboxReconciliationScenario`)
-| incus (instance provisioned) | link:../osgi/incus-edge-spec.adoc[incus-edge-spec] | ships (`incus-bdd`, `IncusProvisionScenario` — image + instance + consults doctor)
+| incus PREPARE + VERIFY (instance prepared/verified) | link:../osgi/incus-edge-spec.adoc[incus-edge-spec] | partial (`incus-bdd`, `IncusProvisionScenario` = image + probe; PREPARE must gain the manifests graft + nocloud + PROMOTE; the GROW between them is pure-host, NOT a scion)
 | systemd (adapter launched) | link:../osgi/dbus-systemd-edge-spec.adoc[dbus-systemd-edge-spec] | ships (`systemd-bdd`)
 | cluster (readiness) | link:../osgi/cluster-edge-spec.adoc[cluster-edge-spec] | ships (`cluster-bdd`)
 | doctor (consulted sub-step) | link:bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern] | consulted, not a root step

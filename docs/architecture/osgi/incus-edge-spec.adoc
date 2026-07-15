@@ -4,7 +4,10 @@
 
 [NOTE]
 ====
-*Status:* IMPLEMENTED (2026-07-07). The incus domain of the frontier-playability model, alongside
+*Status:* the two CONTACTS (edge/port) IMPLEMENTED (2026-07-07); the two SCION scenarios (prepare/verify,
+below) PARTIAL — `IncusProvisionScenario` ships image-build + probe, but PREPARE must still gain the
+manifests graft + nocloud + promote, and the probe must move to a post-grow VERIFY beat (§ the scenarios).
+The incus domain of the frontier-playability model, alongside
 link:pulumi-edge-handoff.adoc[pulumi-edge], link:ssh-to-age-edge-handoff.adoc[ssh-to-age-edge],
 link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge], link:cluster-edge-spec.adoc[cluster-edge],
 link:bbox-edge-spec.adoc[bbox-edge] and link:auth-edge-spec.adoc[auth-edge].
@@ -104,31 +107,56 @@ flowchart LR
   class world w;
 ....
 
-== The incus SCION scenario (target — the metier definition)
+== The incus SCION scenarios (target — the metier definition)
 
-In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) incus is a
-graft-caller: the host step "the instance is provisioned" sows THIS scenario in-container and grafts its
-scion. The host speaks gardening; this scenario speaks the incus metier (image · instance · exec). NOT YET
-an `incus-bdd` bundle — provisioning runs host-side today (`IncusStage` + `IncusResourceBootstrap`, the
-biggest host module); the move is to lift its provisioning narrative into a domain scenario, graft-called
-like systemd/cluster.
+In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) the incus
+WHEN splits into THREE beats, ordered by the mount (settled 2026-07-15, see
+link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] § the crux): PREPARE (scion) →
+GROW (pure-host) → VERIFY (scion). *The incus domain owns TWO of the three — prepare and verify; the GROW
+between them is pure-host `com.pulumi` and is NOT a scion* (a scion has no Pulumi engine around it; the
+control flow cannot enter Felix — shape (A)). The host speaks gardening; these scenarios speak the incus
+metier (image · host-tree · exec).
+
+*Why the instance-creation is NOT here.* An earlier draft of this section had a single scenario whose
+`WHEN … the instance is created from that image (IncusInstanceContact)` — that was WRONG on two counts:
+`IncusInstanceContact.isReachable` only PROBES, it never creates; and the creation is the Pulumi graph
+(`Project/Network/Profile/Image/Instance`), host-side, deleted with `IncusResourceBootstrap`
+(`342b7c327`) and restored as the pure-host GROW beat, not a scion step. The scion prepares the material
+and probes the result; the host grows the VM between the two.
 
 [listing]
 ----
-SCENARIO: the rke2 instance is provisioned on incus
-  GIVEN the image build request (recipe + digest) and the instance contact (edge)
-    AND both edges resolved from the registry — inert if the RunGate is closed
+SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-container)
+  GIVEN the image build request (recipe + digest), the run gate, the broker, the cellar
+    AND the staging slot host.N.staging.d chosen by incus (it owns the tree)
   WHEN the image is built, or found current by its recipe-digest cache key (ImageBuilder)
-    AND the instance is created from that image (IncusInstanceContact)
-    AND the readiness exec lands — the agent answers (IncusExecRequest)
-  THEN the instance is provisioned and its handle is reaped
-    AND a build or exec failure surfaces (ImageBuildException / a failed exec), optionally consulting the doctor
+    AND the manifests material is grafted into the slot (broker.sow AMEND+RUNBOOK → the SOIL)
+    AND the nocloud seed is transcoded (runtime/cloud-config → cloud.d/, decode secrets)   [after the graft]
+    AND HostStagingEntry is published (checksum of the whole tree)
+    AND the tree is PROMOTED (jsync staging → host.live.d) and HostLive/HostDriftEntry published
+  THEN IncusHarvest (recipe digest + soil) is produced — the request the host fetches to GROW
+    AND a build/graft/promote failure surfaces, optionally consulting the doctor
+    AND the instance is NOT started here — GROW is the separate, later pure-host beat
+
+  [ ── between the two scenarios: the pure-host GROW beat (com.pulumi) — NOT a scion ── ]
+
+SCENARIO: the instance is verified   (VERIFY beat — sow-and-graft, in-container, AFTER grow)
+  GIVEN the instance contact (edge) resolved from the registry — inert if the RunGate is closed
+  WHEN the readiness exec lands — the agent answers (IncusInstanceContact.isReachable / IncusExecRequest)
+  THEN the instance is verified reachable and its verdict is reaped
+    AND an unreachable instance surfaces (a failed exec), optionally consulting the doctor
 ----
 
-*Preview inertness:* under a closed `RunGate` the edges do not ssh/build/create — the scion narrates the
+*Preview inertness:* under a closed `RunGate` the edges do not ssh/build/promote — each scion narrates the
 plan (PENDING, E9) without touching the Incus host. *The recipe-digest subtlety* (see above) is metier
-detail owned here, not host-visible. The scion grafts back under the host step; on failure the transversal
+detail owned here, not host-visible. Each scion grafts back under its host step; on failure the transversal
 doctor-consult follows the same pattern as the other scions.
+
+*Migration note.* `IncusProvisionScenario` today FUSES image-build + probe in one scenario and disowns the
+grow ("does NOT make the instance grow"). The split pulls the probe out to VERIFY (post-grow), and grows
+PREPARE with the manifests graft + nocloud + promote (the host-tree CRUD, incus-core / I6). See
+link:host-cellar-realisation-spec.adoc[host-cellar] § CORRECTION for the promotion, and
+link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] Family 1–4 for the full delta list.
 
 == Related documentation
 
