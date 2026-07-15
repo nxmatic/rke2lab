@@ -14,6 +14,8 @@ import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
+import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
+import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
@@ -74,11 +76,12 @@ public class IncusProvisionScenarioInContainerTest {
     // parcel, at the incus-prep coordinate, carrying the recipe digest + the soil the tree was
     // cultivated under (the intention the host fetches to grow the instance, Shape C).
     assertEquals(1, cellar.stored.size(), "the scion stored its prep harvest once");
-    final SeedEnvelope harvest = cellar.stored.get(0);
-    assertEquals("incus-prep", harvest.coordinate(), "stored at the incus-prep coordinate");
+    assertEquals(
+        IncusCoordinate.INCUS_PREP, cellar.storedAt.get(0), "stored at the incus-prep coordinate");
+    final IncusHarvest harvest = (IncusHarvest) cellar.stored.get(0);
     assertEquals(
         "test-recipe",
-        CODEC.decode(harvest.payload()).path("recipeDigest").asText(),
+        harvest.recipeDigest(),
         "the harvest carries the image builder's recipe digest");
   }
 
@@ -279,16 +282,28 @@ public class IncusProvisionScenarioInContainerTest {
    * own prep harvest; {@code fetch}/{@code neighbours} are unused on this path.
    */
   private static final class RecordingCellar implements Cellar {
-    final List<SeedEnvelope> stored = new ArrayList<>();
+    final List<SeedCoordinate> storedAt = new ArrayList<>();
+    final List<Object> stored = new ArrayList<>();
 
     @Override
-    public void store(Parcel parcel, SeedEnvelope vegetal) {
-      stored.add(vegetal);
+    public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
+      storedAt.add(coordinate);
+      stored.add(value);
     }
 
     @Override
-    public List<SeedEnvelope> fetch(Parcel parcel) {
+    public <T> List<T> fetch(Parcel parcel, Class<T> type) {
       return List.of();
+    }
+
+    @Override
+    public <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+      return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+      return Optional.empty();
     }
 
     @Override

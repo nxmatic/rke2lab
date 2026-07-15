@@ -9,6 +9,8 @@ import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
+import io.nxmatic.rke2lab.bbox.contract.BboxCoordinate;
+import io.nxmatic.rke2lab.bbox.contract.BboxHarvest;
 import io.nxmatic.rke2lab.bbox.contract.BboxReconciler;
 import io.nxmatic.rke2lab.bbox.contract.BboxReservationRequest;
 import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
@@ -20,6 +22,7 @@ import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.File;
 import java.net.URI;
@@ -75,16 +78,13 @@ public class BboxReconciliationScenarioInContainerTest {
     // The reversal, proven: the SCION harvested AND stored itself — one store under the current
     // parcel, at the bbox-reservations coordinate, carrying the folded summary (12 MATCHING rows).
     assertEquals(1, cellar.stored.size(), "the scion stored its harvest once");
-    final SeedEnvelope harvest = cellar.stored.get(0);
     assertEquals(
-        "bbox-reservations", harvest.coordinate(), "stored at the bbox-reservations coordinate");
-    final JsonNode summary = CODEC.decode(harvest.payload());
-    assertEquals(
-        DESIRED_COUNT, summary.path("desiredCount").asInt(), "the summary counts every row");
-    assertEquals(
-        DESIRED_COUNT,
-        summary.path("matchingCount").asInt(),
-        "a live all-matching run: all matched");
+        BboxCoordinate.BBOX_RESERVATIONS,
+        cellar.storedAt.get(0),
+        "stored at the bbox-reservations coordinate");
+    final BboxHarvest summary = (BboxHarvest) cellar.stored.get(0);
+    assertEquals(DESIRED_COUNT, summary.desiredCount(), "the summary counts every row");
+    assertEquals(DESIRED_COUNT, summary.matchingCount(), "a live all-matching run: all matched");
   }
 
   @Test
@@ -271,16 +271,28 @@ public class BboxReconciliationScenarioInContainerTest {
    * own harvest; {@code fetch}/{@code neighbours} are unused on this path.
    */
   private static final class RecordingCellar implements Cellar {
-    final List<SeedEnvelope> stored = new ArrayList<>();
+    final List<SeedCoordinate> storedAt = new ArrayList<>();
+    final List<Object> stored = new ArrayList<>();
 
     @Override
-    public void store(Parcel parcel, SeedEnvelope vegetal) {
-      stored.add(vegetal);
+    public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
+      storedAt.add(coordinate);
+      stored.add(value);
     }
 
     @Override
-    public List<SeedEnvelope> fetch(Parcel parcel) {
+    public <T> List<T> fetch(Parcel parcel, Class<T> type) {
       return List.of();
+    }
+
+    @Override
+    public <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+      return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+      return Optional.empty();
     }
 
     @Override

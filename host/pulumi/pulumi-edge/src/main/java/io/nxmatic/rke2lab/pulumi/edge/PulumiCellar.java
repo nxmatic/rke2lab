@@ -11,9 +11,10 @@ import com.pulumi.automation.ProjectSettings;
 import com.pulumi.automation.WorkspaceStack;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,14 +52,23 @@ import org.jspecify.annotations.Nullable;
  * it returns what the soil holds, by the soil's own output names; the capable (OSGi) side reads the
  * cases it knows. The envelope's {@code domain} field is NOT carried across the Pulumi shell (only
  * the coordinate/output-name and the payload survive); no read path consumes it (the readers guard
- * on coordinate only), so it is rebuilt empty.
+ * on coordinate only), so it is rebuilt empty. The typed overloads ({@code fetch(parcel, type)},
+ * {@code fetch(parcel, coordinate, type)}) DELEGATE the decode to the {@link SeedCodec}, which
+ * reflects on the {@code Class} passed — the host decodes any type ITS classpath holds; a type it
+ * lacks (a bundle type) is the codec's throw, not a cellar rule.
+ *
+ * <p><b>withdraw</b> — the fridge take: over an append-only backend it stores a TOMBSTONE marker so
+ * the current-state fold ({@code fetch(parcel, coordinate, type)}, last-wins) reads the case as
+ * empty. The history keeps the trace (the audit does not lie); only the current state is emptied.
+ * This serves the ring rotation (the sole {@code withdraw} usage); the doctor's journal never
+ * takes.
  *
  * <p><b>neighbours</b> — the sibling parcels under the same backend soil (the parcel's own first).
  *
  * <p>An absent file backend yields an empty neighbourhood (just the parcel) and empty fetches; a
  * present-but-unreadable history propagates (corruption is not absence).
  */
-public final class PulumiCellar implements Cellar {
+public final class PulumiCellar implements OpaqueCellar {
 
   private static final String BACKEND_URL_ENV = "PULUMI_BACKEND_URL";
   private static final String FILE_SCHEME = "file://";
@@ -67,6 +78,10 @@ public final class PulumiCellar implements Cellar {
   private static final String PASSPHRASE = "rke2lab-cellar";
 
   private static final TypeReference<Map<String, Object>> PAYLOAD_SHAPE = new TypeReference<>() {};
+
+  // The tombstone marker a withdrawn case stores: a fetch fold reads it as the case's most-recent
+  // state and yields empty (the fridge take, over an append-only backend — the history keeps it).
+  private static final String TOMBSTONE_KEY = "__cellar_withdrawn__";
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final Optional<Path> backendDir;
@@ -201,6 +216,50 @@ public final class PulumiCellar implements Cellar {
       }
     }
     return reaped;
+  }
+
+  @Override
+  public Optional<SeedEnvelope> fetch(Parcel parcel, SeedCoordinate coordinate) {
+    // Peek ONE case OPAQUE: the last-wins fold of the timeline at this coordinate. An empty case
+    // (never stored, or withdrawn — a tombstone won) is Optional.empty(), a legitimate state.
+    return currentAt(parcel, coordinate.slug());
+  }
+
+  @Override
+  public Optional<SeedEnvelope> withdraw(Parcel parcel, SeedCoordinate coordinate) {
+    // Take the case out OPAQUE: hand back its current envelope, then store a tombstone so a later
+    // fetch folds to empty. The removal is of the CURRENT state (the fold); history keeps the
+    // trace.
+    final Optional<SeedEnvelope> current = fetch(parcel, coordinate);
+    if (current.isPresent()) {
+      store(
+          parcel, new SeedEnvelope("", coordinate.slug(), serialize(Map.of(TOMBSTONE_KEY, true))));
+    }
+    return current;
+  }
+
+  /**
+   * The CURRENT envelope at {@code coordinate} — the last-wins fold of the parcel's timeline, or
+   * empty if the case was never filled or its most-recent state is a tombstone (a {@link
+   * #withdraw}).
+   */
+  private Optional<SeedEnvelope> currentAt(Parcel parcel, String coordinate) {
+    final Map<String, SeedEnvelope> current = new LinkedHashMap<>();
+    for (SeedEnvelope envelope : fetch(parcel)) {
+      if (!envelope.coordinate().equals(coordinate)) {
+        continue;
+      }
+      if (isTombstone(envelope)) {
+        current.remove(coordinate);
+      } else {
+        current.put(coordinate, envelope);
+      }
+    }
+    return Optional.ofNullable(current.get(coordinate));
+  }
+
+  private boolean isTombstone(SeedEnvelope envelope) {
+    return deserialize(envelope.payload()).containsKey(TOMBSTONE_KEY);
   }
 
   @Override

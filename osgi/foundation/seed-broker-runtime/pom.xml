@@ -26,6 +26,12 @@
       <artifactId>seed-broker-port</artifactId>
     </dependency>
 
+    <!-- CodecCellar decorates the opaque OpaqueCellar with the realm's SeedCodec (the typed view). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+    </dependency>
+
     <!-- bnd-consumed construction annotations: DefaultSeedBroker (@Component) collects the
          @Reference(MULTIPLE) List<SeedHandler> and is published as the SeedBroker seam service. -->
     <dependency>

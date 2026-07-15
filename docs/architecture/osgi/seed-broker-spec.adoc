@@ -1179,16 +1179,27 @@ the gesture. `harvest` STAYS a gardening verb attached to the grower (in-contain
 cellar operation — so the two registers share no word, the decorrelation stated as vocabulary.
 
 [NOTE]
-.The generic `<T>` is a BUNDLE-side courtesy; host-side never opens an envelope
+.Two faces: the opaque seam (`OpaqueCellar`) and the typed OSGi view (`Cellar` via `CodecCellar`)
 ====
-The generic overloads (`<T> fetch`/`withdraw`) are SIGNATURE-safe on the neutral port (`Class<T>`, `T`,
-`SeedEnvelope`/`Parcel`/`SeedCoordinate` are all flat JDK types — nothing a bundle owns crosses). But the
-HOST impl (`PulumiCellar`) *cannot* materialise a bundle type (`VisitWire`, `HostLiveEntry` are absent from
-the host classpath — the `LinkageError` the seam exists to prevent), so host-side stays OPAQUE: it honours
-only `T = SeedEnvelope` and throws otherwise. The real decode is honoured REALM-BUNDLE (the cellar the
-scion/doctor resolves decodes via `SeedCodec`), on an envelope already in hand. So the consumer says the
-type it expects (`fetch(parcel, VisitWire.class)`); the decode moved OUT of the `*Reader` classes INTO the
-cellar, but it still happens where the codec and the type are legal — bundle-side, never on the host.
+The cellar has TWO interfaces, split by realm rather than joined by inheritance (settled 2026-07-15):
+
+* `OpaqueCellar` (`seed-broker-port`) — the SEAM: `store` / `fetch(parcel)` / `fetch(parcel,
+  coordinate)` / `withdraw(parcel, coordinate)` / `neighbours`, all in sealed `SeedEnvelope`s. The host
+  provides and consumes ONLY this (`PulumiCellar implements OpaqueCellar`); it never opens a payload.
+* `Cellar` (`seed-broker-port`, OSGi-only) — the TYPED view: the generic `<T>` overloads (`store(coord,
+  value)`, `fetch(parcel, Class)`, `fetch/withdraw(parcel, coord, Class)`) plus a codec-neutral
+  `neighbours`. It does NOT extend `OpaqueCellar`; its realisation `CodecCellar` (`seed-broker-runtime`,
+  a `@Component`) takes an `OpaqueCellar` by `@Reference`, holds a `SeedCodec`, and adds the decode —
+  a decorator, so the two faces stay separable.
+
+Why the split, not one interface with `<T>` on the host: the decode reflects on the `Class<T>` a caller
+passes (no bundle type is a compile link across the seam — the `Class` carries its own loader), but the
+codec must RUN in a realm that holds the type. `CodecCellar` lives OSGi-side, where domain types
+(`VisitWire`, `HostLiveEntry`, `IncusCoordinate`) are legal; the host `OpaqueCellar` never decodes. So a
+scion says `store(parcel, IncusCoordinate.INCUS_PREP, harvest)` — no `new SeedCodec()`, no magic-string
+`new SeedEnvelope("incus", "incus-prep", ...)` — and `fetch(parcel, VisitWire.class)` is fail-at-end
+(unreadable entries skipped, the tolerance the `*Reader` classes had). The decode moved OUT of the
+per-domain `*Reader` classes INTO `CodecCellar`, where the codec and the types are legal.
 ====
 
 The three doctor-named host ports (`MedicalRecordJournal.historyOf`/`cohort`, `InterventionJournal.entries`,

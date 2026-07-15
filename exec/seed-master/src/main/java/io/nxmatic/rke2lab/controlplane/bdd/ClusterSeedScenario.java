@@ -25,7 +25,7 @@ import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.util.Hashtable;
@@ -176,7 +176,10 @@ public class ClusterSeedScenario
       this.parcel = run.parcel();
       final Consumer<String> log = line -> {};
       this.cellar = PulumiCellar.fromEnvironment(runGate, log);
-      gardening.connection().context().registerService(Cellar.class, cellar, new Hashtable<>());
+      gardening
+          .connection()
+          .context()
+          .registerService(OpaqueCellar.class, cellar, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
       final BootedFramework framework =
           BootedFramework.attached(gardening.connection().framework());

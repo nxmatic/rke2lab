@@ -167,6 +167,31 @@ class HealthSystemContributionTest {
       }
 
       @Override
+      public Optional<SeedEnvelope> fetch(Parcel parcel, SeedCoordinate coordinate) {
+        return Optional.empty();
+      }
+
+      @Override
+      public Optional<SeedEnvelope> withdraw(Parcel parcel, SeedCoordinate coordinate) {
+        return Optional.empty();
+      }
+
+      @Override
+      public <T> List<T> fetch(Parcel parcel, Class<T> type) {
+        return List.of();
+      }
+
+      @Override
+      public <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+        return Optional.empty();
+      }
+
+      @Override
+      public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+        return Optional.empty();
+      }
+
+      @Override
       public List<Parcel> neighbours(Parcel parcel) {
         return List.of(parcel);
       }

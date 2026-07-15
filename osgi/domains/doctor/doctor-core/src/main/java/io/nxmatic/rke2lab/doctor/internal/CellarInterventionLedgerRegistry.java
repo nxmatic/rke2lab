@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.contract.Intervention;
 import io.nxmatic.rke2lab.doctor.contract.InterventionLedger;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -19,11 +19,11 @@ import org.osgi.service.component.annotations.Reference;
 @Component(service = InterventionLedgerRegistry.class)
 public final class CellarInterventionLedgerRegistry implements InterventionLedgerRegistry {
 
-  private final Cellar cellar;
+  private final OpaqueCellar cellar;
   private final InterventionLedgerReader reader = new InterventionLedgerReader();
 
   @Activate
-  public CellarInterventionLedgerRegistry(@Reference Cellar cellar) {
+  public CellarInterventionLedgerRegistry(@Reference OpaqueCellar cellar) {
     this.cellar = cellar;
   }
 

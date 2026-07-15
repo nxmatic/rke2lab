@@ -1,44 +1,57 @@
 package io.nxmatic.rke2lab.seed.broker.port;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * The commissioner's append-only store, addressed by a neutral {@link Parcel} — the seam the host
- * EDGE provides (over the Pulumi backend) and a domain CONSUMES to keep and retrieve its sealed
- * végétaux. It speaks the CONSERVATION register, never gardening: a cellar does not grow anything,
- * it stores what a harvest brought back. A cellar is a NEUTRAL store — it holds any {@link
- * SeedEnvelope} (crop OR tool), never typed by contents; it knows only the parcel (the shelf) and
- * the gesture, mirroring the envelope's opacity (it never opens the payload).
+ * The TYPED cellar — the codec-aware view of the fridge, its cases peeked/taken as decoded domain
+ * values and its timeline read decoded. It exists ONLY in the OSGi world (the realm that owns the
+ * domain types and holds a {@code SeedCodec}); the host EDGE never references it — a host provides
+ * and consumes only the opaque {@link OpaqueCellar}.
  *
- * <p>This ONE port subsumes the three doctor-named host ports of the pre-vision model ({@code
- * MedicalRecordJournal.historyOf}/{@code cohort}, {@code InterventionJournal.entries}, {@code
- * InterventionLedgerWriter.append}): {@code fetch} is the read (a timeline walk yielding opaque
- * envelopes), {@code store} the append, {@code neighbours} the sibling enumeration. The ledger is
- * just a fixed parcel. Homed in the neutral seam (not a domain {@code -port}) because its FACE is
- * neutral by requirement; the doctor's {@code historyOf(Patient)}-shaped view sits BEHIND it as a
- * projection ({@code Patient ↔ Parcel}). See docs/architecture/osgi/seed-broker-spec.adoc.
+ * <p>It does NOT extend {@link OpaqueCellar}: the realisation ({@code CodecCellar}) is a DECORATOR
+ * that takes an {@code OpaqueCellar} by REFERENCE (an OSGi component) and adds the codec, rather
+ * than an interface that inherits the opaque verbs. So the two faces stay separable — the opaque
+ * one is the seam the host implements, the typed one is the OSGi-only decode layer over it.
+ *
+ * <p>The typed reads DELEGATE to the realm's codec, which reflects on the {@link Class} passed here
+ * — no bundle type is a compile link across the seam ({@code Class<T>} carries its own loader). A
+ * consumer needing per-entry tolerance uses {@link #fetch(Parcel, Class)}, which SKIPS the
+ * unreadable entries (fail-at-end, the tolerance the {@code *Reader} classes had).
  */
 public interface Cellar {
 
   /**
-   * Put a végétal away in the parcel's cellar — append-only, never overwriting. The store never
-   * reads the payload; it files the sealed envelope under its coordinate.
+   * File a decoded value at its coordinate — the typed twin of {@link OpaqueCellar#store}: the impl
+   * encodes {@code value} under {@code coordinate} via the realm's codec, then files the envelope.
    */
-  void store(Parcel parcel, SeedEnvelope vegetal);
+  <T> void store(Parcel parcel, SeedCoordinate coordinate, T value);
 
   /**
-   * Go get what is stored in the parcel's cellar — the timeline, oldest first, one opaque {@link
-   * SeedEnvelope} per readable entry. NOT "harvest" (the field's hand-over gesture): this is
-   * retrieval. An absent or empty cellar yields an empty list (a legitimate nothing-here); a
-   * present-but-unreadable store degrades to the readable prefix rather than throwing.
+   * The whole timeline DECODED into {@code type} — one {@code T} per readable entry, oldest first
+   * (the doctor's medical record, the ledger). Fail-at-end: an entry the codec cannot read into
+   * {@code type} is SKIPPED, the fold continues on the rest. Tombstones (a withdrawn case's marker)
+   * are not entries and are skipped too.
    */
-  List<SeedEnvelope> fetch(Parcel parcel);
+  <T> List<T> fetch(Parcel parcel, Class<T> type);
+
+  /**
+   * Peek ONE case, DECODED — the current value at {@code coordinate} decoded into {@code type}, or
+   * {@link Optional#empty()} if the case is empty (never stored, or withdrawn).
+   */
+  <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type);
+
+  /**
+   * TAKE one case out, DECODED — hand back the withdrawn value decoded into {@code type} ({@link
+   * Optional#empty()} if the case was empty) and leave the case empty until re-stored.
+   */
+  <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type);
 
   /**
    * The parcel's neighbouring cellars — the sibling parcels sharing the same soil (the parcel's own
-   * first). Sibling enumeration is Layer-1 host knowledge (which stacks exist under the backend);
-   * any grant filter is applied by the consumer, not here. With no backend, the neighbourhood is
-   * just the parcel itself.
+   * first). Codec-NEUTRAL (it names only {@link Parcel}s, no envelope, no decode), so it rides the
+   * typed face too — a consumer folding a cohort (the doctor) references one {@code Cellar}, not
+   * also the opaque one. Delegated verbatim to the underlying {@link OpaqueCellar}.
    */
   List<Parcel> neighbours(Parcel parcel);
 }

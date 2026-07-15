@@ -539,11 +539,12 @@ The three roles do not overlap:
   (the sole scion that materialises an FS tree — the instance mounts chiefly the synthesis tree)
   checksums its staging replica with `HostTreeChecksummer` (relpath → SHA-256) and stores a
   `HostStagingEntry` (`@SeedContract("host-staging")`: the staging root, the checksums, the
-  provenance) under the current parcel. It is one of THREE natures of the host-manifest family, all
-  in `manifests-contract`: `HostStagingEntry` (published by the scion), `HostLiveEntry`
-  (`host-live` — which staging the live mirrors, the sole mutable entry, written by the host at the
-  grow), and `HostDriftEntry` (`host-drift` — the drift report the host writes at the grow). The
-  reader-side fold of the three is `HostTreeHead` (host-side, § the two reads).
+  provenance) under the current parcel, keyed by `IncusCoordinate.HOST_STAGING` (the typed store —
+  no magic string). It is one of THREE natures of the host-manifest family, all in `incus-contract`
+  (the host tree belongs to incus, § the I6 correction): `HostStagingEntry` (published by the scion),
+  `HostLiveEntry` (`IncusCoordinate.HOST_LIVE` — which staging the live mirrors, the sole mutable
+  entry, written at the grow), and `HostDriftEntry` (`IncusCoordinate.HOST_DRIFT` — the drift report
+  written at the grow). The reader-side fold of the three is `HostTreeHead`.
 * *The incus PREP VALIDATES the content made available to the instance.* incus is already the prep
   (it consults manifests, assembles what the instance mounts) — validating that content is the natural
   conclusion of preparing, and only incus sees the WHOLE of what the instance will mount, so only it

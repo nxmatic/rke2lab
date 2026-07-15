@@ -10,6 +10,7 @@ import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
+import io.nxmatic.rke2lab.bbox.contract.BboxCoordinate;
 import io.nxmatic.rke2lab.bbox.contract.BboxHarvest;
 import io.nxmatic.rke2lab.bbox.contract.BboxReconciler;
 import io.nxmatic.rke2lab.bbox.contract.BboxReservationRequest;
@@ -274,8 +275,6 @@ public class BboxReconciliationScenario
     @ExpectedScenarioState List<BboxRowOutcome> outcomes;
     @ExpectedScenarioState boolean dryRun;
 
-    private final SeedCodec codec = new SeedCodec();
-
     public Then every_row_has_an_outcome() {
       if (outcomes.size() != desiredCount) {
         throw new AssertionError("expected " + desiredCount + " outcomes, got " + outcomes.size());
@@ -301,7 +300,7 @@ public class BboxReconciliationScenario
      */
     public Then the_harvest_is_stored(@Hidden Cellar cellar, @Hidden Parcel parcel) {
       final BboxHarvest harvest = BboxHarvest.of(dryRun, outcomes);
-      cellar.store(parcel, new SeedEnvelope("bbox", "bbox-reservations", codec.encode(harvest)));
+      cellar.store(parcel, BboxCoordinate.BBOX_RESERVATIONS, harvest);
       return self();
     }
   }

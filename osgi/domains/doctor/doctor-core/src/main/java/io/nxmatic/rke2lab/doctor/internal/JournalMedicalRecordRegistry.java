@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.contract.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.contract.Patient;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.ArrayList;
@@ -31,12 +31,12 @@ import org.osgi.service.component.annotations.Reference;
 @Component(service = MedicalRecordRegistry.class)
 public final class JournalMedicalRecordRegistry implements MedicalRecordRegistry {
 
-  private final Cellar cellar;
+  private final OpaqueCellar cellar;
   private final MedicalRecordReader reader = new MedicalRecordReader();
   private final Map<Patient, MedicalRecord> cache = new ConcurrentHashMap<>();
 
   @Activate
-  public JournalMedicalRecordRegistry(@Reference Cellar cellar) {
+  public JournalMedicalRecordRegistry(@Reference OpaqueCellar cellar) {
     this.cellar = cellar;
   }
 

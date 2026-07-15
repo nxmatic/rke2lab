@@ -20,6 +20,7 @@ import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
+import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Worktree;
@@ -423,8 +424,6 @@ public class IncusProvisionScenario
    */
   public static class Then extends Stage<Then> {
 
-    private final SeedCodec codec = new SeedCodec();
-
     public Then the_instance_is_prepared() {
       return self();
     }
@@ -447,7 +446,7 @@ public class IncusProvisionScenario
         @Hidden Cellar cellar,
         @Hidden Parcel parcel) {
       final IncusHarvest harvest = new IncusHarvest(imageBuilder.recipeDigest(), soil);
-      cellar.store(parcel, new SeedEnvelope("incus", "incus-prep", codec.encode(harvest)));
+      cellar.store(parcel, IncusCoordinate.INCUS_PREP, harvest);
       return self();
     }
 
@@ -473,7 +472,7 @@ public class IncusProvisionScenario
               resolved.stagingRoot(),
               new HostTreeChecksummer().checksum(stagingRoot),
               new GitProvenanceReader().read(resolved.worktreeRoot()));
-      cellar.store(parcel, new SeedEnvelope("incus", "host-staging", codec.encode(entry)));
+      cellar.store(parcel, IncusCoordinate.HOST_STAGING, entry);
       return self();
     }
   }
