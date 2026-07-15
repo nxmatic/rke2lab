@@ -1,15 +1,19 @@
 package io.nxmatic.rke2lab.controlplane;
 
 import com.pulumi.Pulumi;
+import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.nxmatic.rke2lab.controlplane.bdd.SeedRun;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
@@ -57,13 +61,25 @@ public final class Main {
                       return Boolean.TRUE;
                     },
                     ClusterSeedScenario.SEED.into(run));
-            // Render the runbook (adoc + json) into the run's staging slot AFTER the play, from the
-            // model the scenario stashed — the two-channel rule: the runbook is narration,
-            // materialised
-            // post-run. Best-effort inside the renderer, so it never fails the provisioning.
-            new RunbookRenderer(
-                    ClusterSeedScenario.lastStagingRoot(), line -> context.log().info(line))
-                .render(ClusterSeedScenario.lastRunbook());
+            // Render the runbook (adoc + json) into host.live.d AFTER the play — the two-channel
+            // rule: the runbook is narration, materialised post-run. It cannot travel through the
+            // promotion (a mid-scenario beat), so the host writes it into the live tree directly, a
+            // live mutation seen as drift at the next rotation (§ host-cellar-realisation). The
+            // live
+            // root is a WITHIN-RUN fact the incus scion posed on the runbook (the ephemeral cellar,
+            // § seed-broker-spec two cellars): the host reads it back through the graft mechanism,
+            // NOT by re-deriving the layout convention (which lives only in incus-core).
+            // Best-effort
+            // inside the renderer, so it never fails the provisioning; a run with no live root (a
+            // scion that did not pose it) simply renders nothing.
+            final var graft = new ScenarioGraft();
+            final ReportModel runbook = ClusterSeedScenario.lastRunbook();
+            graft
+                .graftedValue(runbook, GraftTag.LIVE_ROOT)
+                .ifPresent(
+                    live ->
+                        new RunbookRenderer(Path.of(live), line -> context.log().info(line))
+                            .render(runbook));
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("the cluster-seed run was interrupted", interrupted);

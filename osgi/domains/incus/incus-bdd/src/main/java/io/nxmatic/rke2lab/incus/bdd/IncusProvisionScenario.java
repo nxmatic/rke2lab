@@ -17,10 +17,17 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Worktree;
+import io.nxmatic.rke2lab.incus.core.BootstrapPaths;
+import io.nxmatic.rke2lab.incus.core.GitProvenanceReader;
+import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
+import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
@@ -31,6 +38,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,9 +56,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * creating the instance is the {@code com.pulumi} graph, which stays HOST (Shape C — the scion asks
  * the host to grow it through the broker), and verifying reachability is the responsibility of
  * whoever grows it (the host, post-push). Played IN-CONTAINER by the engine so the runbook shows a
- * real node of the OSGi world; it lives in {@code incus-bdd} (only the {@code incus-contract} seam,
- * no {@code incus-core} — the heavy Pulumi-bound provisioning stays host-side), not a {@code -test}
- * fragment (it is live seeding logic).
+ * real node of the OSGi world; it lives in {@code incus-bdd} over the {@code incus-contract} seam
+ * plus {@code incus-core} (the host-tree logic — {@code BootstrapPaths} + {@code HostSlotSelector}:
+ * the scion owns the tree, so it reconstructs the topology and picks its own slot in-world, §
+ * host-cellar-realisation CORRECTION 2026-07-14; the heavy Pulumi-bound instance grow stays
+ * host-side). Not a {@code -test} fragment (it is live seeding logic).
  *
  * <p>The bbox/systemd/cluster twin: it resolves its collaborators from its OWN bundle's registry
  * ({@link ScenarioRegistry}) — the {@link ImageBuilder}, the {@link
@@ -113,7 +123,11 @@ public class IncusProvisionScenario
     final ImageBuilder imageBuilder = resolveImageBuilder();
     final RunGate gate = resolveGate();
     final SeedBroker broker = resolveBroker();
-    final String soil = INPUT.get().materializationRoot();
+    // The scion reconstructs the provisioning topology from the flat worktree scalars the host
+    // amended (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE
+    // —
+    // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
+    final Resolved resolved = Resolved.from(INPUT.get().worktree());
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -123,7 +137,7 @@ public class IncusProvisionScenario
         .and()
         .prepared_through(imageBuilder, gate, observations)
         .and()
-        .consulting_manifests_through(broker, soil);
+        .consulting_manifests_through(broker, resolved.soil());
     when()
         .the_run_condition_is_read()
         .and()
@@ -133,7 +147,16 @@ public class IncusProvisionScenario
     then()
         .the_instance_is_prepared()
         .and()
-        .the_prep_is_stored(imageBuilder, soil, resolveCellar(), resolveParcel());
+        .the_prep_is_stored(imageBuilder, resolved.soil(), resolveCellar(), resolveParcel())
+        .and()
+        .the_staging_is_published(resolved, resolveCellar(), resolveParcel());
+    // Pose the live root the host renders the runbook into — a within-run fact whose layout
+    // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
+    // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
+    // on the model BEFORE it is stashed, so it rides the serialised runbook across the realm.
+    if (resolved.isAmended()) {
+      getScenario().getModel().addTag(GraftTag.LIVE_ROOT.of(resolved.liveRoot()));
+    }
     LAST_RUNBOOK.set(getScenario().getModel());
     LAST_CONSULTATIONS.set(consultOnFailure(observations));
   }
@@ -231,6 +254,37 @@ public class IncusProvisionScenario
 
   private <T> T require(Class<T> type, String message) {
     return ScenarioRegistry.of(this).require(type, message);
+  }
+
+  /**
+   * The topology the scion resolves ONCE from the worktree scalars — the inversion made concrete:
+   * the scion owns the tree, picks its OWN rotation slot, and derives every path the run needs. The
+   * slot is chosen ONCE here (a second {@code nextStaging()} after manifests materialised the slot
+   * would see it and pick a different N). {@code stagingRoot} is the slot the assets land in;
+   * {@code soil} the manifests plot forwarded to the manifests scion; {@code liveRoot} where the
+   * host renders the runbook; {@code worktreeRoot} the base for the git provenance. All blank/empty
+   * for an unamended survey (a bare {@code shape} probe), so manifests falls back to a temp dir.
+   */
+  private record Resolved(String stagingRoot, String soil, String liveRoot, Path worktreeRoot) {
+
+    static final Resolved UNAMENDED = new Resolved("", "", "", Path.of(""));
+
+    static Resolved from(Worktree worktree) {
+      if (worktree.worktreeRoot().isBlank()) {
+        return UNAMENDED;
+      }
+      final Path root = Path.of(worktree.worktreeRoot());
+      final BootstrapPaths local =
+          BootstrapPaths.fromLocalWorktree(root, worktree.clusterName(), worktree.nodeName());
+      final Path slot = new HostSlotSelector(local.clusterNodeRoot()).nextStaging();
+      final BootstrapPaths staging = local.asStagingView(slot);
+      return new Resolved(
+          slot.toString(), staging.manifestsRoot().toString(), local.liveRoot().toString(), root);
+    }
+
+    boolean isAmended() {
+      return !stagingRoot.isBlank();
+    }
   }
 
   /**
@@ -394,6 +448,32 @@ public class IncusProvisionScenario
         @Hidden Parcel parcel) {
       final IncusHarvest harvest = new IncusHarvest(imageBuilder.recipeDigest(), soil);
       cellar.store(parcel, new SeedEnvelope("incus", "incus-prep", codec.encode(harvest)));
+      return self();
+    }
+
+    /**
+     * Publish the {@link HostStagingEntry} for the slot this run materialised — the host-tree fact
+     * reconcile folds later to decide the promotion (§ host-cellar-realisation, the reconcile
+     * cycle). It checksums the WHOLE staging tree ({@link HostTreeChecksummer}) — the discriminant
+     * reconcile diffs against the pivot — and captures the worktree's git provenance ({@link
+     * GitProvenanceReader}: sha + dirty), frozen with the immutable staging (the fold keeps N
+     * stagings, so this history survives, unlike the last-wins live). Skipped for an unamended
+     * survey (no slot materialised). The store is unconditional on the gate: the cellar itself
+     * routes conserve vs pre-reserve, so a preview run still records its staging entry (only the
+     * promotion's live entry is gated, at reconcile).
+     */
+    public Then the_staging_is_published(
+        @Hidden Resolved resolved, @Hidden Cellar cellar, @Hidden Parcel parcel) {
+      if (!resolved.isAmended()) {
+        return self();
+      }
+      final Path stagingRoot = Path.of(resolved.stagingRoot());
+      final HostStagingEntry entry =
+          HostStagingEntry.of(
+              resolved.stagingRoot(),
+              new HostTreeChecksummer().checksum(stagingRoot),
+              new GitProvenanceReader().read(resolved.worktreeRoot()));
+      cellar.store(parcel, new SeedEnvelope("incus", "host-staging", codec.encode(entry)));
       return self();
     }
   }

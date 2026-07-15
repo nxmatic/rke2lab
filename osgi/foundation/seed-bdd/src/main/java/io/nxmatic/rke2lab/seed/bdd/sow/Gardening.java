@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.seed.bdd.sow;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
@@ -53,19 +54,20 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
    * reaped {@code RunbookEnvelope} is pulled — read GENERICALLY, never a domain wire-record.
    */
   public String sow(String soil) {
-    return sow(soil, Map.of());
+    return sow(soil, Map.<String, JsonNode>of());
   }
 
   /**
    * Sow {@code soil} with {@code amendments} — a {@code {role → value}} map the host holds under
-   * NEUTRAL {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles (e.g. {@code soil} → the
-   * plot to materialise into). When non-empty, a first sow at {@link AmendCoordinate} reconciles
-   * the roles onto the target's runbook input at the DOOR — the host names no domain field — and
-   * the reconciled payload feeds the runbook sow; when empty, the runbook is sown with the empty
-   * trigger (the scion falls back to its own defaults). Only the {@code runbook} field of the
-   * reaped envelope is pulled, read generically.
+   * NEUTRAL {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles, each value a {@link
+   * JsonNode} so a role may carry a flat scalar OR a sub-record (the incus {@code worktree}
+   * scalars). When non-empty, a first sow at {@link AmendCoordinate} reconciles the roles onto the
+   * target's runbook input at the DOOR — the host names no domain field — and the reconciled
+   * payload feeds the runbook sow; when empty, the runbook is sown with the empty trigger (the
+   * scion falls back to its own defaults). Only the {@code runbook} field of the reaped envelope is
+   * pulled, read generically.
    */
-  public String sow(String soil, Map<String, String> amendments) {
+  public String sow(String soil, Map<String, JsonNode> amendments) {
     final RunbookCoordinate coordinate = new RunbookCoordinate(soil);
     final SeedCodec codec = new SeedCodec();
     final SeedEnvelope trigger =

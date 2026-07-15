@@ -16,9 +16,10 @@ import org.osgi.service.component.annotations.Component;
 /**
  * Incus' contribution of the amend verb — the twin of {@code ManifestsAmendReflector}: it serves
  * {@link AmendCoordinate}{@code ("incus")} so a sower holding a value under a NEUTRAL role ({@code
- * soil}) can fill the incus runbook input without naming the field ({@code materializationRoot}).
- * The host uses it to hand incus the plot the instance's assets materialise into — the SOIL incus
- * forwards to the manifests scion it consults (§ host-cellar-realisation, the SOIL wiring).
+ * worktree}) can fill the incus runbook input without naming the field ({@code worktree}). The host
+ * uses it to hand incus the flat provisioning scalars from its {@code BootstrapConfig}; the scion
+ * reconstructs the topology, picks its slot, and derives the manifests SOIL itself (§
+ * host-cellar-realisation, the whole topology computed OSGi-side).
  *
  * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes {@link
  * IncusRunbookInput#defaults() defaults} and hands them + the roles to the foundation {@link

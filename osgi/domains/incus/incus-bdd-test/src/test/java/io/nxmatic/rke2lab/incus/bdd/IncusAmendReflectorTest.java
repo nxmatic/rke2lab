@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Worktree;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
@@ -12,10 +13,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the first link of the SOIL wiring (I2): the incus amend reflector binds the neutral {@code
- * soil} role onto {@code IncusRunbookInput.materializationRoot} — the host fills the plot without
- * naming the field. A pure-JSON reflector, so no container is needed; the in-container proof of the
- * scenario itself lives in {@code IncusBddInContainerTest}.
+ * Pins the first link of the worktree wiring: the incus amend reflector binds the neutral {@code
+ * worktree} role onto {@code IncusRunbookInput.worktree} — the host fills the flat provisioning
+ * scalars without naming the field, and the scion reconstructs its topology from them. A pure-JSON
+ * reflector, so no container is needed; the in-container proof of the scenario itself lives in
+ * {@code IncusBddInContainerTest}.
  */
 class IncusAmendReflectorTest {
 
@@ -23,36 +25,39 @@ class IncusAmendReflectorTest {
   private final IncusAmendReflector reflector = new IncusAmendReflector();
 
   @Test
-  void it_binds_the_soil_role_onto_the_materialization_root() {
-    final String plot =
-        "/srv/host/.local.d/bioskop/bioskop-master/host.1.staging.d/rke2-manifests.d";
+  void it_binds_the_worktree_role_onto_the_worktree_scalars() {
+    final Worktree scalars =
+        new Worktree("/srv/host/.local.d/worktree", "bioskop", "bioskop-master", true);
     final SeedEnvelope roleValues =
-        new SeedEnvelope("incus", "runbook", CODEC.encode(Map.of(Amendment.SOIL, plot)));
+        new SeedEnvelope(
+            "incus",
+            "runbook",
+            CODEC.encode(Map.of(Amendment.WORKTREE, CODEC.decode(CODEC.encode(scalars)))));
 
     final SeedEnvelope amended = reflector.handle(roleValues);
 
     assertEquals("runbook", amended.coordinate(), "the amended payload is ready to sow at runbook");
     final IncusRunbookInput bound = CODEC.decode(amended.payload(), IncusRunbookInput.class);
-    assertEquals(plot, bound.materializationRoot(), "the soil role landed on materializationRoot");
+    assertEquals(scalars, bound.worktree(), "the worktree role landed on the worktree scalars");
   }
 
   @Test
-  void an_empty_amendment_keeps_the_default_blank_soil() {
+  void an_empty_amendment_keeps_the_default_unset_worktree() {
     final SeedEnvelope roleValues = new SeedEnvelope("incus", "runbook", CODEC.encode(Map.of()));
 
     final IncusRunbookInput bound =
         CODEC.decode(reflector.handle(roleValues).payload(), IncusRunbookInput.class);
 
     assertEquals(
-        IncusRunbookInput.defaults().materializationRoot(),
-        bound.materializationRoot(),
-        "an unamended input keeps its blank soil");
+        IncusRunbookInput.defaults().worktree(),
+        bound.worktree(),
+        "an unamended input keeps its unset worktree");
   }
 
   @Test
   void it_rejects_a_coordinate_it_does_not_amend() {
     final SeedEnvelope unknown =
-        new SeedEnvelope("incus", "not-a-bearer", CODEC.encode(Map.of(Amendment.SOIL, "/x")));
+        new SeedEnvelope("incus", "not-a-bearer", CODEC.encode(Map.of(Amendment.WORKTREE, "/x")));
 
     assertThrows(IllegalArgumentException.class, () -> reflector.handle(unknown));
   }

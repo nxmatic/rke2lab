@@ -6,11 +6,14 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
+import com.tngtech.jgiven.report.model.Tag;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The cross-world graft: the host-side mechanism that folds a scenario played in ANOTHER world (an
@@ -82,12 +85,33 @@ public final class ScenarioGraft {
 
     scionScenario.getScenarioCases().get(0).getSteps().forEach(rootstock::addNestedStep);
 
+    // The scion's tag map rides up with the graft — the ephemeral cellar (§ seed-broker-spec, two
+    // cellars). addNestedStep carries only the STEPS, so a within-run fact the scion posed as a tag
+    // (e.g. GraftTag.LIVE_ROOT) would be lost; merge it so the host reads it back via graftedValue.
+    scion.getTagMap().values().forEach(hostTree::addTag);
+
     if (scionScenario.getExecutionStatus() == ExecutionStatus.FAILED) {
       rootstock.setStatus(StepStatus.FAILED);
       for (int i = rootstockIndex + 1; i < hostSteps.size(); i++) {
         hostSteps.get(i).setStatus(StepStatus.SKIPPED);
       }
     }
+  }
+
+  /**
+   * Read a within-run fact a scion posed on its model and the graft merged into {@code hostTree} —
+   * the ephemeral cellar's read side. Returns the single tag value of {@code kind}, or empty if the
+   * scion posed none (a scion that did not run, or a probe with nothing to bring to the terrain).
+   * The host asks the graft mechanism, never hand-filters a tag map — the tag structure stays the
+   * mechanism's own.
+   */
+  public Optional<String> graftedValue(ReportModel hostTree, GraftTag kind) {
+    return hostTree.getTagMap().values().stream()
+        .filter(tag -> kind.type().equals(tag.getType()))
+        .map(Tag::getValues)
+        .filter(values -> values != null && !values.isEmpty())
+        .map(values -> String.valueOf(values.get(0)))
+        .findFirst();
   }
 
   private static ScenarioModel firstScenarioOf(ReportModel model) {

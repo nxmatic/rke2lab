@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.seed.bdd;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ScenarioState;
@@ -36,7 +37,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
   @ScenarioState private String soil;
   @ScenarioState private Gardening gardening;
   @ScenarioState private ReportModel hostTree;
-  @ScenarioState private Map<String, String> amendments;
+  @ScenarioState private Map<String, JsonNode> amendments;
 
   /**
    * Hand in the crossing's collaborators: the {@code soil} name to sow toward, the open {@link
@@ -47,18 +48,19 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    */
   @Hidden
   public SowAndGraftStage sowing(String soil, Gardening gardening, ReportModel hostTree) {
-    return sowing(soil, gardening, hostTree, Map.of());
+    return sowing(soil, gardening, hostTree, Map.<String, JsonNode>of());
   }
 
   /**
    * The amending variant: {@code amendments} is a {@code {role → value}} map the host holds under
    * neutral {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles (e.g. the incus crossing
-   * fills {@code soil} with the plot to materialise into). Empty behaves exactly like {@link
-   * #sowing(String, Gardening, ReportModel)}.
+   * fills {@code worktree} with the flat provisioning scalars the scion rebuilds its topology
+   * from), each value a {@link JsonNode} — a flat scalar or a sub-record. Empty behaves exactly
+   * like {@link #sowing(String, Gardening, ReportModel)}.
    */
   @Hidden
   public SowAndGraftStage sowing(
-      String soil, Gardening gardening, ReportModel hostTree, Map<String, String> amendments) {
+      String soil, Gardening gardening, ReportModel hostTree, Map<String, JsonNode> amendments) {
     this.soil = soil;
     this.gardening = gardening;
     this.hostTree = hostTree;

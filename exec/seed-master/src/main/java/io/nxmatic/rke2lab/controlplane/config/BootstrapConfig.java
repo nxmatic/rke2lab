@@ -103,70 +103,16 @@ public record BootstrapConfig(
     return "distrobuilder";
   }
 
-  public enum WorktreeHost {
-    DARWIN,
-    NIXOS
-  }
-
-  public Path worktreeDirOn(WorktreeHost host) {
-    return pathOn(host, worktreeDir);
-  }
-
-  public Path pathOn(WorktreeHost host, Path rawPath) {
-    final Path normalizedPath = normalizeAbsolutePath(rawPath);
-    if (host == WorktreeHost.DARWIN || !nfsAutomount) {
-      return normalizedPath;
-    }
-
-    final String netPrefix = netPrefix();
-    final String normalized = normalizedPath.toString();
-
-    if (normalized.startsWith("/net/")) {
-      return normalizedPath;
-    }
-    if (normalized.startsWith("/private/")) {
-      return Path.of(netPrefix + normalized).normalize();
-    }
-    if (normalized.startsWith("/")) {
-      return Path.of(netPrefix + "/private" + normalized).normalize();
-    }
-    return Path.of(netPrefix + "/private/" + normalized).normalize();
-  }
-
-  public BootstrapConfig asIncusConfig() {
-    return new BootstrapConfig(
-        worktreeDirOn(WorktreeHost.NIXOS),
-        clusterName,
-        nodeName,
-        incusProject,
-        incusDefaultRemote,
-        incusRemoteAddress,
-        incusConfigDir,
-        imageAlias,
-        imageBuilderHost,
-        imageDistrobuilderConfig,
-        imageSharedFolder,
-        profileName,
-        lanBridgeParent,
-        vmnetNetworkName,
-        apiEndpoint,
-        kubeconfigRef,
-        nfsAutomount,
-        systemdAdapterDbusHost,
-        systemdAdapterDbusPort,
-        hostAssetRotationRetentionCount,
-        readinessTimeout);
-  }
-
+  /**
+   * The worktree root the provisioner writes under, DARWIN-local (absolute, normalised). The NFS
+   * automount view the remote NIXOS host mounts from is now computed OSGi-side by the incus scion
+   * ({@code BootstrapPaths.asAutomountView}); the host only hands it the flat scalars it needs.
+   */
   public Path localWorktreePath() {
-    return worktreeDirOn(WorktreeHost.DARWIN);
+    return worktreeDir.toAbsolutePath().normalize();
   }
 
   public String netPrefix() {
     return "/net/" + clusterName + ".local";
-  }
-
-  private static Path normalizeAbsolutePath(Path rawPath) {
-    return rawPath.toAbsolutePath().normalize();
   }
 }

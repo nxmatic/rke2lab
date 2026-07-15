@@ -1,5 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.As;
 import com.tngtech.jgiven.annotation.Hidden;
@@ -11,8 +14,6 @@ import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.controlplane.BootstrapPaths;
-import io.nxmatic.rke2lab.controlplane.HostSlotSelector;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
@@ -27,7 +28,6 @@ import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import java.nio.file.Path;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Objects;
@@ -77,25 +77,14 @@ public class ClusterSeedScenario
   private final Scenario<Given, When, Then> scenario = createScenario();
 
   // The driver (Main) renders the runbook AFTER the run from the played model — the launcher
-  // instantiates the scenario, so Main cannot reach `this`; the run stashes the model and the
-  // staging root it materialised into here (the same holder discipline as the scions'
-  // LAST_RUNBOOK).
-  // The staging root is set by the GIVEN (which resolved the slot) so the rotation is read once,
-  // not
-  // recomputed (a second HostSlotSelector call could pick a different N). Never null once played.
+  // instantiates the scenario, so Main cannot reach `this`; the run stashes the model here (the
+  // same holder discipline as the scions' LAST_RUNBOOK). Never null once played.
   private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-  private static final AtomicReference<Path> LAST_STAGING_ROOT = new AtomicReference<>();
 
   /** The played runbook model — for the driver to render after the run. */
   public static ReportModel lastRunbook() {
     return Objects.requireNonNull(
         LAST_RUNBOOK.get(), "the cluster-seed scenario has not played yet — no runbook to render");
-  }
-
-  /** The staging slot the run materialised into — where the driver renders the runbook. */
-  public static Path lastStagingRoot() {
-    return Objects.requireNonNull(
-        LAST_STAGING_ROOT.get(), "the cluster-seed scenario has not played yet — no staging root");
   }
 
   /** Set once by {@link #receiveSeed} (the {@code SessionSeed} post-processor) before the GIVEN. */
@@ -131,8 +120,11 @@ public class ClusterSeedScenario
         .and()
         .the_cluster_becomes_ready(hostTree);
     then().the_harvest_is_stored();
-    // Stash the played model for the driver to render the runbook (adoc + json) into the staging
-    // slot after the run — the two-channel rule: the runbook is narration, rendered post-run.
+    // Stash the played model for the driver to render the runbook (adoc + json) into host.live.d
+    // after the run — the two-channel rule: the runbook is narration, rendered post-run. It cannot
+    // travel through the promotion (which ran mid-scenario), so the host writes it into the live
+    // tree directly, a live mutation seen as drift at the next rotation (§
+    // host-cellar-realisation).
     LAST_RUNBOOK.set(hostTree);
   }
 
@@ -149,29 +141,23 @@ public class ClusterSeedScenario
     @ProvidedScenarioState PulumiCellar cellar;
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
-    @ProvidedScenarioState BootstrapPaths paths;
+    @ProvidedScenarioState JsonNode worktreeScalars;
 
     public Given i_have_access_to_the_open_gardening(@Hidden SeedRun run) {
       this.gardening = Gardening.open();
-      // The provisioning topology, resolved once from the worktree — the state every materialising
-      // WHEN reads (the manifests scion's outdir, the systemd/rke2-config roots). The DARWIN-local
-      // view is where the provisioner writes; asHostView(NIXOS) is the mounted-assets view. This is
-      // PathStage.resolve() transposed onto the scenario's GIVEN. The run materialises into a fresh
-      // host.N.staging.d replica slot (§ host-cellar-realisation, the three fixed places), never
-      // the
-      // live host/ directly — the slot is later rsynced into host.live.d at the grow. The FS is the
-      // rotation state: HostSlotSelector reads the present slots and picks (max+1) mod 3.
-      final BootstrapPaths worktreePaths =
-          BootstrapPaths.fromLocalWorktree(
-              run.config().localWorktreePath(),
-              run.config().clusterName(),
-              run.config().nodeName());
-      final Path stagingSlot = new HostSlotSelector(worktreePaths.clusterNodeRoot()).nextStaging();
-      this.paths = worktreePaths.asStagingView(stagingSlot);
-      // The slot the run materialises into — stashed for the driver to render the runbook here
-      // after
-      // the run (read once, from the GIVEN's chosen slot, not recomputed).
-      LAST_STAGING_ROOT.set(stagingSlot);
+      // The host no longer computes the provisioning topology: the tree is incus's, so the incus
+      // scion reconstructs it in-world from the flat worktree scalars the host hands it (§
+      // host-cellar-realisation, computed OSGi-side) and picks its own rotation slot. The host
+      // holds
+      // only those scalars — built here as a blind subtree mirroring the incus contract's WORKTREE
+      // schema, naming no incus type — and hands them to the incus crossing by the WORKTREE
+      // amendment.
+      final ObjectNode scalars = JsonNodeFactory.instance.objectNode();
+      scalars.put("worktreeRoot", run.config().localWorktreePath().toString());
+      scalars.put("clusterName", run.config().clusterName());
+      scalars.put("nodeName", run.config().nodeName());
+      scalars.put("nfsAutomount", run.config().nfsAutomount());
+      this.worktreeScalars = scalars;
       // Publish the ambient RunGate the scions resolve — projected from the run mode.
       // registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).
@@ -213,7 +199,7 @@ public class ClusterSeedScenario
     @ScenarioState PulumiCellar cellarRealisation;
     @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
-    @ScenarioState BootstrapPaths paths;
+    @ScenarioState JsonNode worktreeScalars;
 
     @NestedSteps
     @As("the entry gates are enforced")
@@ -241,16 +227,14 @@ public class ClusterSeedScenario
     @NestedSteps
     @As("the instance is provisioned")
     public When the_instance_is_provisioned(@Hidden ReportModel hostTree) {
-      // The SOIL amendment: hand incus the plot the instance's assets materialise into (the
-      // staging-view manifests root), which incus forwards to the manifests scion it consults —
-      // the fresh tree the instance will mount is thus materialised under host.N.staging.d, not a
-      // temp dir. The host names only the neutral SOIL role, never an incus field.
+      // The WORKTREE amendment: hand incus the flat provisioning scalars from BootstrapConfig — the
+      // worktree root, cluster/node, and NFS automount. The incus scion reconstructs the topology
+      // from them, picks its own rotation slot, and derives the manifests SOIL itself (§
+      // host-cellar-realisation, computed OSGi-side). The host names only the neutral WORKTREE
+      // role,
+      // never an incus field nor a path — the scion owns the tree.
       sowAndGraft
-          .sowing(
-              "incus",
-              gardening,
-              hostTree,
-              Map.of(Amendment.SOIL, paths.manifestsRoot().toString()))
+          .sowing("incus", gardening, hostTree, Map.of(Amendment.WORKTREE, worktreeScalars))
           .the_scion_is_sown_and_grafted("the instance is provisioned");
       return self();
     }

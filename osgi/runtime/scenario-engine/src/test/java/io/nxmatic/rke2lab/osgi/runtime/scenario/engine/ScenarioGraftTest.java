@@ -12,6 +12,8 @@ import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +67,36 @@ class ScenarioGraftTest {
         StepStatus.SKIPPED,
         stepAfter(host, ROOTSTOCK).getStatus(),
         "the host phase after a failed rootstock is skipped (fail-fast across the frontier)");
+  }
+
+  @Test
+  void a_scion_tag_rides_up_with_the_graft_and_the_host_reads_it_back() {
+    // The ephemeral cellar: a scion poses a within-run fact on its model; the graft merges its tag
+    // map into the host tree, and the host reads it back through the mechanism — not by hand.
+    final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
+    scion.addTag(GraftTag.LIVE_ROOT.of("/x/.local.d/bioskop/master/host.live.d"));
+    final ReportModel host = playHost();
+
+    // Round-trip across the seam (serialize → rebuild) before grafting, as production does.
+    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(new ScenarioJsonWriter(scion).toString()));
+
+    assertEquals(
+        Optional.of("/x/.local.d/bioskop/master/host.live.d"),
+        graft.graftedValue(host, GraftTag.LIVE_ROOT),
+        "the scion's tag survived the seam and merged into the host tree");
+  }
+
+  @Test
+  void a_missing_scion_tag_reads_back_empty() {
+    final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
+    final ReportModel host = playHost();
+
+    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(new ScenarioJsonWriter(scion).toString()));
+
+    assertEquals(
+        Optional.empty(),
+        graft.graftedValue(host, GraftTag.LIVE_ROOT),
+        "a scion that posed no tag reads back empty, not a crash");
   }
 
   @Test

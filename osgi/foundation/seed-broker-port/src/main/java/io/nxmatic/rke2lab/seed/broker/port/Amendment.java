@@ -39,6 +39,14 @@ public @interface Amendment {
   /** The activation facet the sow carries — the host fills it from the run's policy. */
   String FACET = "facet";
 
+  /**
+   * The worktree provisioning coordinates — the flat scalars (worktree root, cluster, node, NFS
+   * automount) the host holds and a domain needs to RECONSTRUCT the provisioning topology in-world.
+   * The host fills it from its {@code BootstrapConfig}; the scion computes its own paths from it (§
+   * host-cellar-realisation, the whole topology is computed OSGi-side).
+   */
+  String WORKTREE = "worktree";
+
   /** The neutral gardening role of this amendment (e.g. {@link #SOIL}, {@link #FACET}). */
   String value();
 }
