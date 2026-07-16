@@ -182,7 +182,7 @@ section pins it down so it stays pinned.
 
 The host (`seed-master` and the two CLIs) runs *flat, outside OSGi* on the JVM application classloader
 (JCL). It boots an embedded Felix and speaks to it across ONE membrane — the seed-broker seam. It
-exchanges services across it — e.g. it publishes `RunGate` / `Cellar` / `SeedEnvelope` and awaits the
+exchanges services across it — e.g. it publishes `RunGate` / `OpaqueCellar` / `SeedEnvelope` and awaits the
 `SeedBroker`, all `seed-broker-port` types. For that typed handoff to work (no reflection, no
 `ClassCastException`), the flat host *and* the installed bundle must share *one copy* of the seam class.
 There is exactly one mechanism for one shared copy: the *system bundle* exports the package
@@ -221,7 +221,7 @@ the host must speak only gardening, so a host file naming a domain contract is a
 constraint to honour. We de-seamed in the OSGi world regardless; the deferred host is rewritten to stop
 importing the contract (it grafts the scion / consults the broker instead). The seam did not wait on
 the leak — the leak waits on the host migration. `seed-broker-port` alone stays a genuine seam:
-RunGate + Cellar + SeedEnvelope ARE published by the host from outside Felix — the one real
+RunGate + OpaqueCellar + SeedEnvelope ARE published by the host from outside Felix — the one real
 host↔OSGi membrane.
 ====
 

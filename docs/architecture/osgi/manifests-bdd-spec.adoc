@@ -328,8 +328,10 @@ THEN every enabled domain produced its units         [domainCount matches the en
 
 No doctor consult. A synthesis `IOException` or an empty domain set fails the step —
 jGiven marks it, the runbook shows the failure. The output tree location is the
-run's `outdir` (dry-run: a temp dir; live: the materialization target the host
-mounts — TBD with Family 2/the checksum glue, see the constat). The two synthesis
+run's `outdir` (dry-run: a temp dir; live: the staging slot incus PREPARE chose, later
+promoted to `host.live.d` and mounted; the only surviving replace-trigger is the
+nocloud→`replaceOnChanges` wire, NOT the removed `TargetChecksumPipeline` — see
+host-cellar § the-grow-anatomy). The two synthesis
 beats (units tree + controlplane overlay) are the two policy ends above: the scion
 drives both, so a single sow produces the complete master material.
 

@@ -401,28 +401,33 @@ flowchart TB
     r0["the entry gates are enforced (preflight) — pure host"]
     rc["the parcel's state is fetched (Cellar.fetch) — pure host"]
     r1["the network reservations are settled (bbox) — sow-and-graft"]
-    r2a["the instance is prepared (incus) — sow-and-graft"]
-    r2b["the instance grows — PURE-HOST (com.pulumi)"]
-    r2c["the instance is verified (incus) — sow-and-graft"]
-    r3["the systemd adapter is launched — sow-and-graft"]
-    r4["the cluster becomes ready (cluster) — sow-and-graft"]
-    r5["the harvest is stored (Cellar.store) — pure host"]
-    r0 --> rc --> r1 --> r2a --> r2b --> r2c --> r3 --> r4 --> r5
+    r2a["the instance is prepared (incus) — sow-and-graft [CODED]"]
+    r2r["the live tree is reconciled (incus RECONCILE → PROMOTE) — sow-and-graft [CODED]"]
+    r2b["the instance grows — PURE-HOST (com.pulumi) [VISION, not coded]"]
+    r2c["the instance is verified (incus) — sow-and-graft [VISION, not coded]"]
+    r3["the systemd adapter is launched — sow-and-graft [CODED]"]
+    r4["the cluster becomes ready (cluster) — sow-and-graft [CODED]"]
+    r5["the harvest is stored (Cellar.store) — pure host [CODED]"]
+    r0 --> rc --> r1 --> r2a --> r2r --> r2b --> r2c --> r3 --> r4 --> r5
   end
-  subgraph scions["DOMAIN scions (in-container, metier register)"]
-    s1["bbox: reservation·diff·outcome"]
-    s2["incus: prepare (image·graft·nocloud·promote·harvest) + verify (probe)"]
-    s3["systemd: adapter·endpoint·symptom"]
-    s4["cluster: readiness·phase·observation"]
+  subgraph scions["DOMAIN scenarios (in-container) — ONE node per SCENARIO class"]
+    s1["BboxReconciliationScenario (bbox)"]
+    s2p["IncusProvisionScenario (incus PREPARE) — IncusScenario.PROVISION"]
+    s2r["IncusReconcileScenario (incus RECONCILE: diff → then PROMOTE) — IncusScenario.RECONCILE"]
+    sman["ManifestSynthesisScenario (manifests) — sub-sown by incus-prepare"]
+    s3["SystemdAdapterScenario (systemd)"]
+    s4["ClusterReadinessScenario (cluster)"]
   end
   doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
   r1 -."sow(RUNBOOK)".-> s1
-  r2a -."sow(RUNBOOK)".-> s2
-  r2c -."sow(RUNBOOK)".-> s2
+  r2a -."sow(RUNBOOK, +WORKTREE)".-> s2p
+  r2r -."sow(RUNBOOK)".-> s2r
   r3 -."sow(RUNBOOK)".-> s3
   r4 -."sow(RUNBOOK)".-> s4
+  s2p -."broker.sow(RUNBOOK, Cellar) — the sub-sow (Cellar carries the tx)".-> sman
   s1 -.graft JSON (host).-> r1
-  s2 -.graft JSON (host).-> r2a
+  s2p -.graft JSON (host).-> r2a
+  s2r -.graft JSON (host).-> r2r
   s3 -.graft JSON (host).-> r3
   s4 -.graft JSON (host).-> r4
   s3 -.consults.-> doctor
@@ -431,11 +436,21 @@ flowchart TB
   classDef host fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef dom fill:#def,stroke:#25a,stroke-width:2px;
   classDef doc fill:#fef,stroke:#a2a,stroke-width:2px;
-  class root,r0,rc,r1,r2a,r2c,r3,r4,r5 host;
+  class root,r0,rc,r1,r2a,r2r,r2c,r3,r4,r5 host;
   class r2b host;
-  class scions,s1,s2,s3,s4 dom;
+  class scions,s1,s2p,s2r,sman,s3,s4 dom;
   class doctor doc;
 ....
+
+NOTE: *the scenario roster (codebase sync 2026-07-16) — ONE holder per domain, `selectClass` of the
+scenario(s):* `BboxBddScenarios` → `BboxReconciliationScenario`; `IncusBddScenarios` → TWO
+(`run`→`IncusProvisionScenario`, `runReconcile`→`IncusReconcileScenario`), enumerated by
+`IncusScenario{PROVISION, RECONCILE}` (the only domain with a scenario enum — it yields each soil's
+`RunbookCoordinate` + `AmendCoordinate`); `ManifestsBddScenarios` → `ManifestSynthesisScenario` (NOT
+sown by a root WHEN — it is the SUB-SOW `IncusProvisionScenario` fires via `consulting_manifests_through`,
+passing the `Cellar` that carries the run's transaction (`ScenarioCellar` — the txId + write-set travel
+IN it, not as a sow param)); `SystemdBddScenarios` → `SystemdAdapterScenario`; `ClusterBddScenarios` →
+`ClusterReadinessScenario`. The other four domains have no scenario enum (a single scenario each).
 
 *The host runbook, read top to bottom (gardening register — the full sentences):*
 
@@ -446,14 +461,26 @@ SCENARIO: the cluster seed grows to a ready cluster
     AND a RunGate that says whether we cultivate or only survey (live vs preview)
   WHEN the entry gates are enforced       THEN we have the right to sow (clean worktree, flake lock)  [preflight, pure host]
   WHEN the parcel's state is fetched      THEN I know where I start from (idempotent sowing)   [Cellar.fetch, pure host]
-  WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]
-  WHEN the instance is prepared              THEN sow incus's scenario (image·graft·nocloud·PROMOTE·harvest), graft it  [incus, graft-caller]
-  WHEN the instance grows                    THEN fetch the harvest, declare the Pulumi graph, bind host.live.d, running=true  [PURE-HOST, com.pulumi]
-  WHEN the instance is verified              THEN sow incus's probe scenario (VM now runs), graft its verdict  [incus, graft-caller]
-  WHEN the systemd adapter is launched       THEN sow systemd's scenario, graft its scion  [systemd, graft-caller]
-  WHEN the cluster becomes ready             THEN sow cluster's scenario, graft its scion  [cluster, graft-caller]
-  WHEN the harvest is stored               THEN each reaped végétal is stored to its parcel's cellar  [Cellar.store, pure host]
+  WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]        [CODED]
+  WHEN the instance is prepared              THEN sow incus's scenario (image·graft·nocloud·secrets·harvest), graft it  [incus, graft-caller]  [CODED; nocloud/secrets beats = VISION]
+  WHEN the live tree is reconciled           THEN sow incus's reconcile (diff→PROMOTE staging→host.live.d), graft it   [incus, graft-caller]  [CODED]
+  WHEN the instance grows                    THEN fetch the harvest, declare the Pulumi graph, bind host.live.d, running=true  [PURE-HOST, com.pulumi]  [VISION, not coded]
+  WHEN the instance is verified              THEN sow incus's probe scenario (VM now runs), graft its verdict  [incus, graft-caller]  [VISION, not coded]
+  WHEN the systemd adapter is launched       THEN sow systemd's scenario, graft its scion  [systemd, graft-caller]     [CODED]
+  WHEN the cluster becomes ready             THEN sow cluster's scenario, graft its scion  [cluster, graft-caller]     [CODED]
+  WHEN the harvest is stored               THEN each reaped végétal is stored to its parcel's cellar  [Cellar.store, pure host]  [CODED]
 ----
+
+NOTE: *CODED vs VISION (codebase sync 2026-07-16).* The runbook above marks each beat. What SHIPS in
+`ClusterSeedScenario`: entry-gates · fetch · bbox · incus-prepare (`the_instance_is_provisioned`) ·
+incus-reconcile (`the_live_tree_is_reconciled` — the RECONCILE cycle that diffs then PROMOTEs, §4 pièce 3
+landed) · systemd · cluster ·
+store. What is VISION (design graved, not coded): the pure-host GROW beat (`com.pulumi` graph + 13
+mounts + nocloud→replace) between reconcile and systemd, the VERIFY beat, and — inside incus-prepare —
+the secrets (#10) and nocloud (#2) Thens. The prepare beat's method is `the_instance_is_provisioned`
+(the map's "prepared" name; the code kept "provisioned"). See
+link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas and
+link:../osgi/host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy].
 
 *The incus WHEN splits into THREE, ordered by the mount (settled 2026-07-15, see
 link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] § the crux).* The old single
@@ -495,8 +522,30 @@ link:../osgi/seed-broker-spec.adoc[the seed-broker spec].
 | incus PREPARE + VERIFY (instance prepared/verified) | link:../osgi/incus-edge-spec.adoc[incus-edge-spec] | partial (`incus-bdd`, `IncusProvisionScenario` = image + probe; PREPARE must gain the manifests graft + nocloud + PROMOTE; the GROW between them is pure-host, NOT a scion)
 | systemd (adapter launched) | link:../osgi/dbus-systemd-edge-spec.adoc[dbus-systemd-edge-spec] | ships (`systemd-bdd`)
 | cluster (readiness) | link:../osgi/cluster-edge-spec.adoc[cluster-edge-spec] | ships (`cluster-bdd`)
-| doctor (consulted sub-step) | link:bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern] | consulted, not a root step
+| doctor (consulted sub-step) | <<doctor-consulted-sub-step>> (below) | consulted, not a root step
 |===
+
+[[doctor-consulted-sub-step]]
+=== The doctor as a CONSULTED sub-step (its place in the scenario map)
+
+The doctor plays NO scenario of its own — it is not a root step, it orchestrates nothing. It is CONSULTED
+transversally by a domain scion in trouble (systemd on a symptom, cluster on a failing phase, bbox on a
+refused row). Its G/W/T is a nested sub-step UNDER a scion's failing phase, never a top-level runbook node:
+
+[listing]
+----
+  (nested under a scion's failing phase)
+  WHEN the domain consults the doctor about a symptom (ConsultingService.consult)
+  THEN the generalist admits the patient — the neutral Parcel projected as Patient, OSGi-side
+    AND reads the medical record — Cellar.fetch(parcel), the visit blobs rebuilt inside the bundle realm
+    AND returns a consultation: a @Scion("fruit") (the finding) + a @Scion("sowing") (verify next visit)
+----
+
+This is the ONE place the (typed, OSGi-side) `Cellar` is READ (`fetch(Parcel)`) and the `fruit`/`sowing`
+scion roles are produced (see link:../osgi/seed-broker-spec.adoc[the seed-broker spec] — the cellar +
+the split-by-role). The projection `Parcel → Patient` is entirely OSGi-side; the host, and every calling
+scion, hold only neutral gardening terms. The consultation grafts back as part of the calling scion's
+scion, so the operator sees the diagnosis exactly under the phase that failed.
 
 *The manifests/flox synthesis is a GRAFT CULTIVATED FRESH, not a cellar artifact.* The old host bootstrap
 fused two unrelated concerns under incus: the incus contact (image + instance — that IS the incus scion,

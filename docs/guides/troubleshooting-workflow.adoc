@@ -139,4 +139,4 @@ The canonical troubleshooting workflow for this repository is:
 * link:policy-configuration-guide.adoc[Policy Configuration Guide] - Debug policies for enabling verbose logging and troubleshooting resources
 * link:systemd-dbus-adapter-architecture.adoc[Systemd DBus Adapter Architecture] - Monitoring systemd unit state for debugging
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - Troubleshooting checklist for manifest application failures
-* link:host-slot-management.adoc[Host Slot Management] - Slot history for comparing deployments and rollback procedures
+* link:../architecture/osgi/host-cellar-realisation-spec.adoc[Host Cellar realisation] - the host tree the instance mounts: staging slots, promotion, drift (supersedes host-slot-management)

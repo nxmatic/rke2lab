@@ -429,7 +429,8 @@ already drew, not a competing shape. The next step (increment: OSGi `seed ↔ do
 === The Cellar realisation — the visit-assembly direction flips (2026-07-12)
 
 The `SeedBrokerCatalog.FIELD_*`/`OUTPUT_KEY` erasure above (l.417) is realised by the CELLAR: the three
-doctor-named host ports fuse into one neutral `Cellar` impl. The spec sub-parts this atlas links:
+doctor-named host ports fuse into one neutral `OpaqueCellar` impl (the opaque seam; the typed `Cellar`
+is the OSGi-only view over it, via `CodecCellar`+`SeedCodec`). The spec sub-parts this atlas links:
 
 * link:../osgi/gardening-model-spec.adoc[the gardening model] — the ROLE model (five roles; the cellar
   as a composition of furnitures; the cellar asks the gardener "what is this?" to store a composite).

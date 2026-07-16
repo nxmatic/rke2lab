@@ -257,8 +257,20 @@ the replacement scions existed. The result is seven open deltas:
 | host (`seed-master`) — restore
 
 | 2
-| `cloud-init` materialization
-| in-container scion, sow-triggered
+| `cloud-init` materialization — the NoCloud seed (`user-data`/`meta-data`/`network-config`)
+  the VM reads at first boot. CARTOGRAPHED 2026-07-16 (`342b7c327~1`): the three files are authored
+  in FINAL form as classpath templates in `manifests-core`
+  (`resources/runtime/cloud-config/{user-data,meta-data,network-config}`), synthesised into the
+  `cloud-config` ConfigMap by `CloudConfigManifestsUnit` (manifests) with the `network-config` MACs
+  substituted from `ClusterNetworkBlueprint` (netplan). There is NO format transcode — the old
+  `CloudConfigSecretRenderer` merely UNWRAPPED the ConfigMap/Secret envelope (+ base64-decode) and
+  wrote the three values byte-for-byte into `cloudSeedRoot`. The unwrap needs only a generic YAML
+  parse (the old `ManifestDocumentService.parseDocument` is literally `yaml.read(path, Map.class)` —
+  no manifests semantics, so NO incus→manifests-contract coupling). The CONTENT is manifests+netplan;
+  the UNWRAP-to-nocloud serves the incus instance → a beat of incus PREPARE. Channels: the FS carries
+  the content (incus re-reads the synthesised ConfigMap from `runtimeCloudConfigRoot`, the way the
+  scion reads the same FS), the ReportModel carries the meta-facts that orchestrate.
+| incus scion (PREPARE beat, reads FS + generic YAML parse) — content synthesised by manifests+netplan
 
 | 3
 | `systemd` materialization
@@ -307,10 +319,18 @@ the replacement scions existed. The result is seven open deltas:
 | 10
 | **the SECRETS write** — `LaunchSecretsUpdater.ensureTokensPresent`: upsert the
   gh/flox token into `.secrets` (YAML upsert preserving comments, env-var precedence).
-  The token READING is dissolved (`CliAuthTokenContact`, auth-edge); the WRITE is
-  absent from all specs — the `AuthTokenContact` javadoc explicitly leaves it to "the
-  host launch-secrets updater", which does not exist in the feature branch.
-| host-only (H1)
+  CORRECTED 2026-07-16: this is NOT host-only. It was host in `main` only because
+  `LaunchSecretsUpdater` was nested in `IncusResourceBootstrap` (an accident of place, not
+  a necessity). It is a FILE MATERIALISATION (regex YAML upsert, no Pulumi engine), and in
+  I6 every materialisation is a scion gesture. The token VALUE is already OSGi-resolvable —
+  `AuthTokenContact` is an `auth-contract` port with a `@Component` realisation
+  (`CliAuthTokenContact`, `gh auth token`/flox), resolved from the registry like any contact;
+  and the scion computes `worktreeRoot` OSGi-side (incus-core `BootstrapPaths`) over the SAME
+  FS. So the scion resolves the token + upserts `<worktree>/.secrets`, BEFORE the `worktree.dir`
+  mount (#1 of the 13) binds it. Homed as a BEAT of the incus PREPARE scenario
+  (`IncusProvisionScenario`, a `Then` after materialisation — mirrors main, where secrets sat in
+  the PREPARE phase after `materializeAssets`), not a distinct scenario.
+| incus scion (PREPARE beat, OSGi — was mis-scoped host-only)
 
 | 11
 | **`HostMountSourceVerifier`** — assert the mount sources exist before the grow binds

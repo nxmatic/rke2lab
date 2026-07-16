@@ -131,9 +131,11 @@ unchanged — the broker only concentrates the crossing into one door.
 ====
 
 *The frame (general):* an OSGi-world word names a pure model; its host-world counterpart names the
-actualised, Pulumi-typed thing. They never share a type — *the ports speak `Document`, not data*, and
-each world maps the `Document` to its own types (the OSGi `DomainDagMapper` to records, the host
-adapter to the stack model). *Reserved to the host world only:* `Pulumi`, `Stack`, `output` —
+actualised, Pulumi-typed thing. They never share a type — *the ports speak `SeedEnvelope`, not data*, and
+each world maps it to its own types (OSGi decodes with its `SeedCodec` to records, the host adapter maps
+to the stack model). (The former `DomainDagMapper`/`DomainDagMultiplexor`/`DomainDagAdapter` mechanism was
+NEVER implemented — records-as-contract was built instead; see atlas/doctor.adoc.) *Reserved to the host
+world only:* `Pulumi`, `Stack`, `output` —
 enforced by `grep -ri pulumi osgi/` == 0. Doctor↔stack is the first (and today only) concrete
 pairing; further domains slot in as rows when they acquire a DAG. The refactored stage decomposition
 this implies — GROUND / GATEWAY / APPLY — is now designed (world-gateway spec), drawn in Diagram O in the link:atlas/seed.adoc[seed orchestration L1] view.
@@ -158,14 +160,11 @@ this implies — GROUND / GATEWAY / APPLY — is now designed (world-gateway spe
 | `InterventionLedgerSource`, `StackCheckpoint`
 | `ResourcesStage` (ledger write-side)
 
-| `DomainDagMapper` (per-domain `@Component`, NEW)
-| (none — Pulumi-blind by construction)
-| n/a today — replaces `ReadinessOutputMapper`; future stage not yet designed
-
-| `DomainDagMultiplexor` / `DomainDagAdapter` (NEW)
-| `DomainDagAdapter` — stream ↔ Pulumi outputs
-| descends from `OutputBuilder` + `OutputsStage`; future stage not yet designed
 |===
+
+NOTE: the `DomainDagMapper`/`DomainDagMultiplexor`/`DomainDagAdapter` rows once listed here were a
+NEVER-implemented mechanism — records-as-contract (each domain's wire-records, decoded per realm by
+`SeedCodec`) was built instead (see atlas/doctor.adoc). Removed from the table 2026-07-17.
 
 The right column is *also* a design tool: a stage that touches two unrelated pairings is a
 candidate to split; a pairing handled in no stage is dead. The before/after of the pipeline refactor
@@ -194,7 +193,7 @@ flowchart LR
     b_voc["doctor words SHARED at the seam<br/>(ObservationWire, Consultation, Patient…)"]:::gone
   end
   subgraph A["after — one broker door, dispatched by coordinate"]
-    a_door["SeedBroker.handle(Document)→Document"]:::new
+    a_door["SeedBroker.sow(coordinate, Cellar, SeedEnvelope)→SeedEnvelope"]:::new
     a_rt["coordinate → Exchange(request→response)"]:::new
     a_doc["Document envelope + coordinate vocabulary"]:::keep
     a_int["doctor words now OSGi-INTERNAL"]:::new

@@ -222,10 +222,11 @@ C'est le rôle qui fait de ces meubles réunis un cellier, et non un tas de meub
 |===
 | Français | English | Terme modèle seed
 
-| cellier | cellar | **le port neutre `Cellar`** (`seed-broker-port`) — le rôle de conservation du commanditaire, adressé par parcelle. Interface d'UN rôle, DERRIÈRE laquelle plusieurs mobiliers ; neutre par construction (il range n'importe quel `SeedEnvelope` scellé, jamais typé par son contenu). `pulumi-edge` TIENT le cellier (backend Pulumi) ; il ne jardine pas
-| ranger | to store | **`Cellar.store(Parcel, SeedEnvelope)`** — append-only. Recevant « range ça » (opaque), le cellier DEMANDE au jardinier « c'est quoi ? » (`sow(SplitCoordinate, …)`) et, de la nature/parts qu'on lui répond, DISPATCHE vers le bon mobilier (pot/vase/frigidaire) et la bonne case. Il ne range pas dans « son » meuble : il choisit le meuble selon la réponse
-| aller chercher | to fetch | **`Cellar.fetch(Parcel)`** — reprendre ce qui est rangé (relecture par adresse). Reprendre-par-adresse ne re-demande PAS au jardinier : l'adresse EST le _où_ (on a rangé là, on relit là). PAS « récolter » (geste du champ)
-| celliers voisins | neighbouring cellars | **`Cellar.neighbours(Parcel)`** — les parcelles voisines sous le même sol (ex-`cohort`)
+| cellier | cellar | DEUX interfaces : **`OpaqueCellar`** (le seam opaque, `seed-broker-port`, tenu par `pulumi-edge`) et **`Cellar`** (la vue TYPÉE, OSGi-only, décorée par `CodecCellar` qui porte un `SeedCodec`). Le rôle de conservation du commanditaire, adressé par parcelle (le frigo) + coordonnée (la case). C'est un FRIGO (mettre/regarder/retirer), PAS un journal append-only ; l'historique du backend n'est qu'un axe d'AUDIT. Transactionnel : `ScenarioCellar` pose les stores en tags sur le ReportModel, drainés au bord du run ROOT
+| ranger | to store | **`store(Parcel, coordinate, végétal)`** — file un végétal à sa case. Un composite opaque : le cellier DEMANDE au jardinier « c'est quoi ? » (`sow(SplitCoordinate, …)`) et DISPATCHE vers le bon mobilier + la bonne case
+| aller chercher | to fetch | **`fetch(Parcel[, coordinate])`** — reprendre ce qui est rangé (relecture par adresse). L'adresse EST le _où_. PAS « récolter » (geste du champ)
+| retirer | to withdraw | **`withdraw(Parcel, coordinate)`** — SORTIR une case : on la consomme, elle n'y est plus tant qu'on ne l'y remet pas (le frigo ; la rotation du ring de staging est l'usage qui le justifie)
+| celliers voisins | neighbouring cellars | **`neighbours(Parcel)`** — les parcelles voisines sous le même sol (ex-`cohort`)
 |===
 
 CAUTION: le cellier est lui-même CLIENT du jardinier : pour RANGER un composite opaque il interroge le

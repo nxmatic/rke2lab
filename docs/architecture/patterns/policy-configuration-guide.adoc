@@ -582,7 +582,7 @@ pulumi up
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - How individual manifest units check policies
 * link:manifests-architecture.adoc[Manifests Architecture] - CDK8s generation system that consumes policies
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A requirements including policy resolution
-* link:host-slot-management.adoc[Host Slot Management] - How policy is recorded in slot manifests
+* link:../osgi/host-cellar-realisation-spec.adoc[Host Cellar realisation] - the host tree + host-manifest entries (supersedes host-slot-management)
 * link:troubleshooting-workflow.adoc[Troubleshooting Workflow] - Debugging policy-related issues
 
 == Best Practices

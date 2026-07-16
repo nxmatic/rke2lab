@@ -89,133 +89,24 @@ A successful Stage A run must provide enough information to install and reconcil
 Operator observability improvement:
 
 * Stage A exports `systemdRuntimeStatusSummary` as an explicit runtime-status contract so operators can see why readiness is blocked without ad-hoc host shelling.
-* **Diagnostic reports** (added 2026-06-04): Stage A publishes BDD scenario results as ConfigMap (YAML for system), stack outputs (JSON for orchestrator), and filesystem reports (AsciiDoc for operator). See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for details.
+* **Diagnostic runbook**: on a failed checkpoint the doctor is CONSULTED (a sub-step, not a root scenario) and its diagnosis grafts into the rendered runbook. See link:../bdd/bdd.adoc#doctor-consulted-sub-step[bdd — the doctor as a consulted sub-step] and link:../doctor/runbook-doctor.adoc[runbook-doctor].
 
-== BDD Scenarios as Infrastructure Resources
+== BDD scenarios verify the seed (BDD-as-engine)
 
-**Added:** 2026-06-04
-**Updated:** 2026-06-04 (evolved from separate verification stage to ComponentResource pattern)
-
-Infrastructure resources are provisioned through BDD scenarios that extend Pulumi `ComponentResource`. Scenarios wrap actual infrastructure as children, execute verification during provisioning, and integrate with Pulumi's native drift detection.
-
-=== Architecture Pattern
-
-**Scenarios ARE the infrastructure**, not tests OF infrastructure.
-
-[source,java]
-----
-// Scenario extends ComponentResource and wraps actual infrastructure
-public class SystemdAdapterScenario extends ComponentResource {
-  private final SystemdUnit unit;  // Wrapped resource (child)
-  private final Output<ScenarioResult> result;  // Cached verification result
-
-  public SystemdAdapterScenario(String name, Args args, ComponentResourceOptions opts) {
-    super("rke2lab:bdd:SystemdAdapter", name, opts);
-
-    // 1. Provision wrapped infrastructure
-    this.unit = new SystemdUnit(..., parent=this);
-
-    // 2. Execute scenario ONCE (given/when/then)
-    this.result = Output.of(executeScenario(args));
-
-    // 3. Handle failure based on severity
-    handleResult(result);
-
-    // 4. Register outputs (cached in Pulumi state)
-    registerOutputs(Map.of("unit", unit, "scenarioResult", result));
-  }
-
-  // Pulumi lifecycle hook for drift detection
-  @Override
-  protected CompletableFuture<ReadResult> read(String id, ReadArgs args) {
-    // Called during "pulumi refresh" - re-execute scenario
-    ScenarioResult actual = executeScenario(argsFromState(args));
-    return CompletableFuture.completedFuture(ReadResult.of(actual));
-  }
-}
-----
-
-=== Provisioning Flow
-
-. Operator runs `pulumi up`
-. Pulumi creates scenario resource (`new SystemdAdapterScenario(...)`)
-. Scenario constructor:
-  .. Provisions wrapped infrastructure (SystemdUnit as child)
-  .. Executes BDD verification (given/when/then via JGiven)
-  .. Caches result in Pulumi state
-  .. Success: registers outputs
-  .. Failure: publishes diagnostics, continues degraded (WARNING) or fails (CRITICAL)
-. Other resources reference `scenario.unit()` without re-executing verification
-. Result cached in Pulumi state for drift detection
-
-=== Drift Detection Flow
-
-. Operator runs `pulumi refresh` (weeks/months later)
-. Pulumi calls `read()` on all ComponentResources
-. Scenario re-executes verification against live infrastructure
-. Compares actual state vs cached state
-. Drift detected → Pulumi shows diff in output
-. No custom drift detection needed (native Pulumi feature)
-
-=== Actor-Specific Publication
-
-[cols="1,2,2",options="header"]
-|===
-|Actor |Format |Channel
-|System |YAML metrics |ConfigMap `rke2lab-diagnostic-reports`
-|Orchestrator |JSON decision data |Stack output `diagnosticReports`
-|Operator |AsciiDoc troubleshooting guide |Filesystem `/var/lib/rke2lab/reports/`
-|===
-
-=== Report Contents by Actor
-
-**System (YAML):**
-```yaml
-status: healthy
-metrics:
-  dbusProbeLatencyMs: 45
-  dbusEndpointReachable: true
-  requiredServicesActive: [rke2-server, containerd]
-```
-
-**Orchestrator (JSON):**
-```json
-{
-  "status": "healthy",
-  "shouldRollback": false,
-  "canProceedToNextStage": true,
-  "scenariosPassed": 5
-}
-```
-
-**Operator (AsciiDoc):**
-```asciidoc
-= Diagnostic Report
-
-== Scenario: systemd_adapter_becomes_reachable
-✓ Given incus instance exists
-✓ When systemd adapter probe runs
-✓ Then dbus endpoint responds
-
-Status: HEALTHY
-```
-
-Or on failure:
-```asciidoc
-✗ When systemd adapter probe runs
-
-=== Diagnostic: dbus-probe
-Connection refused at port 12434
-
-==== systemd-units
-rke2lab-dbus-tcp-system-bus.service: inactive (dead)
-
-==== Remediation
-1. Check if socat is installed
-2. Verify script exists at /srv/host/systemd-scripts.d/
-```
-
-See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for full implementation details.
+[NOTE]
+.Superseded model removed (2026-07-17)
+====
+An earlier draft here modelled scenarios as Pulumi `ComponentResource`s (wrapping infrastructure as
+children, caching results in Pulumi state, drift via `pulumi refresh`/`read()`, publishing 3-format
+actor reports). That model is ABANDONED (it lives in git history). The shipped architecture is
+BDD-as-engine: scenarios are jGiven `Stage`s played on the embedded JUnit launcher, sown through the
+broker (`SeedBroker.sow` → a domain `*BddScenarios` holder), the verdict travelling IN the ReportModel
+(`ScenarioGraft` reads `ExecutionStatus.FAILED`), the run rendered as ONE runbook (`RunbookRenderer` →
+AsciiDoc into `host.live.d`). Severity (stop-vs-degraded) lives in the doctor (`DefaultReadinessAuthority`,
+§ link:../doctor/runbook-doctor.adoc[runbook-doctor]); the doctor is a CONSULTED sub-step (§
+link:../bdd/bdd.adoc#doctor-consulted-sub-step[bdd]). The scenario map is
+link:../bdd/bdd.adoc#clusterseed-scenario-map[bdd § the ClusterSeed scenario map].
+====
 
 == Failure semantics
 
@@ -236,5 +127,5 @@ See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for full implementa
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster identity is passed to manifest units
 * link:manifests-architecture.adoc[Manifests Architecture] - How manifests are generated from identity
 * link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan — Stage B / peer provisioning roadmap]
-* link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] - How BDD scenarios verify deployment health and publish actor-specific reports
+* link:../bdd/bdd.adoc[BDD — the ClusterSeed scenario map] - How BDD scenarios (jGiven on the embedded launcher) verify the seed; the doctor as a consulted sub-step
 * link:../bdd/bdd.adoc[BDD-as-engine] - the seeding expressed as jGiven scenarios on the JUnit launcher

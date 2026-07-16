@@ -407,9 +407,10 @@ matter a run produces: the FILESYSTEM TREE the incus instance mounts (the former
 `rke2-manifests.d` / `k8s-daemonset.d` / `systemd.d`, the cloud-config, the env-overlay). It is a
 DISTINCT concern from a conserved harvest — a harvest is a value in the cellar; this is bytes on the
 host filesystem the instance binds. The former host (`main`) solved it with an FS slot-rotation
-(`docs/architecture/systemd/host-slot-management.adoc` — replica slots → `rsync -av --delete` into
-the live `host/`). That FS mechanism is KEPT; what the scion/cellar idiom adds is WHERE the contract
-and validation live (below), not a replacement of the rsync.
+(replica slots synced into the live `host/`). That FS mechanism is KEPT — but with `jsync`
+(pure-Java, `setDelete(true)`, no `rsync` binary), and the rotation/ring is now realised by
+`HostSlotSelector` reading the cellar (§ the reconcile cycle); what the scion/cellar idiom adds is
+WHERE the contract and validation live (below), not a replacement of the sync.
 
 === The invariants (the result, non-negotiable)
 
@@ -587,6 +588,102 @@ dependency) until the need is real — the FS access + `HostStagingEntry` decode
 over the same FS — reading/checksumming `host.N` from the scion is free. `BootstrapPaths` already
 offers place-dependent VIEWS (host / node) and new views can be added, so resolving `host.N` is a view,
 not new plumbing.
+
+[[the-grow-anatomy]]
+=== The GROW beat anatomy — the host-irreducible core (restoration map, 2026-07-16)
+
+The grow was `IncusResourceBootstrap.apply(ControlplanePolicy)` (3789 lines, deleted at `342b7c327`),
+a three-phase imperative pipeline: PREPARE (materialise + secrets) → PROVISION (the Pulumi graph) →
+LAUNCH (the Instance). In I6 that body SPLITS by realm: PREPARE dissolves into SCION beats (materialise
+= the manifests/incus scions; secrets = an incus PREPARE beat, § delta #10 — NOT host), PROMOTE is the
+reconcile scion (§ the reconcile cycle). What is LEFT host-irreducible is ONLY the Pulumi engine — the
+graph (#1) + the device binding (#8). That is the GROW beat: a pure-host WHEN (no `broker.sow`, no
+metier — `com.pulumi` cannot enter Felix), fetching the scion's `IncusHarvest` like `Cellar.fetch`.
+
+*The graph (#1) — declaration order + dependency edges (real causality to preserve):*
+
+[mermaid]
+....
+flowchart TB
+  proj["Project 'seed-project' (root, retainOnDelete)"]
+  net["Network(vmnet) — type bridge, raw.dnsmasq dhcp-host"]
+  prof["Profile 'seed-profile' — root disk pool=default"]
+  img["Image — fingerprint Output&lt;String&gt;, project-scoped"]
+  inst["Instance 'seed-instance' — running=true, replaceOnChanges(config,config.*)"]
+  proj -->|dependsOn| net
+  proj -->|dependsOn| prof
+  proj -->|scopes| img
+  proj -.->|"Output projectName"| inst
+  prof -.->|"Output profileName"| inst
+  img -.->|"Output imageFingerprint"| inst
+....
+
+Project is the graph root (no dependsOn). Network(vmnet) and Profile carry an explicit
+`dependsOn(Project)`; the canonical LAN bridge is SKIPPED (unmanaged). The image fingerprint is an
+`Output<String>` threaded project→profile→instance. The Instance depends on Project/Profile/Image ONLY
+through Output references (`.project`/`.profiles`/`.image`), not `dependsOn`; its `instanceConfig`
+carries a `user.rke2lab.provisioning.slice.<name>` per STATIC-target checksum, arming
+`replaceOnChanges(["config","config.*"])` (a changed host-asset checksum replaces the instance — this
+is delta #7's surviving cloud-init replace-trigger). `deleteBeforeReplace(true)`, `ignoreChanges(image)`.
+
+*The 13 mounts (#8) — `seedInstanceDevices` builds 17 `InstanceDeviceArgs`: 2 NICs (lan0/vmnet0,
+hwaddr from the node blueprint) + 2 unix-char (kmsg/zfs) + 13 disks.* Each disk = a host-view NIXOS
+SOURCE path (`prepared.nixosPaths()` = `localPaths.asHostView(NIXOS)`) bound to a container TARGET. The
+source/target split IS the BootstrapPaths discipline: source = the operator-machine path translated to
+the NIXOS host view; target = the container layout path from `HostPathCatalog`. The 13:*
+
+[cols="1,2,2",options="header"]
+|===
+| device | source (`hostPaths.*`) | target
+| worktree.dir | worktreeRoot | /srv/host/rke2lab-worktree.d (WORKTREE)
+| rke2lab.environment.dir | runtimeEnvConfigRoot | /srv/host/rke2lab-environment.d (ENV)
+| rke2lab.scripts.dir | scriptsRoot | /srv/host/systemd-scripts.d (SCRIPTS)
+| git.dir | gitRoot | /srv/host/git-worktree.d (GIT_WORKTREE)
+| rke2lab.systemd.libexec.dir | systemdLibexecRoot | /srv/host/systemd-libexec.d (SYSTEMD_LIBEXEC)
+| rke2lab.system.dir | systemdRoot | /srv/host/systemd-units.d (SYSTEMD_UNITS)
+| manifests.dir | manifestsRoot | /srv/host/rke2-manifests.d (MANIFESTS)
+| rke2.config.dir | runtimeRke2ConfigRoot | /srv/host/rke2-config.d (RKE2_CONFIG)
+| cloudconfig.nocloud.dir | runtimeCloudConfigRoot | /srv/host/cloudconfig-nocloud.d (CLOUDCONFIG_NOCLOUD)
+| shared.dir | shareRoot | /srv/host/rke2lab-share.d (SHARE)
+| daemonset.dir | daemonsetRoot | /srv/host/k8s-daemonset.d (`DaemonsetLogPolicy.GUEST_ROOT_PATH` — NOT catalog)
+| kubeconfig.dir | kubeconfigRoot | /srv/host/rke2lab-kube.d (KUBECONFIG)
+| nocloud.dir | cloudSeedRoot | /var/lib/cloud/seed/nocloud (literal — NOT catalog)
+|===
+
+*Causality the restoration MUST preserve:* files-and-secrets materialised (scion beats) BEFORE any
+resource exists; the host GROW then fetches `IncusHarvest`, declares Project→{Network,Profile,Image},
+and binds the Instance with the 13 mounts onto the ALREADY-PROMOTED `host.live.d` (the mount rule: GROW
+after PROMOTE, else the VM mounts stale/empty). The mounts bind host.live.d, not a staging slot.
+
+*The Pulumi Output discipline (transposed from the removed context-registry doc, 2026-07-16).* When the
+GROW threads a value through the graph, distinguish the ASYNC resource identifier from a SYNC local
+value. `imageProvider.ensureSeedImageFingerprint(...)` returns an `Output<String>` (the async resource
+id); but a build CHECKSUM (`buildChecksum()`, a nix-store hash) is read SYNCHRONOUSLY from local state.
+The rule: NEVER write shared state inside an `Output.applyValue(...)` callback (it may run after a later
+stage already read it — a race); compute the sync values eagerly, and let the `Output` carry only the
+resource-identity dependency edges (`.project`/`.profiles`/`.image` on the Instance). This is why the
+`instanceConfig` checksum keys (the nocloud→replace wire) are filled from synchronous checksums, not
+from an Output callback.
+
+*The one surviving replace-trigger (delta #7 host residue) — cloud-init/nocloud.* cloud-init reads its
+NoCloud seed (`user-data`/`meta-data`/`network-config`, mount #13 → `/var/lib/cloud/seed/nocloud`) ONCE
+at first boot, so a RUNNING instance never re-reads a changed seed → the instance MUST be recreated. This
+is the SOLE case where a promoted-content change forces an instance-replace (every other target is
+reconciled live by the `json` refresh map, § R1 — no replace). So the GROW wires: a checksum of the
+nocloud material → a `user.rke2lab.provisioning.slice.<name>` key on `instanceConfig`, which arms
+`replaceOnChanges(["config","config.*"])`. The per-file checksums already live in `HostStagingEntry`
+(incus-contract) — the DATA exists; only the wire "nocloud drift (a `HostDriftEntry` touching the nocloud
+paths) → the instance-config checksum key" is host-side GROW work. NOT restored: `TargetChecksumPipeline`
+/`TargetReloadPolicy`/the 5-target registry (I6 routes hot-reload by drift-entry + `json`, § delta #7).
+
+NOTE: the PRODUCTION of the nocloud seed (delta #2) is a SCION PREPARE beat, not this host GROW.
+Cartographed 2026-07-16: there is NO format transcode — the three files (`user-data`/`meta-data`/
+`network-config`) are authored in final form as `manifests-core` templates, synthesised into the
+`cloud-config` ConfigMap (MACs from netplan's `ClusterNetworkBlueprint`); the incus PREPARE beat
+merely UNWRAPS the ConfigMap envelope (a generic YAML parse — no manifests type) and writes the three
+values byte-for-byte into `cloudSeedRoot`. Content = manifests+netplan; unwrap-for-the-instance =
+incus PREPARE (§ provisioning-slice delta #2). This GROW section covers only the host residue:
+mounting #13 and the nocloud→replace wire above.
 
 === Live vs preview
 

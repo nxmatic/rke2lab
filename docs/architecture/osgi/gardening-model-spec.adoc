@@ -230,18 +230,29 @@ shared word would re-couple what the roles separate):
 | the grower's hand-over of what grew — a FIELD gesture, never a cellar operation
 
 | conservation (the cellar)
-| `store(Parcel, végétal)`
-| put a végétal away in the parcel's cellar — append-only, never overwrite
+| `store(Parcel, coordinate, végétal)`
+| file a végétal at its coordinate (the case) — a FRIDGE (put/peek/take), not an append-only journal
 
 | conservation (the cellar)
-| `fetch(Parcel)`
+| `fetch(Parcel[, coordinate])`
 | go get what is stored (re-read by key) — NOT `harvest`: harvest is the field's hand-over, fetch is the
   cellar's retrieval
+
+| conservation (the cellar)
+| `withdraw(Parcel, coordinate)`
+| TAKE one case out — consume it: gone until re-stored (the fridge; the staging-ring rotation is the usage)
 
 | conservation (the cellar)
 | `neighbours(Parcel)`
 | the neighbouring cellars — sibling parcels under the same soil
 |===
+
+NOTE: the cellar has TWO interfaces (§ link:seed-broker-spec.adoc[seed-broker spec]): `OpaqueCellar`
+(the opaque seam the host implements) and `Cellar` (the TYPED, OSGi-only view, decorated by
+`CodecCellar` holding a `SeedCodec`). It is a FRIDGE — current-state mutable (store/fetch/withdraw),
+with the backend's revision log as an append-only AUDIT axis only. Transactional: `ScenarioCellar`
+posts stores as tags on the run's ReportModel and drains them to the durable backend at the ROOT
+run boundary.
 
 `harvest`/`reap` STAY gardening verbs attached to the grower; `store`/`fetch`/`neighbours` are the
 cellar's. The two registers share no verb — that is the model's guarantee that the field and the store

@@ -124,23 +124,43 @@ metier (image · host-tree · exec).
 (`342b7c327`) and restored as the pure-host GROW beat, not a scion step. The scion prepares the material
 and probes the result; the host grows the VM between the two.
 
+The scenario skeleton below tracks the codebase (2026-07-16). Step names are the jGiven methods where
+they exist; `[CODED]`/`[VISION]` mark what ships vs what is designed-not-yet-coded. It will eventually
+be superseded by a rendered runbook (more faithful), but stays the readable target meanwhile.
+
 [listing]
 ----
-SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-container)
-  GIVEN the image build request (recipe + digest), the run gate, the broker, the cellar
-    AND the staging slot host.N.staging.d chosen by incus (it owns the tree)
-  WHEN the image is built, or found current by its recipe-digest cache key (ImageBuilder)
-    AND the manifests material is grafted into the slot (broker.sow AMEND+RUNBOOK → the SOIL)
-    AND the nocloud seed is transcoded (runtime/cloud-config → cloud.d/, decode secrets)   [after the graft]
-    AND HostStagingEntry is published (checksum of the whole tree)
-    AND the tree is PROMOTED (jsync staging → host.live.d) and HostLive/HostDriftEntry published
-  THEN IncusHarvest (recipe digest + soil) is produced — the request the host fetches to GROW
-    AND a build/graft/promote failure surfaces, optionally consulting the doctor
+SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-container)  [IncusScenario.PROVISION]
+  GIVEN the image build request (recipe + digest), the run gate, the broker, the cellar   [CODED]
+    AND the staging slot host.N.staging.d chosen by incus (it owns the tree, HostSlotSelector)   [CODED]
+  WHEN the_image_is_built — built, or found current by its recipe-digest cache key       [CODED]
+    AND the_manifests_are_cultivated — the manifests SUB-SOW (broker.sow AMEND+RUNBOOK → the SOIL, passing the Cellar that carries the tx)  [CODED]
+    AND the .secrets are written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets)  [VISION]
+    AND the nocloud seed is UNWRAPPED (#2 — read the cloud-config ConfigMap on FS, strip the envelope →
+        user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [VISION]
+  THEN the_prep_is_stored — IncusHarvest (recipe digest + soil) stored, the request the host fetches to GROW  [CODED]
+    AND the_staging_is_published — HostStagingEntry (checksums + git provenance) published                    [CODED]
+    AND a build/graft failure surfaces, optionally consulting the doctor                  [CODED]
     AND the instance is NOT started here — GROW is the separate, later pure-host beat
 
-  [ ── between the two scenarios: the pure-host GROW beat (com.pulumi) — NOT a scion ── ]
+SCENARIO: the live tree is reconciled   (RECONCILE beat — sow-and-graft, in-container)  [IncusScenario.RECONCILE — CODED]
+  GIVEN the cellar's host-tree entries fetched (fold → pivot liveSyncedFrom + source staging), the run gate
+  WHEN change = diff(pivot, source) on checksums is read
+  THEN empty → NO-OP ; gate closed → PENDING ; else HostTreePromoter.promote (jsync staging → host.live.d)
+    AND HostLiveEntry + HostDriftEntry stored, a PROMOTED tag posted   [CODED — §4 pièce 3 landed]
 
-SCENARIO: the instance is verified   (VERIFY beat — sow-and-graft, in-container, AFTER grow)
+  [ ── the pure-host GROW beat (com.pulumi) — NOT a scion, sits HERE, after reconcile/promote ── ]
+
+SCENARIO: the instance grows   (GROW beat — PURE-HOST com.pulumi, NOT a scion)  [VISION, not coded]
+  GIVEN the IncusHarvest fetched from the cellar (like Cellar.fetch — no metier, no sow)
+  WHEN the Pulumi graph is declared (#1: Project root → Network/Profile dependsOn, Image fingerprint Output,
+        Instance via Output refs, replaceOnChanges(config,config.*), deleteBeforeReplace)
+    AND the 13 mounts are bound (#8: source NIXOS host-view asHostView → target HostPathCatalog) onto the
+        ALREADY-PROMOTED host.live.d, running=true
+    AND the nocloud→replace wire is armed (#7: cloud-init checksum → user.rke2lab.provisioning.slice.cloud-init)
+  THEN the VM is grown, mounting the current host.live.d
+
+SCENARIO: the instance is verified   (VERIFY beat — sow-and-graft, in-container, AFTER grow)  [VISION, not coded]
   GIVEN the instance contact (edge) resolved from the registry — inert if the RunGate is closed
   WHEN the readiness exec lands — the agent answers (IncusInstanceContact.isReachable / IncusExecRequest)
   THEN the instance is verified reachable and its verdict is reaped
@@ -152,11 +172,13 @@ plan (PENDING, E9) without touching the Incus host. *The recipe-digest subtlety*
 detail owned here, not host-visible. Each scion grafts back under its host step; on failure the transversal
 doctor-consult follows the same pattern as the other scions.
 
-*Migration note.* `IncusProvisionScenario` today FUSES image-build + probe in one scenario and disowns the
-grow ("does NOT make the instance grow"). The split pulls the probe out to VERIFY (post-grow), and grows
-PREPARE with the manifests graft + nocloud + promote (the host-tree CRUD, incus-core / I6). See
-link:host-cellar-realisation-spec.adoc[host-cellar] § CORRECTION for the promotion, and
-link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] Family 1–4 for the full delta list.
+*Migration note (2026-07-16).* `IncusProvisionScenario` ships image-build + manifests-sub-sow +
+staging-publish + IncusHarvest (the CODED PREPARE). Still to grow PREPARE: the .secrets (#10) and
+nocloud-unwrap (#2) Thens. The PROMOTE is NO LONGER a PREPARE step — it is its own landed scenario
+`IncusReconcileScenario` (`IncusScenario.RECONCILE`, a distinct root WHEN). The probe pulls out to a
+VERIFY beat (post-grow, vision), and the GROW between reconcile and verify is pure-host (com.pulumi),
+NOT a scion. See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy]
+and link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas.
 
 == Related documentation
 

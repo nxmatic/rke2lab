@@ -6,6 +6,74 @@ metadata:
   type: project
 ---
 
+## ★ UPDATE 2026-07-17 — full-doc staleness sweep DONE (all 94 .adoc audited, 3 agents)
+
+Before coding the GROW, a full-doc audit (3 parallel Explore agents over the ~40 chantier-touching docs)
+against the graved truth. Result: NO conception hole blocks the GROW — the core specs are current; the
+dette was periphery. Actions taken (all doc, no code):
+
+- *5 LEGACY docs DELETED* (they misdescribed the current arch as if current; git keeps them):
+  `bdd/bdd-diagnostic-pattern.adoc` (scenario=Pulumi ComponentResource/drift model — ABANDONED; its
+  live §doctor-consulted migrated into `bdd.adoc#doctor-consulted-sub-step`, its severity into
+  `doctor/runbook-doctor.adoc`), `systemd/host-slot-management.adoc` (old FS slot model — fully covered
+  by host-cellar), `guides/rke2lab-authored-notes-import.adoc` (other-repo provenance),
+  `patterns/context-registry-architecture.adoc` (ContextRegistry/BootstrapContext — absent from code;
+  its Pulumi-Output register-early/update-late discipline migrated into host-cellar § the-grow-anatomy),
+  `patterns/incus-distribution-contract.adoc` (reverse-engineered v1 of the rke2lab source model).
+  All inbound links repaired.
+- *FIXES in live docs:* append-only→FRIDGE+withdraw (`seed-gardening-lexicon`, `gardening-model-spec`);
+  `Cellar`→`OpaqueCellar` at the seam (`atlas/doctor`, `port-edge-domain-ownership`, `README`);
+  removed-component names (`bootstrap-contract` scenario-as-ComponentResource block → BDD-as-engine note;
+  `manifests-bdd-spec` checksum-glue → nocloud-replace wire; `integration-atlas` DomainDag* removed +
+  `SeedBroker.handle(Document)` → `sow(coordinate, Cellar, SeedEnvelope)`).
+- *Signature corrected everywhere:* the sow no longer carries `Optional<String> txId` — the CELLAR
+  crosses (`sow(SeedCoordinate, Cellar, SeedEnvelope)` / `handle(Cellar, SeedEnvelope)`), and the
+  ScenarioCellar IS the transaction (it carries txId + write-set). The transactional model is documented
+  in seed-broker-spec § "The cellar is TRANSACTIONAL — a UNIVERSAL ScenarioCellar" (complete, clear).
+
+Doc is now aligned on codebase + vision. NEXT stays: CODE the PREPARE beats (#10 secrets, #2 nocloud)
+then the GROW (see whiteboard).
+
+## ★ UPDATE 2026-07-16 — the spec reconciliation is DONE; the GROW body is CARTOGRAPHED
+
+The "reconcile provisioning-slice ↔ I6" NEXT this memory pointed to is DONE (it happened after this
+memory's 2026-07-14 date). All three specs already carry the PREPARE→GROW→VERIFY order, the flip
+("scion promotes first, host grows last"), and the MENT/SELF-OBSOLETE cures: `bdd.adoc` (l.460-466),
+`incus-edge-spec` (l.111-123), `provisioning-slice` (l.436-448). Do NOT re-litigate the order.
+
+The real remaining work is CODE: restore the GROW body (deleted at `342b7c327`, was
+`IncusResourceBootstrap` 3789L). Cartographed 2026-07-16 (two Explore passes), graved into
+provisioning-slice §deltas + host-cellar § the-grow-anatomy:
+
+- *#10 secrets — NOT host-only (corrected).* Was host only by accident of place (nested in
+  IncusResourceBootstrap). It is a file materialisation; the token VALUE is OSGi-resolvable
+  (`AuthTokenContact`, an auth-contract port with `CliAuthTokenContact` realisation). → a beat of
+  incus PREPARE (`IncusProvisionScenario`, a Then after materialisation): resolve token, upsert
+  `<worktree>/.secrets`, before the `worktree.dir` mount (#1) binds it.
+- *#2 nocloud — NO transcode.* The 3 files (user-data/meta-data/network-config) are authored in FINAL
+  form as manifests-core templates, synthesised into the `cloud-config` ConfigMap
+  (`CloudConfigManifestsUnit`) with MACs substituted from netplan's `ClusterNetworkBlueprint`. The old
+  `CloudConfigSecretRenderer` merely UNWRAPPED the ConfigMap envelope (+base64) and wrote byte-for-byte
+  to `cloudSeedRoot`. The unwrap needs only generic YAML parse (`ManifestDocumentService.parseDocument`
+  = `yaml.read(path, Map.class)`, no manifests semantics → NO coupling). Content = manifests+netplan;
+  unwrap-for-the-instance = a beat of incus PREPARE. CHANNELS: FS carries the content (incus re-reads
+  the synthesised ConfigMap from `runtimeCloudConfigRoot`), ReportModel carries the meta-facts.
+- *GROW = host-irreducible core ONLY:* Pulumi graph #1 (Project root → Network/Profile dependsOn,
+  Image fingerprint Output threaded, Instance via Output refs, `replaceOnChanges(config,config.*)`,
+  `deleteBeforeReplace`) + 13 mounts #8 (source NIXOS host-view `asHostView(NIXOS)` → target
+  `HostPathCatalog`; 2 non-catalog: daemonset `GUEST_ROOT_PATH`, nocloud literal) + the nocloud→replace
+  wire #7 (cloud-init is the SOLE STATIC target; user-data change → instance recreate; checksum →
+  `user.rke2lab.provisioning.slice.cloud-init` on instanceConfig). NOT restored: TargetChecksumPipeline/
+  TargetReloadPolicy/5-target registry (I6 routes hot-reload by drift-entry + json refresh).
+- *Form:* GROW is a pure-host WHEN (no sow — `com.pulumi` can't enter Felix), fetches `IncusHarvest`
+  like `Cellar.fetch`, sits AFTER reconcile/promote (mount rule) and BEFORE systemd/cluster verify.
+- *Causality to preserve:* materialise+secrets+nocloud+promote (scion beats) BEFORE any resource;
+  then host GROW declares Project→{Network,Profile,Image} and binds the Instance's 13 mounts onto the
+  ALREADY-PROMOTED `host.live.d`.
+
+NEXT (code, session neuve): restore a `HostGrowStage` (the pure-host WHEN) + the incus PREPARE beats
+(secrets, nocloud) + wire into ClusterSeedScenario between reconcile and systemd. See whiteboard.
+
 ## Playing the first preview was a TESTBED — it walked the whole host boot and exposed a defect chain
 
 Running `pulumi preview --stack dev` on the seed-master exec-jar (2026-07-14) is the first time the

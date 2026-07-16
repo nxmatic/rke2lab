@@ -35,7 +35,23 @@ if the current one is in order).
 
 We have one readiness checkpoint working: `systemd-adapter` plays a Given/When/Then
 scenario during `pulumi up`/`preview`, streams its prose into the Pulumi log, and decides
-stop-vs-degraded by severity (see link:../bdd/bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern]).
+stop-vs-degraded by severity.
+
+[NOTE]
+.Severity — stop-vs-degraded (the current model, transposed here 2026-07-17)
+====
+Each checkpoint declares its severity from domain knowledge: a non-essential adapter failing is a
+DEGRADED continue (`continue-degraded`); something nothing can proceed without is a STOP. In the
+shipped model this lives in `DefaultReadinessAuthority` — it folds the scion's observations into a
+provisioning verdict (`stop` iff CRITICAL, else `continue-degraded`), published as a `SeedHandler`
+serving `readiness-verdict`; the operator can force strict mode. This section is the source of truth
+for severity (formerly documented in the now-deleted `bdd-diagnostic-pattern.adoc`, which described
+it in the abandoned "scenario = Pulumi ComponentResource" wrapper). The multi-format report
+publication (ConfigMap/JSON/AsciiDoc) of that old doc is NOT carried over: the shipped model renders
+ONE runbook (`RunbookRenderer` → AsciiDoc into `host.live.d`), the verdict travels IN the ReportModel
+(`ScenarioGraft` reads `ExecutionStatus.FAILED`), and the doctor is a consulted sub-step (§
+link:../bdd/bdd.adoc#doctor-consulted-sub-step[bdd — the doctor as a consulted sub-step]).
+====
 
 This design extends that into two intertwined subsystems:
 
@@ -1098,6 +1114,6 @@ link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enri
 == Related documentation
 
 * link:glossary.adoc[Doctor Glossary] — the clinical vocabulary source of truth (every term, its Pulumi mapping, the 2026-06-10 rename map)
-* link:../bdd/bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] — the pattern this extends (doctor hierarchy, actor-specific reports, severity)
+* link:../bdd/bdd.adoc[BDD — the ClusterSeed scenario map] — the BDD-as-engine model + the doctor as a consulted sub-step (supersedes the removed bdd-diagnostic-pattern.adoc)
 * link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] — where checkpoints fit Stage A
 * link:medical-record-query-api-design.adoc[Medical Record — Query API] — how a practitioner reads the patient's past (the four clinical questions, reconstructed on-demand from Pulumi)
