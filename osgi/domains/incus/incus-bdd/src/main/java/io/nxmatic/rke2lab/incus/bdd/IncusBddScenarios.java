@@ -71,4 +71,32 @@ public final class IncusBddScenarios {
                 .orElse(store -> {})
                 .andThen(CellarEntriesSeed.into(inheritedEntries)));
   }
+
+  /**
+   * Play {@link IncusReconcileScenario} in-container and return its runbook JSON. Unlike {@link
+   * #run}, reconcile takes NO activation input — it derives the whole host-tree state (source,
+   * pivot, live root) from the ambient {@link io.nxmatic.rke2lab.seed.broker.port.Cellar} + {@link
+   * io.nxmatic.rke2lab.seed.broker.port.RunGate} this bundle's registry holds. The txId + inherited
+   * entries are seeded so the reconcile reads the SAME transaction's in-flight staging (the one
+   * prepare published this run, § seed-broker-spec, the entries descend). It raises no doctor
+   * consultation, so the envelope's consultations are always empty.
+   */
+  public static String runReconcile(Optional<String> txId, List<String> inheritedEntries)
+      throws InterruptedException {
+    final SeedCodec codec = new SeedCodec();
+    return new JUnitLauncherCore<String>()
+        .run(
+            IncusBddScenarios.class.getClassLoader(),
+            JupiterTestEngine.class,
+            wiring -> List.of(DiscoverySelectors.selectClass(IncusReconcileScenario.class)),
+            (launcher, request) -> {
+              launcher.execute(request);
+              final String runbook =
+                  new ScenarioJsonWriter(IncusReconcileScenario.lastRunbook()).toString();
+              return codec.encode(new RunbookEnvelope(runbook, List.of()));
+            },
+            txId.map(TxIdSeed::into)
+                .orElse(store -> {})
+                .andThen(CellarEntriesSeed.into(inheritedEntries)));
+  }
 }

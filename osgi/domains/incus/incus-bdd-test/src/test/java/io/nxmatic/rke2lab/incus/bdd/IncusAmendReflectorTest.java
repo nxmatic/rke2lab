@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Worktree;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
-import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.testkit.RefusingCellar;
@@ -68,6 +67,6 @@ class IncusAmendReflectorTest {
 
   @Test
   void it_serves_the_incus_amend_coordinate() {
-    assertEquals(new AmendCoordinate("incus"), reflector.serves());
+    assertEquals(IncusScenario.PROVISION.amend(), reflector.serves());
   }
 }

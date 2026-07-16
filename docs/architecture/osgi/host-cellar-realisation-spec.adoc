@@ -890,19 +890,21 @@ letting load-bearing facts hide in unrendered state.
   `host.N.staging.d/rke2-manifests.d` — a temp dir only when the scalars are blank (a bare survey). The
   intermediate `manifests.yaml` sits a level ABOVE the synthesis root (sibling of `rke2-manifests.d`),
   outside the checksummed/mounted subtree.
-* The reconcile (I6, NOT yet built) — DESIGNED 2026-07-14, CORRECTED 2026-07-15 (it is a SCION, not
-  host-side): a DISTINCT incus scion `IncusReconcileScenario`, its promoter `HostTreePromoter` in
-  `incus-core`. The two deltas (`change`, `drift`) pivot on `host.{live.syncedFrom}.staging.d` (NOT
-  arithmetic N-1); the DECISION is `change = diff(pivot, source)` on checksum maps (no FS touch);
-  `drift` is observed/reported, never a gate. See § *The two deltas* (the corrected Packaging + reconcile
-  cycle paragraphs). Impacts to land at I6: (a) `HostSlotSelector`'s `(max+1)%3` must SKIP the pinned
-  `live.syncedFrom` slot (the rotation protects the live's pivot tree, § the model); (b) `jsync-engine`
-  + `jsync-vfs` are EMBEDDED in incus-core's `Bundle-ClassPath` (nu manifests, one consumer → embed not
-  `*-wrap`); `java-diff-utils` carries a BSN, imported normally; (c) prepare must publish
-  `HostStagingEntry(stagingRoot, checksums)` so reconcile has a source to fold; (d) R1 preservation (a
-  mount dir survives `setDelete(true)` + the `.flox` exclude) proven by a test before trusting live
-  mounts; (e) the promotion envelope `{host.live.d → SN, host.{DN}.drift → prior syncedFrom}` committed
-  to the cellar ONLY post-sync-success (the cellar is written once, at the end, when the flip is done).
+* The reconcile (I6) — LANDED 2026-07-16 (§4 pièce 3): a DISTINCT incus scion `IncusReconcileScenario`
+  (in `incus-bdd`, played through `IncusBddScenarios.runReconcile` behind `IncusReconcileRunbookHandler`
+  serving `RunbookCoordinate("incus-reconcile")`), its promoter `HostTreePromoter` in `incus-core`. It
+  derives its whole state from the cellar — no worktree amendment: the `source` is the run's own
+  `host-staging` entry (prepare published it this run; the cellar's overlay returns the in-flight one,
+  the entries-descend transaction), the `pivot` is the `host-live` entry's `syncedFrom` (empty on a
+  first run), the live root the `host.live.d` sibling of the staging slot. The DECISION is `change =
+  source.checksums ≠ pivot.checksums` (checksum maps, no FS touch): empty ⇒ NO-OP; gate closed ⇒
+  PENDING (nothing written); else `HostTreePromoter.promote`. The `drift` (`live ↔ pivot`, via
+  `HostTreeDiffer` + `HostTreeDeltaRenderer`) is OBSERVED on the FS before the sync and reported, never
+  a gate. The THEN commits `HostLiveEntry(syncedFrom=source)` + any `HostDriftEntry` ONLY on a real
+  promotion, and poses the `GraftTag.PROMOTED` narration tag (a projection of the live entry). The
+  crossing sits in `ClusterSeedScenario` AFTER `the_instance_is_provisioned` (which publishes the
+  staging) and BEFORE `the_systemd_adapter_is_launched` (which runs inside the instance mounting the
+  live). `HostSlotSelector` reads the cellar (occupancy + pinned), the FS-scan gone.
 
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild

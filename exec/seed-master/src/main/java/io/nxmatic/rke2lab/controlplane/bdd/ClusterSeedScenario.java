@@ -148,6 +148,8 @@ public class ClusterSeedScenario
         .and()
         .the_instance_is_provisioned(hostTree)
         .and()
+        .the_live_tree_is_reconciled(hostTree)
+        .and()
         .the_systemd_adapter_is_launched(hostTree)
         .and()
         .the_cluster_becomes_ready(hostTree);
@@ -282,8 +284,22 @@ public class ClusterSeedScenario
       // role,
       // never an incus field nor a path — the scion owns the tree.
       sowAndGraft
-          .sowing("incus", gardening, hostTree, Map.of(Amendment.WORKTREE, worktreeScalars))
+          .sowing(
+              "incus-provision", gardening, hostTree, Map.of(Amendment.WORKTREE, worktreeScalars))
           .the_scion_is_sown_and_grafted("the instance is provisioned");
+      return self();
+    }
+
+    @NestedSteps
+    @As("the live tree is reconciled")
+    public When the_live_tree_is_reconciled(@Hidden ReportModel hostTree) {
+      // Reconcile promotes the fresh staging (incus just published it) into host.live.d BEFORE the
+      // instance mounts it — so it sits after the provision crossing and before systemd/cluster,
+      // which run inside the instance. No amendment: the scion derives its whole state from the
+      // cellar it inherits (source + pivot), the twin transaction the provision crossing wrote to.
+      sowAndGraft
+          .sowing("incus-reconcile", gardening, hostTree)
+          .the_scion_is_sown_and_grafted("the live tree is reconciled");
       return self();
     }
 

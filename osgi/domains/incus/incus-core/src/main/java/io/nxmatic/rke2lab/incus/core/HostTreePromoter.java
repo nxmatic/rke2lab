@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.incus.core;
 
 import com.fizzed.jsync.engine.JsyncEngine;
 import com.fizzed.jsync.engine.JsyncMode;
-import com.fizzed.jsync.engine.JsyncResult;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -36,13 +35,16 @@ public final class HostTreePromoter {
 
   /**
    * Sync {@code source} (a materialised staging slot) into {@code live} ({@code host.live.d}),
-   * deleting stale entries but preserving {@code .flox/} runtime state on both sides. Returns the
-   * {@link JsyncResult} (files created/updated/deleted) — the promotion's factual outcome, for the
-   * reconcile scion to narrate.
+   * deleting stale entries but preserving {@code .flox/} runtime state on both sides. Returns
+   * nothing: jsync's {@code JsyncResult} is an incus-core INTERNAL — it must NOT appear in this
+   * method's signature, or a consumer (the reconcile scion in incus-bdd) would import {@code
+   * com.fizzed.jsync.engine}, a package that is EMBEDDED here (nu manifest, no BSN) and cannot be
+   * imported across a bundle boundary (the resolution would fail in-container). The promotion's
+   * factual outcome is narrated by the scion from the cellar entries, not from a jsync type.
    */
-  public JsyncResult promote(Path source, Path live) {
+  public void promote(Path source, Path live) {
     try {
-      return new JsyncEngine()
+      new JsyncEngine()
           .setDelete(true)
           // Compare by CHECKSUM, not mtime: two same-size files differing only in content (a
           // regenerated YAML with an edited value) must sync — an mtime/size heuristic would miss
