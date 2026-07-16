@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -35,11 +36,11 @@ public final class ManifestsRunbookHandler implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope trigger) {
+  public SeedEnvelope handle(SeedEnvelope trigger, Optional<String> txId) {
     final ManifestsRunbookInput facet =
         codec.decode(trigger.payload(), ManifestsRunbookInput.class);
     try {
-      return SeedEnvelope.of(COORDINATE, ManifestsBddScenarios.run(facet));
+      return SeedEnvelope.of(COORDINATE, ManifestsBddScenarios.run(facet, txId));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(

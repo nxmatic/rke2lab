@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.junit.jupiter.api.extension.ExtensionContext.Store;
+import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 
 /**
  * The SHARED work of the discipline extensions (spec Figure 6): reach the OSGi world and raise the
@@ -23,7 +24,8 @@ import org.junit.jupiter.api.extension.ExtensionContext.Store;
  * the connection — not a separate policy — decides who closes; there is no ambient supplier masking
  * the source.
  */
-public abstract class BaseWorldExtension implements BeforeAllCallback, AfterAllCallback {
+public abstract class BaseWorldExtension
+    implements BeforeAllCallback, AfterAllCallback, TestInstancePostProcessor {
 
   /** Namespace of the socle's per-scope resources (the connection + the lever). */
   public static final Namespace NAMESPACE = Namespace.create(BaseWorldExtension.class);
@@ -57,6 +59,18 @@ public abstract class BaseWorldExtension implements BeforeAllCallback, AfterAllC
     final OsgiConnection connection = connection(context);
     if (connection.ownsLifecycle()) {
       connection.close();
+    }
+  }
+
+  /**
+   * Bridge the class-scope connection to the scenario body: a scenario that {@link
+   * ConnectionReceiver receives} it does {@code Gardening.over(connection)} instead of booting a
+   * second Felix. Runs after {@link #beforeAll} placed the connection, before the body.
+   */
+  @Override
+  public void postProcessTestInstance(Object testInstance, ExtensionContext context) {
+    if (testInstance instanceof ConnectionReceiver receiver) {
+      receiver.receiveConnection(connection(context));
     }
   }
 

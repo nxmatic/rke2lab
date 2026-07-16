@@ -249,6 +249,20 @@ The doctor is the cellar's FIRST consumer, not its only one. The general law: *e
 harvest to the cellar, and — on the Pulumi realisation — `store` PRODUCES the Pulumi resource.* This is where
 the host's old `ResourceManager` dissolves.
 
+[NOTE]
+.The `store` is TRANSACTIONAL — the scion TAGS, the ROOT drains (2026-07-16)
+====
+The law below (*every scion harvests AND stores, `store` PRODUCES the resource*) holds at the API level, but
+the store is now TRANSACTIONAL: a scion's `store` posts a TAG on its `ReportModel` (it does NOT touch the
+durable backend), the graft folds those tags into the host trunk, and only the ROOT drains them to the
+durable `OpaqueCellar` (`PulumiCellar`) at the run boundary — a single all-or-nothing flush. So "on Pulumi
+`store` PRODUCES the resource" is the DRAIN's act at the root, not an immediate per-scion `up()`. The scion
+is handed a UNIVERSAL `ScenarioCellar` (injected, not resolved from the registry) whose `store` tags; the
+durable resolution is the root extension's, via the registry. Full design: §
+link:seed-broker-spec.adoc#cellar-transactional[seed-broker-spec — cellar transactional]. The paragraphs
+below describe the API contract (what a scion calls); read them with this deferral in mind.
+====
+
 *The SCION harvests AND stores — it does not return its harvest to the host.* Since the host lays the `Cellar`
 into Felix at boot (`registerService(Cellar.class)`), a scion resolves it in-container via
 `ScenarioRegistry.require(Cellar.class)`, the same way it resolves its contact and the `RunGate`. When it

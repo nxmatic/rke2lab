@@ -42,7 +42,7 @@ public final class DefaultInterventionIntake implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope rawFacts) {
+  public SeedEnvelope handle(SeedEnvelope rawFacts, Optional<String> txId) {
     final InterventionRequest request = codec.decode(rawFacts, InterventionRequest.class);
 
     if (isBlank(request.problem())) {

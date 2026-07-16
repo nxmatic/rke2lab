@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
-import com.tngtech.jgiven.report.model.Tag;
-
 /**
  * The vocabulary of within-run facts a scion attaches to its {@code ReportModel} for the host to
  * read back after the graft — the EPHEMERAL cellar (§ seed-broker-spec, two cellars: durable vs
@@ -16,7 +14,7 @@ import com.tngtech.jgiven.report.model.Tag;
  * The tag stays NARRATION: it rides the observability channel and renders in the runbook; it is not
  * a decision input (those are the verdict + the amendment).
  */
-public enum GraftTag {
+public enum GraftTag implements ScenarioTag {
 
   /**
    * The {@code host.live.d} tree the run's assets deploy into — the host renders the runbook here
@@ -31,15 +29,8 @@ public enum GraftTag {
     this.type = type;
   }
 
-  /** The tag {@code type} discriminator — how {@code ScenarioGraft} finds this tag in a tag map. */
+  @Override
   public String type() {
     return type;
-  }
-
-  /** A jGiven {@link Tag} of this kind carrying {@code value} — what a scion adds to its model. */
-  public Tag of(String value) {
-    final Tag tag = new Tag(type, value);
-    tag.setType(type);
-    return tag;
   }
 }

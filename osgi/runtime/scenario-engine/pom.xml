@@ -47,6 +47,17 @@
       <artifactId>jgiven-junit5</artifactId>
     </dependency>
 
+    <!-- The transactional cellar (ScenarioCellar) lives here (dual-realm, jGiven-aware): the neutral
+         Cellar/OpaqueCellar/SeedEnvelope seam it decorates, and the codec it encodes tags with. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+    </dependency>
+
     <!-- The framework the envelopes boot + drive: Felix (embedded) + the OSGi core API
          (BundleWiring/BundleReference for in-container discovery, FrameworkStartLevel for the
          lever). -->

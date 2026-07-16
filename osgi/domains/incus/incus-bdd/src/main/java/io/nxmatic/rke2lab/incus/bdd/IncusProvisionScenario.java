@@ -391,14 +391,15 @@ public class IncusProvisionScenario
       final SeedEnvelope amended =
           broker.sow(
               new AmendCoordinate("manifests"),
-              new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)));
+              new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)),
+              Optional.empty());
       // RUNBOOK: play the manifests synthesis with the reconciled input; the fresh tree is the
       // graft
       // the instance will mount (consumed at once, never cellared — cultivated fresh). No
       // observation
       // recorded here: the consult sink is for probe symptoms (build/reachability), not for the
       // sub-scenario's own outcome — a manifests failure surfaces as the sow throwing.
-      broker.sow(new RunbookCoordinate("manifests"), amended);
+      broker.sow(new RunbookCoordinate("manifests"), amended, Optional.empty());
       return self();
     }
 

@@ -1225,49 +1225,100 @@ needs a versioning/staleness answer — not yet designed, and not required by th
 ====
 
 [[cellar-transactional]]
-==== The cellar is TRANSACTIONAL via a SUBTYPE — the ReportModel IS the transaction (2026-07-15, revised)
+==== The cellar is TRANSACTIONAL — a UNIVERSAL ScenarioCellar, the ReportModel IS the transaction (2026-07-16, converged)
 
-A run must be able to accumulate stores and persist them atomically at a boundary. The FIRST design put a
-transient buffer + a read-through CLEAN cache INSIDE the service; the user debunked BOTH (revised
-2026-07-15):
+A run must accumulate stores and persist them atomically at a boundary. The design converged over several
+turns; the debunked framings are recorded so they are not re-attempted:
 
-* *No read-through CLEAN cache.* A second cache in the service is invisible to the consumer and illegitimate
-  — `fetch` reads the durable backend directly. Called twice in a run it re-hits the backend; correct and
-  negligible at our scale. There is NO DIRTY/CLEAN split (that distinction only existed to re-sort what a
-  read-through polluted the buffer with).
-* *No `Transaction` type wrapping the ReportModel.* "The ReportModel IS the transaction" is a FIGURE, not a
-  type to materialise. The within-run write set already lives on the scenario's `ReportModel`, and its
-  isolation comes FREE from sow-and-graft (a scenario sees only what it itself wrote; the graft folds the
-  scion into the root). We invent no buffer.
+* *No transient buffer + read-through CLEAN cache in the service.* A second cache is invisible to the
+  consumer and illegitimate — `fetch` reads the durable backend directly (re-hitting it twice a run is
+  correct and negligible at our scale). No DIRTY/CLEAN split.
+* *No `SeedRunLedger`.* A ledger was posited to index `txId → transaction`. That role dissolved: the cellar
+  is INJECTED per scenario, not resolved by key, and the `txId` (a plain UUID) enters no map — so there is
+  no index, hence no ledger.
+* *No "role encoded by the injected type".* Every scenario — host root AND scion — receives the SAME
+  `ScenarioCellar`; it is UNIVERSAL, the SOLE writer of a tag on the `ReportModel`, carrying the common
+  logic the scions did by hand (`getScenario().getModel().addTag`, one live site today,
+  `IncusProvisionScenario`). Uniformity (CLAUDE.md): one type everywhere.
 
-*The shape — a SUBTYPE, not a param.* The neutral `Cellar` (`seed-broker-port`) stays flat — it can NOT
-name `ReportModel` (a jGiven type; passing one to the host `PulumiCellar` would be the cross-loader
-`LinkageError`). A `ScenarioCellar extends Cellar`, homed in `scenario-engine` (jGiven-aware, loadable in
-BOTH realms), adds `commit()`. The role is encoded BY THE INJECTED TYPE, a compile fact: a scenario handed
-a plain `Cellar` cannot commit (no method); the root plant, handed a `ScenarioCellar`, can. The
-`ScenarioCellar` HOLDS the run's ReportModel (handed at wiring, the way `CellarStage.conserving(cellar,
-parcel)` already receives its collaborators — a `Stage` has no `getScenario()`, only the `@Test` does, so
-the model is threaded from the `@Test` body). It centralises ALL tag-posting: no scion calls
-`getScenario().getModel().addTag` anymore (the dispersed gesture the user wanted ranged in one place).
+*The three core decisions.*
 
-* *store* accumulates by posting on the model (the single `addTag`/attachment of the system).
-* *commit* is RESERVED to the root plant (it alone knows it is the transaction; a grafted scion does not
-  know if it is root-plant or fragment). It drains the FOLDED model's envelopes to `super`'s durable
-  `store`. Failure before commit → the model dies with the run, nothing persisted (atomicity, FREE — the
-  buffer is the disposable model, no `AutoCloseable`/rollback needed).
+. *UNIVERSAL, injected per scenario.* Each scenario (host root AND scion) has its OWN local
+  `ScenarioCellar`, backed by its OWN `ReportModel` (`scenario-engine` is DUAL-REALM — depended on by
+  `exec/seed-master` and by the domain bundles — so the type lives there, names `ReportModel`, and each
+  realm holds its copy; no seam for the cellar). `store` posts the codec-encoded envelope as a `Tag` on the
+  model (the within-run write set); `fetch`/`neighbours` delegate to the durable backend directly. The
+  cellar is INJECTED by the extension into a scenario field — NOT resolved from the registry (that
+  registry-resolution was the source of the identity ambiguity).
+. *Tags only, the ROOT drains.* A fragment never touches the durable backend: it posts tags, and the graft
+  folds each scion's tags into the host trunk (`ScenarioGraft`, the `getTagMap` merge — already exists). At
+  the boundary only the root drains — a single all-or-nothing flush. Isolation (A), not sub-transactions;
+  the spec's atomicity, kept.
+. *The root/fragment role comes from the LAUNCHER, not the type.* A given scenario is a FRAGMENT when
+  sown by the host, a ROOT when played alone (`IncusProvisionScenario` in its own in-container test) — so
+  the role is not a property of the type; whoever LAUNCHES knows it. A `RunRole` (ROOT|FRAGMENT) is seeded
+  into the launcher session store (the same channel as `SessionSeed`/`SeedRun`): `Main` and
+  `*BddScenarios.run` (isolated test) seed ROOT, the sow-graft seeds FRAGMENT — and the extension READS it
+  from the `ExtensionContext`. No inference, no realm test (`FrameworkUtil.getBundle` would read the REALM
+  and be blind to OSGi→OSGi nesting).
+. *`txId` = a UUID minted by the root — for AUDIT correlation (no longer the discriminant).* A
+  globally-unique transaction id, stable across serialization (valid remote/P2P). Minted by the root
+  (`UUID.randomUUID()`) and propagated to fragments by the sow's `Optional<String>` param. It no longer
+  decides root/fragment (the `RunRole` does) — it stays an observability datum, never indexed in a map.
 
-*Narration vs persistence — complementary, the tag PROJECTS the entry (never a second source).* The
-Cellar persists to the durable backend, invisible in the runbook; a `tag` is visible in the runbook
-(operator narration) but not durable. A host-tree fact that must be BOTH seen and kept is posed as a tag
-AND committed as an entry — but the tag is a PROJECTION of the entry (computed from it: "promoted from
-staging.N, sha abc, dirty"), never a separately-captured fact. One truth (the entry, the Cellar's), two
-renderings (the durable envelope + the narrated tag) — the "ONE model, two renderings" discipline, so the
-two cannot diverge. `liveRoot` stays a pure tag (a within-run render path, no durable entry behind it).
+*The `txId` is a PARAMETER of the sow, not a field of the document — `Optional<String>`.* Nesting is
+OSGi→OSGi REAL (`IncusProvisionScenario` sows `RunbookCoordinate("manifests")`) — so "root" is NOT
+"host-flat". Filiation travels PARENT→CHILD through the sow. The `txId` qualifies the CROSSING (the act of
+sowing), NOT the document: a `SeedEnvelope` also carries REAPED responses (consultations, verdicts) that
+bear no transaction — so it rides `SeedBroker.sow(SeedCoordinate, SeedEnvelope, Optional<String> txId)` and
+`SeedHandler.handle(SeedEnvelope, Optional<String> txId)`, never a field on the record (the record has 55
+construction sites; `sow` has 2, `handle` 10 impls of which 5 ignore it). It never enters a map — carried
+and compared LOCALLY (an observability datum), no collision surface. `Optional` is SIGNIFICANT: there are
+two handler natures — the 5 `*RunbookHandler`s (cluster/systemd/incus/manifests/bbox) LAUNCH an in-container
+run (txId PRESENT, relayed into the run via the input's `seedInput` channel), the 5 reflectors
+(Amend/Shape/Split/Intervention/Readiness) TRANSFORM (introspection/response), played UPSTREAM
+(`Gardening.sow` chains an `AmendCoordinate` before the `RunbookCoordinate`) with NO transaction →
+`Optional.empty()`. The boot is NOT a sow (`Gardening.open()` is Felix start + `awaitService`), so no sow
+precedes the root minting its `txId`.
 
-NOTE: the OPEN sub-point — whether a durable envelope rides the ReportModel as a `Tag` (round-trip
-verified, but narrated in the runbook) or an `Attachment` (opaque, out of narration) — is still to be
-decided at `ScenarioCellar` implementation time. `liveRoot` is a tag (it is MEANT to be narrated); an
-opaque durable envelope leans toward an attachment.
+*The lifecycle — the host adopts `BaseWorldExtension`.* The connection to the shared framework is a WORLD
+fact (it lives as long as the framework). `BaseWorldExtension` (already written, used by the scions) opens
+`OsgiConnection.embedded()` at `beforeAll`, puts it in the class-`Store` (key `CONNECTION`), and closes it
+at `afterAll` (gated by `ownsLifecycle`). `ClusterSeedScenario` ADOPTS it (`@ExtendWith(SeedRuntime)`) and
+stops opening the `Gardening` by hand — which fixes a pre-existing leak (the host connection was never
+closed) and unifies host and OSGi on ONE lifecycle model. Three ownership layers: WORLD = the connection
+(the extension) ; RUN = `OpaqueCellar`/`RunGate`/`Parcel` (the GIVEN `registerService`s them, their source
+the already-seeded `SeedRun`) ; SCENARIO = `worktreeScalars`/`preflightGate` (host-local computation, stay
+in the GIVEN).
+
+*The extension — `ScenarioCellarExtension` (no ledger).* Dual-loaded (host-flat + one per bundle). Three
+gestures; `commit`/`rollback` stay PRIVATE to the extension (the cellar exposes only
+store/fetch/neighbours):
+
+* `BeforeTestExecutionCallback` — reads the `RunRole` + the `txId` from the session store. Builds and
+  injects the `ScenarioCellar` into a scenario FIELD — the proven `SessionSeed` pattern. NOT a
+  `ParameterResolver`: jGiven reads every `@Test` PARAMETER as a narrated scenario argument
+  (`ArgumentReflectionUtil.getNamedArgs` → `startScenario`, verified in 2.0.3), so a parameter would be
+  narrated and could collide with jGiven's own param-reading; a field puts no parameter on the `@Test`.
+* `AfterTestExecutionCallback` — reads `getExecutionException()`: success + ROLE=ROOT ⇒ DRAIN — resolve the
+  `OpaqueCellar` from the REGISTRY (via the connection in the class-`Store` `BaseWorldExtension.CONNECTION`,
+  the SAME path the scions resolve their collaborators — one resolution route), read the folded
+  tag-envelopes off the trunk, re-`store` them opaquely (the host never decodes, a tag-envelope is already
+  an encoded `SeedEnvelope`); failure ⇒ nothing (the model dies with the run — atomicity); FRAGMENT ⇒ inert
+  regardless of verdict.
+
+Timing with `JGivenExtension` is LEVED BY CONSTRUCTION: begin/end touch no `ReportModel`; the drain reads
+tags `store` already posted during the body; the verdict comes from JUnit, not jGiven's sealed
+`ExecutionStatus`. The cellar reads the model LAZILY (first `store`), so the order between this
+`TestInstancePostProcessor` and jGiven's is a non-issue.
+
+*Narration vs persistence — the tag PROJECTS the entry (never a second source).* The Cellar persists to the
+durable backend, invisible in the runbook; a `tag` is visible in the runbook but not durable. A host-tree
+fact that must be BOTH seen and kept is posed as a tag AND drained as an entry — but the tag is a PROJECTION
+of the entry ("promoted from staging.N, sha abc, dirty"), never a separately-captured fact. One truth, two
+renderings — so the two cannot diverge. `liveRoot` stays a pure tag (a within-run render path, no durable
+entry behind it). A durable envelope rides the model as a `Tag` (round-trip verified, narrated), not an
+opaque `Attachment`.
 
 [[edge-reaches-osgi]]
 === How the host EDGE reaches an OSGi consumer — registerService, not a handler

@@ -70,7 +70,7 @@ class InterventionIntakeTest {
         new SeedEnvelope(
             "doctor", DoctorCoordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
-    final SeedEnvelope canonical = intake.handle(rawFacts);
+    final SeedEnvelope canonical = intake.handle(rawFacts, Optional.empty());
     assertEquals(
         DoctorCoordinate.INTERVENTION.slug(),
         canonical.coordinate(),
@@ -97,7 +97,7 @@ class InterventionIntakeTest {
         new SeedEnvelope(
             "doctor", DoctorCoordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
-    final SeedEnvelope verdict = intake.handle(rawFacts);
+    final SeedEnvelope verdict = intake.handle(rawFacts, Optional.empty());
     assertEquals(
         DoctorCoordinate.READINESS_VERDICT.slug(),
         verdict.coordinate(),

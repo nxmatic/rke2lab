@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -27,9 +28,9 @@ public final class ClusterRunbookHandler implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope trigger) {
+  public SeedEnvelope handle(SeedEnvelope trigger, Optional<String> txId) {
     try {
-      return SeedEnvelope.of(COORDINATE, ClusterBddScenarios.run());
+      return SeedEnvelope.of(COORDINATE, ClusterBddScenarios.run(txId));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(

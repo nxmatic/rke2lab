@@ -297,21 +297,24 @@ sequenceDiagram
   participant P as Pulumi
   participant M as Main (host)
   participant L as JUnitLauncherCore
+  participant WE as SeedRuntime (BaseWorldExtension)
+  participant CE as ScenarioCellarExtension
   participant S as ClusterSeedScenario (GIVEN)
-  participant G as Gardening (Felix + gardener)
   participant Sc as a scion
 
   P->>M: Pulumi.run(context)
   Note over M: capture RunMode (isDryRun) — the ONE irreducible fact
-  M->>L: run(selectClass(ClusterSeedScenario), seed RunMode into session store)
-  L->>S: play — a post-processor sets RunMode before GIVEN
-  Note over S: GIVEN bootstraps (narrated):
-  S->>G: Gardening.open() — boot framework, find the gardener
-  S->>G: registerService(RunGate) — projected from RunMode (scions resolve it)
-  Note over S: build PulumiCellar, PreflightGate, Parcel
-  Note over S: WHEN ×7 — preflight · fetch · 4× sow-and-graft · store
-  S->>Sc: broker.sow(RunbookCoordinate(soil))
-  Sc-->>S: runbook JSON → ScenarioGraft grafts it host-side
+  M->>L: run(selectClass(ClusterSeedScenario), seed SeedRun + RunRole=ROOT)
+  WE->>WE: beforeAll — OsgiConnection.embedded(), store.put(CONNECTION) — owns the world
+  CE->>CE: BeforeTestExecution — read RunRole+txId, inject ScenarioCellar (field)
+  L->>S: play — a post-processor sets SeedRun before GIVEN
+  Note over S: GIVEN bootstraps (narrated) — consumes the connection, does NOT open it
+  S->>S: registerService(RunGate/OpaqueCellar/Parcel) — the RUN layer, from SeedRun
+  Note over S: WHEN ×7 — preflight · fetch · 4× sow-and-graft · store→tag
+  S->>Sc: broker.sow(RunbookCoordinate(soil), txId)
+  Sc-->>S: runbook JSON → ScenarioGraft grafts it (tags fold into the trunk)
+  CE->>CE: AfterTestExecution — ROLE=ROOT + success ⇒ drain trunk tags → OpaqueCellar
+  WE->>WE: afterAll — close the connection (ownsLifecycle)
 ----
 
 *The frontier is precise:* Layer 1 (`Main`, inside `Pulumi.run`) is host-irreducible — the `com.pulumi`
@@ -402,7 +405,28 @@ re-created: *every scion, in-container, harvests AND stores* — the host lays t
 (`registerService`), the scion resolves it (and the ambient current `Parcel`, published like the `RunGate`) and
 stores its own harvest; the host does NOT round-trip a harvest back to re-store it (§
 link:../osgi/host-cellar-realisation-spec.adoc#every-scion-contributes[host Cellar realisation — every scion
-contributes]). The `RunbookEnvelope` keeps `(runbook, consultations)`: consultations cross because the host
+contributes]).
+
+[NOTE]
+.The store is TRANSACTIONAL — the scion TAGS, the root DRAINS (2026-07-16, supersedes the durable-immediate reading)
+====
+The `store` API is unchanged (*every scion contributes* still holds — the scion calls `store`), but WHEN it
+becomes durable moves: the scion's `store` now posts a TAG on its `ReportModel` (the within-run write set),
+the graft folds those tags into the host trunk, and only the ROOT drains them to `PulumiCellar` at the run
+boundary — a single all-or-nothing flush (§ link:../osgi/seed-broker-spec.adoc#cellar-transactional[cellar
+transactional]). What this PRESERVES, checked against the model:
+
+* *the `PulumiCellar` API* — the drain calls the same `store(Parcel, envelope)`, opaque; the FRUIT/RESOURCE
+  projection is untouched (the scion still marks `@Scion(Role.FRUIT)`, the façade still lifts).
+* *the RunGate mode* — the scion no longer consults the gate at store time; the ROOT consults it at drain
+  time. Same gate, same run ⇒ same up()/preview() decision. No regression.
+* *causal order* — today each `store` is an INDEPENDENT `up()` with NO `dependsOn` edge (the edge is the
+  planned field-level evolution, not realised). The drain replays the folded tags in fold order (the
+  trunk's `LinkedHashMap`, WHEN order), so order is preserved WHILE there are no edges. WHEN `dependsOn` is
+  realised, the drain must reconstruct causality from the AMENDMENT graph (as this atlas already mandates —
+  "read CAUSALLY from the amendment graph, not the runbook position"), NOT from fold order — a constraint
+  the drain implementation must honour then. This is the one point tag+drain adds to the model.
+==== The `RunbookEnvelope` keeps `(runbook, consultations)`: consultations cross because the host
 GRAFTS them into the runbook; the harvest does not cross because its destination is the cellar, not the runbook.
 Two natures follow: RESOURCES (graph nodes + the `dependsOn` edge, read CAUSALLY from the amendment graph, not
 the runbook position) and top-level OUTPUTS (a PROJECTION of the resources — the read façade, host, no métier).

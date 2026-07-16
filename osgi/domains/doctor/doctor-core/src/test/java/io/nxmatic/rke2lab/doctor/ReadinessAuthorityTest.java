@@ -36,20 +36,23 @@ class ReadinessAuthorityTest {
 
   @Test
   void intrinsicWarningContinuesDegraded() {
-    final SeedEnvelope verdict = authority.handle(checkpoint("systemd-adapter", true, null));
+    final SeedEnvelope verdict =
+        authority.handle(checkpoint("systemd-adapter", true, null), Optional.empty());
     assertEquals(DoctorCoordinate.READINESS_VERDICT.slug(), verdict.coordinate());
     assertEquals(Action.CONTINUE_DEGRADED, action(verdict));
   }
 
   @Test
   void operatorCriticalOverrideStops() {
-    final SeedEnvelope verdict = authority.handle(checkpoint("systemd-adapter", true, "critical"));
+    final SeedEnvelope verdict =
+        authority.handle(checkpoint("systemd-adapter", true, "critical"), Optional.empty());
     assertEquals(Action.STOP, action(verdict));
   }
 
   @Test
   void operatorWarningOverrideContinuesDegraded() {
-    final SeedEnvelope verdict = authority.handle(checkpoint("systemd-adapter", true, "warning"));
+    final SeedEnvelope verdict =
+        authority.handle(checkpoint("systemd-adapter", true, "warning"), Optional.empty());
     assertEquals(Action.CONTINUE_DEGRADED, action(verdict));
   }
 }

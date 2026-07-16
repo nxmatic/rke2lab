@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.seed.broker.port;
 
+import java.util.Optional;
+
 /**
  * A grower behind the {@link SeedBroker} door: the thing that actually sows one coordinate of seed.
  * Each handler declares the coordinate it {@link #serves} (its response type) and turns a request
@@ -17,6 +19,11 @@ public interface SeedHandler {
   /** The coordinate this handler grows — the {@code wanted} value that routes a seed here. */
   SeedCoordinate serves();
 
-  /** Sow the request {@code seed} and return the {@link #serves} coordinate's SeedEnvelope. */
-  SeedEnvelope handle(SeedEnvelope seed);
+  /**
+   * Sow the request {@code seed} under transaction {@code txId} and return the {@link #serves}
+   * coordinate's SeedEnvelope. {@code txId} is present when the crossing runs inside a transaction
+   * (a {@code *RunbookHandler} relays it into the in-container run so the scion inherits it) and
+   * {@link Optional#empty()} for an introspection handler (a reflector) that opens none.
+   */
+  SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId);
 }

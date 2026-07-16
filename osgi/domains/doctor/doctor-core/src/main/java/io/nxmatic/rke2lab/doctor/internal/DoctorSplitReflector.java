@@ -13,6 +13,7 @@ import java.lang.reflect.RecordComponent;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -49,7 +50,7 @@ public final class DoctorSplitReflector implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope seed) {
+  public SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId) {
     final Class<?> bearer = SPLIT_BEARERS.get(seed.coordinate());
     if (bearer == null) {
       // A seed whose coordinate carries no scions splits to nothing — the frontier nests an empty

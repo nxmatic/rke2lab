@@ -39,6 +39,10 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
   @ScenarioState private ReportModel hostTree;
   @ScenarioState private Map<String, JsonNode> amendments;
 
+  // The run's transaction id — published once by the root GIVEN, carried on every sow so a launched
+  // scion inherits it (audit correlation, § cellar-transactional). Empty when no run seeded one.
+  @ScenarioState private String txId = "";
+
   /**
    * Hand in the crossing's collaborators: the {@code soil} name to sow toward, the open {@link
    * Gardening}, and the root scenario's own {@link ReportModel} to graft into. Hidden — it carries
@@ -73,7 +77,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    * rootStepName} — the name of the root step that stands for this crossing.
    */
   public SowAndGraftStage the_scion_is_sown_and_grafted(@Hidden String rootStepName) {
-    final String runbookJson = gardening.sow(soil, amendments);
+    final String runbookJson = gardening.sow(soil, amendments, txId);
     graft.graftUnder(hostTree, rootStepName, graft.rebuild(runbookJson));
     return self();
   }

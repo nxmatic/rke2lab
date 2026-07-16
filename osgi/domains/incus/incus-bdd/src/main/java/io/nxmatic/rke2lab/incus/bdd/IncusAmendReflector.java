@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -45,7 +46,7 @@ public final class IncusAmendReflector implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope seed) {
+  public SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId) {
     final Class<?> bearer = AMEND_BEARERS.get(seed.coordinate());
     if (bearer == null) {
       throw new IllegalArgumentException(

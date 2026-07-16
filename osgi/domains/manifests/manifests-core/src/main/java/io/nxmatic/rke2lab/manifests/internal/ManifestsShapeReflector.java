@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.seed.broker.port.ShapeCoordinate;
 import io.nxmatic.rke2lab.seed.broker.shape.RecordSchemaProjector;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -48,7 +49,7 @@ public final class ManifestsShapeReflector implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope seed) {
+  public SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId) {
     final Class<?> bearer = SHAPE_BEARERS.get(seed.coordinate());
     if (bearer == null) {
       throw new IllegalArgumentException(

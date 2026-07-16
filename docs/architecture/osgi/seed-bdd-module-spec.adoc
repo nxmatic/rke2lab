@@ -166,26 +166,48 @@ There are TWO layers, and the frontier between them is precise.
 *inside* `Pulumi.run(context -> …)`: the `com.pulumi` provisioning graph cannot enter Felix (it stays
 host, per the migration spec), and the run-mode fact — is this a live run or a preview? — is only knowable
 there (`Deployment.getInstance().isDryRun()`, projected to `RunMode`). So `Main` is and stays the Pulumi
-entry point; it captures the `RunMode` and plays the root scenario on the launcher (`JUnitLauncherCore`,
-flat host loader, `selectClass(ClusterSeedScenario)`). This layer is NOT a jGiven step — it *precedes* the
-jGiven world.
+entry point; it captures the run's facts into a `SeedRun` and plays the root scenario on the launcher
+(`JUnitLauncherCore`, flat host loader, `selectClass(ClusterSeedScenario)`). This layer is NOT a jGiven
+step — it *precedes* the jGiven world.
+
+[NOTE]
+.One `pulumi up` = one `SeedRun` = one transaction — no concurrent root scenarios
+====
+A `pulumi up`/`preview` is ONE `Main` process, ONE `Pulumi.run`, ONE `new SeedRun(...)` — so ONE root
+scenario, played once (`selectClass` of a single class, sequential). Two `pulumi up` on the SAME stack are
+refused by Pulumi's state lock; on DIFFERENT stacks they are SEPARATE processes (separate JVMs, disjoint
+worlds). There is never a second live root in one process. This is why the run's `txId` (below) needs no
+map: within a run it is the one id every fragment inherits, between runs the process is the isolation. The
+in-process concurrency is only the scions under one root, and the `sow` is synchronous — they share the
+one `txId` by design (that IS the correlation).
+====
+
+*The `SeedRun` carries the run's facts, `txId` included.* `Main` builds a `SeedRun(runMode, parcel, config,
+cleanWorktreeRequired, txId)` where `txId = UUID.randomUUID()` — the root-minted transaction id. It is NOT
+the drain discriminant (the `RunRole` is, § seed-broker-spec cellar-transactional); it is the AUDIT
+correlation thread, carried on every `sow` so a launched scion inherits it and its work ties back to the
+run that sowed it. A scion posts it as a narrative tag on its runbook (visible in the graft), never into a
+map.
 
 *Layer 2 — the GIVEN bootstraps the gardening (narrated).* Everything else the run needs is built in the
-scenario's GIVEN, read as narration: open the `Gardening` (`Gardening.open()` — boots the framework, finds
-the gardener), publish the `RunGate` into the registry so the scions resolve it (`registerService`, not a
-handler — the ambient run-condition the map's GIVEN names), build the `Cellar` realisation
-(`PulumiCellar.fromEnvironment`) and the `PreflightGate` (delegating to the exec's entry-gate enforcer),
-name the `Parcel`. The map's GIVEN — "I have access to the open gardening, and a RunGate" — IS this
-bootstrap; opening the gardening is a precondition, never a WHEN.
+scenario's GIVEN, read as narration: take the `Gardening` OVER the world extension's connection
+(`Gardening.over(connection)` — the connection `BaseWorldExtension`/`@SeedRuntime` opened and owns at the
+class scope; the GIVEN does NOT boot a second framework), publish the `RunGate` into the registry so the
+scions resolve it (`registerService`, not a handler — the ambient run-condition the map's GIVEN names),
+build the `Cellar` realisation (`PulumiCellar.fromEnvironment`) and the `PreflightGate` (delegating to the
+exec's entry-gate enforcer), name the `Parcel`, publish the `txId`. The map's GIVEN — "I have access to the
+open gardening, and a RunGate" — IS this bootstrap; opening the gardening is a precondition, never a WHEN.
 
-*What crosses layer 1 → layer 2: exactly one value — the `RunMode`.* It is the sole fact only `Main`
-(inside `Pulumi.run`) can capture; the GIVEN bootstraps all the rest from it. It crosses through the
-launcher's *session store* — the inbound channel `JUnitLauncherCore.run(…, seedSessionStore)` exists for:
-`Main` seeds the value into the `LauncherSession` store; a jGiven-ordered `TestInstancePostProcessor`
-reads it and sets it on the scenario before the GIVEN runs. JUnit already bridges the two store realms —
-a Jupiter extension's `ExtensionContext.getStore(ns)` walks the parent chain up to the session-level store
-the driver seeded (same namespace parts on both sides), so no bridge code is written; the launcher's
-channel is used for what it was built for.
+*What crosses layer 1 → layer 2, all through the session store.* The launcher's inbound channel
+(`JUnitLauncherCore.run(…, seedSessionStore)`) carries what only `Main` can know: the `SeedRun` (bearing
+the `RunMode` + `txId`) via `SessionSeed`, and the `RunRole` (=ROOT for the host root) via `RunRoleSeed` —
+seeded together (`SEED.into(run).andThen(RunRoleSeed.into(ROOT))`). A jGiven-ordered
+`TestInstancePostProcessor` reads the `SeedRun` and sets it before the GIVEN; `ScenarioCellarExtension`
+reads the `RunRole` to decide the drain. JUnit bridges the two store realms — a Jupiter extension's
+`ExtensionContext.getStore(ns)` walks the parent chain up to the session-level store the driver seeded
+(same namespace parts on both sides), so no bridge code is written. A sown scion opens its OWN launcher
+session (a fresh store), so `RunRoleSeed.read` finds nothing there ⇒ defaults to FRAGMENT — correct: a
+scion no one declared root does not drain, its tags ride the graft up to the root.
 
 *Why the store, not a static field or the global flag:* the store is the launcher's designed inbound
 channel (typed, namespaced, cross-thread-safe), and the amorce is where other execs will carry their own

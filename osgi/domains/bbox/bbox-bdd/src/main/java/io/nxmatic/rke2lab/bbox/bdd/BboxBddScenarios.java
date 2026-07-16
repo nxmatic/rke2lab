@@ -2,9 +2,11 @@ package io.nxmatic.rke2lab.bbox.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 
@@ -42,7 +44,7 @@ public final class BboxBddScenarios {
    * ConsultingService} on a refused row) are resolved by the scenario from this bundle's registry —
    * a caller seeds mocks before invoking, or the live edge + the host's gate published them.
    */
-  public static String run() throws InterruptedException {
+  public static String run(Optional<String> txId) throws InterruptedException {
     final SeedCodec codec = new SeedCodec();
     return new JUnitLauncherCore<String>()
         .run(
@@ -55,6 +57,7 @@ public final class BboxBddScenarios {
                   new ScenarioJsonWriter(BboxReconciliationScenario.lastRunbook()).toString();
               return codec.encode(
                   new RunbookEnvelope(runbook, BboxReconciliationScenario.lastConsultations()));
-            });
+            },
+            txId.map(TxIdSeed::into).orElse(store -> {}));
   }
 }

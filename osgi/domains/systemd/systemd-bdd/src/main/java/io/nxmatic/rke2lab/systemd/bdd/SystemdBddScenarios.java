@@ -2,9 +2,11 @@ package io.nxmatic.rke2lab.systemd.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 
@@ -44,7 +46,7 @@ public final class SystemdBddScenarios {
    * ConsultingService} on a failing facet) are resolved by the scenario from this bundle's registry
    * — a caller seeds a mock before invoking, or the live edge published one.
    */
-  public static String run() throws InterruptedException {
+  public static String run(Optional<String> txId) throws InterruptedException {
     final SeedCodec codec = new SeedCodec();
     return new JUnitLauncherCore<String>()
         .run(
@@ -57,6 +59,7 @@ public final class SystemdBddScenarios {
                   new ScenarioJsonWriter(SystemdAdapterScenario.lastRunbook()).toString();
               return codec.encode(
                   new RunbookEnvelope(runbook, SystemdAdapterScenario.lastConsultations()));
-            });
+            },
+            txId.map(TxIdSeed::into).orElse(store -> {}));
   }
 }

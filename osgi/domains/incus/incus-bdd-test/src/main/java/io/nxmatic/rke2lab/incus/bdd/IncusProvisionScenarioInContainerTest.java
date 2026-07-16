@@ -270,7 +270,7 @@ public class IncusProvisionScenarioInContainerTest {
     final List<SeedCoordinate> sown = new ArrayList<>();
 
     @Override
-    public SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed) {
+    public SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed, Optional<String> txId) {
       sown.add(wanted);
       return seed;
     }

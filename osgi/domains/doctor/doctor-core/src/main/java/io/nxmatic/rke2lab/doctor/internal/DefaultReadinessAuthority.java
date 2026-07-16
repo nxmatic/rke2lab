@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -45,7 +46,7 @@ public final class DefaultReadinessAuthority implements SeedHandler {
   private final SeedCodec codec = new SeedCodec();
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope checkpoint) {
+  public SeedEnvelope handle(SeedEnvelope checkpoint, Optional<String> txId) {
     final ReadinessCheckpoint decoded = codec.decode(checkpoint, ReadinessCheckpoint.class);
     final String scenarioId = decoded.scenarioId();
 

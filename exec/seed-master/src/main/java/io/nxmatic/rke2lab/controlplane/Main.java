@@ -11,10 +11,14 @@ import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRoleSeed;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 
@@ -48,7 +52,8 @@ public final class Main {
                   runMode,
                   parcel,
                   bootstrap,
-                  config.entryGate().cleanWorktreeRequired().orElse(true));
+                  config.entryGate().cleanWorktreeRequired().orElse(true),
+                  UUID.randomUUID().toString());
 
           try {
             new JUnitLauncherCore<Boolean>()
@@ -60,7 +65,10 @@ public final class Main {
                       launcher.execute(request);
                       return Boolean.TRUE;
                     },
-                    ClusterSeedScenario.SEED.into(run));
+                    ClusterSeedScenario.SEED
+                        .into(run)
+                        .andThen(RunRoleSeed.into(RunRole.ROOT))
+                        .andThen(TxIdSeed.into(run.txId())));
             // Render the runbook (adoc + json) into host.live.d AFTER the play — the two-channel
             // rule: the runbook is narration, materialised post-run. It cannot travel through the
             // promotion (a mid-scenario beat), so the host writes it into the live tree directly, a

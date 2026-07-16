@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The open gardening — the framework as the gardener works it. An INSTANCE holding what it opened
@@ -35,7 +36,17 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
    * stops the world.
    */
   public static Gardening open() {
-    final OsgiConnection connection = OsgiConnection.embedded();
+    return over(OsgiConnection.embedded());
+  }
+
+  /**
+   * Open the gardening OVER an already-connected world — find the gardener in a connection someone
+   * else owns (the world extension's, at the class scope). The gardening does NOT own this
+   * connection's lifecycle: its {@link #close} only detaches (the connection reports {@code
+   * ownsLifecycle}, its owner closes it). This is the host path once {@code ClusterSeedScenario}
+   * wears a world discipline (the connection lives on the class store) — no second Felix booted.
+   */
+  public static Gardening over(OsgiConnection connection) {
     final SeedBroker gardener = connection.awaitService(SeedBroker.class, GARDENER_TIMEOUT_MILLIS);
     if (gardener == null) {
       throw new IllegalStateException(
@@ -54,7 +65,7 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
    * reaped {@code RunbookEnvelope} is pulled — read GENERICALLY, never a domain wire-record.
    */
   public String sow(String soil) {
-    return sow(soil, Map.<String, JsonNode>of());
+    return sow(soil, Map.<String, JsonNode>of(), "");
   }
 
   /**
@@ -67,16 +78,23 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
    * scion falls back to its own defaults). Only the {@code runbook} field of the reaped envelope is
    * pulled, read generically.
    */
-  public String sow(String soil, Map<String, JsonNode> amendments) {
+  public String sow(String soil, Map<String, JsonNode> amendments, String txId) {
     final RunbookCoordinate coordinate = new RunbookCoordinate(soil);
     final SeedCodec codec = new SeedCodec();
+    // The AMEND sow is UPSTREAM introspection (reconcile the roles onto the input) — no
+    // transaction,
+    // Optional.empty(). The RUNBOOK sow plays the scion's transactional scenario: it carries the
+    // run's txId so the scion inherits it (audit correlation, § cellar-transactional). Empty txId
+    // (a sow outside a run) crosses as empty.
     final SeedEnvelope trigger =
         amendments.isEmpty()
             ? SeedEnvelope.of(coordinate, "{}")
             : gardener.sow(
                 new AmendCoordinate(soil),
-                new SeedEnvelope(soil, coordinate.slug(), codec.encode(amendments)));
-    final SeedEnvelope reaped = gardener.sow(coordinate, trigger);
+                new SeedEnvelope(soil, coordinate.slug(), codec.encode(amendments)),
+                Optional.empty());
+    final Optional<String> runTx = txId.isEmpty() ? Optional.empty() : Optional.of(txId);
+    final SeedEnvelope reaped = gardener.sow(coordinate, trigger, runTx);
     return codec.decode(reaped.payload()).path("runbook").asText();
   }
 

@@ -16,6 +16,10 @@ import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioCellarExtension;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.SeedRuntime;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
 import io.nxmatic.rke2lab.seed.bdd.CellarStage;
 import io.nxmatic.rke2lab.seed.bdd.PreflightGate;
@@ -58,10 +62,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * body grafts under it.
  */
 @ExtendWith(JGivenExtension.class)
+@SeedRuntime
+@ExtendWith(ScenarioCellarExtension.class)
 public class ClusterSeedScenario
     extends ScenarioTestBase<
         ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then>
-    implements SeedReceiver<SeedRun> {
+    implements SeedReceiver<SeedRun>, ConnectionReceiver {
 
   /**
    * The inbound channel the driver ({@code Main}) seeds the {@link SeedRun} through and this
@@ -90,6 +96,9 @@ public class ClusterSeedScenario
   /** Set once by {@link #receiveSeed} (the {@code SessionSeed} post-processor) before the GIVEN. */
   @MonotonicNonNull private SeedRun run;
 
+  /** Set once by {@link #receiveConnection} ({@code BaseWorldExtension}) before the GIVEN. */
+  @MonotonicNonNull private OsgiConnection connection;
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -100,13 +109,21 @@ public class ClusterSeedScenario
     this.run = run;
   }
 
+  @Override
+  public void receiveConnection(OsgiConnection connection) {
+    this.connection = connection;
+  }
+
   @Test
   void the_cluster_seed_grows_to_a_ready_cluster() {
     final SeedRun seedRun =
         Objects.requireNonNull(
             run, "the SeedRun was not seeded before the scenario ran (the driver must seed it)");
     final ReportModel hostTree = getScenario().getModel();
-    given().i_have_access_to_the_open_gardening(seedRun);
+    final OsgiConnection world =
+        Objects.requireNonNull(
+            connection, "the OsgiConnection was not received before the scenario ran");
+    given().i_have_access_to_the_open_gardening(seedRun, world);
     when()
         .the_entry_gates_are_enforced()
         .and()
@@ -142,9 +159,15 @@ public class ClusterSeedScenario
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
     @ProvidedScenarioState JsonNode worktreeScalars;
+    @ProvidedScenarioState String txId;
 
-    public Given i_have_access_to_the_open_gardening(@Hidden SeedRun run) {
-      this.gardening = Gardening.open();
+    public Given i_have_access_to_the_open_gardening(
+        @Hidden SeedRun run, @Hidden OsgiConnection world) {
+      // Open OVER the connection the world extension owns (class scope) — no second Felix booted;
+      // the extension closes it at afterAll (the leak the hand-rolled open() left is gone).
+      this.gardening = Gardening.over(world);
+      // The run's transaction id — carried on every sow so a scion inherits it (audit correlation).
+      this.txId = run.txId();
       // The host no longer computes the provisioning topology: the tree is incus's, so the incus
       // scion reconstructs it in-world from the flat worktree scalars the host hands it (§
       // host-cellar-realisation, computed OSGi-side) and picks its own rotation slot. The host

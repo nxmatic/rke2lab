@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.ShapeCoordinate;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,7 +38,7 @@ class ManifestsShapeReflectorTest {
     // A sower asks the shape of the runbook coordinate — the seed carries that coordinate's slug.
     final SeedEnvelope ask = SeedEnvelope.of(new RunbookCoordinate("manifests"), "{}");
 
-    final SeedEnvelope reaped = REFLECTOR.handle(ask);
+    final SeedEnvelope reaped = REFLECTOR.handle(ask, Optional.empty());
 
     assertEquals(ShapeCoordinate.SLUG, reaped.coordinate());
     final var schema = CODEC.decode(reaped.payload());
@@ -52,7 +53,7 @@ class ManifestsShapeReflectorTest {
   @Test
   void refuses_a_coordinate_it_describes_no_shape_for() {
     final SeedEnvelope ask = SeedEnvelope.of(new ShapeCoordinate("manifests"), "{}");
-    assertThrows(IllegalArgumentException.class, () -> REFLECTOR.handle(ask));
+    assertThrows(IllegalArgumentException.class, () -> REFLECTOR.handle(ask, Optional.empty()));
   }
 
   @Test
