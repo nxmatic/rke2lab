@@ -27,3 +27,13 @@ flat launcher, not a DS bundle) gets it via the pipeline context / service looku
 `ManifestsUnitContext` threads `YamlMapper`. Delete `Document.newPayload()` and migrate its call sites
 in that same change (no half-migration — uniformity rule). See [[world-gateway-2a-execution-state]]
 [[world-gateway-document-design]].
+
+**★ NAME UPDATE (2026-07-16): the codec is now `SeedCodec`** (post `world-gateway → seed-broker`
+rename, module `osgi/foundation/seed-broker-codec`). This backlog's "DocumentCodec" = today's
+`SeedCodec` — DO NOT hunt for the old name in 2D and miss the link. Current state confirmed still
+STATELESS (an `ObjectMapper` + a `withValidation` flag, no config), instantiated `new SeedCodec()` at
+~35 prod sites (CodecCellar, every *Reflector, every *BddScenarios, ScenarioCellar, the cellar
+transactional engine). The trigger is UNCHANGED (schemas + config borne by the codec); when it fires,
+the 35 sites migrate together (uniformity). The cellar-transactional work (2026-07-16) deliberately
+kept `new SeedCodec()` — consistent with this deferral, NOT an oversight. See
+[[cellar-transactional-design-state]].

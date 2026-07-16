@@ -22,6 +22,8 @@ checkpoint-*.md
 
 # Diagram preview scratch — overwritten every query, never committed
 claude-preview.adoc
+# Design brainstorm scratch — working notes for a session, never committed
+claude-brainstorm-*.adoc
 diag-*.svg
 
 # Per-conversation git worktrees (Workspace isolation rule) — never committed
