@@ -7,7 +7,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
 import io.nxmatic.rke2lab.bbox.contract.BboxCoordinate;
@@ -22,7 +21,9 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -35,8 +36,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The bbox reservation-reconciliation scenario, a production jGiven scenario told in the BBOX
@@ -54,12 +55,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * LiveBboxReconciler} + the host's RunGate, or the mocks a test seeds into the registry before
  * playing).
  */
-@ExtendWith(JGivenExtension.class)
+@SeedScenario
 public class BboxReconciliationScenario
     extends ScenarioTestBase<
         BboxReconciliationScenario.Given,
         BboxReconciliationScenario.When,
-        BboxReconciliationScenario.Then> {
+        BboxReconciliationScenario.Then>
+    implements CellarReceiver {
 
   /** The router base-URI the scion reconciles against; the mock edge ignores it. */
   private static final URI ROUTER = URI.create("http://bbox.local");
@@ -85,9 +87,20 @@ public class BboxReconciliationScenario
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
+  // The transactional cellar the extension injects before the body (store→tag, not
+  // registry-resolved).
+  // @MonotonicNonNull: null until receiveCellar sets it (before the body), then read, never
+  // re-null.
+  @MonotonicNonNull private Cellar cellar;
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
+  }
+
+  @Override
+  public void receiveCellar(Cellar cellar) {
+    this.cellar = cellar;
   }
 
   @Test
@@ -109,7 +122,7 @@ public class BboxReconciliationScenario
         .and()
         .no_failed_row_is_silently_dropped()
         .and()
-        .the_harvest_is_stored(resolveCellar(), resolveParcel());
+        .the_harvest_is_stored(cellar, resolveParcel());
     LAST_RUNBOOK.set(getScenario().getModel());
     LAST_CONSULTATIONS.set(consultOnRefusal(outcomes));
   }
@@ -186,17 +199,6 @@ public class BboxReconciliationScenario
    */
   private Optional<ConsultingService> resolveDoctor() {
     return ScenarioRegistry.of(this).optional(ConsultingService.class);
-  }
-
-  /**
-   * Resolve the {@link Cellar} the host laid into the registry — the neutral furniture the scion
-   * stores its harvest at. Required: the host publishes it at the GIVEN, a test registers a mock.
-   */
-  private Cellar resolveCellar() {
-    return ScenarioRegistry.of(this)
-        .require(
-            Cellar.class,
-            "no Cellar in the registry (the host lays it in at boot, a test registers a mock)");
   }
 
   /**

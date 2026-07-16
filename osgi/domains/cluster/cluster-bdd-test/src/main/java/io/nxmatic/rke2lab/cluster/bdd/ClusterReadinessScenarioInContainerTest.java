@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -115,7 +116,7 @@ public class ClusterReadinessScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return ClusterBddScenarios.run();
+      return ClusterBddScenarios.run(Optional.empty());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

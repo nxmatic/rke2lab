@@ -47,7 +47,8 @@ class IncusAmendReflectorTest {
     final SeedEnvelope roleValues = new SeedEnvelope("incus", "runbook", CODEC.encode(Map.of()));
 
     final IncusRunbookInput bound =
-        CODEC.decode(reflector.handle(roleValues, Optional.empty()).payload(), IncusRunbookInput.class);
+        CODEC.decode(
+            reflector.handle(roleValues, Optional.empty()).payload(), IncusRunbookInput.class);
 
     assertEquals(
         IncusRunbookInput.defaults().worktree(),

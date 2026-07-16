@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.doctor;
 
-import static org.junit.jupiter.api.Assertions.fail;
-
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -27,6 +27,9 @@ import org.osgi.framework.Bundle;
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
 @OsgiWorld
+// Flip to FrameworkLog.Level.DEBUG to troubleshoot a failed in-container resolve/activation
+// (Felix then traces WHICH requirement could not be wired); WARNING is the quiet committed default.
+@FrameworkLog(FrameworkLog.Level.WARNING)
 class DoctorCoreInContainerTest {
 
   // The doctor suite's two fixtures, selected by what they declare. role=core is the host under
@@ -61,47 +64,20 @@ class DoctorCoreInContainerTest {
   Stream<DynamicTest> actorTests() throws Exception {
     // doctor-contract carries the value vocabulary + the exported doctor.testkit fixtures (via its
     // own -test fragment); doctor-core depends on it. Each fixture installs its host + fragment,
-    // located through the fragment's declared Fragment-Host — no host named by a literal. Attach
-    // both fragments, then let OSGi pull the hosts' own import closure (their sibling domain
-    // bundles
-    // + the third-party libraries they import, jackson among them) instead of a hand-kept list.
-    // Resolve hosts + the derived closure together, in one pass.
-    Bundle contract = felix.installFixtureWithHost(CONTRACT_FIXTURE).host();
-    final OutOfContainerFrameworkExtension.FixtureWithHost core =
-        felix.installFixtureWithHost(CORE_FIXTURE);
-    Bundle host = core.host();
-    final List<Bundle> toResolve = new ArrayList<>(List.of(contract, host));
-    // Walk the CORE fragment too: its passenger imports systemd.contract (the dbus-tcp specialist's
-    // typed unit id), now a DE-SEAMED installed bundle — so the closure must see the fragment's
-    // imports to pull it, else the host resolves without the fragment attaching.
-    toResolve.addAll(felix.installImportClosureOf(contract, host, core.fragment()));
-    if (!felix.resolve(toResolve)) {
-      fail("doctor-contract + doctor-core (with their -test fragments) must resolve");
-    }
-    host.start();
-
-    final Class<?> runner = host.loadClass(RUNNER_FQN);
-    final Method run = runner.getMethod("run");
-    @SuppressWarnings("unchecked")
-    final List<String> results = (List<String>) run.invoke(null);
-
-    if (results.isEmpty()) {
-      fail("no in-container test was discovered — the jupiter engine did not attach");
-    }
-
-    return results.stream().map(DoctorCoreInContainerTest::toDynamicTest);
-  }
-
-  private static DynamicTest toDynamicTest(String encoded) {
-    final String[] parts = encoded.split("\u001F", 3);
-    final String status = parts[0];
-    final String displayName = parts.length > 1 ? parts[1] : "(unnamed)";
-    return DynamicTest.dynamicTest(
-        displayName,
-        () -> {
-          if ("FAIL".equals(status)) {
-            fail(parts.length > 2 ? parts[2] : "in-container test failed");
-          }
+    // located through the fragment's declared Fragment-Host. Walk the CORE fragment too: its
+    // passenger imports systemd.contract (the dbus-tcp specialist's typed unit id), a DE-SEAMED
+    // installed bundle — so the closure must see the fragment's imports to pull it.
+    return InContainerScenarios.drive(
+        felix,
+        RUNNER_FQN,
+        f -> {
+          final Bundle contract = f.installFixtureWithHost(CONTRACT_FIXTURE).host();
+          final OutOfContainerFrameworkExtension.FixtureWithHost core =
+              f.installFixtureWithHost(CORE_FIXTURE);
+          final Bundle host = core.host();
+          final List<Bundle> toResolve = new ArrayList<>(List.of(contract, host));
+          toResolve.addAll(f.installImportClosureOf(contract, host, core.fragment()));
+          return new Provisioning(host, toResolve, false);
         });
   }
 }

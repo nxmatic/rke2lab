@@ -18,6 +18,7 @@ import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -59,11 +60,14 @@ public class BboxReconciliationScenarioInContainerTest {
   /** The canonical run enumerates 2 clusters × 6 nodes = 12 desired reservations. */
   private static final int DESIRED_COUNT = 12;
 
+  /** The current parcel the host publishes at the GIVEN; the scion files its harvest under it. */
+  private static final Parcel PARCEL = new Parcel("bioskop", "dev");
+
   @Test
   void a_live_run_reconciles_every_row_green() throws Exception {
     // cultivating() true → the scion asks for a live apply; the mock reconciler matches every row.
-    final RecordingCellar cellar = new RecordingCellar();
-    final String envelope = playWith(cultivatingGate(true), allMatching(), null, cellar);
+    final String envelope =
+        playWith(cultivatingGate(true), allMatching(), null, new RecordingCellar());
     final ReportModel runbook = rebuild(envelope);
 
     assertNotNull(runbook, "the front-door harvested the played model");
@@ -75,14 +79,18 @@ public class BboxReconciliationScenarioInContainerTest {
     assertTrue(
         consultationsOf(envelope).isEmpty(), "a healthy run refused no row, so it consults no one");
 
-    // The reversal, proven: the SCION harvested AND stored itself — one store under the current
-    // parcel, at the bbox-reservations coordinate, carrying the folded summary (12 MATCHING rows).
-    assertEquals(1, cellar.stored.size(), "the scion stored its harvest once");
-    assertEquals(
-        BboxCoordinate.BBOX_RESERVATIONS,
-        cellar.storedAt.get(0),
-        "stored at the bbox-reservations coordinate");
-    final BboxHarvest summary = (BboxHarvest) cellar.stored.get(0);
+    // The reversal, proven: the SCION harvested AND stored itself. The store is a cellar-entry on
+    // the played model (the scion is a fragment; the host root drains at the boundary), read back
+    // through the cellar's OWN generic API — a ScenarioCellar over the rebuilt model with an empty
+    // durable side, so fetch returns the run's own write (read-your-writes). At the
+    // bbox-reservations
+    // coordinate, carrying the folded summary (12 MATCHING rows).
+    final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, RecordingCellar::new, "");
+    final BboxHarvest summary =
+        cellar
+            .fetch(PARCEL, BboxCoordinate.BBOX_RESERVATIONS, BboxHarvest.class)
+            .orElseThrow(
+                () -> new AssertionError("the scion stored no harvest at bbox-reservations"));
     assertEquals(DESIRED_COUNT, summary.desiredCount(), "the summary counts every row");
     assertEquals(DESIRED_COUNT, summary.matchingCount(), "a live all-matching run: all matched");
   }
@@ -146,14 +154,13 @@ public class BboxReconciliationScenarioInContainerTest {
     // The two ambient facts the scion needs to store its own harvest — the host publishes them at
     // the GIVEN in prod; here the passenger seeds a recording cellar and a fixed current parcel.
     registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
-    registrations.add(
-        context.registerService(Parcel.class, new Parcel("bioskop", "dev"), new Hashtable<>()));
+    registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
     if (doctor != null) {
       registrations.add(
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return BboxBddScenarios.run();
+      return BboxBddScenarios.run(Optional.empty());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

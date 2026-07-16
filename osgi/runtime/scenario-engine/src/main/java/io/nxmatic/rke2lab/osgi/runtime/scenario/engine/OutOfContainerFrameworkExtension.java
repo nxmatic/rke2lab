@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
@@ -330,22 +331,53 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     if (startResolver) {
       startResolver();
     }
+    // Install EVERYTHING first, start EVERYTHING after — two passes, never interleaved. OSGi
+    // resolution is order-independent (the resolver wires against the whole INSTALLED set), but a
+    // bundle's start() forces its resolution at that instant: interleaving install+start made an
+    // early starter (scenario-engine, which imports com.tngtech.jgiven.impl) fail because
+    // jgiven-wrap
+    // — installed in a later group — was not yet present to export it. Separating the phases makes
+    // the install order truly irrelevant.
+    final List<Bundle> toStart = new ArrayList<>();
     for (String symbolicName : classpathBundles) {
-      installFromClasspath(symbolicName).start();
+      toStart.add(installFromClasspath(symbolicName));
     }
     for (String symbolicName : reactorBundles) {
-      Bundle bundle = install(symbolicName);
-      bundle.start();
+      final Bundle bundle = install(symbolicName);
       installedBundles.put(symbolicName, bundle);
+      toStart.add(bundle);
     }
     // Bundles selected by what they DECLARE (the embed capability) rather than named. Keyed in the
     // installed map by the bundle's OWN Bundle-SymbolicName — they were discovered by capability,
     // never named by the caller, so OSGi's native identity is the only honest key.
     for (String ldapFilter : matchFilters) {
       for (BundleLocation location : classpath.matching(ldapFilter)) {
-        Bundle bundle = installAt(location);
-        bundle.start();
+        final Bundle bundle = installAt(location);
         installedBundles.put(bundle.getSymbolicName(), bundle);
+        toStart.add(bundle);
+      }
+    }
+    // Start each installed bundle, tolerating one that cannot resolve YET. A package-only bundle
+    // whose mandatory imports arrive LATER — scenario-engine imports seed-broker-codec (+
+    // optionally
+    // jGiven), pulled in the test body by installImportClosureOf of the host — cannot resolve here;
+    // it has no Bundle-Activator and nothing needs it ACTIVE (its runner package is class-loaded
+    // when
+    // the host runs the launcher), so its start() throws and is swallowed, leaving it installed for
+    // the test-body resolve to wire. Per-bundle (not a batch resolveBundles): a batch containing
+    // the
+    // deferred bundle resolves NONE, but starting each independently lets the library + JUnit
+    // bundles
+    // (which CAN resolve) reach ACTIVE while only the deferred one is skipped.
+    final BundleInstaller installer = new BundleInstaller(context());
+    for (Bundle bundle : toStart) {
+      try {
+        installer.startIfNotFragment(bundle);
+      } catch (BundleException deferred) {
+        LOG.debug(
+            "bundle {} not started in beforeAll — deferred to the test-body resolve: {}",
+            bundle.getSymbolicName(),
+            deferred.getMessage());
       }
     }
   }
@@ -507,6 +539,14 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     final var wiring = framework().adapt(FrameworkWiring.class);
     final List<String> unsatisfied = new ArrayList<>();
     for (var requirement : bundle.adapt(BundleRevision.class).getDeclaredRequirements(null)) {
+      // An OPTIONAL requirement with no provider does NOT block resolution, so it is noise in a
+      // resolution-failure post-mortem — listing it points at the wrong package (e.g. a host-side
+      // seam import a bundle legitimately lacks in-container). Only mandatory unmet requirements
+      // are
+      // the actionable cause.
+      if ("optional".equals(requirement.getDirectives().get("resolution"))) {
+        continue;
+      }
       final var candidates = wiring.findProviders(requirement);
       if (candidates.isEmpty()) {
         unsatisfied.add(requirement.toString());

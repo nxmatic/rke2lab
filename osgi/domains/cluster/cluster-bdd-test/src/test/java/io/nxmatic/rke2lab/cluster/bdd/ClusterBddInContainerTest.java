@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.cluster.bdd;
 
-import static org.junit.jupiter.api.Assertions.fail;
-
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -34,6 +34,9 @@ import org.osgi.framework.Bundle;
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
 @OsgiWorld
+// Flip to FrameworkLog.Level.DEBUG to troubleshoot a failed in-container resolve/activation
+// (Felix then traces WHICH requirement could not be wired); WARNING is the quiet committed default.
+@FrameworkLog(FrameworkLog.Level.WARNING)
 class ClusterBddInContainerTest {
 
   // The cluster scion fixture, selected by what it declares (its host cluster-bdd is found through
@@ -55,41 +58,18 @@ class ClusterBddInContainerTest {
 
   @TestFactory
   Stream<DynamicTest> scionTests() throws Exception {
-    // Install the fixture + its host (cluster-bdd), located through the fragment's Fragment-Host —
-    // no
-    // host named by a literal. Then let OSGi pull the host's own import closure (its sibling domain
-    // bundles + the third-party libraries it imports) instead of a hand-kept list. Resolve the host
-    // + the derived closure together, in one pass.
-    final Bundle host = felix.installFixtureWithHost(CLUSTER_BDD_FIXTURE).host();
-    final List<Bundle> toResolve = new ArrayList<>(List.of(host));
-    toResolve.addAll(felix.installImportClosureOf(host));
-    if (!felix.resolve(toResolve)) {
-      fail("cluster-bdd (with its -test fragment) must resolve");
-    }
-    host.start();
-
-    final Class<?> runner = host.loadClass(RUNNER_FQN);
-    final Method run = runner.getMethod("run");
-    @SuppressWarnings("unchecked")
-    final List<String> results = (List<String>) run.invoke(null);
-
-    if (results.isEmpty()) {
-      fail("no in-container test was discovered — the jupiter engine did not attach");
-    }
-
-    return results.stream().map(ClusterBddInContainerTest::toDynamicTest);
-  }
-
-  private static DynamicTest toDynamicTest(String encoded) {
-    final String[] parts = encoded.split("\u001F", 3);
-    final String status = parts[0];
-    final String displayName = parts.length > 1 ? parts[1] : "(unnamed)";
-    return DynamicTest.dynamicTest(
-        displayName,
-        () -> {
-          if ("FAIL".equals(status)) {
-            fail(parts.length > 2 ? parts[2] : "in-container test failed");
-          }
+    // The shared driver installs the fixture + its host (found through the fragment's
+    // Fragment-Host),
+    // pulls the host's own import closure, resolves+starts it, and runs the front-door
+    // in-container.
+    return InContainerScenarios.drive(
+        felix,
+        RUNNER_FQN,
+        f -> {
+          final Bundle host = f.installFixtureWithHost(CLUSTER_BDD_FIXTURE).host();
+          final List<Bundle> toResolve = new ArrayList<>(List.of(host));
+          toResolve.addAll(f.installImportClosureOf(host));
+          return new Provisioning(host, toResolve, false);
         });
   }
 }

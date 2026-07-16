@@ -12,14 +12,13 @@ import com.tngtech.jgiven.annotation.ScenarioStage;
 import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioCellarExtension;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.SeedRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
 import io.nxmatic.rke2lab.seed.bdd.CellarStage;
 import io.nxmatic.rke2lab.seed.bdd.PreflightGate;
@@ -39,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
@@ -61,9 +59,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * a top-level step to the model at invocation time, so the rootstock step already exists when its
  * body grafts under it.
  */
-@ExtendWith(JGivenExtension.class)
+@SeedScenario
 @SeedRuntime
-@ExtendWith(ScenarioCellarExtension.class)
 public class ClusterSeedScenario
     extends ScenarioTestBase<
         ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then>

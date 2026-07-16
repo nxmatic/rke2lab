@@ -21,7 +21,7 @@ import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -159,22 +159,7 @@ class HealthSystemContributionTest {
   private static Cellar emptyCellar() {
     return new Cellar() {
       @Override
-      public void store(Parcel parcel, SeedEnvelope vegetal) {}
-
-      @Override
-      public List<SeedEnvelope> fetch(Parcel parcel) {
-        return List.of();
-      }
-
-      @Override
-      public Optional<SeedEnvelope> fetch(Parcel parcel, SeedCoordinate coordinate) {
-        return Optional.empty();
-      }
-
-      @Override
-      public Optional<SeedEnvelope> withdraw(Parcel parcel, SeedCoordinate coordinate) {
-        return Optional.empty();
-      }
+      public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {}
 
       @Override
       public <T> List<T> fetch(Parcel parcel, Class<T> type) {

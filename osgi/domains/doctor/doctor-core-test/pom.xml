@@ -48,13 +48,6 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- the value vocabulary the tests speak (Symptom, RemediationPlan, …) -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-core</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
     <!-- the doctor's internal contracts the actor tests adapt to: ClinicalReasoning (the routing/
          narration face reached via ConsultingService.adapt) + Clinician/Specialist. Direct, not
          transitive — every imported class comes from a direct dependency. provided: resolved against

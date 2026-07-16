@@ -9,7 +9,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.junit5.JGivenExtension;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -28,8 +27,11 @@ import io.nxmatic.rke2lab.incus.core.BootstrapPaths;
 import io.nxmatic.rke2lab.incus.core.GitProvenanceReader;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
 import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
@@ -46,8 +48,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The incus provisioning checkpoint, a production jGiven scenario told in the INCUS DOMAIN's own
@@ -77,10 +79,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * config-derived plumbing is the same deferral the cluster/systemd twins make for their kubeconfig
  * / endpoint).
  */
-@ExtendWith(JGivenExtension.class)
+@SeedScenario
 public class IncusProvisionScenario
     extends ScenarioTestBase<
-        IncusProvisionScenario.Given, IncusProvisionScenario.When, IncusProvisionScenario.Then> {
+        IncusProvisionScenario.Given, IncusProvisionScenario.When, IncusProvisionScenario.Then>
+    implements CellarReceiver<ScenarioCellar> {
 
   private static final String NODE = "bioskop-master";
 
@@ -114,9 +117,20 @@ public class IncusProvisionScenario
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
+  // The transactional cellar the extension injects before the body (store→tag, not
+  // registry-resolved).
+  // Typed ScenarioCellar (not just Cellar): the manifests sub-sow reads transactionId() to pass the
+  // run's tx on. @MonotonicNonNull: null until receiveCellar sets it (before the body), then read.
+  @MonotonicNonNull private ScenarioCellar cellar;
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
+  }
+
+  @Override
+  public void receiveCellar(ScenarioCellar cellar) {
+    this.cellar = cellar;
   }
 
   @Test
@@ -138,7 +152,7 @@ public class IncusProvisionScenario
         .and()
         .prepared_through(imageBuilder, gate, observations)
         .and()
-        .consulting_manifests_through(broker, resolved.soil());
+        .consulting_manifests_through(broker, resolved.soil(), cellar.transactionId().orElse(""));
     when()
         .the_run_condition_is_read()
         .and()
@@ -148,9 +162,9 @@ public class IncusProvisionScenario
     then()
         .the_instance_is_prepared()
         .and()
-        .the_prep_is_stored(imageBuilder, resolved.soil(), resolveCellar(), resolveParcel())
+        .the_prep_is_stored(imageBuilder, resolved.soil(), cellar, resolveParcel())
         .and()
-        .the_staging_is_published(resolved, resolveCellar(), resolveParcel());
+        .the_staging_is_published(resolved, cellar, resolveParcel());
     // Pose the live root the host renders the runbook into — a within-run fact whose layout
     // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
     // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
@@ -232,17 +246,6 @@ public class IncusProvisionScenario
   }
 
   /**
-   * Resolve the {@link Cellar} the host laid into the registry — the neutral furniture the scion
-   * stores its prep harvest at. Required: the host publishes it at the GIVEN, a test registers a
-   * mock (the twin of the bbox scion's resolve).
-   */
-  private Cellar resolveCellar() {
-    return require(
-        Cellar.class,
-        "no Cellar in the registry (the host lays it in at boot, a test registers a mock)");
-  }
-
-  /**
    * Resolve the current {@link Parcel} — the one plot this run cultivates, published as an ambient
    * fact beside the Cellar (the twin of the RunGate). The scion stores under it without ever
    * computing the stack identity.
@@ -305,6 +308,8 @@ public class IncusProvisionScenario
     @ProvidedScenarioState List<ObservationWire> observations;
     @ProvidedScenarioState SeedBroker broker;
     @ProvidedScenarioState String soil;
+    // The run's transaction id, carried on to the manifests sub-sow so it inherits the same tx.
+    @ProvidedScenarioState String txId;
 
     public Given the_seed_node(@Quoted String name) {
       return self();
@@ -320,9 +325,10 @@ public class IncusProvisionScenario
     }
 
     @Hidden
-    public Given consulting_manifests_through(SeedBroker broker, String soil) {
+    public Given consulting_manifests_through(SeedBroker broker, String soil, String txId) {
       this.broker = broker;
       this.soil = soil;
+      this.txId = txId;
       return self();
     }
   }
@@ -349,6 +355,7 @@ public class IncusProvisionScenario
     @ExpectedScenarioState List<ObservationWire> observations;
     @ExpectedScenarioState SeedBroker broker;
     @ExpectedScenarioState String soil;
+    @ExpectedScenarioState String txId;
     @ProvidedScenarioState boolean cultivating;
 
     private final SeedCodec codec = new SeedCodec();
@@ -399,7 +406,10 @@ public class IncusProvisionScenario
       // observation
       // recorded here: the consult sink is for probe symptoms (build/reachability), not for the
       // sub-scenario's own outcome — a manifests failure surfaces as the sow throwing.
-      broker.sow(new RunbookCoordinate("manifests"), amended, Optional.empty());
+      broker.sow(
+          new RunbookCoordinate("manifests"),
+          amended,
+          txId.isEmpty() ? Optional.empty() : Optional.of(txId));
       return self();
     }
 

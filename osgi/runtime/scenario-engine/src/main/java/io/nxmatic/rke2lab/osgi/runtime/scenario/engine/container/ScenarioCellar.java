@@ -6,7 +6,10 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -19,10 +22,13 @@ import java.util.function.Supplier;
  * durable {@link io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar} — so a fragment never persists,
  * only the root does, atomically (§ seed-broker-spec, cellar-transactional).
  *
- * <p>The reads ({@code fetch}/{@code neighbours}) are NOT transactional — they delegate to a
- * durable {@link Cellar} directly (no cache; re-hitting the backend twice a run is correct and
- * negligible). A scenario with no durable read side (a pure in-container fragment whose reads are
- * mocked) is handed a delegate for them; the transactional {@code store} needs only the model.
+ * <p>The reads are an OVERLAY: the run's own read-write set (its {@code store}s and {@code
+ * withdraw} tombstones on the model) takes precedence, the durable {@link Cellar} is the fallback.
+ * So a scenario reads back what it just wrote (read-your-writes) before the drain has made anything
+ * durable, and a {@code withdraw} shadows the durable case for the rest of the run. {@code
+ * neighbours} alone is pure delegation — it names parcels (topology), not values, so the set never
+ * shadows it. A scenario with no durable read side (a pure in-container fragment whose reads are
+ * mocked) is handed a delegate for the fallback; the overlay itself needs only the model.
  *
  * <p>The {@link ReportModel} is read LAZILY (a {@link Supplier}, resolved at the first {@code
  * store}), so the extension can inject this cellar before jGiven has bound the model to the
@@ -52,17 +58,44 @@ public final class ScenarioCellar implements Cellar {
     }
   }
 
-  /** The run's transaction id — what a scion passes on when it sows a sub-scion (correlation). */
-  public String transactionId() {
-    return txId;
+  /**
+   * The run's transaction id, or empty when this cellar is not transactional (a scenario played
+   * outside a run — its own isolated test). A scion sowing a sub-scion passes this straight to the
+   * sow: present ⇒ the sub-scion inherits the tx; empty ⇒ a non-transactional play, legitimately no
+   * correlation. So "error if transactional, tolerated otherwise" is encoded by the value itself —
+   * no ad-hoc emptiness check at the call site.
+   */
+  public Optional<String> transactionId() {
+    return txId.isEmpty() ? Optional.empty() : Optional.of(txId);
   }
 
   /**
-   * One accumulated cellar entry as it rides the model: the {@link Parcel} it is filed under and
-   * the encoded {@link SeedEnvelope}. Flat (the codec serialises it to the tag's value String); the
-   * drain decodes it back and re-stores the envelope opaquely.
+   * One accumulated cellar operation as it rides the model: the {@link Parcel} it is filed under,
+   * the {@link SeedEnvelope} (its {@code coordinate} always meaningful; its {@code payload} the
+   * encoded value for a store, empty for a tombstone), and whether it is a {@code tombstone} — a
+   * {@code withdraw} that empties the case. Flat (the codec serialises it to the tag's value
+   * String). Entries ride in store ORDER, so the drain replays each in turn: a store re-stores the
+   * envelope, a tombstone withdraws the case (a store→withdraw→store sequence lands the case
+   * present, as it must).
    */
-  public record Entry(Parcel parcel, SeedEnvelope envelope) {}
+  public record Entry(Parcel parcel, SeedEnvelope envelope, boolean tombstone) {}
+
+  /**
+   * The accumulated {@link Entry entries} on a {@code model}, decoded from the {@link Tag#ENTRY}
+   * tags — the cellar is the SOLE writer of that tag, so it is also the sole READER of its format.
+   * Package-private: the run-boundary DRAIN (its lifecycle-mate {@code ScenarioCellarExtension},
+   * same package) consumes it, and the overlay reads use it internally; the format stays the
+   * cellar's private concern (a test reads back through the generic {@link #fetch} API, not this).
+   * Order is the model's tag order, i.e. store order.
+   */
+  static List<Entry> entriesOf(ReportModel model) {
+    final SeedCodec codec = new SeedCodec();
+    return model.getTagMap().values().stream()
+        .filter(tag -> Tag.ENTRY.type().equals(tag.getType()))
+        .flatMap(tag -> tag.getValues().stream())
+        .map(value -> codec.decode(value, Entry.class))
+        .toList();
+  }
 
   /**
    * The cellar's tags on a scenario's {@code ReportModel} — nested here because the cellar is their
@@ -93,28 +126,110 @@ public final class ScenarioCellar implements Cellar {
 
   @Override
   public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
-    final SeedEnvelope envelope = SeedEnvelope.of(coordinate, codec.encode(value));
-    final String entryJson = codec.encode(new Entry(parcel, envelope));
-    model.get().addTag(Tag.ENTRY.of(entryJson));
+    append(new Entry(parcel, SeedEnvelope.of(coordinate, codec.encode(value)), false));
   }
 
-  @Override
-  public <T> List<T> fetch(Parcel parcel, Class<T> type) {
-    return durableReads.get().fetch(parcel, type);
+  /** Append one operation to the read-write set — a new {@link Tag#ENTRY} tag, in store order. */
+  private void append(Entry entry) {
+    model.get().addTag(Tag.ENTRY.of(codec.encode(entry)));
   }
 
+  /**
+   * Peek ONE case, DECODED — an OVERLAY read: the run's own read-write set (the {@link Tag#ENTRY}
+   * tags on the model) takes precedence over the durable backend, so a scenario reads back what it
+   * just {@code store}d (read-your-writes) before the drain has made anything durable. The set's
+   * LAST entry for {@code (parcel, coordinate)} wins (a re-store overwrites); only when the set has
+   * nothing for that case does it fall through to the durable read side.
+   */
   @Override
   public <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
-    return durableReads.get().fetch(parcel, coordinate, type);
+    final Optional<Entry> latest = latestSetEntry(parcel, coordinate);
+    if (latest.isEmpty()) {
+      return durableReads
+          .get()
+          .fetch(parcel, coordinate, type); // set silent here → the durable case
+    }
+    // The set has the last word on this case: a store → its value; a tombstone → EMPTY, and it does
+    // NOT fall back to the durable (the withdraw's intent is "gone for this run", the durable is
+    // shadowed, not consulted).
+    return latest
+        .filter(entry -> !entry.tombstone())
+        .map(entry -> codec.decode(entry.envelope().payload(), type));
   }
 
+  /**
+   * The whole timeline DECODED — the OVERLAY of the read-write set over the durable timeline: the
+   * run's own CURRENT values for {@code parcel} first (the last entry per coordinate; a tombstoned
+   * coordinate contributes nothing), then the durable timeline. Fail-at-end: an entry the codec
+   * cannot read into {@code type} is skipped, so a fold over one domain's records tolerates a
+   * foreign coordinate in the set.
+   */
+  @Override
+  public <T> List<T> fetch(Parcel parcel, Class<T> type) {
+    final List<T> overlaid = new ArrayList<>();
+    for (Entry entry : currentSetEntries(parcel)) {
+      try {
+        overlaid.add(codec.decode(entry.envelope().payload(), type));
+      } catch (RuntimeException skip) {
+        // not readable into type (a foreign coordinate) — skip, keep the fold going.
+      }
+    }
+    overlaid.addAll(durableReads.get().fetch(parcel, type));
+    return overlaid;
+  }
+
+  /**
+   * TAKE one case out, DECODED — the OVERLAY value ({@link #fetch(Parcel, SeedCoordinate, Class)}:
+   * the run's own store, else the durable one), then RECORD the withdraw as a tombstone {@link
+   * Entry} in the read-write set. The tombstone empties the case within the run (a later {@code
+   * fetch} sees the case gone) and is replayed at the drain as a durable {@code withdraw} — the set
+   * is the transaction, so the take is deferred like every other write, not applied to the durable
+   * backend now.
+   */
   @Override
   public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
-    return durableReads.get().withdraw(parcel, coordinate, type);
+    final Optional<T> current = fetch(parcel, coordinate, type);
+    append(new Entry(parcel, SeedEnvelope.of(coordinate, ""), true));
+    return current;
   }
 
   @Override
   public List<Parcel> neighbours(Parcel parcel) {
     return durableReads.get().neighbours(parcel);
+  }
+
+  /**
+   * The LAST read-write-set entry filed at {@code (parcel, coordinate)} — store OR tombstone — or
+   * empty if the set is silent on this case. The caller reads {@link Entry#tombstone()} to tell a
+   * withdraw (case emptied in-run, durable shadowed) from a store (its value), and an empty result
+   * (set silent) means "consult the durable".
+   */
+  private Optional<Entry> latestSetEntry(Parcel parcel, SeedCoordinate coordinate) {
+    Entry latest = null;
+    for (Entry entry : setEntriesFor(parcel)) {
+      if (entry.envelope().coordinate().equals(coordinate.slug())) {
+        latest = entry; // store order → the last match is the current value
+      }
+    }
+    return Optional.ofNullable(latest);
+  }
+
+  /**
+   * The read-write set's CURRENT non-empty cases under {@code parcel}: the last entry per
+   * coordinate (store order, last wins), a coordinate whose last entry is a tombstone DROPPED (the
+   * case is empty in-run). The overlay's live state, coordinate order preserved by first
+   * appearance.
+   */
+  private List<Entry> currentSetEntries(Parcel parcel) {
+    final Map<String, Entry> byCoordinate = new LinkedHashMap<>();
+    for (Entry entry : setEntriesFor(parcel)) {
+      byCoordinate.put(entry.envelope().coordinate(), entry);
+    }
+    return byCoordinate.values().stream().filter(entry -> !entry.tombstone()).toList();
+  }
+
+  /** The read-write-set entries filed under {@code parcel}, in store order. */
+  private List<Entry> setEntriesFor(Parcel parcel) {
+    return entriesOf(model.get()).stream().filter(entry -> entry.parcel().equals(parcel)).toList();
   }
 }

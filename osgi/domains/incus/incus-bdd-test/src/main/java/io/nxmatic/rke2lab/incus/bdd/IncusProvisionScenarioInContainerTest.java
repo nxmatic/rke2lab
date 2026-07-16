@@ -17,6 +17,7 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -54,12 +55,14 @@ public class IncusProvisionScenarioInContainerTest {
 
   private static final SeedCodec CODEC = new SeedCodec();
 
+  /** The current parcel the host publishes at the GIVEN; the scion files its prep under it. */
+  private static final Parcel PARCEL = new Parcel("bioskop", "dev");
+
   @Test
   void a_live_prepare_builds_and_consults_manifests_green() throws Exception {
     // cultivating() true → the scion builds the image and consults manifests; the mocks succeed. It
     // does NOT probe reachability — the host makes the instance grow and verifies it (Shape C).
-    final RecordingCellar cellar = new RecordingCellar();
-    final String envelope = playWith(cultivatingGate(true), builds(), null, cellar);
+    final String envelope = playWith(cultivatingGate(true), builds(), null, new RecordingCellar());
     final ReportModel runbook = rebuild(envelope);
 
     assertNotNull(runbook, "the front-door harvested the played model");
@@ -72,13 +75,17 @@ public class IncusProvisionScenarioInContainerTest {
         consultationsOf(envelope).isEmpty(),
         "a clean prepare raised no symptom, so consults no one");
 
-    // The reversal, proven: the SCION harvested AND stored its prep — one store under the current
-    // parcel, at the incus-prep coordinate, carrying the recipe digest + the soil the tree was
-    // cultivated under (the intention the host fetches to grow the instance, Shape C).
-    assertEquals(1, cellar.stored.size(), "the scion stored its prep harvest once");
-    assertEquals(
-        IncusCoordinate.INCUS_PREP, cellar.storedAt.get(0), "stored at the incus-prep coordinate");
-    final IncusHarvest harvest = (IncusHarvest) cellar.stored.get(0);
+    // The reversal, proven: the SCION harvested AND stored its prep. The store is a cellar-entry on
+    // the played model (the scion is a fragment; the host root drains at the boundary), read back
+    // through the cellar's OWN generic API — a ScenarioCellar over the rebuilt model with an empty
+    // durable side, so fetch returns the run's own write (read-your-writes). At the incus-prep
+    // coordinate, carrying the recipe digest + the soil the tree was cultivated under (Shape C).
+    final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, RecordingCellar::new, "");
+    final IncusHarvest harvest =
+        cellar
+            .fetch(PARCEL, IncusCoordinate.INCUS_PREP, IncusHarvest.class)
+            .orElseThrow(
+                () -> new AssertionError("the scion stored no prep harvest at incus-prep"));
     assertEquals(
         "test-recipe",
         harvest.recipeDigest(),
@@ -146,14 +153,13 @@ public class IncusProvisionScenarioInContainerTest {
     // The two ambient facts the scion needs to store its own prep harvest — the host publishes them
     // at the GIVEN in prod; here the passenger seeds a recording cellar and a fixed current parcel.
     registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
-    registrations.add(
-        context.registerService(Parcel.class, new Parcel("bioskop", "dev"), new Hashtable<>()));
+    registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
     if (doctor != null) {
       registrations.add(
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return IncusBddScenarios.run(IncusRunbookInput.defaults());
+      return IncusBddScenarios.run(IncusRunbookInput.defaults(), Optional.empty());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
@@ -277,19 +283,16 @@ public class IncusProvisionScenarioInContainerTest {
   }
 
   /**
-   * A neutral cellar that records every {@code store} — the twin of the host's {@code PulumiCellar}
-   * for the test, minus the Pulumi backend. It proves the SCION reached the cellar and stored its
-   * own prep harvest; {@code fetch}/{@code neighbours} are unused on this path.
+   * The durable read side the scion's injected {@code ScenarioCellar} delegates {@code
+   * fetch}/{@code neighbours} to — an empty backend (nothing pre-filed). The scion's {@code store}
+   * no longer reaches it: a store is now a cellar-entry TAG on the played model (asserted via
+   * {@link ScenarioCellar#entriesOf}), which the host root drains at the boundary. It is registered
+   * only so the injected cellar has a durable delegate to resolve.
    */
   private static final class RecordingCellar implements Cellar {
-    final List<SeedCoordinate> storedAt = new ArrayList<>();
-    final List<Object> stored = new ArrayList<>();
 
     @Override
-    public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
-      storedAt.add(coordinate);
-      stored.add(value);
-    }
+    public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {}
 
     @Override
     public <T> List<T> fetch(Parcel parcel, Class<T> type) {

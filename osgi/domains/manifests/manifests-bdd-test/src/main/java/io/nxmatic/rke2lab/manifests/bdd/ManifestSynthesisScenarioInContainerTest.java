@@ -12,6 +12,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.Hashtable;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -66,7 +67,7 @@ public class ManifestSynthesisScenarioInContainerTest {
     final ServiceRegistration<RunGate> registration =
         context.registerService(RunGate.class, gate, new Hashtable<>());
     try {
-      return ManifestsBddScenarios.run(facet);
+      return ManifestsBddScenarios.run(facet, Optional.empty());
     } finally {
       registration.unregister();
     }

@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.doctor.contract;
 
-import static org.junit.jupiter.api.Assertions.fail;
-
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -26,6 +26,9 @@ import org.osgi.framework.Bundle;
  * encoded {@link String} mapped to one {@link DynamicTest}, so VSCode shows a node per test.
  */
 @OsgiWorld
+// Flip to FrameworkLog.Level.DEBUG to troubleshoot a failed in-container resolve/activation
+// (Felix then traces WHICH requirement could not be wired); WARNING is the quiet committed default.
+@FrameworkLog(FrameworkLog.Level.WARNING)
 class DoctorContractInContainerTest {
 
   private static final String FIXTURE_FILTER = "(&(type=fixture)(suite=doctor)(role=contract))";
@@ -49,40 +52,20 @@ class DoctorContractInContainerTest {
   Stream<DynamicTest> valueTypeTests() throws Exception {
     // Select the doctor-records fixture by what it DECLARES; its host (doctor-records) is found
     // through the fragment's Fragment-Host — neither named by a literal. Seed the import closure
-    // with BOTH host and fragment: the fragment's FakeSpecialist imports doctor.spi, which the
-    // host's own manifest does not, so the fragment must be walked too.
-    final OutOfContainerFrameworkExtension.FixtureWithHost fixture =
-        felix.installFixtureWithHost(FIXTURE_FILTER);
-    final Bundle host = fixture.host();
-    final List<Bundle> toResolve = new ArrayList<>(List.of(host));
-    toResolve.addAll(felix.installImportClosureOf(host, fixture.fragment()));
-    if (!felix.resolve(toResolve)) {
-      fail("doctor-contract host (with its -test fragment) must resolve");
-    }
-    host.start();
-
-    final Class<?> runner = host.loadClass(RUNNER_FQN);
-    final Method run = runner.getMethod("run");
-    @SuppressWarnings("unchecked")
-    final List<String> results = (List<String>) run.invoke(null);
-
-    if (results.isEmpty()) {
-      fail("no in-container test was discovered — the jupiter engine did not attach");
-    }
-
-    return results.stream().map(DoctorContractInContainerTest::toDynamicTest);
-  }
-
-  private static DynamicTest toDynamicTest(String encoded) {
-    final String[] parts = encoded.split("\u001F", 3);
-    final String status = parts[0];
-    final String displayName = parts.length > 1 ? parts[1] : "(unnamed)";
-    return DynamicTest.dynamicTest(
-        displayName,
-        () -> {
-          if ("FAIL".equals(status)) {
-            fail(parts.length > 2 ? parts[2] : "in-container test failed");
-          }
+    // with
+    // BOTH host and fragment: the fragment's FakeSpecialist imports doctor.spi, which the host's
+    // own
+    // manifest does not, so the fragment must be walked too.
+    return InContainerScenarios.drive(
+        felix,
+        RUNNER_FQN,
+        f -> {
+          final OutOfContainerFrameworkExtension.FixtureWithHost fixture =
+              f.installFixtureWithHost(FIXTURE_FILTER);
+          final Bundle host = fixture.host();
+          final List<Bundle> toResolve = new ArrayList<>(List.of(host));
+          toResolve.addAll(f.installImportClosureOf(host, fixture.fragment()));
+          return new Provisioning(host, toResolve, false);
         });
   }
 }

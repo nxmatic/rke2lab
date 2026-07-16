@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.incus.bdd;
 
-import static org.junit.jupiter.api.Assertions.fail;
-
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -32,6 +32,9 @@ import org.osgi.framework.Bundle;
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
 @OsgiWorld
+// Flip to FrameworkLog.Level.DEBUG to troubleshoot a failed in-container resolve/activation (Felix
+// then traces WHICH requirement could not be wired); WARNING is the quiet committed default.
+@FrameworkLog(FrameworkLog.Level.WARNING)
 class IncusBddInContainerTest {
 
   // The incus scion fixture, selected by what it declares (its host incus-bdd is found through the
@@ -56,42 +59,18 @@ class IncusBddInContainerTest {
 
   @TestFactory
   Stream<DynamicTest> scionTests() throws Exception {
-    final Bundle host = felix.installFixtureWithHost(INCUS_BDD_FIXTURE).host();
-    final List<Bundle> toResolve = new ArrayList<>(List.of(host));
-    toResolve.addAll(felix.installImportClosureOf(host));
-    if (!felix.resolve(toResolve)) {
-      final StringBuilder states = new StringBuilder();
-      for (Bundle b : toResolve) {
-        if ((b.getState() & Bundle.RESOLVED) == 0) {
-          states.append("\n  UNRESOLVED ").append(b.getSymbolicName());
-        }
-      }
-      fail("incus-bdd (with its -test fragment) must resolve" + states);
-    }
-    host.start();
-
-    final Class<?> runner = host.loadClass(RUNNER_FQN);
-    final Method run = runner.getMethod("run");
-    @SuppressWarnings("unchecked")
-    final List<String> results = (List<String>) run.invoke(null);
-
-    if (results.isEmpty()) {
-      fail("no in-container test was discovered — the jupiter engine did not attach");
-    }
-
-    return results.stream().map(IncusBddInContainerTest::toDynamicTest);
-  }
-
-  private static DynamicTest toDynamicTest(String encoded) {
-    final String[] parts = encoded.split("", 3);
-    final String status = parts[0];
-    final String displayName = parts.length > 1 ? parts[1] : "(unnamed)";
-    return DynamicTest.dynamicTest(
-        displayName,
-        () -> {
-          if ("FAIL".equals(status)) {
-            fail(parts.length > 2 ? parts[2] : "in-container test failed");
-          }
+    // The shared driver installs the fixture + its host (found through the fragment's
+    // Fragment-Host),
+    // pulls the host's own import closure, resolves+starts it, and runs the front-door
+    // in-container.
+    return InContainerScenarios.drive(
+        felix,
+        RUNNER_FQN,
+        f -> {
+          final Bundle host = f.installFixtureWithHost(INCUS_BDD_FIXTURE).host();
+          final List<Bundle> toResolve = new ArrayList<>(List.of(host));
+          toResolve.addAll(f.installImportClosureOf(host));
+          return new Provisioning(host, toResolve, false);
         });
   }
 }
