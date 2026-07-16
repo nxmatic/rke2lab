@@ -159,7 +159,7 @@ public class IncusProvisionScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return IncusBddScenarios.run(IncusRunbookInput.defaults(), Optional.empty());
+      return IncusBddScenarios.run(IncusRunbookInput.defaults(), Optional.empty(), List.of());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
@@ -276,7 +276,7 @@ public class IncusProvisionScenarioInContainerTest {
     final List<SeedCoordinate> sown = new ArrayList<>();
 
     @Override
-    public SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed, Optional<String> txId) {
+    public SeedEnvelope sow(SeedCoordinate wanted, Cellar cellar, SeedEnvelope seed) {
       sown.add(wanted);
       return seed;
     }

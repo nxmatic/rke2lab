@@ -68,6 +68,11 @@
       <artifactId>org.osgi.service.component.annotations</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-testkit</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import io.nxmatic.rke2lab.seed.broker.testkit.RefusingCellar;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class ReadinessAuthorityTest {
   @Test
   void intrinsicWarningContinuesDegraded() {
     final SeedEnvelope verdict =
-        authority.handle(checkpoint("systemd-adapter", true, null), Optional.empty());
+        authority.handle(RefusingCellar.INSTANCE, checkpoint("systemd-adapter", true, null));
     assertEquals(DoctorCoordinate.READINESS_VERDICT.slug(), verdict.coordinate());
     assertEquals(Action.CONTINUE_DEGRADED, action(verdict));
   }
@@ -45,14 +46,14 @@ class ReadinessAuthorityTest {
   @Test
   void operatorCriticalOverrideStops() {
     final SeedEnvelope verdict =
-        authority.handle(checkpoint("systemd-adapter", true, "critical"), Optional.empty());
+        authority.handle(RefusingCellar.INSTANCE, checkpoint("systemd-adapter", true, "critical"));
     assertEquals(Action.STOP, action(verdict));
   }
 
   @Test
   void operatorWarningOverrideContinuesDegraded() {
     final SeedEnvelope verdict =
-        authority.handle(checkpoint("systemd-adapter", true, "warning"), Optional.empty());
+        authority.handle(RefusingCellar.INSTANCE, checkpoint("systemd-adapter", true, "warning"));
     assertEquals(Action.CONTINUE_DEGRADED, action(verdict));
   }
 }

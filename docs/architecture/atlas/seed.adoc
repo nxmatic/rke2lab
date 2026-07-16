@@ -311,8 +311,10 @@ sequenceDiagram
   Note over S: GIVEN bootstraps (narrated) — consumes the connection, does NOT open it
   S->>S: registerService(RunGate/OpaqueCellar/Parcel) — the RUN layer, from SeedRun
   Note over S: WHEN ×7 — preflight · fetch · 4× sow-and-graft · store→tag
-  S->>Sc: broker.sow(RunbookCoordinate(soil), txId)
-  Sc-->>S: runbook JSON → ScenarioGraft grafts it (tags fold into the trunk)
+  S->>Sc: broker.sow(RunbookCoordinate(soil), txId + writeSetOf(trunk)) — the ALLER sense
+  Note over Sc: scion CE poses the write-set as Entry(inherited=true), scion reads own>inherited>durable
+  Sc->>Sc: scion CE AfterTestExecution — STRIP the inherited before the front-door serializes
+  Sc-->>S: runbook JSON → ScenarioGraft grafts it (scion's OWN tags fold into the trunk)
   CE->>CE: AfterTestExecution — ROLE=ROOT + success ⇒ drain trunk tags → OpaqueCellar
   WE->>WE: afterAll — close the connection (ownsLifecycle)
 ----
@@ -322,6 +324,17 @@ graph cannot enter Felix and `isDryRun()` is only knowable there. Layer 2 (the G
 gardening as narration. Only the `RunMode` crosses, through the launcher's designed inbound channel — NOT
 the former `HostSeeder` (one value set, none of the executor-swap / model-injection / probe-fan-out
 machinery). Opening the gardening is the GIVEN, never a WHEN; the seven WHENs are the map's runbook.
+
+*The transaction crosses BOTH ways.* The RETURN sense (a scion's tags fold UP into the trunk, the root
+drains) was the original design; the ALLER sense (the root hands DOWN the in-flight write-set so a
+later crossing reads an earlier crossing's in-flight store) was added 2026-07-16, the twin of the
+`txId` channel — the sow carries the `txId` AND `writeSetOf(trunk)` (the encoded entries), both flat
+strings in the session store, the `ScenarioCellar` itself unchanged (a view on the caller's model) (§
+link:../osgi/seed-broker-spec.adoc#the-cellar-is-transactional[seed-broker-spec, write-set descends]).
+The scion posts the parent's write-set as `Entry(inherited=true)` on its own model (so `fetch` overlays
+it uniformly), and the extension STRIPS those inherited entries before the graft, so they never fold up
+twice. This is what lets the reconcile scion read the staging the provision crossing published earlier
+in the SAME run (§ link:../osgi/host-cellar-realisation-spec.adoc[the reconcile cycle]).
 
 === Design scenarios — the host-pipeline capabilities as DSL sentences
 

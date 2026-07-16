@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Rootstock;
 import io.nxmatic.rke2lab.seed.broker.port.Scion;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
@@ -13,7 +14,6 @@ import java.lang.reflect.RecordComponent;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -50,7 +50,7 @@ public final class DoctorSplitReflector implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId) {
+  public SeedEnvelope handle(Cellar cellar, SeedEnvelope seed) {
     final Class<?> bearer = SPLIT_BEARERS.get(seed.coordinate());
     if (bearer == null) {
       // A seed whose coordinate carries no scions splits to nothing — the frontier nests an empty

@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.seed.broker.port;
 
-import java.util.Optional;
-
 /**
  * A grower behind the {@link SeedBroker} door: the thing that actually sows one coordinate of seed.
  * Each handler declares the coordinate it {@link #serves} (its response type) and turns a request
@@ -20,10 +18,12 @@ public interface SeedHandler {
   SeedCoordinate serves();
 
   /**
-   * Sow the request {@code seed} under transaction {@code txId} and return the {@link #serves}
-   * coordinate's SeedEnvelope. {@code txId} is present when the crossing runs inside a transaction
-   * (a {@code *RunbookHandler} relays it into the in-container run so the scion inherits it) and
-   * {@link Optional#empty()} for an introspection handler (a reflector) that opens none.
+   * Sow the request {@code seed} with the ambient transaction {@code cellar} and return the {@link
+   * #serves} coordinate's SeedEnvelope. {@code cellar} IS the transaction (§ cellar-transactional):
+   * a {@code *RunbookHandler} flattens its {@code txId} + write-set into the in-container run (so
+   * the scion inherits both); an introspection handler (a reflector) ignores it. Always present,
+   * never null — the optionality lives inside it ({@code transactionId()} empty for a
+   * non-transactional play).
    */
-  SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId);
+  SeedEnvelope handle(Cellar cellar, SeedEnvelope seed);
 }

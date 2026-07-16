@@ -5,13 +5,13 @@ import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.AmendmentBinder;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -46,7 +46,7 @@ public final class IncusAmendReflector implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId) {
+  public SeedEnvelope handle(Cellar cellar, SeedEnvelope seed) {
     final Class<?> bearer = AMEND_BEARERS.get(seed.coordinate());
     if (bearer == null) {
       throw new IllegalArgumentException(

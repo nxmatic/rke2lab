@@ -114,7 +114,7 @@ public class SystemdAdapterScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return SystemdBddScenarios.run(Optional.empty());
+      return SystemdBddScenarios.run(Optional.empty(), List.of());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

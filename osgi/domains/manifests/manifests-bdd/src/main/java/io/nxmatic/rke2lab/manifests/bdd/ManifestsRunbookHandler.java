@@ -1,12 +1,13 @@
 package io.nxmatic.rke2lab.manifests.bdd;
 
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
-import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -36,11 +37,15 @@ public final class ManifestsRunbookHandler implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope trigger, Optional<String> txId) {
+  public SeedEnvelope handle(Cellar cellar, SeedEnvelope trigger) {
     final ManifestsRunbookInput facet =
         codec.decode(trigger.payload(), ManifestsRunbookInput.class);
+    final ScenarioCellar transaction = (ScenarioCellar) cellar;
     try {
-      return SeedEnvelope.of(COORDINATE, ManifestsBddScenarios.run(facet, txId));
+      return SeedEnvelope.of(
+          COORDINATE,
+          ManifestsBddScenarios.run(
+              facet, transaction.transactionId(), transaction.entriesEncoded()));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(

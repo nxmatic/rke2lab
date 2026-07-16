@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.cluster.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -51,7 +52,8 @@ public final class ClusterBddScenarios {
    * ConsultingService} on a failing phase) are resolved by the scenario from this bundle's registry
    * — a caller seeds a mock before invoking, or the live edge published one.
    */
-  public static String run(Optional<String> txId) throws InterruptedException {
+  public static String run(Optional<String> txId, List<String> inheritedEntries)
+      throws InterruptedException {
     final SeedCodec codec = new SeedCodec();
     return new JUnitLauncherCore<String>()
         .run(
@@ -65,6 +67,8 @@ public final class ClusterBddScenarios {
               return codec.encode(
                   new RunbookEnvelope(runbook, ClusterReadinessScenario.lastConsultations()));
             },
-            txId.map(TxIdSeed::into).orElse(store -> {}));
+            txId.map(TxIdSeed::into)
+                .orElse(store -> {})
+                .andThen(CellarEntriesSeed.into(inheritedEntries)));
   }
 }

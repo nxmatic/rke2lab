@@ -94,6 +94,11 @@
       <artifactId>byte-buddy</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-testkit</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.0.0</version>
+    <relativePath>../../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>seed-broker-testkit</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+  <name>osgi/foundation/seed-broker-testkit</name>
+  <description>Reusable test doubles for the seed-broker seam. Chiefly RefusingCellar: a Cellar that
+    THROWS on every access — the honest stand-in for a sow whose handler must NOT touch the cellar
+    (a reflector's unit test), so a stray read fails loud instead of a null NPE-ing or a silent
+    empty masking the contract breach. A plain jar (not a bundle); consumers add it in test scope.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

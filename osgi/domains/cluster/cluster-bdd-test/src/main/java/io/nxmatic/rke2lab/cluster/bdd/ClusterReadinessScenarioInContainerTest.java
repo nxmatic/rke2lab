@@ -116,7 +116,7 @@ public class ClusterReadinessScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return ClusterBddScenarios.run(Optional.empty());
+      return ClusterBddScenarios.run(Optional.empty(), List.of());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

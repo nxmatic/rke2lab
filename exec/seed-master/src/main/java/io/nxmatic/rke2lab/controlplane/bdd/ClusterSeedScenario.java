@@ -18,6 +18,8 @@ import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.SeedRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
 import io.nxmatic.rke2lab.seed.bdd.CellarStage;
@@ -28,6 +30,7 @@ import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
@@ -64,7 +67,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 public class ClusterSeedScenario
     extends ScenarioTestBase<
         ClusterSeedScenario.Given, ClusterSeedScenario.When, ClusterSeedScenario.Then>
-    implements SeedReceiver<SeedRun>, ConnectionReceiver {
+    implements SeedReceiver<SeedRun>, ConnectionReceiver, CellarReceiver<ScenarioCellar> {
 
   /**
    * The inbound channel the driver ({@code Main}) seeds the {@link SeedRun} through and this
@@ -96,6 +99,13 @@ public class ClusterSeedScenario
   /** Set once by {@link #receiveConnection} ({@code BaseWorldExtension}) before the GIVEN. */
   @MonotonicNonNull private OsgiConnection connection;
 
+  /**
+   * The run's transactional cellar — injected by {@code ScenarioCellarExtension} before the body
+   * (the root's own, carrying the run txId; every scion's crossing inherits its in-flight entries).
+   * Threaded into each sow-and-graft crossing as the ambient transaction.
+   */
+  @MonotonicNonNull private ScenarioCellar cellar;
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -111,6 +121,11 @@ public class ClusterSeedScenario
     this.connection = connection;
   }
 
+  @Override
+  public void receiveCellar(ScenarioCellar cellar) {
+    this.cellar = cellar;
+  }
+
   @Test
   void the_cluster_seed_grows_to_a_ready_cluster() {
     final SeedRun seedRun =
@@ -120,7 +135,10 @@ public class ClusterSeedScenario
     final OsgiConnection world =
         Objects.requireNonNull(
             connection, "the OsgiConnection was not received before the scenario ran");
-    given().i_have_access_to_the_open_gardening(seedRun, world);
+    final ScenarioCellar tx =
+        Objects.requireNonNull(
+            cellar, "the ScenarioCellar was not injected before the scenario ran");
+    given().i_have_access_to_the_open_gardening(seedRun, world, tx);
     when()
         .the_entry_gates_are_enforced()
         .and()
@@ -152,19 +170,26 @@ public class ClusterSeedScenario
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState Gardening gardening;
-    @ProvidedScenarioState PulumiCellar cellar;
+    // The durable backend realisation (the Pulumi store the working cellar drains to at the
+    // boundary). Named for its role, distinct from the working `cellar` below — the When already
+    // consumes it as `cellarRealisation`.
+    @ProvidedScenarioState PulumiCellar cellarRealisation;
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
     @ProvidedScenarioState JsonNode worktreeScalars;
-    @ProvidedScenarioState String txId;
+    // The run's working cellar — the root's own ScenarioCellar (the seam type Cellar here),
+    // injected
+    // onto the scenario instance and published for SowAndGraftStage; every sow carries it, so a
+    // launched scion inherits its txId + in-flight entries (§ cellar-transactional). Resolved by
+    // TYPE: the durable backend is a distinct type (PulumiCellar), no clash.
+    @ProvidedScenarioState Cellar cellar;
 
     public Given i_have_access_to_the_open_gardening(
-        @Hidden SeedRun run, @Hidden OsgiConnection world) {
+        @Hidden SeedRun run, @Hidden OsgiConnection world, @Hidden ScenarioCellar cellar) {
       // Open OVER the connection the world extension owns (class scope) — no second Felix booted;
       // the extension closes it at afterAll (the leak the hand-rolled open() left is gone).
       this.gardening = Gardening.over(world);
-      // The run's transaction id — carried on every sow so a scion inherits it (audit correlation).
-      this.txId = run.txId();
+      this.cellar = cellar;
       // The host no longer computes the provisioning topology: the tree is incus's, so the incus
       // scion reconstructs it in-world from the flat worktree scalars the host hands it (§
       // host-cellar-realisation, computed OSGi-side) and picks its own rotation slot. The host
@@ -195,11 +220,11 @@ public class ClusterSeedScenario
       // lives BESIDE it as an ambient fact, never inside it (the doctor addresses N parcels).
       this.parcel = run.parcel();
       final Consumer<String> log = line -> {};
-      this.cellar = PulumiCellar.fromEnvironment(runGate, log);
+      this.cellarRealisation = PulumiCellar.fromEnvironment(runGate, log);
       gardening
           .connection()
           .context()
-          .registerService(OpaqueCellar.class, cellar, new Hashtable<>());
+          .registerService(OpaqueCellar.class, cellarRealisation, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
       final BootedFramework framework =
           BootedFramework.attached(gardening.connection().framework());

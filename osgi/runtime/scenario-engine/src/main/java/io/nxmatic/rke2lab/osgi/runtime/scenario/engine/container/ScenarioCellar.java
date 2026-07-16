@@ -70,6 +70,17 @@ public final class ScenarioCellar implements Cellar {
   }
 
   /**
+   * This run's entries as flat encoded strings — the instance view of {@link
+   * #entriesEncodedOf(ReportModel)} over this cellar's own model. A {@code *RunbookHandler} reads
+   * it to hand DOWN the transaction's in-flight stores when it launches a sub-scion (the ALLER
+   * sense, § seed-broker-spec, the entries descend); the sub-scion's extension re-posts them via
+   * {@link #inheritEntries}. Flat by construction, so nothing live crosses the launcher membrane.
+   */
+  public List<String> entriesEncoded() {
+    return entriesEncodedOf(model.get());
+  }
+
+  /**
    * One accumulated cellar operation as it rides the model: the {@link Parcel} it is filed under,
    * the {@link SeedEnvelope} (its {@code coordinate} always meaningful; its {@code payload} the
    * encoded value for a store, empty for a tombstone), and whether it is a {@code tombstone} — a
@@ -78,7 +89,19 @@ public final class ScenarioCellar implements Cellar {
    * envelope, a tombstone withdraws the case (a store→withdraw→store sequence lands the case
    * present, as it must).
    */
-  public record Entry(Parcel parcel, SeedEnvelope envelope, boolean tombstone) {}
+  public record Entry(Parcel parcel, SeedEnvelope envelope, boolean tombstone, boolean inherited) {
+
+    /**
+     * The same operation seen from a CHILD crossing — marked {@code inherited} so the overlay reads
+     * it (read-your-parent's-writes) but the child's graft does NOT fold it back up into the trunk
+     * (the trunk already holds it; the extension strips it first). Orthogonal to {@code tombstone}:
+     * a parent's WITHDRAW descends as an inherited tombstone (else the child re-reads a durable
+     * case the parent emptied in-flight).
+     */
+    Entry asInherited() {
+      return new Entry(parcel, envelope, tombstone, true);
+    }
+  }
 
   /**
    * The accumulated {@link Entry entries} on a {@code model}, decoded from the {@link Tag#ENTRY}
@@ -95,6 +118,56 @@ public final class ScenarioCellar implements Cellar {
         .flatMap(tag -> tag.getValues().stream())
         .map(value -> codec.decode(value, Entry.class))
         .toList();
+  }
+
+  /**
+   * The run's entries as they ride the model — the ENCODED {@link Entry} strings (the raw {@link
+   * Tag#ENTRY} tag values), in store order. This is a VIEW on the caller's {@link ReportModel}, the
+   * ALLER-sense twin of the runbook JSON the graft carries the other way: the host reads it off the
+   * trunk at a {@code sow}, hands it down (§ seed-broker-spec, the entries descend), and the
+   * child's extension re-posts it via {@link #inheritEntries}. Encoded (not decoded) because it
+   * only needs to cross flat and be re-posted verbatim, never inspected host-side.
+   */
+  public static List<String> entriesEncodedOf(ReportModel model) {
+    return model.getTagMap().values().stream()
+        .filter(tag -> Tag.ENTRY.type().equals(tag.getType()))
+        .flatMap(tag -> tag.getValues().stream())
+        .toList();
+  }
+
+  /**
+   * Re-post a parent transaction's entries onto THIS run's model, each marked {@code inherited} —
+   * the ALLER sense of the transaction (the child reads its parent's in-flight stores as its own
+   * overlay). Called by the extension BEFORE the body, so the inherited entries precede the child's
+   * own stores in tag order: on a shared coordinate the child's own store (posted later) wins,
+   * giving own {@literal >} inherited {@literal >} durable for free. The cellar is the SOLE tag
+   * writer, so this re-posting lives here, not in the extension.
+   */
+  public void inheritEntries(List<String> encodedEntries) {
+    for (String encoded : encodedEntries) {
+      append(codec.decode(encoded, Entry.class).asInherited());
+    }
+  }
+
+  /**
+   * Remove the inherited entries from {@code model}'s tag map — the child's extension calls this
+   * AFTER the body, before the graft folds the model up into the trunk, so an inherited entry
+   * (which the trunk already holds from the parent crossing) is not folded up a SECOND time and
+   * drained twice. Clean on jGiven 2.0.3: a cellar tag is added via {@code ReportModel.addTag} (the
+   * tag map alone) and never referenced by a {@code ScenarioModel.tagIds}, so removing it leaves no
+   * dangling id. Each {@link Tag#ENTRY} tag holds exactly one entry (a distinct {@code
+   * toIdString}), so the per-tag test is unambiguous.
+   */
+  public static void stripInherited(ReportModel model) {
+    final SeedCodec codec = new SeedCodec();
+    model
+        .getTagMap()
+        .values()
+        .removeIf(
+            tag ->
+                Tag.ENTRY.type().equals(tag.getType())
+                    && tag.getValues().stream()
+                        .anyMatch(value -> codec.decode(value, Entry.class).inherited()));
   }
 
   /**
@@ -126,7 +199,7 @@ public final class ScenarioCellar implements Cellar {
 
   @Override
   public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
-    append(new Entry(parcel, SeedEnvelope.of(coordinate, codec.encode(value)), false));
+    append(new Entry(parcel, SeedEnvelope.of(coordinate, codec.encode(value)), false, false));
   }
 
   /** Append one operation to the read-write set — a new {@link Tag#ENTRY} tag, in store order. */
@@ -189,7 +262,7 @@ public final class ScenarioCellar implements Cellar {
   @Override
   public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
     final Optional<T> current = fetch(parcel, coordinate, type);
-    append(new Entry(parcel, SeedEnvelope.of(coordinate, ""), true));
+    append(new Entry(parcel, SeedEnvelope.of(coordinate, ""), true, false));
     return current;
   }
 

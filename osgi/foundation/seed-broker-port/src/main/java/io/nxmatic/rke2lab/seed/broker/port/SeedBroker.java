@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.seed.broker.port;
 
-import java.util.Optional;
-
 /**
  * The one door every seed crosses: a client hands a seed (a request {@link SeedEnvelope}) and names
  * the coordinate it wants to reap ({@code wanted} — the response type), and the broker sows it at
@@ -19,16 +17,17 @@ import java.util.Optional;
 public interface SeedBroker {
 
   /**
-   * Sow {@code seed} under transaction {@code txId} and reap the {@code wanted} coordinate's {@link
-   * SeedEnvelope}. Routes to the {@link SeedHandler} that {@link SeedHandler#serves serves} {@code
+   * Sow {@code seed} with the ambient transaction {@code cellar} and reap the {@code wanted}
+   * coordinate's {@link SeedEnvelope} — read as a sentence: <em>what I want, with what, the
+   * seed</em>. Routes to the {@link SeedHandler} that {@link SeedHandler#serves serves} {@code
    * wanted}; throws {@link IllegalStateException} if no handler serves it (a coordinate with no
    * grower is a wiring bug, not a runtime condition).
    *
-   * <p>{@code txId} is the run's transaction id — the sow's crossing carries it so a launched scion
-   * INHERITS its parent's transaction (§ cellar-transactional). It is {@link Optional#empty()} for
-   * an UPSTREAM introspection sow ({@code AmendCoordinate}/{@code ShapeCoordinate}) that opens no
-   * transactional scenario; present for a {@code RunbookCoordinate} sow that plays one
-   * in-container.
+   * <p>{@code cellar} IS the run's transaction (§ cellar-transactional): it carries the {@code
+   * txId} ({@code transactionId()}) AND the in-flight write-set, so a launched scion INHERITS both.
+   * It is always present (every sow issues from a scenario whose cellar was injected), never null —
+   * the optionality lives inside it ({@code transactionId()} is empty for a non-transactional
+   * play). A {@code *RunbookHandler} flattens it at the launcher boundary; a reflector ignores it.
    */
-  SeedEnvelope sow(SeedCoordinate wanted, SeedEnvelope seed, Optional<String> txId);
+  SeedEnvelope sow(SeedCoordinate wanted, Cellar cellar, SeedEnvelope seed);
 }

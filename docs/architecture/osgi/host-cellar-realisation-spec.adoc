@@ -675,6 +675,27 @@ no no-op-detect (the WHEN already decided by checksums), it only syncs — `jsyn
 Ordering: the reconcile's sow-and-graft WHEN sits in `ClusterSeedScenario` BEFORE the grow (the live must
 be current before the VM mounts it).
 
+*How the `source` is VISIBLE — the in-flight write-set descends (2026-07-16).* The `source` is the staging
+the PROVISION crossing published EARLIER in the same run — an IN-FLIGHT store, not yet drained (the root
+drains at its own boundary, AFTER reconcile). Reconcile plays in its own fresh `ReportModel`, so without
+help its overlay would see only the durable backend (last run's stagings), never this run's fresh one. The
+transaction's ALLER sense closes it: the root hands the accumulated write-set DOWN the sow (the twin of the
+`txId`, § link:seed-broker-spec.adoc#the-cellar-is-transactional[seed-broker-spec, write-set descends]), the
+extension posts it as `Entry(inherited=true)` on reconcile's model, and `fetch(HostStagingEntry)` overlays
+it — so reconcile reads the just-published staging as its `source`. The `pivot` (`liveSyncedFrom`) is a
+PRIOR-run committed fact, so it resolves from the durable fallback; only the `source` needs the in-flight
+overlay. The inherited entries are STRIPPED before reconcile's graft, so they do not fold up a second time
+(they are already in the trunk from the provision crossing).
+
+*`HostSlotSelector` reads the cellar, not the FS (2026-07-16).* The slot rotation's occupancy no longer
+comes from `Files.list(nodeRoot)`; the selector `fetch`es the `host-staging` entries (the occupancy) and the
+`host-live` entry (the pinned `liveSyncedFrom` pivot) from the cellar it is handed, and the same overlay
+makes this run's fresh staging visible. incus-core already depends on `seed-broker-port` + `-codec` (via
+`HostTreeHead`), so this adds no new dependency category; the selector is tested against a mock cellar (the
+scions' existing gesture). BOTH callers migrate together — provision and reconcile — no transitional
+FS-reading variant (uniformity). The position/wrap/pin arithmetic is unchanged; only the occupancy source
+moves.
+
 *Rejected (why not):* Apache VFS is a file-ACCESS layer, not a reconciler (one would rewrite the whole
 diff/delete over it); Ant `SyncTask` does delete + `<preserveintarget>` but drags Ant as a runtime dep
 and wants `Project`/`Task` piloting — heavy inside a jGiven `Stage`; a reversible binary patch (jbsdiff)

@@ -142,7 +142,7 @@ public class IncusProvisionScenario
     // amended (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE
     // —
     // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
-    final Resolved resolved = Resolved.from(INPUT.get().worktree());
+    final Resolved resolved = Resolved.from(INPUT.get().worktree(), cellar, resolveParcel());
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -152,7 +152,7 @@ public class IncusProvisionScenario
         .and()
         .prepared_through(imageBuilder, gate, observations)
         .and()
-        .consulting_manifests_through(broker, resolved.soil(), cellar.transactionId().orElse(""));
+        .consulting_manifests_through(broker, resolved.soil(), cellar);
     when()
         .the_run_condition_is_read()
         .and()
@@ -273,14 +273,14 @@ public class IncusProvisionScenario
 
     static final Resolved UNAMENDED = new Resolved("", "", "", Path.of(""));
 
-    static Resolved from(Worktree worktree) {
+    static Resolved from(Worktree worktree, Cellar cellar, Parcel parcel) {
       if (worktree.worktreeRoot().isBlank()) {
         return UNAMENDED;
       }
       final Path root = Path.of(worktree.worktreeRoot());
       final BootstrapPaths local =
           BootstrapPaths.fromLocalWorktree(root, worktree.clusterName(), worktree.nodeName());
-      final Path slot = new HostSlotSelector(local.clusterNodeRoot()).nextStaging();
+      final Path slot = new HostSlotSelector(local.clusterNodeRoot(), cellar, parcel).nextStaging();
       final BootstrapPaths staging = local.asStagingView(slot);
       return new Resolved(
           slot.toString(), staging.manifestsRoot().toString(), local.liveRoot().toString(), root);
@@ -308,8 +308,10 @@ public class IncusProvisionScenario
     @ProvidedScenarioState List<ObservationWire> observations;
     @ProvidedScenarioState SeedBroker broker;
     @ProvidedScenarioState String soil;
-    // The run's transaction id, carried on to the manifests sub-sow so it inherits the same tx.
-    @ProvidedScenarioState String txId;
+    // This scion's working cellar (the seam type Cellar here), carried on to the manifests sub-sow
+    // so it inherits the same tx (txId + in-flight entries). Resolved by TYPE — the only Cellar in
+    // stage state.
+    @ProvidedScenarioState Cellar cellar;
 
     public Given the_seed_node(@Quoted String name) {
       return self();
@@ -325,10 +327,10 @@ public class IncusProvisionScenario
     }
 
     @Hidden
-    public Given consulting_manifests_through(SeedBroker broker, String soil, String txId) {
+    public Given consulting_manifests_through(SeedBroker broker, String soil, Cellar cellar) {
       this.broker = broker;
       this.soil = soil;
-      this.txId = txId;
+      this.cellar = cellar;
       return self();
     }
   }
@@ -355,7 +357,9 @@ public class IncusProvisionScenario
     @ExpectedScenarioState List<ObservationWire> observations;
     @ExpectedScenarioState SeedBroker broker;
     @ExpectedScenarioState String soil;
-    @ExpectedScenarioState String txId;
+
+    @ExpectedScenarioState Cellar cellar;
+
     @ProvidedScenarioState boolean cultivating;
 
     private final SeedCodec codec = new SeedCodec();
@@ -398,18 +402,15 @@ public class IncusProvisionScenario
       final SeedEnvelope amended =
           broker.sow(
               new AmendCoordinate("manifests"),
-              new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)),
-              Optional.empty());
+              cellar,
+              new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)));
       // RUNBOOK: play the manifests synthesis with the reconciled input; the fresh tree is the
       // graft
       // the instance will mount (consumed at once, never cellared — cultivated fresh). No
       // observation
       // recorded here: the consult sink is for probe symptoms (build/reachability), not for the
       // sub-scenario's own outcome — a manifests failure surfaces as the sow throwing.
-      broker.sow(
-          new RunbookCoordinate("manifests"),
-          amended,
-          txId.isEmpty() ? Optional.empty() : Optional.of(txId));
+      broker.sow(new RunbookCoordinate("manifests"), cellar, amended);
       return self();
     }
 

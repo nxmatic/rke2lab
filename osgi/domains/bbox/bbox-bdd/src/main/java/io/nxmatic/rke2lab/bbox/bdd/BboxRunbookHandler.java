@@ -1,10 +1,11 @@
 package io.nxmatic.rke2lab.bbox.bdd;
 
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
-import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -28,9 +29,12 @@ public final class BboxRunbookHandler implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope trigger, Optional<String> txId) {
+  public SeedEnvelope handle(Cellar cellar, SeedEnvelope trigger) {
+    final ScenarioCellar transaction = (ScenarioCellar) cellar;
     try {
-      return SeedEnvelope.of(COORDINATE, BboxBddScenarios.run(txId));
+      return SeedEnvelope.of(
+          COORDINATE,
+          BboxBddScenarios.run(transaction.transactionId(), transaction.entriesEncoded()));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(

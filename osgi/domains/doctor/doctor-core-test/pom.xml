@@ -78,6 +78,12 @@
       <artifactId>seed-broker-port</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- RefusingCellar: the honest no-transaction Cellar InterventionIntakeTest hands handle(). This
+         test lives in src/main of a *-test module, so the testkit is a compile dep, not test-scope. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-testkit</artifactId>
+    </dependency>
     <!-- The codec that (de)serializes wire-contract; nested in the doctor-core host bundle (T2), so
          the fragment resolves it through the host at runtime — compile-only here, like the seam. -->
     <dependency>

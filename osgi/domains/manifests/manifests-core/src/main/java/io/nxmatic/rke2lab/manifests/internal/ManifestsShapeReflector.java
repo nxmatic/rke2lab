@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests.internal;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -11,7 +12,6 @@ import io.nxmatic.rke2lab.seed.broker.port.ShapeCoordinate;
 import io.nxmatic.rke2lab.seed.broker.shape.RecordSchemaProjector;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -49,7 +49,7 @@ public final class ManifestsShapeReflector implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope seed, Optional<String> txId) {
+  public SeedEnvelope handle(Cellar cellar, SeedEnvelope seed) {
     final Class<?> bearer = SHAPE_BEARERS.get(seed.coordinate());
     if (bearer == null) {
       throw new IllegalArgumentException(

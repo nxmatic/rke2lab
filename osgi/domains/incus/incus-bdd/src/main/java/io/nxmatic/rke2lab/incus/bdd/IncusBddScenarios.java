@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.incus.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -49,7 +50,8 @@ public final class IncusBddScenarios {
    * failure) are resolved by the scenario from this bundle's registry — a caller seeds mocks before
    * invoking, or the live edges + the host's gate published them.
    */
-  public static String run(IncusRunbookInput input, Optional<String> txId)
+  public static String run(
+      IncusRunbookInput input, Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
     IncusProvisionScenario.seedInput(input);
     final SeedCodec codec = new SeedCodec();
@@ -65,6 +67,8 @@ public final class IncusBddScenarios {
               return codec.encode(
                   new RunbookEnvelope(runbook, IncusProvisionScenario.lastConsultations()));
             },
-            txId.map(TxIdSeed::into).orElse(store -> {}));
+            txId.map(TxIdSeed::into)
+                .orElse(store -> {})
+                .andThen(CellarEntriesSeed.into(inheritedEntries)));
   }
 }

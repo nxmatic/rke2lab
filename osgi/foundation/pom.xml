@@ -21,6 +21,7 @@
     <module>seed-broker-runtime</module>
     <module>pipeline</module>
     <module>seed-broker-codec</module>
+    <module>seed-broker-testkit</module>
     <module>seed-broker-shape</module>
     <module>seed-bdd</module>
   </modules>

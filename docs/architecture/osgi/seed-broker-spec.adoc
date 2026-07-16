@@ -1266,20 +1266,25 @@ turns; the debunked framings are recorded so they are not re-attempted:
   (`UUID.randomUUID()`) and propagated to fragments by the sow's `Optional<String>` param. It no longer
   decides root/fragment (the `RunRole` does) — it stays an observability datum, never indexed in a map.
 
-*The `txId` is a PARAMETER of the sow, not a field of the document — `Optional<String>`.* Nesting is
-OSGi→OSGi REAL (`IncusProvisionScenario` sows `RunbookCoordinate("manifests")`) — so "root" is NOT
-"host-flat". Filiation travels PARENT→CHILD through the sow. The `txId` qualifies the CROSSING (the act of
-sowing), NOT the document: a `SeedEnvelope` also carries REAPED responses (consultations, verdicts) that
-bear no transaction — so it rides `SeedBroker.sow(SeedCoordinate, SeedEnvelope, Optional<String> txId)` and
-`SeedHandler.handle(SeedEnvelope, Optional<String> txId)`, never a field on the record (the record has 55
-construction sites; `sow` has 2, `handle` 10 impls of which 5 ignore it). It never enters a map — carried
-and compared LOCALLY (an observability datum), no collision surface. `Optional` is SIGNIFICANT: there are
-two handler natures — the 5 `*RunbookHandler`s (cluster/systemd/incus/manifests/bbox) LAUNCH an in-container
-run (txId PRESENT, relayed into the run via the input's `seedInput` channel), the 5 reflectors
-(Amend/Shape/Split/Intervention/Readiness) TRANSFORM (introspection/response), played UPSTREAM
-(`Gardening.sow` chains an `AmendCoordinate` before the `RunbookCoordinate`) with NO transaction →
-`Optional.empty()`. The boot is NOT a sow (`Gardening.open()` is Felix start + `awaitService`), so no sow
-precedes the root minting its `txId`.
+*The TRANSACTION is a PARAMETER of the sow — and it IS the `Cellar` (2026-07-16).* Nesting is OSGi→OSGi
+REAL (`IncusProvisionScenario` sows `RunbookCoordinate("manifests")`) — so "root" is NOT "host-flat".
+Filiation travels PARENT→CHILD through the sow. The transaction qualifies the CROSSING (the act of sowing),
+NOT the document (a `SeedEnvelope` also carries REAPED responses that bear no transaction). Earlier this was
+a lone `Optional<String> txId`; it GENERALISED (§ the write-set descends) to the whole transaction, and the
+transaction is not a new DTO — it is the ambient `Cellar` itself, which already carries the `txId` (its
+`transactionId()`) AND the in-flight write-set (its model view). So the sow's shape is
+`SeedBroker.sow(SeedCoordinate wanted, Cellar cellar, SeedEnvelope seed)` — read as a sentence: *what I
+want, with what (the ambient transaction), the seed* — and `SeedHandler.handle(Cellar cellar, SeedEnvelope
+seed)`. The `Cellar` is ALWAYS present: every sow issues from a scenario whose cellar the extension injected
+(there is no sowing outside a run), so it is a plain `Cellar` param, never `Optional`, never null — the
+optionality lives INSIDE it (`transactionId()` is the `Optional`, empty for a non-transactional play). The
+type at the seam is the port interface `Cellar` (module direction: `scenario-engine` → `seed-broker-port`,
+so the port cannot name `ScenarioCellar`). The two handler natures stay: the 5 `*RunbookHandler`s
+(cluster/systemd/incus/manifests/bbox) LAUNCH an in-container run — they cast `(ScenarioCellar) cellar` (safe:
+the injected cellar is universally a `ScenarioCellar` at runtime) and FLATTEN the transaction at the launcher
+boundary (`TxIdSeed.into(transactionId())` + `WriteSetSeed.into(writeSet())`, both flat strings — the
+isolation guard-rail); the 5 reflectors (Amend/Shape/Split/Intervention/Readiness) TRANSFORM and IGNORE the
+cellar. The boot is NOT a sow, so no sow precedes the root minting its `txId`.
 
 *The lifecycle — the host adopts `BaseWorldExtension`.* The connection to the shared framework is a WORLD
 fact (it lives as long as the framework). `BaseWorldExtension` (already written, used by the scions) opens
@@ -1304,13 +1309,72 @@ store/fetch/neighbours):
   `OpaqueCellar` from the REGISTRY (via the connection in the class-`Store` `BaseWorldExtension.CONNECTION`,
   the SAME path the scions resolve their collaborators — one resolution route), read the folded
   tag-envelopes off the trunk, re-`store` them opaquely (the host never decodes, a tag-envelope is already
-  an encoded `SeedEnvelope`); failure ⇒ nothing (the model dies with the run — atomicity); FRAGMENT ⇒ inert
-  regardless of verdict.
+  an encoded `SeedEnvelope`); failure ⇒ nothing (the model dies with the run — atomicity); FRAGMENT ⇒ no
+  drain, but STRIP the inherited entries (`ScenarioCellar.stripInherited`) before the front-door serialises
+  the model, so the write-set it inherited from its parent does not fold up into the trunk a SECOND time (§
+  the write-set descends).
 
 Timing with `JGivenExtension` is LEVED BY CONSTRUCTION: begin/end touch no `ReportModel`; the drain reads
 tags `store` already posted during the body; the verdict comes from JUnit, not jGiven's sealed
 `ExecutionStatus`. The cellar reads the model LAZILY (first `store`), so the order between this
 `TestInstancePostProcessor` and jGiven's is a non-issue.
+
+===== The three neutral channels the extension reads — role, identity, write-set (2026-07-16)
+
+The extension lives in `scenario-engine` (runtime); `SeedRun` lives in `exec/seed-master` (the host world,
+where `Main` runs). The module direction is `seed-master → scenario-engine`, NEVER the reverse — so the
+extension CANNOT read `SeedRun` (it does not know the type, and `SeedRun` is host-flat, it does not cross
+the launcher membrane into a scion anyway). That is WHY the transaction context reaches the extension as
+THREE NEUTRAL channels (each a flat JDK value in the launcher session store, each with a launcher-side
+`into` and an extension-side `read`), never as the host record:
+
+[cols="1,2,1,1",options="header"]
+|===
+| channel | role | root (Main seeds) | scion (the parent's `*RunbookHandler` relays)
+| `TxIdSeed` | the transaction IDENTITY (a UUID) — correlation/narration, one per run | present (the minted UUID) | present (the SAME UUID, relayed unchanged)
+| `RunRoleSeed` | the DRAIN discriminant (ROOT drains, FRAGMENT does not) — decides atomicity | `ROOT` | `FRAGMENT`
+| `WriteSetSeed` | the inherited WRITE-SET (the parent's in-flight stores) — the ALLER sense | empty (the root is the source) | the parent cellar's `writeSet()`
+|===
+
+*Why THREE, not fewer — each answers a distinct question, and none derives from another.*
+
+* `TxIdSeed` is present on BOTH sides with the SAME value, so it CANNOT tell root from scion — identity is
+  not a role.
+* `RunRoleSeed` cannot be DERIVED from the write-set's contents: at the FIRST sow the root has stored
+  nothing yet (its `store` is the closing `the_harvest_is_stored`), so the first scion inherits an EMPTY
+  write-set — deducing "empty ⇒ root" would wrongly make it drain mid-run and shatter atomicity. The role
+  is a LAUNCHER fact (who launched knows), seeded explicitly, never inferred.
+* `WriteSetSeed` is the only one that varies by depth; it is the passenger this increment adds.
+
+.The transaction context reaches the extension as three neutral channels (never the host `SeedRun`)
+[mermaid]
+....
+flowchart TB
+  subgraph host["exec/seed-master (host world)"]
+    main["Main mints UUID → SeedRun"]
+    run["SeedRun (host-flat, does NOT cross)"]
+    main --> run
+  end
+  subgraph store["launcher session store (flat JDK values only)"]
+    tx["TxIdSeed = UUID"]
+    role["RunRoleSeed = ROOT | FRAGMENT"]
+    ws["WriteSetSeed = encoded entries"]
+  end
+  subgraph engine["scenario-engine (runtime) — cannot see SeedRun"]
+    ext["ScenarioCellarExtension.beforeTestExecution"]
+    cellar["new ScenarioCellar(model, durable, txId)<br/>+ inheritWriteSet(writeSet)"]
+    ext --> cellar
+  end
+  main -->|"TxIdSeed.into · RunRoleSeed.into"| tx & role
+  handler["a parent *RunbookHandler at a sow"] -->|"relays: TxIdSeed · RunRoleSeed=FRAGMENT · WriteSetSeed.into(cellar.writeSet())"| tx & role & ws
+  tx & role & ws -->|"read by"| ext
+....
+
+The scion side of the same channels is fed by the parent's handler, which holds the parent `cellar` LIVE
+(same realm, synchronous sow) and flattens its projection into the child's fresh session — the child's
+namespace starts empty (a new `LauncherSession`), so the handler is what makes the transaction context
+exist on the far side. `RunRole=FRAGMENT` is what the handler seeds there, so a sown scion never drains;
+the root's own session, seeded by `Main`, carries `ROOT`.
 
 *Narration vs persistence — the tag PROJECTS the entry (never a second source).* The Cellar persists to the
 durable backend, invisible in the runbook; a `tag` is visible in the runbook but not durable. A host-tree
@@ -1319,6 +1383,74 @@ of the entry ("promoted from staging.N, sha abc, dirty"), never a separately-cap
 renderings — so the two cannot diverge. `liveRoot` stays a pure tag (a within-run render path, no durable
 entry behind it). A durable envelope rides the model as a `Tag` (round-trip verified, narrated), not an
 opaque `Attachment`.
+
+===== The write-set descends too — the ALLER sense of the transaction (2026-07-16)
+
+The design above carried the transaction ONE way: a fragment posts tags, the graft folds them UP into the
+trunk (`scion → host`, the RETURN), and the root drains. That is the return sense of the transaction. The
+ALLER sense was MISSING: when the root sows a fragment MID-transaction, the fragment opened a FRESH
+`ReportModel` whose write-set was empty, so it could not read what an EARLIER crossing of the SAME
+transaction had already stored. A crossing that must READ an in-flight store of a sibling crossing — the
+reconcile scion reading the staging the provision scion published earlier in the same run (§
+host-cellar-realisation, the reconcile cycle) — saw only the DURABLE backend (last run's state), never the
+in-flight write. Read-your-transaction's-writes did not hold across crossings.
+
+The correction is the exact twin of the `txId`: whoever SOWS a fragment ALSO hands down the transaction's
+accumulated write-set. The `txId` already descends this channel (`TxIdSeed`) — the write-set is its
+passenger (`WriteSetSeed`, the same session-store idiom). The `ScenarioCellar` is UNCHANGED — it stays a
+pure VIEW on the caller's `ReportModel` (`model`, `durableReads`, `txId`), no new field, no `Transaction`
+type. What crosses is the VIEW EXTRACTED as flat data: `ScenarioCellar.writeSetOf(model)` returns the
+encoded `Entry` strings (the raw `Tag.ENTRY` values) off the trunk — the exact ALLER-sense twin of the
+runbook JSON the graft carries the RETURN way. At `BeforeTestExecution` the extension re-posts them onto the
+fragment's OWN model via `cellar.inheritWriteSet(encoded)` (the cellar is the sole tag writer): each becomes
+an `Entry(inherited=true)` tag, so `fetch` overlays them uniformly — no third read source, the model stays
+the sole carrier. Because they are posted BEFORE the body, they precede the fragment's own stores in tag
+order, so a shared coordinate resolves own {@literal >} inherited {@literal >} durable for free.
+
+.The two senses of the transaction across a crossing
+[mermaid]
+....
+flowchart LR
+  subgraph root["root run (trunk ReportModel)"]
+    ta["crossing A store<br/>(ENTRY tag)"]
+    tb["sow crossing B"]
+  end
+  subgraph frag["fragment B (fresh ReportModel)"]
+    inh["A's write-set posed as<br/>Entry(inherited=true) — ALLER"]
+    own["B reads (own > inherited > durable),<br/>decides, stores its OWN"]
+    strip["extension STRIPS the inherited<br/>before the model is rendered"]
+  end
+  ta --> tb -->|"writeSetOf(trunk) descends as flat List&lt;String&gt;"| inh --> own --> strip
+  own -->|"B's OWN tags fold UP — RETURN"| root
+  inh -.->|"NEVER folds up (stripped)"| root
+....
+
+*The inherited entries live IN the model, marked, then STRIPPED — the anti-duplication.* The parent's
+write-set is posed on the fragment's model as ordinary `ScenarioCellar.Entry` tags, so `fetch` reads them
+through the SAME overlay path as the fragment's own stores (no third read source — the model is the sole
+carrier). But the graft folds a fragment's WHOLE `getTagMap()` up into the trunk; left as-is, the inherited
+entries — which the trunk ALREADY holds (crossing A posted them) — would fold up a SECOND time and drain
+twice. So each inherited entry carries a flag `inherited=true`, and the extension REMOVES them from the tag
+map at `AfterTestExecution`, before the front-door serializes the model. The graft then lifts only the
+fragment's OWN tags. Verified on jGiven 2.0.3: a cellar tag is added via `ReportModel.addTag` (the `tagMap`
+alone) and is NEVER referenced by a `ScenarioModel.tagIds`, so removing it leaves no dangling id — the strip
+is as clean as a tombstone.
+
+`Entry` gains `inherited` as a SECOND flat marker beside `tombstone`, and the two are ORTHOGONAL, not a
+single enum: a parent's WITHDRAW must descend too (else the fragment re-reads a durable case the parent
+emptied in-flight), so `(tombstone, inherited)` is a real combination — inheritance and emptiness are
+independent axes.
+
+*The isolation guard-rail (load-bearing).* `scenario-engine` is DUAL-REALM — host-flat AND one copy per
+bundle, SAME version, DIFFERENT classloaders — so a live `ScenarioCellar` or `Entry` object crossing the
+launcher membrane would `ClassCastException`/`LinkageError` (the `JsonNode`-payload trap § the seam types).
+Nothing of the sort crosses: the write-set descends as the VIEW extracted flat — `writeSetOf(trunk)` returns
+already-encoded `Entry` STRINGS, and the session store carries ONLY those flat JDK types (`TxIdSeed` puts a
+`String`, its twin `WriteSetSeed` puts ONE `String`, the JSON array of the encoded entries). The child's
+cellar re-posts them LOCALLY via `inheritWriteSet` — decoding each string into an `Entry` in ITS OWN realm,
+then re-appending it as a tag on ITS OWN model. Each realm holds its own `Entry` class; none travels. The
+rule that keeps it safe: the channel carries FLAT (encoded strings), the typed `Entry` is born downstream of
+the read, per realm. Never `store.put(aCellar)` nor put a live `Entry` in the session store.
 
 [[edge-reaches-osgi]]
 === How the host EDGE reaches an OSGi consumer — registerService, not a handler

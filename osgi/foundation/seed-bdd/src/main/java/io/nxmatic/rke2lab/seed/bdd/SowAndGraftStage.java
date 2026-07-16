@@ -7,6 +7,7 @@ import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import java.util.Map;
 
 /**
@@ -39,9 +40,11 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
   @ScenarioState private ReportModel hostTree;
   @ScenarioState private Map<String, JsonNode> amendments;
 
-  // The run's transaction id — published once by the root GIVEN, carried on every sow so a launched
-  // scion inherits it (audit correlation, § cellar-transactional). Empty when no run seeded one.
-  @ScenarioState private String txId = "";
+  // The run's working cellar — the root's own ScenarioCellar (the seam type Cellar here), published
+  // by the root GIVEN and carried on every sow, so a launched scion inherits its txId + in-flight
+  // entries (§ cellar-transactional). The RunbookHandler casts to ScenarioCellar at the launcher
+  // boundary. Resolved by TYPE: the durable backend is a distinct type (PulumiCellar), no clash.
+  @ScenarioState private Cellar cellar;
 
   /**
    * Hand in the crossing's collaborators: the {@code soil} name to sow toward, the open {@link
@@ -77,7 +80,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    * rootStepName} — the name of the root step that stands for this crossing.
    */
   public SowAndGraftStage the_scion_is_sown_and_grafted(@Hidden String rootStepName) {
-    final String runbookJson = gardening.sow(soil, amendments, txId);
+    final String runbookJson = gardening.sow(soil, amendments, cellar);
     graft.graftUnder(hostTree, rootStepName, graft.rebuild(runbookJson));
     return self();
   }

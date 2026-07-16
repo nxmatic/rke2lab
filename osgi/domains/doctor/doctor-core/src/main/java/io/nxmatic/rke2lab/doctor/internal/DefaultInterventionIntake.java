@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.doctor.contract.Provenance;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessVerdict;
 import io.nxmatic.rke2lab.doctor.contract.RemediationProgramRef;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
@@ -42,7 +43,7 @@ public final class DefaultInterventionIntake implements SeedHandler {
   }
 
   @Override
-  public SeedEnvelope handle(SeedEnvelope rawFacts, Optional<String> txId) {
+  public SeedEnvelope handle(Cellar cellar, SeedEnvelope rawFacts) {
     final InterventionRequest request = codec.decode(rawFacts, InterventionRequest.class);
 
     if (isBlank(request.problem())) {

@@ -9,9 +9,9 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SplitCoordinate;
+import io.nxmatic.rke2lab.seed.broker.testkit.RefusingCellar;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -75,10 +75,10 @@ class DoctorSplitReflectorTest {
   void reaps_at_the_split_meta_coordinate() {
     final SeedEnvelope reaped =
         REFLECTOR.handle(
+            null,
             SeedEnvelope.of(
                 DoctorCoordinate.CONSULTATION,
-                CODEC.encode(new Consultation("s", "n", "", Map.of(), List.of()))),
-            Optional.empty());
+                CODEC.encode(new Consultation("s", "n", "", Map.of(), List.of()))));
 
     assertEquals("doctor", reaped.domain());
     assertEquals(SplitCoordinate.SLUG, reaped.coordinate());
@@ -88,6 +88,6 @@ class DoctorSplitReflectorTest {
   private static Map<String, Object> split(Consultation consultation) {
     final SeedEnvelope seed =
         SeedEnvelope.of(DoctorCoordinate.CONSULTATION, CODEC.encode(consultation));
-    return CODEC.decode(REFLECTOR.handle(seed, Optional.empty()).payload(), Map.class);
+    return CODEC.decode(REFLECTOR.handle(RefusingCellar.INSTANCE, seed).payload(), Map.class);
   }
 }

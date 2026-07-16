@@ -51,15 +51,28 @@ public final class ScenarioCellarExtension
     final CellarReceiver<ScenarioCellar> receiver =
         (CellarReceiver<ScenarioCellar>) context.getRequiredTestInstance();
     final String txId = TxIdSeed.read(context).orElse("");
-    receiver.receiveCellar(
+    final ScenarioCellar cellar =
         new ScenarioCellar(
-            ScenarioCellarExtension::currentModel, () -> resolve(context, Cellar.class), txId));
+            ScenarioCellarExtension::currentModel, () -> resolve(context, Cellar.class), txId);
+    // The ALLER sense of the transaction: re-post the parent's in-flight entries onto THIS model
+    // (marked inherited), BEFORE the body, so the scion reads its parent's stores as its own
+    // overlay
+    // (read-your-parent's-writes) — posted first, so a shared coordinate resolves own > inherited >
+    // durable. The cellar is the sole tag writer, so the re-posting is its own method. Empty for a
+    // run with no parent transaction (a root, or an isolated test).
+    cellar.inheritEntries(CellarEntriesSeed.read(context));
+    receiver.receiveCellar(cellar);
   }
 
   @Override
   public void afterTestExecution(ExtensionContext context) {
     if (role(context) != RunRole.ROOT) {
-      return; // a fragment never drains — its tags ride the graft up to the root
+      // A fragment never drains — its tags ride the graft up to the root. But the inherited entries
+      // it read as its overlay (the parent's write-set) must NOT ride up: the trunk already holds
+      // them (the parent crossing posted them), so strip them before the front-door serialises this
+      // model, or they would fold up a second time and drain twice.
+      ScenarioCellar.stripInherited(currentModel());
+      return;
     }
     if (context.getExecutionException().isPresent()) {
       return; // failure → nothing persisted (the disposable model IS the transaction)

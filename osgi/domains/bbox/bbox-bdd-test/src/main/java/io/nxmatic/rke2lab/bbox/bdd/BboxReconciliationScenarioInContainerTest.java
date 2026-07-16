@@ -160,7 +160,7 @@ public class BboxReconciliationScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return BboxBddScenarios.run(Optional.empty());
+      return BboxBddScenarios.run(Optional.empty(), List.of());
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

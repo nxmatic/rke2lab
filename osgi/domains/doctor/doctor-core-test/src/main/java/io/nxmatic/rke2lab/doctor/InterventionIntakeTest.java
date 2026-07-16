@@ -13,6 +13,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import io.nxmatic.rke2lab.seed.broker.testkit.RefusingCellar;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -70,7 +71,7 @@ class InterventionIntakeTest {
         new SeedEnvelope(
             "doctor", DoctorCoordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
-    final SeedEnvelope canonical = intake.handle(rawFacts, Optional.empty());
+    final SeedEnvelope canonical = intake.handle(RefusingCellar.INSTANCE, rawFacts);
     assertEquals(
         DoctorCoordinate.INTERVENTION.slug(),
         canonical.coordinate(),
@@ -97,7 +98,7 @@ class InterventionIntakeTest {
         new SeedEnvelope(
             "doctor", DoctorCoordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
-    final SeedEnvelope verdict = intake.handle(rawFacts, Optional.empty());
+    final SeedEnvelope verdict = intake.handle(RefusingCellar.INSTANCE, rawFacts);
     assertEquals(
         DoctorCoordinate.READINESS_VERDICT.slug(),
         verdict.coordinate(),

@@ -55,6 +55,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <!-- InMemoryCellar: the test double HostSlotSelectorTest seeds host-staging / host-live cases
+         into (the cellar is the selector's state now, not the filesystem). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-testkit</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

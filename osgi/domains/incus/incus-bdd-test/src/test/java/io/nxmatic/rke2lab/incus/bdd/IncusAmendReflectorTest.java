@@ -9,8 +9,8 @@ import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.testkit.RefusingCellar;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,7 +35,7 @@ class IncusAmendReflectorTest {
             "runbook",
             CODEC.encode(Map.of(Amendment.WORKTREE, CODEC.decode(CODEC.encode(scalars)))));
 
-    final SeedEnvelope amended = reflector.handle(roleValues, Optional.empty());
+    final SeedEnvelope amended = reflector.handle(RefusingCellar.INSTANCE, roleValues);
 
     assertEquals("runbook", amended.coordinate(), "the amended payload is ready to sow at runbook");
     final IncusRunbookInput bound = CODEC.decode(amended.payload(), IncusRunbookInput.class);
@@ -48,7 +48,8 @@ class IncusAmendReflectorTest {
 
     final IncusRunbookInput bound =
         CODEC.decode(
-            reflector.handle(roleValues, Optional.empty()).payload(), IncusRunbookInput.class);
+            reflector.handle(RefusingCellar.INSTANCE, roleValues).payload(),
+            IncusRunbookInput.class);
 
     assertEquals(
         IncusRunbookInput.defaults().worktree(),
@@ -61,7 +62,8 @@ class IncusAmendReflectorTest {
     final SeedEnvelope unknown =
         new SeedEnvelope("incus", "not-a-bearer", CODEC.encode(Map.of(Amendment.WORKTREE, "/x")));
 
-    assertThrows(IllegalArgumentException.class, () -> reflector.handle(unknown, Optional.empty()));
+    assertThrows(
+        IllegalArgumentException.class, () -> reflector.handle(RefusingCellar.INSTANCE, unknown));
   }
 
   @Test

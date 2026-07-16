@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.manifests.bdd;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -43,7 +44,8 @@ public final class ManifestsBddScenarios {
    * the launcher selects it; the collaborators (the synthesis + overlay services, the ambient
    * RunGate) are resolved by the scenario from this bundle's registry.
    */
-  public static String run(ManifestsRunbookInput facet, Optional<String> txId)
+  public static String run(
+      ManifestsRunbookInput facet, Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
     ManifestSynthesisScenario.seedInput(facet);
     final SeedCodec codec = new SeedCodec();
@@ -58,6 +60,8 @@ public final class ManifestsBddScenarios {
                   new ScenarioJsonWriter(ManifestSynthesisScenario.lastRunbook()).toString();
               return codec.encode(new RunbookEnvelope(runbook, List.of()));
             },
-            txId.map(TxIdSeed::into).orElse(store -> {}));
+            txId.map(TxIdSeed::into)
+                .orElse(store -> {})
+                .andThen(CellarEntriesSeed.into(inheritedEntries)));
   }
 }

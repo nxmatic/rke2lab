@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * The open gardening — the framework as the gardener works it. An INSTANCE holding what it opened
@@ -59,42 +59,31 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
   }
 
   /**
-   * Sow {@code soil}'s runbook coordinate through the gardener and reap its runbook JSON. The
-   * trigger envelope is empty: the coordinate carries the whole request (which soil to play), and
-   * the scion resolves its own collaborators in-container. Only the {@code runbook} field of the
-   * reaped {@code RunbookEnvelope} is pulled — read GENERICALLY, never a domain wire-record.
+   * Sow {@code soil} with {@code amendments} and the ambient transaction {@code cellar} — a {@code
+   * {role → value}} map the host holds under NEUTRAL {@link
+   * io.nxmatic.rke2lab.seed.broker.port.Amendment} roles, each value a {@link JsonNode} so a role
+   * may carry a flat scalar OR a sub-record (the incus {@code worktree} scalars). When non-empty, a
+   * first sow at {@link AmendCoordinate} reconciles the roles onto the target's runbook input at
+   * the DOOR — the host names no domain field — and the reconciled payload feeds the runbook sow;
+   * when empty, the runbook is sown with the empty trigger (the scion falls back to its own
+   * defaults). Only the {@code runbook} field of the reaped envelope is pulled, read generically.
+   *
+   * <p>The {@code cellar} IS the run's transaction (§ cellar-transactional): it rides BOTH sows so
+   * the launched scion inherits its parent's txId + in-flight entries. The AMEND sow is upstream
+   * introspection (a reflector ignores the cellar); the RUNBOOK sow plays the scion's transactional
+   * scenario (its {@code *RunbookHandler} flattens the cellar into the in-container run).
    */
-  public String sow(String soil) {
-    return sow(soil, Map.<String, JsonNode>of(), "");
-  }
-
-  /**
-   * Sow {@code soil} with {@code amendments} — a {@code {role → value}} map the host holds under
-   * NEUTRAL {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles, each value a {@link
-   * JsonNode} so a role may carry a flat scalar OR a sub-record (the incus {@code worktree}
-   * scalars). When non-empty, a first sow at {@link AmendCoordinate} reconciles the roles onto the
-   * target's runbook input at the DOOR — the host names no domain field — and the reconciled
-   * payload feeds the runbook sow; when empty, the runbook is sown with the empty trigger (the
-   * scion falls back to its own defaults). Only the {@code runbook} field of the reaped envelope is
-   * pulled, read generically.
-   */
-  public String sow(String soil, Map<String, JsonNode> amendments, String txId) {
+  public String sow(String soil, Map<String, JsonNode> amendments, Cellar cellar) {
     final RunbookCoordinate coordinate = new RunbookCoordinate(soil);
     final SeedCodec codec = new SeedCodec();
-    // The AMEND sow is UPSTREAM introspection (reconcile the roles onto the input) — no
-    // transaction,
-    // Optional.empty(). The RUNBOOK sow plays the scion's transactional scenario: it carries the
-    // run's txId so the scion inherits it (audit correlation, § cellar-transactional). Empty txId
-    // (a sow outside a run) crosses as empty.
     final SeedEnvelope trigger =
         amendments.isEmpty()
             ? SeedEnvelope.of(coordinate, "{}")
             : gardener.sow(
                 new AmendCoordinate(soil),
-                new SeedEnvelope(soil, coordinate.slug(), codec.encode(amendments)),
-                Optional.empty());
-    final Optional<String> runTx = txId.isEmpty() ? Optional.empty() : Optional.of(txId);
-    final SeedEnvelope reaped = gardener.sow(coordinate, trigger, runTx);
+                cellar,
+                new SeedEnvelope(soil, coordinate.slug(), codec.encode(amendments)));
+    final SeedEnvelope reaped = gardener.sow(coordinate, cellar, trigger);
     return codec.decode(reaped.payload()).path("runbook").asText();
   }
 
