@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.manifests.bdd;
 
-import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.scenario.testkit.ScenarioTestkit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -17,7 +17,7 @@ import org.osgi.framework.Bundle;
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs the manifests scion's in-container proof. It
  * boots a Felix carrying BOTH worlds — the JUnit bundles (via the runner) and the jGiven boot
- * closure (via {@link JGivenTestkit#felix()}, since the scenario is a jGiven ScenarioTest) —
+ * closure (via {@link ScenarioTestkit#felix()}, since the scenario is a jGiven ScenarioTest) —
  * installs the manifests-bdd host bundle and this {@code -test} fragment PLUS manifests-bdd's whole
  * runtime graph (its own import closure pulls manifests-core, the cdk8s carrier + systemd fragment,
  * the sibling ports, the pipeline engine, unitrepo-core, and the third-party OSGi bundles),
@@ -45,7 +45,7 @@ class ManifestsBddInContainerTest {
 
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
-      JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
+      ScenarioTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
           // manifests-core carries @Components (the synthesis + overlay services), so its bundle
           // Requires the DS extender (osgi.extender=osgi.component); felix.scr must run for them to
           // resolve and activate — the scenario resolves the REAL services, not mocks.

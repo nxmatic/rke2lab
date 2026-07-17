@@ -18,6 +18,6 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=systemd; role=
 # by bnd from bytecode and captured by that wildcard: org.junit.jupiter.engine (SystemdBddTests names
 # JupiterTestEngine.class), the scenario-engine runner, the systemd/doctor/seed-broker contracts. So
 # no manual Import-Package here — the include's wildcard suffices.
--include: ${.}/../../../foundation/pipeline/pipeline-testkit/src/main/resources/jgiven-fragment.bnd
+-include: ${.}/../../../runtime/scenario-testkit/src/main/resources/jgiven-fragment.bnd
 
 -noimportjava: true

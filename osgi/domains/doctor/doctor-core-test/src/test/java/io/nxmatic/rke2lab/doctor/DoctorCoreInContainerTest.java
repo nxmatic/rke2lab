@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
+import io.nxmatic.rke2lab.scenario.testkit.ScenarioTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
@@ -17,7 +17,7 @@ import org.osgi.framework.Bundle;
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs doctor-core's actor tests IN-CONTAINER. It boots
  * a Felix carrying BOTH worlds — the JUnit bundles (via the runner) and the jGiven boot closure
- * (via {@link JGivenTestkit#felix()}, for the 2 scenario tests) — installs the doctor-core host
+ * (via {@link ScenarioTestkit#felix()}, for the 2 scenario tests) — installs the doctor-core host
  * bundle and this {@code -test} fragment, resolves the host (attaching the fragment, OSGi Core
  * §3.14), then drives a JUnit Platform Launcher FROM INSIDE the framework via {@code
  * DoctorCoreTests}. The actor tests read doctor-core's sealed package-private actors white-box; the
@@ -42,7 +42,7 @@ class DoctorCoreInContainerTest {
 
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
-      JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
+      ScenarioTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
           // doctor-core now carries the DefaultHealthSystem @Component, so its bundle Requires the
           // DS
           // extender (osgi.extender=osgi.component); felix.scr must run for doctor-core to resolve.

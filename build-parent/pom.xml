@@ -284,17 +284,17 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>pipeline-probe</artifactId>
+        <artifactId>scenario-probe</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>pipeline-probe-test</artifactId>
+        <artifactId>scenario-probe-test</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>pipeline-testkit</artifactId>
+        <artifactId>scenario-testkit</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>

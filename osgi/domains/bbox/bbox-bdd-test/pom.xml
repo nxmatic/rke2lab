@@ -84,7 +84,7 @@
          jGiven bundle worlds by classpath substring, so they must be on the TEST classpath. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-testkit</artifactId>
+      <artifactId>scenario-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

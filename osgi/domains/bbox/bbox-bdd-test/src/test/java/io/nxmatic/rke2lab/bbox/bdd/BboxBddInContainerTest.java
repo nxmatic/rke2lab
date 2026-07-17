@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.bbox.bdd;
 
-import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
+import io.nxmatic.rke2lab.scenario.testkit.ScenarioTestkit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -17,7 +17,7 @@ import org.osgi.framework.Bundle;
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs the bbox scion's in-container proof. It boots a
  * Felix carrying BOTH worlds — the JUnit bundles (via the runner) and the jGiven boot closure (via
- * {@link JGivenTestkit#felix()}, since the scenario is a jGiven ScenarioTest) — installs the
+ * {@link ScenarioTestkit#felix()}, since the scenario is a jGiven ScenarioTest) — installs the
  * bbox-bdd host bundle and this {@code -test} fragment, resolves the host (attaching the fragment,
  * OSGi Core §3.14), then drives {@code BboxBddTests} FROM INSIDE the framework. The passenger it
  * runs registers its mock collaborators in-container and plays the scenario through the front-door.
@@ -43,7 +43,7 @@ class BboxBddInContainerTest {
 
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
-      JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
+      ScenarioTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
           // bbox, netplan and doctor are all DE-SEAMED: their contracts are installed bundles
           // (type=contract/record/model), wired bundle-to-bundle by installImportClosureOf — no
           // domain seam to system-export. The ONE package still system-exported is seed.broker.port

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
+import io.nxmatic.rke2lab.scenario.testkit.ScenarioTestkit;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
@@ -16,7 +16,7 @@ import org.osgi.framework.Bundle;
 
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs manifests-core's actor tests IN-CONTAINER. It
- * boots a Felix carrying the JUnit + jGiven worlds (via {@link JGivenTestkit#felix()}), installs
+ * boots a Felix carrying the JUnit + jGiven worlds (via {@link ScenarioTestkit#felix()}), installs
  * the manifests-core host bundle and this {@code -test} fragment plus manifests-core's whole
  * runtime graph — the cdk8s carrier (with its embedded flat closure) and the
  * systemd-cdk8s-manifests fragment that rides it, the sibling ports, the pipeline engine,
@@ -46,7 +46,7 @@ class ManifestsCoreInContainerTest {
 
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
-      JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
+      ScenarioTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
           // manifests-core carries @Components (YamlMapper, the Default…Services), so its bundle
           // Requires the DS extender (osgi.extender=osgi.component); felix.scr must run for
           // manifests-core to resolve and activate.

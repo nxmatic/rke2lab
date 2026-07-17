@@ -23,8 +23,8 @@ import java.lang.annotation.Target;
  * }</pre>
  *
  * <p>It is an annotation, not a builder verb, on purpose: many tests obtain their extension from a
- * SHARED factory ({@code JGivenTestkit.felix()}), where a per-test builder call is not reachable —
- * the annotation rides on the test class regardless of how the extension was assembled. Default
+ * SHARED factory ({@code ScenarioTestkit.felix()}), where a per-test builder call is not reachable
+ * — the annotation rides on the test class regardless of how the extension was assembled. Default
  * (unannotated) is {@link Level#ERROR}: quiet unless a test opts into the noise.
  */
 @Retention(RetentionPolicy.RUNTIME)

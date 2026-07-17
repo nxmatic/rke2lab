@@ -95,7 +95,7 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     // org.slf4j is universal: every domain bundle logs through it, and no slf4j provider is staged
     // in-container, so it is system-exported by default from the test classpath — one place, not
     // repeated per proxy. Only when the test did not already declare its own slf4j export (a second
-    // version would split the package): JGivenTestkit, e.g., exports 2.0.17 itself.
+    // version would split the package): ScenarioTestkit, e.g., exports 2.0.17 itself.
     if (exports.stream().noneMatch(p -> p.startsWith("org.slf4j;") || p.equals("org.slf4j"))) {
       exports.add("org.slf4j;version=2.0.0");
     }

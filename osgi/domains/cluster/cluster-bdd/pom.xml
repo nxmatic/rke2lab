@@ -93,7 +93,7 @@
     <!-- JGivenTestkit.felix() — the jGiven boot closure the out-of-container proof installs. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-testkit</artifactId>
+      <artifactId>scenario-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
