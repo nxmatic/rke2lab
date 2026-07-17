@@ -17,6 +17,10 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisRequest;
+import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisResult;
+import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
@@ -144,6 +148,15 @@ public class IncusProvisionScenarioInContainerTest {
     final List<ServiceRegistration<?>> registrations = new ArrayList<>();
     registrations.add(context.registerService(RunGate.class, gate, new Hashtable<>()));
     registrations.add(context.registerService(ImageBuilder.class, builder, new Hashtable<>()));
+    // The netplan synthesis service the scion resolves to project its network view — mocked here
+    // like the ImageBuilder (incus-bdd has no netplan-core; the real @Component is a prod fact).
+    // The
+    // mock delegates to the real blueprint builder (pure, no bundle) so an amended run gets
+    // faithful
+    // hwaddrs/dnsmasq; the default (unamended) survey never calls it — the WHEN skips.
+    registrations.add(
+        context.registerService(
+            NetplanSynthesisService.class, synthesizesNetwork(), new Hashtable<>()));
     // The broker incus consults manifests through — mocked here (incus-bdd has no broker-runtime
     // nor
     // manifests; the real routing to the manifests amend/runbook handlers is a fact of prod). The
@@ -189,6 +202,31 @@ public class IncusProvisionScenarioInContainerTest {
   /** A RunGate the test pins to a chosen cultivating value. */
   private static RunGate cultivatingGate(boolean cultivating) {
     return () -> cultivating;
+  }
+
+  /**
+   * A NetplanSynthesisService that derives the real {@link ClusterNetworkBlueprint} — pure (no
+   * bundle, no I/O), so an amended run gets faithful hwaddrs/dnsmasq. The default survey never
+   * calls it (the WHEN skips on an unamended input); it exists so the eager registry resolve
+   * succeeds.
+   */
+  private static NetplanSynthesisService synthesizesNetwork() {
+    return new NetplanSynthesisService() {
+      @Override
+      public String providerId() {
+        return "test-netplan-synthesizer";
+      }
+
+      @Override
+      public NetplanSynthesisResult synthesize(NetplanSynthesisRequest request) {
+        return new NetplanSynthesisResult(
+            ClusterNetworkBlueprint.builder()
+                .cluster(request.clusterName())
+                .node(request.nodeName())
+                .deriveRecipeModel()
+                .build());
+      }
+    };
   }
 
   /** An ImageBuilder that builds successfully. */

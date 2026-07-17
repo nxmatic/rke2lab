@@ -24,6 +24,17 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
     </dependency>
+    <!-- The flat grow views the scion projects (GrowNetworkView): GrowNetworkResolver assembles it. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-contract-host</artifactId>
+    </dependency>
+    <!-- The netplan blueprint + synthesis service GrowNetworkResolver reads to project the NIC hwaddrs
+         and the dnsmasq config the per-cluster bridge carries. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-contract</artifactId>
+    </dependency>
     <!-- The codec the fold uses to decode the cellar-timeline envelopes. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

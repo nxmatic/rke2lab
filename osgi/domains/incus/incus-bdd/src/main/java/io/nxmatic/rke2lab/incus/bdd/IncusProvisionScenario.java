@@ -23,13 +23,20 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Image;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Worktree;
+import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
+import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
+import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
 import io.nxmatic.rke2lab.incus.core.BootstrapPaths;
 import io.nxmatic.rke2lab.incus.core.GitProvenanceReader;
+import io.nxmatic.rke2lab.incus.core.GrowNetworkResolver;
+import io.nxmatic.rke2lab.incus.core.GrowPlanAssembler;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
 import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
 import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
 import io.nxmatic.rke2lab.incus.core.NocloudSeedWriter;
+import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
@@ -153,7 +160,7 @@ public class IncusProvisionScenario
     given()
         .the_seed_node(NODE)
         .and()
-        .prepared_through(imageBuilder, gate, observations)
+        .prepared_through(imageBuilder, gate, observations, resolveNetplan())
         .and()
         .consulting_manifests_through(broker, resolved.soil(), cellar);
     when()
@@ -165,13 +172,22 @@ public class IncusProvisionScenario
         .and()
         .the_nocloud_seed_is_unwrapped(resolved)
         .and()
-        .the_secrets_are_written(resolved, resolveAuthToken());
+        .the_secrets_are_written(resolved, resolveAuthToken())
+        .and()
+        .the_network_is_resolved(resolved);
     then()
         .the_instance_is_prepared()
         .and()
         .the_prep_is_stored(imageBuilder, resolved.soil(), cellar, resolveParcel())
         .and()
-        .the_staging_is_published(resolved, cellar, resolveParcel());
+        .the_staging_is_published(resolved, cellar, resolveParcel())
+        .and()
+        .the_instance_grow_plan_is_published(
+            resolved,
+            INPUT.get().image().orElse(new Image("", "", "", "")),
+            imageBuilder.recipeDigest(),
+            cellar,
+            resolveParcel());
     // Pose the live root the host renders the runbook into — a within-run fact whose layout
     // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
     // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
@@ -272,6 +288,18 @@ public class IncusProvisionScenario
     return ScenarioRegistry.of(this).optional(AuthTokenContact.class);
   }
 
+  /**
+   * Resolve the {@link NetplanSynthesisService} from THIS bundle's registry — the
+   * {@code @Component} the scion reads (like {@link ImageBuilder}) to derive the network blueprint
+   * it projects into the grow plan. Required: a run without it is a wiring bug (netplan-core
+   * publishes it; a test mocks it).
+   */
+  private NetplanSynthesisService resolveNetplan() {
+    return require(
+        NetplanSynthesisService.class,
+        "no NetplanSynthesisService in the registry (netplan-core publishes it; a test mocks it)");
+  }
+
   private <T> T require(Class<T> type, String message) {
     return ScenarioRegistry.of(this).require(type, message);
   }
@@ -292,10 +320,12 @@ public class IncusProvisionScenario
       Path worktreeRoot,
       Path runtimeCloudConfigRoot,
       Path cloudSeedRoot,
-      Path secretsFile) {
+      Path secretsFile,
+      String clusterName,
+      String nodeName) {
 
     static final Resolved UNAMENDED =
-        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), Path.of(""));
+        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), Path.of(""), "", "");
 
     static Resolved from(Optional<Worktree> maybeWorktree, Cellar cellar, Parcel parcel) {
       if (maybeWorktree.isEmpty()) {
@@ -314,7 +344,9 @@ public class IncusProvisionScenario
           root,
           staging.runtimeCloudConfigRoot(),
           staging.cloudSeedRoot(),
-          staging.secretsFile());
+          staging.secretsFile(),
+          worktree.clusterName(),
+          worktree.nodeName());
     }
 
     boolean isAmended() {
@@ -339,6 +371,10 @@ public class IncusProvisionScenario
     @ProvidedScenarioState List<ObservationWire> observations;
     @ProvidedScenarioState SeedBroker broker;
     @ProvidedScenarioState String soil;
+    // The netplan synthesis service the scion reads to derive the network blueprint it projects
+    // into
+    // the grow plan (the_network_is_resolved). A resolved collaborator like the image builder.
+    @ProvidedScenarioState NetplanSynthesisService netplan;
     // This scion's working cellar (the seam type Cellar here), carried on to the manifests sub-sow
     // so it inherits the same tx (txId + in-flight entries). Resolved by TYPE — the only Cellar in
     // stage state.
@@ -350,10 +386,14 @@ public class IncusProvisionScenario
 
     @Hidden
     public Given prepared_through(
-        ImageBuilder imageBuilder, RunGate gate, List<ObservationWire> observations) {
+        ImageBuilder imageBuilder,
+        RunGate gate,
+        List<ObservationWire> observations,
+        NetplanSynthesisService netplan) {
       this.imageBuilder = imageBuilder;
       this.gate = gate;
       this.observations = observations;
+      this.netplan = netplan;
       return self();
     }
 
@@ -388,10 +428,15 @@ public class IncusProvisionScenario
     @ExpectedScenarioState List<ObservationWire> observations;
     @ExpectedScenarioState SeedBroker broker;
     @ExpectedScenarioState String soil;
+    @ExpectedScenarioState NetplanSynthesisService netplan;
 
     @ExpectedScenarioState Cellar cellar;
 
     @ProvidedScenarioState boolean cultivating;
+    // The flat network view the scion projects for the host GROW — assembled here (WHEN
+    // fabricates),
+    // sealed into the plan by the THEN. Null for an unamended survey (no cluster to resolve).
+    @ProvidedScenarioState GrowNetworkView networkView;
 
     private final SeedCodec codec = new SeedCodec();
 
@@ -483,6 +528,23 @@ public class IncusProvisionScenario
       return self();
     }
 
+    /**
+     * Resolve the network view the host GROW poses — the two NIC hwaddrs + the {@code vmnet}
+     * bridge's dnsmasq config, projected flat from the netplan blueprint (§ the
+     * scion-projects/host-actualises rule). A WHEN because it FABRICATES the value the THEN seals
+     * into the grow plan. NOT gated: a pure OSGi computation off the {@link
+     * NetplanSynthesisService}, no edge contacted — inert at preview like the manifests synthesis.
+     * Skipped for an unamended survey (no cluster to resolve).
+     */
+    public When the_network_is_resolved(@Hidden Resolved resolved) {
+      if (!resolved.isAmended()) {
+        return self();
+      }
+      this.networkView =
+          new GrowNetworkResolver(netplan).resolve(resolved.clusterName(), resolved.nodeName());
+      return self();
+    }
+
     private void record(String facet, boolean ok, SymptomKind failureSymptom, String detail) {
       if (ok) {
         observations.add(
@@ -504,6 +566,10 @@ public class IncusProvisionScenario
    * the instance grow (Shape C) and verifies its reachability, not this scion.
    */
   public static class Then extends Stage<Then> {
+
+    // The network view the WHEN produced — read here to seal it into the grow plan. Null for an
+    // unamended survey (the_network_is_resolved skipped).
+    @ExpectedScenarioState GrowNetworkView networkView;
 
     public Then the_instance_is_prepared() {
       return self();
@@ -554,6 +620,40 @@ public class IncusProvisionScenario
               new HostTreeChecksummer().checksum(stagingRoot),
               new GitProvenanceReader().read(resolved.worktreeRoot()));
       cellar.store(parcel, IncusCoordinate.HOST_STAGING, entry);
+      return self();
+    }
+
+    /**
+     * Seal the ONE immutable {@link InstanceGrowPlan} the host GROW fetches — the scion-projects
+     * part of the scion-projects/host-actualises rule (§ host-cellar-realisation,
+     * the-grow-anatomy). The network view the {@code the_network_is_resolved} WHEN produced, plus
+     * the image view and the cloud-init checksum the {@link GrowPlanAssembler} computes OSGi-side
+     * (the {@code buildChecksum} folding the edge {@code recipeDigest} with the image scalars, the
+     * readable artifact paths, and the SHA-256 of the NoCloud seed that arms the replace wire).
+     * Stored at {@link IncusGrowCoordinate#INSTANCE_GROW_PLAN} — the single record the host decodes
+     * host-side via the dual-realm codec. Skipped for an unamended survey (no view resolved). The
+     * store is unconditional on the gate: the cellar routes conserve vs pre-reserve, so a preview
+     * run still records the plan.
+     */
+    public Then the_instance_grow_plan_is_published(
+        @Hidden Resolved resolved,
+        @Hidden Image image,
+        @Hidden String recipeDigest,
+        @Hidden Cellar cellar,
+        @Hidden Parcel parcel) {
+      if (!resolved.isAmended() || networkView == null) {
+        return self();
+      }
+      final InstanceGrowPlan plan =
+          new GrowPlanAssembler(
+                  image.alias(),
+                  image.builderBinary(),
+                  image.builderHost(),
+                  recipeDigest,
+                  Path.of(image.sharedFolder()),
+                  resolved.cloudSeedRoot())
+              .assemble(networkView);
+      cellar.store(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, plan);
       return self();
     }
   }

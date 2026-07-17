@@ -35,10 +35,17 @@
       <artifactId>incus-contract-host</artifactId>
     </dependency>
     <!-- The incus domain's host-tree logic: BootstrapPaths (the scion reconstructs the provisioning
-         topology from the worktree scalars) + HostSlotSelector (it picks its own rotation slot). -->
+         topology from the worktree scalars) + HostSlotSelector (it picks its own rotation slot) +
+         GrowNetworkResolver (assembles the flat network view from the netplan blueprint). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-core</artifactId>
+    </dependency>
+    <!-- The netplan synthesis service the scion resolves to derive the network blueprint it projects
+         into the grow plan (the_network_is_resolved). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-contract</artifactId>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a build/exec failure. -->
     <dependency>
