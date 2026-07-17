@@ -30,9 +30,11 @@ public final class BlueprintRowEnumerator {
    */
   public static final List<String> CANONICAL_CLUSTERS = List.of("bioskop", "nikopol");
 
-  /** Canonical node names within every cluster — must match {@code BlueprintExportCommand}. */
-  public static final List<String> CANONICAL_NODES =
-      List.of("master", "peer1", "peer2", "peer3", "worker1", "worker2");
+  /**
+   * Canonical node names within every cluster — the netplan domain owns the topology, so this reads
+   * its single source rather than restating the list.
+   */
+  public static final List<String> CANONICAL_NODES = ClusterNetworkBlueprint.CANONICAL_NODE_NAMES;
 
   private final List<String> clusters;
   private final List<String> nodes;

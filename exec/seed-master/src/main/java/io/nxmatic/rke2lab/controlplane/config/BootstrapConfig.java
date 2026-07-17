@@ -17,7 +17,6 @@ public record BootstrapConfig(
     Path incusConfigDir,
     String imageAlias,
     String imageBuilderHost,
-    URI imageDistrobuilderConfig,
     Path imageSharedFolder,
     String profileName,
     String lanBridgeParent,
@@ -40,9 +39,6 @@ public record BootstrapConfig(
       URI.create("https://bioskop-nixos.local:8443");
   private static final String DEFAULT_IMAGE_ALIAS = "control-node";
   private static final String DEFAULT_IMAGE_BUILDER_HOST = "bioskop-nixos.local";
-  private static final URI DEFAULT_IMAGE_DISTROBUILDER_CONFIG =
-      URI.create(
-          "classpath:/META-INF/io.nxmatic/rke2lab/controlplane/incus/incus-distrobuilder.yaml");
   private static final String DEFAULT_PROFILE_NAME = "rke2lab";
   private static final String DEFAULT_LAN_BRIDGE_PARENT = "lan-br";
   private static final String DEFAULT_VMNET_NETWORK_NAME = "vmnet-br";
@@ -82,7 +78,6 @@ public record BootstrapConfig(
         config.incus().configDir(),
         config.image().alias().orElse(DEFAULT_IMAGE_ALIAS),
         config.image().builderHost().orElse(DEFAULT_IMAGE_BUILDER_HOST),
-        config.image().distrobuilderConfig().orElse(DEFAULT_IMAGE_DISTROBUILDER_CONFIG),
         config.image().sharedFolder(),
         config.profile().name().orElse(DEFAULT_PROFILE_NAME),
         config.network().lanBridgeParent().orElse(DEFAULT_LAN_BRIDGE_PARENT),

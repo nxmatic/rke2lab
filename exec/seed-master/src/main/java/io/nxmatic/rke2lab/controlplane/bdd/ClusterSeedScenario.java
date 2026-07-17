@@ -179,6 +179,7 @@ public class ClusterSeedScenario
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
     @ProvidedScenarioState JsonNode worktreeScalars;
+    @ProvidedScenarioState JsonNode imageScalars;
     // The run's working cellar — the root's own ScenarioCellar (the seam type Cellar here),
     // injected
     // onto the scenario instance and published for SowAndGraftStage; every sow carries it, so a
@@ -205,6 +206,16 @@ public class ClusterSeedScenario
       scalars.put("nodeName", run.config().nodeName());
       scalars.put("nfsAutomount", run.config().nfsAutomount());
       this.worktreeScalars = scalars;
+      // The IMAGE amendment — the seed-image build scalars the incus scion folds into the
+      // buildChecksum and the artifact paths it projects for the GROW. Same blind-subtree
+      // discipline
+      // as WORKTREE: the host names only the neutral IMAGE role's schema fields, no incus type.
+      final ObjectNode imageScalars = JsonNodeFactory.instance.objectNode();
+      imageScalars.put("alias", run.config().imageAlias());
+      imageScalars.put("builderBinary", run.config().imageBuilderBinary());
+      imageScalars.put("builderHost", run.config().imageBuilderHost());
+      imageScalars.put("sharedFolder", run.config().imageSharedFolder().toString());
+      this.imageScalars = imageScalars;
       // Publish the ambient RunGate the scions resolve — projected from the run mode.
       // registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).
@@ -250,6 +261,7 @@ public class ClusterSeedScenario
     @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
     @ScenarioState JsonNode worktreeScalars;
+    @ScenarioState JsonNode imageScalars;
 
     @NestedSteps
     @As("the entry gates are enforced")
@@ -277,15 +289,18 @@ public class ClusterSeedScenario
     @NestedSteps
     @As("the instance is provisioned")
     public When the_instance_is_provisioned(@Hidden ReportModel hostTree) {
-      // The WORKTREE amendment: hand incus the flat provisioning scalars from BootstrapConfig — the
-      // worktree root, cluster/node, and NFS automount. The incus scion reconstructs the topology
-      // from them, picks its own rotation slot, and derives the manifests SOIL itself (§
-      // host-cellar-realisation, computed OSGi-side). The host names only the neutral WORKTREE
-      // role,
-      // never an incus field nor a path — the scion owns the tree.
+      // Two amendments hand incus the flat scalars from BootstrapConfig. WORKTREE — the worktree
+      // root, cluster/node, NFS automount: the scion reconstructs the topology, picks its own
+      // rotation slot, and derives the manifests SOIL itself. IMAGE — the seed-image build scalars
+      // the scion folds into the buildChecksum and the artifact paths it projects for the GROW (§
+      // host-cellar-realisation, computed OSGi-side). The host names only the neutral roles, never
+      // an incus field nor a path — the scion owns the tree.
       sowAndGraft
           .sowing(
-              "incus-provision", gardening, hostTree, Map.of(Amendment.WORKTREE, worktreeScalars))
+              "incus-provision",
+              gardening,
+              hostTree,
+              Map.of(Amendment.WORKTREE, worktreeScalars, Amendment.IMAGE, imageScalars))
           .the_scion_is_sown_and_grafted("the instance is provisioned");
       return self();
     }

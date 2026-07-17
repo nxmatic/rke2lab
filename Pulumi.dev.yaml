@@ -14,7 +14,6 @@ config:
   rke2lab:image:
     alias: control-node
     builderHost: bioskop-nixos
-    distrobuilderConfig: classpath:/incus/incus-distrobuilder.yaml
     sharedFolder: .local.d/images/distrobuilder
   rke2lab:network:
     lanBridgeParent: lan-br
@@ -22,7 +21,7 @@ config:
   rke2lab:api:
     endpoint: https://10.66.106.10:6443
   rke2lab:worktree:
-    dir: /private/var/lib/git/nxmatic/rke2lab.d/main
+    dir: /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-seed-scenario/
   rke2lab:systemd:
     dbusHost: bioskop-master
     dbusPort: "12434"

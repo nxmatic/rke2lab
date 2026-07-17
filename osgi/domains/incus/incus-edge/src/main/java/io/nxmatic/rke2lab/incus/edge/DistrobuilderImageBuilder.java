@@ -4,12 +4,14 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,11 +22,18 @@ import org.osgi.service.component.annotations.Component;
 /**
  * The realised incus image-build edge: produces the seed image's distrobuilder artifacts by
  * shelling {@code distrobuilder build-incus} when the binary is on {@code PATH}, otherwise by
- * streaming the bundled remote build recipe over {@code ssh} to the builder host. The single door
- * toward this one external contact — the {@code ProcessBuilder} mechanism formerly inlined in the
- * host {@code PulumiIncusImageProvider}. {@code ProcessBuilder} is playable, so this edge lives in
- * the OSGi world; SCR publishes it and the host provider composes it from the registry when a
- * rebuild is needed.
+ * streaming the bundled build recipe over {@code ssh} to the builder host. The single door toward
+ * this one external contact — the {@code ProcessBuilder} mechanism formerly inlined in the host
+ * {@code PulumiIncusImageProvider}. {@code ProcessBuilder} is playable, so this edge lives in the
+ * OSGi world; SCR publishes it and the host provider composes it from the registry when a rebuild
+ * is needed.
+ *
+ * <p>The edge is the SOLE owner of the build recipe: BOTH the {@code remote-build-incus-image.sh}
+ * driver AND the {@code incus-distrobuilder.yaml} distrobuilder config are its bundle resources. A
+ * local build materialises the config to a temp file; a remote build delivers both resources over
+ * the SAME ssh/stdin channel (base64 heredocs — no NFS hand-off, no quoting hazard). {@link
+ * #recipeDigest()} folds both resources' bytes, so a change to EITHER invalidates the host's image
+ * cache — the host never holds the recipe, only its digest.
  *
  * <p><b>Runtime dependency:</b> {@code distrobuilder} (+ {@code sudo}) locally, or {@code ssh} and
  * key-based access to the builder host.
@@ -34,6 +43,9 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
 
   private static final String REMOTE_BUILD_SCRIPT_RESOURCE =
       "io/nxmatic/rke2lab/incus/edge/remote-build-incus-image.sh";
+  private static final String DISTROBUILDER_CONFIG_RESOURCE =
+      "io/nxmatic/rke2lab/incus/edge/incus-distrobuilder.yaml";
+  private static final String CONFIG_FILENAME = "incus-distrobuilder.yaml";
 
   @Override
   public Optional<String> build(ImageBuildRequest request) {
@@ -52,11 +64,7 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
     final String localExecutable = tryResolveExecutable(request.builderBinary());
 
     if (!localExecutable.isBlank()) {
-      final List<String> buildCommand =
-          buildIncusAsRootCommand(
-              localExecutable, request.localConfigPath(), request.localArtifactDir());
-      runCommandOrThrow(
-          workspace, buildCommand, "Failed to build Incus image artifacts using distrobuilder");
+      runLocalBuildOrThrow(workspace, localExecutable, request.localArtifactDir());
       return;
     }
 
@@ -67,10 +75,28 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
   public String recipeDigest() {
     try {
       final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      digest.update(loadRecipeScript().getBytes(StandardCharsets.UTF_8));
+      digest.update(loadResource(REMOTE_BUILD_SCRIPT_RESOURCE));
+      digest.update((byte) '\n');
+      digest.update(loadResource(DISTROBUILDER_CONFIG_RESOURCE));
       return HexFormat.of().formatHex(digest.digest());
     } catch (NoSuchAlgorithmException ex) {
       throw new ImageBuildException("SHA-256 is not available", ex);
+    }
+  }
+
+  private void runLocalBuildOrThrow(Path workspace, String executable, String artifactDir) {
+    final Path configFile = materializeConfig();
+    try {
+      final List<String> buildCommand =
+          buildIncusAsRootCommand(executable, configFile.toString(), artifactDir);
+      runCommandOrThrow(
+          workspace, buildCommand, "Failed to build Incus image artifacts using distrobuilder");
+    } finally {
+      try {
+        Files.deleteIfExists(configFile);
+      } catch (IOException ignored) {
+        // A leftover temp config is harmless; the build outcome already stands.
+      }
     }
   }
 
@@ -86,15 +112,23 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
     final String binary =
         request.builderBinary().isBlank() ? "distrobuilder" : request.builderBinary();
 
-    runRemoteScriptOverSshOrThrow(
+    runRemoteBootstrapOverSshOrThrow(
         Path.of(request.workspaceDir()),
         remoteHost,
-        List.of(
-            request.remoteWorkspaceDir(),
-            request.remoteConfigPath(),
-            request.remoteArtifactDir(),
-            binary),
+        List.of(request.remoteWorkspaceDir(), request.remoteArtifactDir(), binary),
         "Failed to build Incus image artifacts on remote builder host " + remoteHost);
+  }
+
+  /** Write the bundled distrobuilder config to a temp file for a local {@code build-incus}. */
+  private Path materializeConfig() {
+    try {
+      final Path configFile = Files.createTempFile("incus-distrobuilder-", ".yaml");
+      Files.write(configFile, loadResource(DISTROBUILDER_CONFIG_RESOURCE));
+      return configFile;
+    } catch (IOException ex) {
+      throw new ImageBuildException(
+          "Failed to materialise distrobuilder config: " + ex.getMessage(), ex);
+    }
   }
 
   private List<String> buildIncusAsRootCommand(
@@ -202,21 +236,15 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
     }
   }
 
-  private void runRemoteScriptOverSshOrThrow(
+  private void runRemoteBootstrapOverSshOrThrow(
       Path workingDirectory, String remoteHost, List<String> scriptArgs, String failureMessage) {
-    final String script = loadRecipeScript();
+    final String bootstrap = remoteBootstrap();
 
     final List<String> command = new ArrayList<>();
     command.add("ssh");
     command.add(remoteHost);
     command.add("sh");
-    command.add("-lc");
-    command.add(
-        "'set -eu; tmp_dir=$(mktemp -d); trap \"rm -rf \\\"$tmp_dir\\\"\" EXIT; "
-            + "script_path=\"$tmp_dir/remote-build-incus-image.sh\"; "
-            + "cat > \"$script_path\"; chmod 700 \"$script_path\"; "
-            + "\"$script_path\" \"$@\"'");
-    command.add("--");
+    command.add("-s");
     command.addAll(scriptArgs);
 
     final ProcessBuilder pb = new ProcessBuilder(command);
@@ -226,7 +254,7 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
     try {
       final Process process = pb.start();
       try (OutputStream stdin = process.getOutputStream()) {
-        stdin.write(script.getBytes(StandardCharsets.UTF_8));
+        stdin.write(bootstrap.getBytes(StandardCharsets.UTF_8));
         stdin.flush();
       }
 
@@ -252,15 +280,43 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
     }
   }
 
-  private String loadRecipeScript() {
-    try (var in = getClass().getClassLoader().getResourceAsStream(REMOTE_BUILD_SCRIPT_RESOURCE)) {
+  /**
+   * The self-contained bootstrap streamed to the builder over {@code ssh … sh -s}. It decodes the
+   * two bundle resources (the driver script + the distrobuilder config) from base64 heredocs into a
+   * throwaway temp dir, then runs the driver with the config it just wrote. base64 keeps the
+   * heredoc delimiters collision-free (the payload can be any text/binary) and needs nothing beyond
+   * coreutils. Positional args from {@code sh -s}: {@code $1}=remote workspace, {@code $2}=artifact
+   * dir, {@code $3}=builder binary; the config path is the temp file this bootstrap writes.
+   */
+  private String remoteBootstrap() {
+    final String scriptB64 =
+        Base64.getEncoder().encodeToString(loadResource(REMOTE_BUILD_SCRIPT_RESOURCE));
+    final String configB64 =
+        Base64.getEncoder().encodeToString(loadResource(DISTROBUILDER_CONFIG_RESOURCE));
+    return String.join(
+        "\n",
+        "set -eu",
+        "export PATH=\"/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"",
+        "tmp_dir=$(mktemp -d)",
+        "trap 'rm -rf \"$tmp_dir\"' EXIT",
+        "base64 -d > \"$tmp_dir/build.sh\" <<'B64SCRIPT'",
+        scriptB64,
+        "B64SCRIPT",
+        "base64 -d > \"$tmp_dir/" + CONFIG_FILENAME + "\" <<'B64CONFIG'",
+        configB64,
+        "B64CONFIG",
+        "chmod 700 \"$tmp_dir/build.sh\"",
+        "\"$tmp_dir/build.sh\" \"$1\" \"$tmp_dir/" + CONFIG_FILENAME + "\" \"$2\" \"$3\"");
+  }
+
+  private byte[] loadResource(String resource) {
+    try (var in = getClass().getClassLoader().getResourceAsStream(resource)) {
       if (in == null) {
-        throw new ImageBuildException("Recipe script not found: " + REMOTE_BUILD_SCRIPT_RESOURCE);
+        throw new ImageBuildException("Bundle resource not found: " + resource);
       }
-      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+      return in.readAllBytes();
     } catch (IOException ex) {
-      throw new ImageBuildException(
-          "Failed to load recipe script: " + REMOTE_BUILD_SCRIPT_RESOURCE, ex);
+      throw new UncheckedIOException("Failed to load bundle resource: " + resource, ex);
     }
   }
 }

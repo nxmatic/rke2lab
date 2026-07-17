@@ -10,25 +10,26 @@ package io.nxmatic.rke2lab.incus.contract;
  * drive the ssh recipe on {@code remoteHost} (when it is not). The edge decides which by probing
  * for the binary. {@code remoteHost} may be blank — the edge then requires the binary locally or
  * fails.
+ *
+ * <p>The distrobuilder CONFIG is NOT a coordinate here: the edge owns it as a bundle resource (the
+ * single source of the recipe, folded into {@code recipeDigest()}), so it materialises the config
+ * itself — locally to a temp file, remotely over the ssh channel. Only the artifact/workspace
+ * placement crosses.
  */
 public record ImageBuildRequest(
     String builderBinary,
     String workspaceDir,
-    String localConfigPath,
     String localArtifactDir,
     String remoteHost,
     String remoteWorkspaceDir,
-    String remoteConfigPath,
     String remoteArtifactDir) {
 
   public ImageBuildRequest {
     builderBinary = normalize(builderBinary);
     workspaceDir = normalize(workspaceDir);
-    localConfigPath = normalize(localConfigPath);
     localArtifactDir = normalize(localArtifactDir);
     remoteHost = normalize(remoteHost);
     remoteWorkspaceDir = normalize(remoteWorkspaceDir);
-    remoteConfigPath = normalize(remoteConfigPath);
     remoteArtifactDir = normalize(remoteArtifactDir);
   }
 

@@ -105,11 +105,7 @@ public record Rke2labConfig(
       Path configDir)
       implements InfraConfigFragment {}
 
-  public record ImageConfig(
-      Optional<String> alias,
-      Optional<String> builderHost,
-      Optional<URI> distrobuilderConfig,
-      Path sharedFolder)
+  public record ImageConfig(Optional<String> alias, Optional<String> builderHost, Path sharedFolder)
       implements InfraConfigFragment {}
 
   public record NetworkConfig(

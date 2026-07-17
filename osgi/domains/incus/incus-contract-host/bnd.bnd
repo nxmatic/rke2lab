@@ -1,0 +1,13 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.incus.contract.host
+Export-Package: io.nxmatic.rke2lab.incus.contract.host
+# type=library — the incus domain's dual-realm host face: the flat value views the pure-host GROW
+# consumes (InstanceGrowPlan and its sub-views). Like seed-broker-codec it is staged as a bundle
+# OSGi-side (the scion assembles the plan) AND kept flat host-side (the GROW fetches + decodes it),
+# so its exported package legitimately lives in two realms and DUPLICATE_REALM_CLASS exempts it.
+# It is NOT a seam surface between DOMAINS: producer (incus scion) and consumer (incus GROW) are the
+# SAME domain, so no typed value leaks to another domain — orthogonal to the contract-purity guard.
+# RECORDS OF FLAT VALUES ONLY: it carries no @Component, so it does NOT Require the SCR extender.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=library
+# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
+Import-Package: !org.jspecify.annotations, *
+-noimportjava: true

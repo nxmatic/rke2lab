@@ -212,7 +212,6 @@ classDiagram
     class ImageConfig {
         +Optional~String~ alias
         +Optional~String~ builderHost
-        +Optional~URI~ distrobuilderConfig
         +Path sharedFolder  «MANDATORY»
     }
     class WorktreeConfig {
@@ -409,7 +408,6 @@ config:
   rke2lab:image:
     alias: control-node
     builderHost: bioskop-nixos.local
-    distrobuilderConfig: classpath:/META-INF/io.nxmatic/rke2lab/controlplane/incus/incus-distrobuilder.yaml
     sharedFolder: /Users/nxmatic/.../distrobuilder # MANDATORY
   rke2lab:network:
     lanBridgeParent: lan-br

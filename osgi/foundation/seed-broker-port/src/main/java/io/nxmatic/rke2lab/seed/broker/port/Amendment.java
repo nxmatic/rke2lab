@@ -47,6 +47,16 @@ public @interface Amendment {
    */
   String WORKTREE = "worktree";
 
+  /**
+   * The seed-image build coordinates — the flat scalars (image alias, builder binary/host, shared
+   * artifact folder) the host holds and the incus scion needs to drive the image build and PROJECT
+   * the image view the host GROW actualises. The host fills it from its {@code BootstrapConfig};
+   * the scion folds the edge's {@code recipeDigest} with these into the {@code buildChecksum} and
+   * resolves the artifact paths (§ host-cellar-realisation, the scion-projects/host-actualises
+   * rule).
+   */
+  String IMAGE = "image";
+
   /** The neutral gardening role of this amendment (e.g. {@link #SOIL}, {@link #FACET}). */
   String value();
 }

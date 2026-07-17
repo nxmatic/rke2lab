@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.testkit.RefusingCellar;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -38,11 +39,12 @@ class IncusAmendReflectorTest {
 
     assertEquals("runbook", amended.coordinate(), "the amended payload is ready to sow at runbook");
     final IncusRunbookInput bound = CODEC.decode(amended.payload(), IncusRunbookInput.class);
-    assertEquals(scalars, bound.worktree(), "the worktree role landed on the worktree scalars");
+    assertEquals(
+        Optional.of(scalars), bound.worktree(), "the worktree role landed on the worktree scalars");
   }
 
   @Test
-  void an_empty_amendment_keeps_the_default_unset_worktree() {
+  void an_empty_amendment_keeps_the_default_empty_worktree() {
     final SeedEnvelope roleValues = new SeedEnvelope("incus", "runbook", CODEC.encode(Map.of()));
 
     final IncusRunbookInput bound =
@@ -51,9 +53,9 @@ class IncusAmendReflectorTest {
             IncusRunbookInput.class);
 
     assertEquals(
-        IncusRunbookInput.defaults().worktree(),
+        Optional.empty(),
         bound.worktree(),
-        "an unamended input keeps its unset worktree");
+        "an unamended input keeps its empty worktree amendment");
   }
 
   @Test

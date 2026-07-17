@@ -25,6 +25,7 @@
 
   <modules>
     <module>incus-contract</module>
+    <module>incus-contract-host</module>
     <module>incus-core</module>
     <module>incus-edge</module>
     <module>incus-bdd</module>

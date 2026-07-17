@@ -55,7 +55,9 @@ projection are host orchestration that genuinely stays.
 `PulumiIncusImageProvider` (seed-master) ensures the seed image exists. Most of it is host
 orchestration that stays: the `getImagePlain` reuse lookup, the `com.pulumi.incus.Image` resource it
 schedules, the artifact-directory resolution across NFS mirror candidates, the `.build-checksum.sha256`
-cache marker, the distrobuilder-config materialisation, and the NixOS path translation.
+cache marker, and the NixOS path translation. (The distrobuilder-config materialisation is NO LONGER
+host — the config is an edge bundle resource the edge materialises itself; see § the recipe is
+edge-owned.)
 
 Buried inside was one external contact — *building the artifacts*: probe `PATH` for `distrobuilder`,
 run `distrobuilder build-incus` (under `sudo` if not root), or, failing a local binary, stream a
@@ -67,22 +69,32 @@ recipe script as a classpath resource.
 * *incus-contract* declares `ImageBuilder` — `build(ImageBuildRequest)` (produce the artifacts, throwing
   `ImageBuildException` on failure) and `recipeDigest()` (a stable digest of the edge-owned recipe).
   `ImageBuildRequest` is the flat contract record: the builder binary, and two path families — `local*`
-  (drive a local build) and `remote*` (NixOS-translated by the host, drive the ssh recipe).
+  (drive a local build) and `remote*` (NixOS-translated by the host, drive the ssh recipe). The
+  distrobuilder CONFIG is NOT a field — the edge owns it (see below), so only artifact/workspace
+  placement crosses.
 * *incus-edge* provides `DistrobuilderImageBuilder` (`@Component`) — owns the local-vs-remote decision
   (`tryResolveExecutable`), the local `distrobuilder build-incus` (+ sudo), and the ssh recipe stream.
-  The `remote-build-incus-image.sh` recipe moved here as a *bundle resource* (this edge is its single
-  source).
+  BOTH recipe resources moved here as *bundle resources* (this edge is their single source): the
+  `remote-build-incus-image.sh` driver AND the `incus-distrobuilder.yaml` distrobuilder config.
 * *seed-master* keeps the Pulumi `Image` resource, the reuse lookup, the cache marker, and the path
   translation. `PulumiIncusImageProvider` resolves `ImageBuilder` from the registry (`singleSpiProvider`
   on the held `BootedFramework`) and calls `build` only when a rebuild is needed.
 
-==== The recipe-digest subtlety
+==== The recipe is edge-owned end to end (2026-07-17)
 
-The host's `computeBuildChecksum` used to hash the recipe-script bytes, so a recipe change invalidated
-the artifact cache *and* changed the published image-state ConfigMap fingerprint. When the script moved
-to the edge, the host lost it. Rather than duplicate the script (which would fork its single source),
-the port exposes `recipeDigest()`: the edge digests its own recipe, the host folds that digest into its
-checksum exactly where the script bytes used to go. Behaviour is preserved; the recipe has one owner.
+The distrobuilder config `incus-distrobuilder.yaml` used to live as a seed-master classpath resource
+handed to the edge by PATH — while the driver script travelled over ssh/stdin. Two resources of the
+SAME recipe delivered by two channels (NFS path vs ssh stream): incoherent, and it forked the recipe's
+ownership. Voie B unifies it: the yaml joins the edge as a bundle resource beside the driver, and the
+edge delivers BOTH over the one ssh channel — a local build materialises the yaml to a temp file, a
+remote build streams both as base64 heredocs into a throwaway dir (`ssh … sh -s`), no NFS hand-off.
+
+`recipeDigest()` now folds BOTH resources' bytes (script `\n` config), so a change to EITHER invalidates
+the host's image cache. The host still holds only the digest, never the recipe — it folds
+`recipeDigest()` into its `buildChecksum` exactly where the script bytes used to go. The scion composes
+`buildChecksum` from `recipeDigest` + `imageAlias` + `builderBinary` + `builderHost` (all it holds via
+the image amendment); the config bytes it never sees are already covered by the digest. One owner, one
+channel, behaviour preserved.
 
 == The shared shape
 

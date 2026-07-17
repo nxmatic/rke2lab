@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.netplan.contract;
 
 import java.net.InetAddress;
+import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -20,6 +21,16 @@ public record ClusterNetworkBlueprint(
     WanPlan wan,
     InterfacePlan interfaces,
     VlanPlan vlan) {
+
+  /**
+   * The canonical node names of every cluster, in topology order (1 master + 3 peers + 2 workers).
+   * The single source of truth the netplan domain OWNS — it already derives each node's id/type and
+   * validates names against this topology, so a consumer that must enumerate the cluster's nodes
+   * (the incus grow's dnsmasq {@code dhcp-host} lines, the bbox reservation rows) reads THIS rather
+   * than duplicating the list.
+   */
+  public static final List<String> CANONICAL_NODE_NAMES =
+      List.of("master", "peer1", "peer2", "peer3", "worker1", "worker2");
 
   /** Create a fluent builder for blueprint derivation. */
   public static Builder builder() {
@@ -164,16 +175,12 @@ public record ClusterNetworkBlueprint(
   }
 
   private static void validateNodeName(String nodeName) {
-    // Validate that the node name corresponds to the canonical topology
-    // (1 master + 3 peers + 2 workers)
-    if (!("master".equals(nodeName)
-        || nodeName.matches("peer[1-3]")
-        || nodeName.matches("worker[1-2]"))) {
+    if (!CANONICAL_NODE_NAMES.contains(nodeName)) {
       throw new IllegalArgumentException(
           "Node name '"
               + nodeName
               + "' does not conform to canonical topology "
-              + "(master, peer1-3, worker1-2)");
+              + CANONICAL_NODE_NAMES);
     }
   }
 

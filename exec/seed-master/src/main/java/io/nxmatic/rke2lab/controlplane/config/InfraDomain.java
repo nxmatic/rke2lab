@@ -29,7 +29,6 @@ public enum InfraDomain {
       return new Rke2labConfig.ImageConfig(
           loader.optional(domainId(), "alias"),
           loader.optional(domainId(), "builderHost"),
-          loader.optionalUri(domainId(), "distrobuilderConfig"),
           loader.requirePath(domainId(), "sharedFolder"));
     }
   },

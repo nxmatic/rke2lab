@@ -219,8 +219,7 @@ public class IncusProvisionScenario
    * defers its kubeconfig.
    */
   private static ImageBuildRequest imageRequest() {
-    return new ImageBuildRequest(
-        "distrobuilder", "/srv/host/incus-build", "config.yaml", "artifacts", "", "", "", "");
+    return new ImageBuildRequest("distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "");
   }
 
   private ImageBuilder resolveImageBuilder() {
@@ -298,10 +297,11 @@ public class IncusProvisionScenario
     static final Resolved UNAMENDED =
         new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), Path.of(""));
 
-    static Resolved from(Worktree worktree, Cellar cellar, Parcel parcel) {
-      if (worktree.worktreeRoot().isBlank()) {
+    static Resolved from(Optional<Worktree> maybeWorktree, Cellar cellar, Parcel parcel) {
+      if (maybeWorktree.isEmpty()) {
         return UNAMENDED;
       }
+      final Worktree worktree = maybeWorktree.orElseThrow();
       final Path root = Path.of(worktree.worktreeRoot());
       final BootstrapPaths local =
           BootstrapPaths.fromLocalWorktree(root, worktree.clusterName(), worktree.nodeName());
