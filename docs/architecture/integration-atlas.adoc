@@ -56,6 +56,29 @@ The only edge that legitimately crosses is the *bundle/host contract*: a bundle 
 pure model reaching directly into host code — as `Rke2labConfig → ConfigLoader` does today — is a
 crossing in the WRONG direction, a decomposition defect to invert.
 
+[NOTE]
+.The dual-realm library — the sanctioned exception, and its intra-domain form (2026-07-17)
+====
+A `type=contract` bundle is OSGi-only *by seam purity*: the host reads no domain type back typed, it
+speaks only to the broker (the `contract-purity` guard fails the build if a contract exports a concrete
+class). The one sanctioned exception is a `type=library` bundle, staged in-framework AND kept flat in
+the host uber-jar — TWO copies, each bound to its realm — because it carries NO seam surface: only flat
+values cross, each realm holds its own copy. `seed-broker-codec` is the founding case (a foundation:
+serves all domains, both worlds).
+
+`incus-contract-host` (2026-07-17) is the first `type=library` of a DOMAIN, and it refines the rule:
+the dual-realm here is *intra-domain*. incus must run part of its logic host-flat — the GROW beat,
+because `com.pulumi` cannot enter Felix — so the incus SCION (OSGi) and the incus GROW (host) are two
+halves of ONE domain that need to share flat value records (the `InstanceGrowPlan`) ACROSS the realm
+boundary. That is NOT the leak seam-purity forbids (a domain's vocabulary crossing to ANOTHER domain
+typed): producer and consumer are the same domain. The dual-realm-intra-domain is *orthogonal* to seam
+purity — incus speaking to incus across the realm frontier the Pulumi engine imposes on it. Discipline
+(graved in the module's bnd): FLAT VALUE RECORDS ONLY — no logic method, no `com.pulumi`, no OSGi
+service ref, else it becomes the door behind which behaviour leaks host-side. Computation stays OSGi
+(scion) or host (GROW); the shared module carries only projected DATA. See
+link:osgi/host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy].
+====
+
 [mermaid]
 ....
 flowchart TB

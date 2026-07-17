@@ -598,7 +598,65 @@ LAUNCH (the Instance). In I6 that body SPLITS by realm: PREPARE dissolves into S
 = the manifests/incus scions; secrets = an incus PREPARE beat, § delta #10 — NOT host), PROMOTE is the
 reconcile scion (§ the reconcile cycle). What is LEFT host-irreducible is ONLY the Pulumi engine — the
 graph (#1) + the device binding (#8). That is the GROW beat: a pure-host WHEN (no `broker.sow`, no
-metier — `com.pulumi` cannot enter Felix), fetching the scion's `IncusHarvest` like `Cellar.fetch`.
+metier — `com.pulumi` cannot enter Felix), fetching an `InstanceGrowPlan` like `Cellar.fetch`.
+
+==== The scion-projects / host-actualises rule + `InstanceGrowPlan` (2026-07-17)
+
+The GROW runs HOST-FLAT (the `ClusterSeedScenario` and its WHENs run on the launcher's flat classpath,
+outside Felix; only the sowed scions run in-container). So the GROW cannot read an OSGi-only
+`type=contract` typed — `ClusterNetworkBlueprint` (netplan), `HostStagingEntry` (incus) never cross as
+objects; the seam carries String / encoded payloads only. The rule that resolves this: *everything that
+is COMPUTATION is OSGi-side, PROJECTED into a plan; the host does ONLY `com.pulumi`* (declare resources,
+provider invokes). The host derives NOTHING of the domain — it actualises a description.
+
+*The channel — `InstanceGrowPlan`, one immutable record, one fetch, one consumer.* The GROW is the SOLE
+host consumer, so the scion assembles ONE immutable plan at the end of PREPARE (a THEN of sealing) and
+stores it; the host does a single `Cellar.fetch(parcel, INSTANCE_GROW_PLAN, InstanceGrowPlan.class)`.
+No incremental accumulation (that would mutate), no three separate views fetched apart — one value DAG:
+
+[listing]
+----
+InstanceGrowPlan(
+    GrowNetworkView network,      // group: lanHwaddr, wanHwaddr, dnsmasqConfig (Map)
+    GrowImageView   image,        // group: imageAlias, metadataPath, dataPath, buildChecksum
+    String cloudInitChecksum)     // instance scalar → at the ROOT (the plan IS the instance's)
+----
+
+*It lives in a NEW module `incus-contract-host` — the HOST FACE of the incus contract, `type=library`
+dual-realm, RECORDS OF FLAT VALUES ONLY* (no logic method, no `com.pulumi`, no OSGi service ref — else
+it becomes the door behind which behaviour leaks host-side). Its rationale: `incus-contract` is
+`type=contract` OSGi-only (the host reads no incus type back; the `contract-purity` guard forbids it),
+but the GROW needs the plan TYPED to decode it (the `SeedCodec`, dual-realm, reflects on the `Class` the
+host's classpath holds). NO transgression of the seam-purity rule: producer (incus scion) AND consumer
+(incus grow) are the SAME domain — incus speaks to incus across the REALM boundary, not a domain leaking
+to another. The dual-realm-intra-domain is orthogonal to seam purity. It is the first `type=library` of
+a domain (the only prior one, `seed-broker-codec`, is a foundation).
+
+*What the scion computes and projects (all OSGi-side, none host):*
+
+* *the network view* — the scion resolves `NetplanSynthesisService` from its own registry (a published
+  `@Component`, like `ImageBuilder`), gets the `ClusterNetworkBlueprint` TYPED (same world), and
+  ASSEMBLES the flat view: the two NIC hwaddrs + the whole `dnsmasqConfig` map (the `raw.dnsmasq`
+  dhcp-host lines over the cluster's nodes + the `ipv4.*` keys). The dnsmasq assembly is pure netplan
+  logic (no host state, no `com.pulumi`) — done once OSGi-side, the host receives the assembled result.
+  netplan does NOT depend on incus (no back-arrow): it is a service the incus scion RESOLVES.
+* *the image view* — the scion PREPARE already builds the artifacts (`the_image_is_built`, the edge
+  `ImageBuilder`); it also computes `buildChecksum` = `SHA-256(distrobuilder-config + imageAlias +
+  builderBinary + builderHost + recipeDigest)` — the 4 first from the `ImageBuildRequest` it already
+  fills, `recipeDigest` from the edge `ImageBuilder` (OSGi). *`buildChecksum` is computed by the SCION,
+  never host-side* (recomputing it host-side would force re-resolving the edge host — proscribed; an
+  improvement over the original, which recomputed it host-side when `ImageBuilder` was still host). The
+  NFS path translation is already OSGi (`BootstrapPaths.asAutomountView`/`automountPath` = the migrated
+  `pathOn`), so `metadataPath`/`dataPath` are projected NIXOS-host-view paths.
+* *the cloud-init checksum* (delta #7 wire) — `host.live.d = jsync(syncedFrom)`, so its nocloud checksum
+  IS the `syncedFrom` staging's, which `HostStagingEntry` already carries per-file (7a, no recompute).
+  The scion projects that one scalar; the host poses it on `user.rke2lab.provisioning.slice.cloud-init`.
+
+*What the host GROW does (ONLY `com.pulumi`, zero domain computation):* fetch the `InstanceGrowPlan`,
+run the reuse-lookup (provider invoke `getImagePlain` on the alias — host-pur, NOT ssh), declare the
+graph (#1) from the plan's projected values + the 13 mounts (#8) derived from the FIXED `host.live.d`
+(no slot state to know), and pose the two checksums (`buildChecksum`, `cloudInitChecksum`) on the
+instance config. The import-lookup (§ below) stays — it is a provider invoke, host-pur.
 
 *The graph (#1) — declaration order + dependency edges (real causality to preserve):*
 
@@ -651,9 +709,13 @@ the NIXOS host view; target = the container layout path from `HostPathCatalog`. 
 |===
 
 *Causality the restoration MUST preserve:* files-and-secrets materialised (scion beats) BEFORE any
-resource exists; the host GROW then fetches `IncusHarvest`, declares Project→{Network,Profile,Image},
-and binds the Instance with the 13 mounts onto the ALREADY-PROMOTED `host.live.d` (the mount rule: GROW
-after PROMOTE, else the VM mounts stale/empty). The mounts bind host.live.d, not a staging slot.
+resource exists; the host GROW then fetches the `InstanceGrowPlan`, declares Project→{Network,Profile,
+Image}, and binds the Instance with the 13 mounts onto the ALREADY-PROMOTED `host.live.d` (the mount
+rule: GROW after PROMOTE, else the VM mounts stale/empty). The mounts bind host.live.d, not a staging
+slot — so their sources derive from the FIXED `host.live.d` (`liveRoot() = clusterNodeRoot/host.live.d`)
+via `asAutomountView`, a pure translation the host needs no slot state to compute (the earlier
+`prepared.nixosPaths()` above is the original's pre-rotation `host/` base; in I6 the mounts bind the
+promoted live tree).
 
 *The Pulumi Output discipline (transposed from the removed context-registry doc, 2026-07-16).* When the
 GROW threads a value through the graph, distinguish the ASYNC resource identifier from a SYNC local

@@ -140,8 +140,13 @@ SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-contain
         user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [CODED]
     AND the_secrets_are_written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets;
         gated on cultivating — the contact shells gh/flox)                                                [CODED]
+    AND the_network_is_resolved — resolve NetplanSynthesisService (@Component), assemble the flat network
+        view (2 NIC hwaddrs + the dnsmasqConfig map) OSGi-side                                            [VISION]
   THEN the_prep_is_stored — IncusHarvest (recipe digest + soil) stored, the request the host fetches to GROW  [CODED]
     AND the_staging_is_published — HostStagingEntry (checksums + git provenance) published                    [CODED]
+    AND the_instance_grow_plan_is_published — assemble ONE immutable InstanceGrowPlan {network view, image
+        view (imageAlias, artifact paths, buildChecksum computed OSGi-side), cloudInitChecksum} and store
+        it at INSTANCE_GROW_PLAN — the single record the host GROW fetches (incus-contract-host library)  [VISION]
     AND a build/graft failure surfaces, optionally consulting the doctor                  [CODED]
     AND the instance is NOT started here — GROW is the separate, later pure-host beat
 
@@ -154,13 +159,21 @@ SCENARIO: the live tree is reconciled   (RECONCILE beat — sow-and-graft, in-co
   [ ── the pure-host GROW beat (com.pulumi) — NOT a scion, sits HERE, after reconcile/promote ── ]
 
 SCENARIO: the instance grows   (GROW beat — PURE-HOST com.pulumi, NOT a scion)  [VISION, not coded]
-  GIVEN the IncusHarvest fetched from the cellar (like Cellar.fetch — no metier, no sow)
-  WHEN the Pulumi graph is declared (#1: Project root → Network/Profile dependsOn, Image fingerprint Output,
+  GIVEN the InstanceGrowPlan fetched from the cellar (Cellar.fetch(INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
+        — one immutable record decoded host-side via the dual-realm SeedCodec; no metier, no sow)
+    AND the Pulumi Context threaded from Main (SessionSeed<Context> + a receiver)
+  WHEN the image resource is resolved (reuse-lookup getImagePlain(alias) — a provider invoke, host-pur;
+        else new Image from the plan's artifact paths → fingerprint Output)
+    AND the existing project/network are import-looked-up (IncusImportLookup — provider invokes
+        getProject/getNetworkPlain, NOT ssh; adopt via importId, skip the unmanaged canonical LAN bridge)
+    AND the Pulumi graph is declared (#1: Project root → Network/Profile dependsOn, Image fingerprint Output,
         Instance via Output refs, replaceOnChanges(config,config.*), deleteBeforeReplace)
-    AND the 13 mounts are bound (#8: source NIXOS host-view asHostView → target HostPathCatalog) onto the
-        ALREADY-PROMOTED host.live.d, running=true
-    AND the nocloud→replace wire is armed (#7: cloud-init checksum → user.rke2lab.provisioning.slice.cloud-init)
+    AND the 13 mounts are bound (#8: sources derived from the FIXED host.live.d via asAutomountView →
+        target HostPathCatalog) onto the ALREADY-PROMOTED host.live.d, running=true
+    AND the nocloud→replace wire is armed (#7: the plan's cloudInitChecksum + buildChecksum posed on
+        user.rke2lab.provisioning.slice.* / imageBuildChecksum — the scion computed them, the host only poses)
   THEN the VM is grown, mounting the current host.live.d
+  NOTE the host does ONLY com.pulumi + provider invokes — zero domain computation (all projected in the plan)
 
 SCENARIO: the instance is verified   (VERIFY beat — sow-and-graft, in-container, AFTER grow)  [VISION, not coded]
   GIVEN the instance contact (edge) resolved from the registry — inert if the RunGate is closed
@@ -174,15 +187,24 @@ plan (PENDING, E9) without touching the Incus host. *The recipe-digest subtlety*
 detail owned here, not host-visible. Each scion grafts back under its host step; on failure the transversal
 doctor-consult follows the same pattern as the other scions.
 
-*Migration note (2026-07-17).* PREPARE is COMPLETE: `IncusProvisionScenario` ships image-build +
-manifests-sub-sow + nocloud-unwrap (#2) + secrets (#10) + IncusHarvest/HostStaging stores. The two
-materialisations are WHEN steps (they FABRICATE material — § bdd.adoc, the G/W/T phase rule),
+*Migration note (2026-07-17).* PREPARE's materialisations are CODED: `IncusProvisionScenario` ships
+image-build + manifests-sub-sow + nocloud-unwrap (#2) + secrets (#10) + IncusHarvest/HostStaging stores.
+The two materialisations are WHEN steps (they FABRICATE material — § bdd.adoc, the G/W/T phase rule),
 delegating to incus-core instances (`NocloudSeedWriter`, `LaunchSecretsWriter`); the stores are the
 THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed scenario
-`IncusReconcileScenario` (`IncusScenario.RECONCILE`, a distinct root WHEN). The probe pulls out to a
-VERIFY beat (post-grow, vision), and the GROW between reconcile and verify is pure-host (com.pulumi),
-NOT a scion. See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy]
-and link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas.
+`IncusReconcileScenario` (`IncusScenario.RECONCILE`, a distinct root WHEN).
+
+*Designed-not-coded (2026-07-17), the GROW enablement:* PREPARE gains `the_network_is_resolved` (WHEN)
++ `the_instance_grow_plan_is_published` (THEN) — the scion resolves `NetplanSynthesisService`, computes
+`buildChecksum` OSGi-side, and assembles ONE immutable `InstanceGrowPlan` (network view + image view +
+cloudInitChecksum) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=library`
+dual-realm module `incus-contract-host` (the host face of the incus contract — flat value records only,
+no logic; the first `type=library` of a domain). The GROW between reconcile and verify is pure-host
+(`com.pulumi` + provider invokes only — it fetches the plan and actualises, computes nothing of the
+domain), NOT a scion; the import-lookup it keeps is a provider invoke, not ssh. The probe pulls out to a
+VERIFY beat (post-grow). See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar §
+the-grow-anatomy] (the scion-projects/host-actualises rule + the plan) and
+link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas.
 
 == Related documentation
 

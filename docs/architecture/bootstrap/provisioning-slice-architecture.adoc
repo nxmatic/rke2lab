@@ -438,11 +438,14 @@ but nothing plays it as a scion. Standing up `manifests-bdd` — a scion that
 synthesizes + materializes, fed a host-neutral activation payload sown by the host
 — unblocks all five at once, on the same pattern as bbox/incus/systemd/cluster.
 
-**Family 3 — the checksum→reload glue (delta #7), straddling.** Checksum
-computation in-container (scion, reads materialized paths), partition +
-`replaceOnChanges` on the host `Instance`. It *depends* on both other families (a
-graph to wire `replaceOnChanges` onto, materializations to checksum), so it comes
-last.
+**Family 3 — the checksum→reload glue (delta #7), straddling.** The cloud-init
+checksum is COMPUTED in-container (the scion already carries it: `host.live.d =
+jsync(syncedFrom)`, so the nocloud checksum IS the `syncedFrom` `HostStagingEntry`'s
+per-file value — no recompute) and PROJECTED into the `InstanceGrowPlan`; the host
+only POSES it on `replaceOnChanges`'s `user.rke2lab.provisioning.slice.cloud-init`
+key (with `buildChecksum`, likewise scion-computed). It *depends* on both other
+families (a graph to wire `replaceOnChanges` onto, materializations to checksum), so
+it comes last. The straddle is now clean: compute+project OSGi-side, pose host-side.
 
 **Family 4 — the host-tree promotion + bind (deltas #8–11), scion-then-host.** The
 materialisation (Family 2) writes a staging slot; the PROMOTION (delta #9,
@@ -498,11 +501,17 @@ prepare beat in front — corrected 2026-07-15):
   PROMOTES (`jsync staging → host.live.d`, Family 4 delta #9) and publishes the
   live/drift entries. It produces `IncusHarvest` (recipe digest + soil) — the request
   the host fetches. No VM yet.
-. **(pure-host beat) the instance GROWS** — the host fetches `IncusHarvest`, declares
-  the resource graph (Project/Network/Profile/Image/Instance) and the Pulumi engine
-  drives the Incus provider over gRPC to create the VM with `running=true`, binding
-  the 13 mounts (delta #8) onto the already-promoted `host.live.d`. Pure-host register,
-  like `Cellar.fetch` — no metier, no sow. MUST come after PREPARE (the mount rule).
+. **(pure-host beat) the instance GROWS** — the host fetches ONE immutable
+  `InstanceGrowPlan` (network view + image view + cloudInitChecksum — assembled and
+  stored by the scion at PREPARE's end, in the `incus-contract-host` `type=library`
+  module), declares the resource graph (Project/Network/Profile/Image/Instance) and the
+  Pulumi engine drives the Incus provider over gRPC to create the VM with `running=true`,
+  binding the 13 mounts (delta #8) onto the already-promoted `host.live.d`. Pure-host
+  register, like `Cellar.fetch` — no metier, no sow. The host does ONLY `com.pulumi` +
+  provider invokes (reuse-lookup, import-lookup); it COMPUTES nothing of the domain — the
+  scion projected every value (blueprint-derived NIC/dnsmasq, buildChecksum, checksums)
+  into the plan (§ link:../osgi/host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar,
+  the scion-projects/host-actualises rule]). MUST come after PREPARE (the mount rule).
 . **(sow-and-graft beat) the instance is VERIFIED** — the host sow-and-grafts the incus
   scion, which probes reachability in-container (the VM now runs) and grafts its verdict.
 
