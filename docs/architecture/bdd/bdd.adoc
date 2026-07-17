@@ -321,6 +321,31 @@ flowchart TB
   linkStyle 6 stroke:#d1242f,stroke-width:3px;
 ....
 
+=== The G/W/T phase rule — fabricate in WHEN, seal in THEN (NOT arrange/act/assert)
+
+Because the scenario IS the seeding engine (decision 1), its `Given/When/Then` are NOT the test
+triptyque arrange/act/assert — where WHEN mutates and THEN only observes. Here BOTH `when()` and
+`then()` legitimately carry effects; the split is by the NATURE of the effect, not by
+mutation-vs-observation:
+
+* *GIVEN* — resolve the collaborators and the ambient facts (the registry lookups, the run gate, the
+  cellar, the reconstructed topology). No metier effect.
+* *WHEN* — the metier operations that FABRICATE the run's material: build the image, cultivate the
+  manifests (a sub-sow), unwrap the nocloud seed, write the secrets, reconcile, promote, probe. This is
+  where the domain does its work; a failure throws here (fail-fast, read off the model — §
+  <<fail-fast>>).
+* *THEN* — the *cellar bookend*: SEAL the harvest — `cellar.store` the domain's reaped wire-record,
+  publish the host-tree entry. On the Pulumi realisation the `store` PRODUCES the resource (§
+  link:../osgi/host-cellar-realisation-spec.adoc[host-cellar] § every-scion-contributes), so the store
+  is an effect, not an assertion. A verification MAY also live in THEN (bbox asserts every row has an
+  outcome before storing), but the closing act of a production scenario is the store, not a check.
+
+The tell that a `then()` is verification-ONLY (no store) is a *test* scenario, not a seeding phase:
+`DoctorScenario` is pure-assertion precisely because it is `-test`, never played in production. So the
+rule for a LIVE scenario: *if a step fabricates material, it is a WHEN; if it seals the harvest, it is
+a THEN.* `IncusProvisionScenario` is the reference — image·manifests·nocloud·secrets in WHEN;
+`the_prep_is_stored`·`the_staging_is_published` in THEN.
+
 === The scenario tree — a phase opens a nested scenario (the pièce maîtresse)
 
 The mechanism that makes "phase = scenario" compose into ONE runbook tree is E5: a step CAN open onto a

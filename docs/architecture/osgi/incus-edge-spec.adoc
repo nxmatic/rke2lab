@@ -4,9 +4,10 @@
 
 [NOTE]
 ====
-*Status:* the two CONTACTS (edge/port) IMPLEMENTED (2026-07-07); the two SCION scenarios (prepare/verify,
-below) PARTIAL — `IncusProvisionScenario` ships image-build + probe, but PREPARE must still gain the
-manifests graft + nocloud + promote, and the probe must move to a post-grow VERIFY beat (§ the scenarios).
+*Status:* the two CONTACTS (edge/port) IMPLEMENTED (2026-07-07); PREPARE COMPLETE (2026-07-17) —
+`IncusProvisionScenario` ships image-build + manifests graft + nocloud-unwrap (#2) + secrets (#10) +
+IncusHarvest/HostStaging stores; the PROMOTE landed as its own `IncusReconcileScenario`. Remaining VISION:
+the pure-host GROW beat and the post-grow VERIFY beat (the probe moves there — § the scenarios).
 The incus domain of the frontier-playability model, alongside
 link:pulumi-edge-handoff.adoc[pulumi-edge], link:ssh-to-age-edge-handoff.adoc[ssh-to-age-edge],
 link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge], link:cluster-edge-spec.adoc[cluster-edge],
@@ -135,9 +136,10 @@ SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-contain
     AND the staging slot host.N.staging.d chosen by incus (it owns the tree, HostSlotSelector)   [CODED]
   WHEN the_image_is_built — built, or found current by its recipe-digest cache key       [CODED]
     AND the_manifests_are_cultivated — the manifests SUB-SOW (broker.sow AMEND+RUNBOOK → the SOIL, passing the Cellar that carries the tx)  [CODED]
-    AND the .secrets are written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets)  [VISION]
-    AND the nocloud seed is UNWRAPPED (#2 — read the cloud-config ConfigMap on FS, strip the envelope →
-        user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [VISION]
+    AND the_nocloud_seed_is_unwrapped (#2 — read the cloud-config ConfigMap on FS, strip the envelope →
+        user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [CODED]
+    AND the_secrets_are_written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets;
+        gated on cultivating — the contact shells gh/flox)                                                [CODED]
   THEN the_prep_is_stored — IncusHarvest (recipe digest + soil) stored, the request the host fetches to GROW  [CODED]
     AND the_staging_is_published — HostStagingEntry (checksums + git provenance) published                    [CODED]
     AND a build/graft failure surfaces, optionally consulting the doctor                  [CODED]
@@ -172,9 +174,11 @@ plan (PENDING, E9) without touching the Incus host. *The recipe-digest subtlety*
 detail owned here, not host-visible. Each scion grafts back under its host step; on failure the transversal
 doctor-consult follows the same pattern as the other scions.
 
-*Migration note (2026-07-16).* `IncusProvisionScenario` ships image-build + manifests-sub-sow +
-staging-publish + IncusHarvest (the CODED PREPARE). Still to grow PREPARE: the .secrets (#10) and
-nocloud-unwrap (#2) Thens. The PROMOTE is NO LONGER a PREPARE step — it is its own landed scenario
+*Migration note (2026-07-17).* PREPARE is COMPLETE: `IncusProvisionScenario` ships image-build +
+manifests-sub-sow + nocloud-unwrap (#2) + secrets (#10) + IncusHarvest/HostStaging stores. The two
+materialisations are WHEN steps (they FABRICATE material — § bdd.adoc, the G/W/T phase rule),
+delegating to incus-core instances (`NocloudSeedWriter`, `LaunchSecretsWriter`); the stores are the
+THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed scenario
 `IncusReconcileScenario` (`IncusScenario.RECONCILE`, a distinct root WHEN). The probe pulls out to a
 VERIFY beat (post-grow, vision), and the GROW between reconcile and verify is pure-host (com.pulumi),
 NOT a scion. See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy]

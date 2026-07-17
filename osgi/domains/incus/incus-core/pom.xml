@@ -29,6 +29,18 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
+    <!-- The auth port LaunchSecretsWriter asks for the gh/flox token (§ provisioning-slice #10):
+         the value crosses via AuthTokenContact, realised by auth-edge (gh/flox CLI). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>auth-contract</artifactId>
+    </dependency>
+    <!-- Generic YAML parse for NocloudSeedWriter — unwrap the cloud-config ConfigMap into the
+         NoCloud seed (§ provisioning-slice #2). No manifests coupling: a bare read into a Map. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+    </dependency>
     <!-- OBSERVE: the per-file line-level unified diff of a modified text file (HostTreeDiffer). -->
     <dependency>
       <groupId>io.github.java-diff-utils</groupId>

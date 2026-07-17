@@ -10,6 +10,7 @@ import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.auth.contract.AuthTokenContact;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
@@ -27,6 +28,8 @@ import io.nxmatic.rke2lab.incus.core.BootstrapPaths;
 import io.nxmatic.rke2lab.incus.core.GitProvenanceReader;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
 import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
+import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
+import io.nxmatic.rke2lab.incus.core.NocloudSeedWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
@@ -158,7 +161,11 @@ public class IncusProvisionScenario
         .and()
         .the_image_is_built()
         .and()
-        .the_manifests_are_cultivated();
+        .the_manifests_are_cultivated()
+        .and()
+        .the_nocloud_seed_is_unwrapped(resolved)
+        .and()
+        .the_secrets_are_written(resolved, resolveAuthToken());
     then()
         .the_instance_is_prepared()
         .and()
@@ -256,6 +263,16 @@ public class IncusProvisionScenario
         "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
   }
 
+  /**
+   * Resolve the {@link AuthTokenContact} from THIS bundle's registry, or {@link Optional#empty()}
+   * when no {@code auth-edge} is published — {@link LaunchSecretsWriter} still resolves tokens from
+   * the environment (its higher-precedence source), so a missing contact degrades gracefully rather
+   * than failing the prepare.
+   */
+  private Optional<AuthTokenContact> resolveAuthToken() {
+    return ScenarioRegistry.of(this).optional(AuthTokenContact.class);
+  }
+
   private <T> T require(Class<T> type, String message) {
     return ScenarioRegistry.of(this).require(type, message);
   }
@@ -269,9 +286,17 @@ public class IncusProvisionScenario
    * host renders the runbook; {@code worktreeRoot} the base for the git provenance. All blank/empty
    * for an unamended survey (a bare {@code shape} probe), so manifests falls back to a temp dir.
    */
-  private record Resolved(String stagingRoot, String soil, String liveRoot, Path worktreeRoot) {
+  private record Resolved(
+      String stagingRoot,
+      String soil,
+      String liveRoot,
+      Path worktreeRoot,
+      Path runtimeCloudConfigRoot,
+      Path cloudSeedRoot,
+      Path secretsFile) {
 
-    static final Resolved UNAMENDED = new Resolved("", "", "", Path.of(""));
+    static final Resolved UNAMENDED =
+        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), Path.of(""));
 
     static Resolved from(Worktree worktree, Cellar cellar, Parcel parcel) {
       if (worktree.worktreeRoot().isBlank()) {
@@ -283,7 +308,13 @@ public class IncusProvisionScenario
       final Path slot = new HostSlotSelector(local.clusterNodeRoot(), cellar, parcel).nextStaging();
       final BootstrapPaths staging = local.asStagingView(slot);
       return new Resolved(
-          slot.toString(), staging.manifestsRoot().toString(), local.liveRoot().toString(), root);
+          slot.toString(),
+          staging.manifestsRoot().toString(),
+          local.liveRoot().toString(),
+          root,
+          staging.runtimeCloudConfigRoot(),
+          staging.cloudSeedRoot(),
+          staging.secretsFile());
     }
 
     boolean isAmended() {
@@ -411,6 +442,44 @@ public class IncusProvisionScenario
       // recorded here: the consult sink is for probe symptoms (build/reachability), not for the
       // sub-scenario's own outcome — a manifests failure surfaces as the sow throwing.
       broker.sow(new RunbookCoordinate("manifests"), cellar, amended);
+      return self();
+    }
+
+    /**
+     * Unwrap the synthesised {@code cloud-config} ConfigMap into the NoCloud seed the instance
+     * reads at first boot (§ provisioning-slice delta #2) — a WHEN because it FABRICATES material,
+     * like the manifests synthesis it follows. The manifests sub-sow materialised the ConfigMap
+     * under the staging slot's {@code runtime/cloud-config}; {@link NocloudSeedWriter} strips the
+     * envelope and writes {@code user-data}/{@code meta-data}/{@code network-config} into the
+     * slot's {@code cloud.d}, so it lands BEFORE {@code the_staging_is_published} checksums the
+     * tree. NOT gated: a pure FS materialisation into the staging slot, inert against the live
+     * instance (like the manifests synthesis) — only the promotion into {@code host.live.d} is
+     * gated. Skipped for an unamended survey (no slot materialised).
+     */
+    public When the_nocloud_seed_is_unwrapped(@Hidden Resolved resolved) {
+      if (!resolved.isAmended()) {
+        return self();
+      }
+      new NocloudSeedWriter().unwrap(resolved.runtimeCloudConfigRoot(), resolved.cloudSeedRoot());
+      return self();
+    }
+
+    /**
+     * Upsert the gh/flox launch tokens into the worktree's {@code .secrets} (§ provisioning-slice
+     * delta #10) — a WHEN because it FABRICATES material (a file materialisation), BEFORE the
+     * {@code worktree.dir} mount binds it into the instance. {@link LaunchSecretsWriter} resolves
+     * each token from the environment first, else the {@link AuthTokenContact} edge. GATED on
+     * {@code cultivating}: the contact shells {@code gh}/{@code flox} (an edge effect), so a closed
+     * gate touches no CLI and leaves the file untouched — the plan renders PENDING via E9, the same
+     * deferral the image build makes. Skipped for an unamended survey (no worktree {@code .secrets}
+     * to upsert).
+     */
+    public When the_secrets_are_written(
+        @Hidden Resolved resolved, @Hidden Optional<AuthTokenContact> authToken) {
+      if (!resolved.isAmended() || !cultivating) {
+        return self();
+      }
+      new LaunchSecretsWriter(authToken).ensureTokensPresent(resolved.secretsFile());
       return self();
     }
 
