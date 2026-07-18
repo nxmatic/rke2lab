@@ -31,6 +31,9 @@
     <jspecify.version>1.0.0</jspecify.version>
     <checker-qual.version>4.2.1</checker-qual.version>
     <gson.version>2.14.0</gson.version>
+    <!-- guava-bom version — see the dependencyManagement import below for the transitive-conflict
+         rationale (pulumi 32.1.2 vs jGiven 33.4.8). -->
+    <guava.version>33.5.0-jre</guava.version>
     <java-bbox-api-client.version>0.2.1</java-bbox-api-client.version>
     <jackson.version>2.22.0</jackson.version>
     <asm.version>9.10.1</asm.version>
@@ -180,6 +183,19 @@
         <artifactId>gson</artifactId>
         <version>${gson.version}</version>
       </dependency>
+      <!-- guava via its BOM — one version for guava / failureaccess / listenablefuture at once (the
+           jackson-bom pattern). Resolves the transitive-conflict: com.pulumi 1.30 pulls 32.1.2-jre
+           (nearest the root), jGiven 2.0.3 pulls 33.4.8-jre; jgiven-wrap is COMPILED against 33.4.8
+           so its bundle imports com.google.common.*;version="[33.4,34)", unsatisfiable by a staged
+           32.1.2. guava is strongly backward-compatible (33.x ⊃ 32.x), so pinning the latest -jre
+           satisfies both realms — pulumi flat and the jgiven-wrap bundle. -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-bom</artifactId>
+        <version>${guava.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- The Bbox router client the bbox-edge embeds (translated home↔library, no type crosses the
            seam). An external artifact, so its version belongs here in the third-party catalogue. -->
       <dependency>
@@ -193,16 +209,15 @@
         <version>${jgit.version}</version>
       </dependency>
       <!-- ACT of the host-tree reconcile: jsync syncs a staging into host.live.d (setDelete + a
-           .flox exclude). Nu manifest (no BSN) → embedded in incus-core's Bundle-ClassPath. -->
+           .flox exclude). Nu manifest (no BSN) → embedded in incus-core's Bundle-ClassPath. Via the
+           fizzed:jsync aggregator POM — no dedicated -bom, but the aggregator carries a real
+           dependencyManagement for jsync-engine + jsync-vfs, so it imports like a BOM. -->
       <dependency>
         <groupId>com.fizzed</groupId>
-        <artifactId>jsync-engine</artifactId>
+        <artifactId>jsync</artifactId>
         <version>${jsync.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fizzed</groupId>
-        <artifactId>jsync-vfs</artifactId>
-        <version>${jsync.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>software.constructs</groupId>
@@ -247,16 +262,14 @@
       <!-- victools JSON-Schema generator (Draft 2020-12): the RecordSchemaProjector's engine — the
            amont projection of a wire-record's shape. The generator core + its jackson module (nested
            records, enum-slug, Optional → non-required); wrapped as an OSGi bundle in victools-wrap
-           (both jars ship without a Bundle-SymbolicName). -->
+           (both jars ship without a Bundle-SymbolicName). Via its BOM — one version for the generator
+           + every module (the jackson-bom pattern). -->
       <dependency>
         <groupId>com.github.victools</groupId>
-        <artifactId>jsonschema-generator</artifactId>
+        <artifactId>jsonschema-generator-bom</artifactId>
         <version>${victools.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.victools</groupId>
-        <artifactId>jsonschema-module-jackson</artifactId>
-        <version>${victools.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <!-- java-diff-utils: the OBSERVE brick of the host-tree grow (I6c) — line-level unified diffs
            for the text files of the two deltas (change / drift). A HOST-classpath dep (the grow is

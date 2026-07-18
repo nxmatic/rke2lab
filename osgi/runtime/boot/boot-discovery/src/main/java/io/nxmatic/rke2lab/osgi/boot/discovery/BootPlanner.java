@@ -159,6 +159,23 @@ public final class BootPlanner {
     for (BundleManifest manifest : manifests) {
       exports.addAll(manifest.imports().asSystemExports());
     }
+    // The runtime-machinery seam. A domain bundle's imports feed the derive above; the launcher
+    // machinery (boot.discovery, the scenario-engine base package) is FLAT — Private-Package, held
+    // on the host classpath, never a bundle — yet it is imported by an installed non-model bundle
+    // (scenario-engine, type=runtime), whose imports the model loop never visits. So mirror every
+    // installed bundle's OURS imports too, keeping only what NO installed bundle exports (a package
+    // some bundle provides is wired bundle-to-bundle, not system-exported). The two guards below do
+    // the rest: the leak guard rejects a domain package whose bundle is absent (a seam stays), and
+    // hostResolves drops anything not actually flat. This is the seam treatment seed.broker.port
+    // gets for free (a model imports it) extended to the launcher's own flat packages.
+    for (Installable installable : stack) {
+      for (Clause imported : discovery.manifestOf(installable.location()).imports().clauses()) {
+        if (imported.name().startsWith("io.nxmatic.rke2lab")
+            && !installedExportedPackages.contains(imported.name())) {
+          exports.add(imported.asExportClause());
+        }
+      }
+    }
     // A package an installed bundle exports is provided bundle-to-bundle inside the framework —
     // re-exporting it from the system bundle would split the class. This covers domain bundles
     // (their own exports) AND staged realm libraries (jackson): the same rule, one source.

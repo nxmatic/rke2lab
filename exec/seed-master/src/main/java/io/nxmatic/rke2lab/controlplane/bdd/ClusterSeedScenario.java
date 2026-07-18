@@ -10,6 +10,7 @@ import com.tngtech.jgiven.annotation.NestedSteps;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import com.tngtech.jgiven.annotation.ScenarioState;
+import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -195,8 +196,15 @@ public class ClusterSeedScenario
     @ProvidedScenarioState PulumiCellar cellarRealisation;
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
-    @ProvidedScenarioState JsonNode worktreeScalars;
-    @ProvidedScenarioState JsonNode imageScalars;
+
+    // Two JsonNode subtrees in one stage: jGiven shares state BY TYPE by default, so name-resolve
+    // both to avoid an AmbiguousResolutionException (the When picks each back by field name).
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    JsonNode worktreeScalars;
+
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    JsonNode imageScalars;
+
     // The run's provisioning config — the host GROW derives the instance mounts from it (via the
     // dual-realm BootstrapPaths) and builds the provider context from it.
     @ProvidedScenarioState BootstrapConfig config;
@@ -282,8 +290,15 @@ public class ClusterSeedScenario
     @ScenarioState PulumiCellar cellarRealisation;
     @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
-    @ScenarioState JsonNode worktreeScalars;
-    @ScenarioState JsonNode imageScalars;
+
+    // Name-resolved on both sides of the crossing: two JsonNode subtrees share the same TYPE, so
+    // jGiven must pick each by field name here as it did in the Given (else AmbiguousResolution).
+    @ScenarioState(resolution = ScenarioState.Resolution.NAME)
+    JsonNode worktreeScalars;
+
+    @ScenarioState(resolution = ScenarioState.Resolution.NAME)
+    JsonNode imageScalars;
+
     @ScenarioState BootstrapConfig config;
 
     // Decodes the InstanceGrowPlan envelope the GROW fetches — the host's flat copy of the codec

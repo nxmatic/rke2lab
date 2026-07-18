@@ -95,6 +95,21 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
+    <!-- jGiven-in-OSGi, dual-realm. jGiven runs in BOTH realms: FLAT (shaded into the uber-jar) for
+         the host ROOT scenario, and as a BUNDLE in-framework for the in-container scions — scenario-
+         engine's exported .container package hard-imports com.tngtech.jgiven.junit5 (the @SeedScenario
+         socle's JGivenExtension), so the bundle must resolve it in-framework or every scion fails to
+         wire (the live-boot gap the in-container testkit hides by calling installBundles(WRAP_BSN)).
+         Declaring the wrap DIRECTLY here is the realm-library signal (StagingClosure.isRealmLibrary):
+         a directly-declared third-party bundle is staged as a bundle AND kept host-flat — exactly
+         gson's treatment. runtime scope: the host names no jGiven type of its own; the raw jgiven-core
+         /jgiven-junit5 jars (pulled compile for the flat root) stay flat, the wrap carries the OSGi
+         headers the bundle realm needs. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>jgiven-wrap</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
          flattened into the uber-jar (excluded from the shade). runtime scope MACHINE-ENFORCES path
          2: seed-master's main + tests compile only against -port + OsgiRuntime, never against a
@@ -278,6 +293,18 @@
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
+    <!-- junit-jupiter-params staged as a bundle (runtime scope): jgiven-junit5 references
+         org.junit.jupiter.params.{aggregator,provider,support} in its bytecode, so the jgiven-wrap
+         bundle imports them MANDATORY — and no other staged bundle exports them (api + engine do
+         not). We never run a @ParameterizedTest, but the import must still resolve in-framework or
+         jgiven-wrap fails, cascading to scenario-engine + seed-bdd. The in-container testkit serves
+         these flat via systemPackages; the live boot has no such list, so we stage the params bundle
+         to satisfy the wire bundle-to-bundle. runtime scope: seed-master names no params type. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
