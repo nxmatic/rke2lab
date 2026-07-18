@@ -631,6 +631,50 @@ The host never names `*BddScenarios` nor a `*Coordinate` enum — only the found
 string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
 verdict.
 
+[[the-scenario-outcome-channel]]
+==== How the played model comes back — the `ScenarioOutcome` channel, not a static holder (2026-07-18)
+
+The handler plays the scenario on `JUnitLauncherCore`, then must reap what the run produced — the
+jGiven `ReportModel` (the runbook) and, for a fork-B scenario, the doctor consultations it raised. That
+reap crosses a THREAD boundary: the launcher runs the scenario on a dedicated host-bound worker
+(§ the three OSGi crossings), and the JUnit engine INSTANTIATES the scenario itself, so neither the
+handler nor the front-door holds a reference to the played instance to read its fields.
+
+*The wrong shape it replaces.* Each scenario used to expose its outputs through a pair of `static
+AtomicReference` holders — `LAST_RUNBOOK` set at the end of the `@Test`, `LAST_CONSULTATIONS` beside
+it — that the front-door read after `launcher.execute`. A cross-membrane static is fragile, and this
+one actively MASKED failures: when a scenario threw before reaching the `LAST_RUNBOOK.set(...)` line,
+the front-door's `lastRunbook()` NPE'd on the empty holder, hiding the real cause under a "no runbook"
+error.
+
+*The channel.* The runbook comes back the SAME way the transaction context goes IN (§ the three
+neutral channels): through the launcher session store, the launcher's designed cross-thread channel.
+`ScenarioOutcome(ReportModel runbook, List<SeedEnvelope> consultations)` is seeded by
+`ScenarioOutcomeExtension` (on `@SeedScenario`, so every scenario wears it) and read back by the
+front-door via `ScenarioOutcomeSeed`. The store hop stays IN-REALM — the extension writes and the
+harvest reads on the same worker thread, same session, same loader — so the live `ReportModel` is
+carried as an object; only the front-door's later `ScenarioJsonWriter` serialisation crosses
+scion→host (the realm membrane), exactly as before.
+
+*Harvest-on-failure — the `ReportModel` IS the fail-at-end collector.* The extension reaps the model
+in `afterTestExecution`, which fires EVEN when the body failed. jGiven defers a failed step's throw to
+scenario-end (a not-ready phase marks its step FAILED and skips the downstream chain, but the `@Test`
+still completes), so a FAILED runbook is COMPLETE — every step recorded — and, for fork-B, the
+`consultOn*` computation still ran. The masking NPE is structurally impossible now: the runbook is
+always seeded. This is why the former `failFast` harvest decorator is DELETED — the front-doors
+harvest the FAILED outcome uniformly, and the host driver (`Main`) renders the diagnostic runbook
+THEN inspects `getScenariosWithStatus(FAILED, ABORTED)` to fail the Pulumi run: render-then-verify,
+never throw-instead-of-render.
+
+* *`ConsultationSource`* — the pull twin of `CellarReceiver`. A fork-B scenario (bbox · cluster ·
+  incus-provision · systemd) consults its own doctor and HOLDS the returned envelopes in a field; the
+  extension PULLS them (`consultations()`) at the boundary. The other three (root, incus-reconcile,
+  manifests) consult no one and do not implement it — the outcome carries an empty list. No push sink,
+  no static — the value is read after the body, so a refused row's consultation survives the FAILED
+  runbook.
+* *`RunbookEnvelope`* — the reap the front-door serialises (runbook JSON + consultations) is still one
+  record per domain today; unifying it is the front-door dedup (whiteboarded, § planned evolution).
+
 [[the-broker-closes-the-host-osgi-gap]]
 === The broker closes the HOST↔OSGi gap; in-container, a scion resolves by lookup
 
@@ -661,6 +705,39 @@ Everything a scion needs while playing is a lookup. The earlier temptation to ro
 through the broker was rejected: it is not a host↔OSGi crossing (it is scion→scion, in-container), so
 it stays the service verb it always was — consistent with `consult` STAYING a verb (§ the principle
 above), not becoming a handler.
+
+[[the-osgi-service-bridge]]
+==== The lookup is PUSH-injected, not hand-pulled — the `@OsgiService` bridge (2026-07-18)
+
+"A scion resolves all its collaborators by lookup" was, at first, a hand-written PULL: every scion
+carried a byte-identical triad — `ScenarioRegistry.of(this).require(BboxReconciler.class, "…")`,
+`.require(RunGate.class, …)`, `.optional(ConsultingService.class)` — one `resolve*` helper per
+collaborator, repeated across all six scions. A service-locator, forced because a scenario is
+instantiated by the JUnit engine, NOT by SCR: it cannot carry a DS `@Reference`, so SCR never sees it
+to inject.
+
+The bridge closes that gap the DS way, but from the jGiven side: `@OsgiService` marks a scenario
+field the `OsgiServiceExtension` (a `TestInstancePostProcessor` on `@SeedScenario`, the twin of the
+inbound `ScenarioInputSeed`) INJECTS before the GIVEN, resolving through the same `ScenarioRegistry`
+underneath. The scenario now DECLARES its collaborators as fields; the extension fills them. It is the
+`@Reference` a Jupiter-instantiated scenario cannot have — the push the engine owns.
+
+* *Uniform `Optional<T>` — the bridge OWNS presence.* Every `@OsgiService` field is an `Optional<T>`,
+  initialised to `Optional.empty()`, so NO field is ever null (the null-hygiene discipline holds
+  without a `@MonotonicNonNull` guard or a hand-written getter). The field SHAPE is uniform; what
+  varies is one attribute.
+* *`await` drives resolution, not the field shape.* `@OsgiService` (default `await = true`, the DS
+  `@Reference` norm) AWAITS SCR — `require()`, up to the registry timeout — because a delayed DS
+  component publishes its service ASYNC to `bundle.start()` (the SCR race a bare `getServiceReference`
+  loses); the bridge throws if it never appears, so a required field's `orElseThrow` at the use site
+  never fires. `await = false` takes an immediate SNAPSHOT (`optional()`) — the doctor, the
+  auth-token edge, empty when a world booted without it. The body unwraps required with `orElseThrow`,
+  optional with `map`/`ifPresent`.
+
+Nothing about the RESOLUTION changed — it is still the registry lookup this section describes, still
+scion-local, still identical live and in test (only who published the service differs: the live edge,
+or a mock the `-bdd-test` registers). What changed is the DIRECTION at the field: pull → push, so the
+`resolve*` triad is gone and the scenario reads as a declaration.
 
 == OSGi holds the authority; the host transports (the asymmetry)
 

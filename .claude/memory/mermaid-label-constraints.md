@@ -21,6 +21,11 @@ the whole diagram fails.
 + **Never use a Mermaid reserved word as a node ID** — `graph`, `end`, `style`, `class`, `subgraph`,
   `flowchart`. `graph["…"]` breaks the parse (it reads `graph` as the diagram-type keyword expecting
   `graph LR`). Rename the node (`pgraph`, `theGraph`). Caught 2026-07-14 on the cellar whiteboard.
++ **Never put angle-brackets `<...>` in ANY label** — a Java generic like `Consumer<Store>` in a
+  sequenceDiagram message (or any node/edge label) is read as an HTML tag and 400s the render (pptr.dev
+  "Error 400"). Caught 2026-07-18 on the runbook-handler whiteboard. Drop the type parameter (`seed
+  Consumer`) or say it in prose. Same class: sequenceDiagram message text also rejects `()` and `:` —
+  write `handle cellar, trigger`, not `handle(cellar, trigger)`. Keep message labels plain words.
 
 **How to apply:** when authoring/editing any Mermaid block, grep the diff for `\"` before saving — a
 nested escaped quote is the classic breaker. Prefer apostrophes for inner quoting. See

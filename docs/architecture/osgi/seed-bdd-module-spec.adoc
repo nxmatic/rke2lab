@@ -217,6 +217,35 @@ global `isDryRun()` in the GIVEN would couple the scenario to the `com.pulumi` g
 former `HostSeeder`: it carries ONE value and sets it — no executor swap, no model injection, no report
 toggle, no probe fan-out. The channel, minus the machinery.
 
+=== The scion twin — `ScenarioInputSeed`, the same channel one realm deeper (2026-07-18)
+
+`SessionSeed` bootstraps the HOST ROOT, host-flat, from `Main`. Two scions — manifests and
+incus-provision — need the same shape one realm deeper: their `*RunbookHandler` (in-container) must
+hand the played scenario an ACTIVATION INPUT decoded off the trigger (the operator's `ManifestsRunbookInput`
+facet, the `IncusRunbookInput` carrying the `@Amendment(SOIL)`). The other four scions ignore their
+trigger, so they take no input.
+
+*Why not `SessionSeed` itself.* `SessionSeed` lives in `seed-bdd`'s base package, which is NOT
+exported (§ placement — the graft half stays host-flat, never wired in-container); a scion bundle
+cannot import it. So the scion twin lives in the exported `scenario-engine` `.container` package the
+scions already depend on: `ScenarioInputSeed<T>` (a generic `TestInstancePostProcessor`, keyed +
+typed like `SessionSeed`) + `InputReceiver<T>` (the receiver the scenario implements). The front-door
+seeds `INPUT.into(input)` onto the launcher session store; the post-processor reads it and sets the
+field before the GIVEN — the exact `SessionSeed` mechanism, one realm deeper.
+
+*What it replaced.* The two input-bearing scenarios used a `static AtomicReference INPUT` + a
+`seedInput(...)` setter the front-door called before `selectClass` — the inbound counterpart of the
+`LAST_RUNBOOK` static (§ seed-broker-spec, the ScenarioOutcome channel). Same cross-membrane-static
+fragility, same fix: a typed session-store channel. The value is carried as a LIVE object (no codec) —
+the hop is in-realm (front-door and scenario share the bundle loader, the very property the former
+"same-loader static" relied on), so nothing crosses the dual-realm membrane.
+
+The three receivers a scion may wear are now uniform siblings, each a field set before the GIVEN by
+its own extension: `InputReceiver` (the activation input, this §), `CellarReceiver` (the transactional
+cellar, § seed-broker cellar-transactional), and the `@OsgiService` fields (the registry
+collaborators, § seed-broker the OSGi-service bridge) — plus `ConsultationSource`, the one PULL twin,
+read OUT after the body.
+
 == Related documentation
 
 * link:gardening-model-spec.adoc[The gardening model] — the roles the stages speak.
