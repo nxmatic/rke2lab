@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
@@ -19,15 +17,15 @@ import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
-import java.io.File;
 import java.net.URI;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -43,15 +41,19 @@ import org.osgi.framework.ServiceRegistration;
  * The in-container proof of the bbox scion, run WHERE the scenario lives (this passenger shares the
  * bbox-bdd host loader through the fragment). It registers the scion's collaborators — a mock
  * {@link BboxReconciler} and a mock {@link RunGate} (and, for the refusal case, a mock {@link
- * ConsultingService}) — into the SAME registry the scenario resolves from, then plays {@link
- * BboxBddScenarios#run()} (the production front-door) and asserts on the harvested envelope.
+ * ConsultingService}) — into the SAME registry the scenario resolves from, then plays it
+ * in-container through {@link ScenarioPlayer} (the shared play recipe the production {@code
+ * GenericRunbookHandler} also drives) and asserts on the harvested {@link ScenarioOutcome}.
  *
  * <p>No seam, no system-export: because the fragment shares the bundle's classloader, the mock this
  * passenger registers is the same {@code Class} the scenario reads (unlike the out-of-container
  * shape, which registers on the host loader and needs the port system-exported). It is the {@code
  * HealthSystemContributionTest} shape — register in-container, then act, one method — applied to a
- * front-door play. Registrations are unregistered in a {@code finally} because the framework is
- * shared across the passenger's tests (an oldest-wins ranking tie would otherwise leak a mock).
+ * scenario play. Because the play, the harvest, and this assertion all sit on the same in-container
+ * worker, it reads the LIVE outcome — the jGiven {@code ReportModel} as an object, no JSON
+ * round-trip (that serialisation is the host-crossing handler's concern). Registrations are
+ * unregistered in a {@code finally} because the framework is shared across the passenger's tests
+ * (an oldest-wins ranking tie would otherwise leak a mock).
  */
 public class BboxReconciliationScenarioInContainerTest {
 
@@ -66,25 +68,24 @@ public class BboxReconciliationScenarioInContainerTest {
   @Test
   void a_live_run_reconciles_every_row_green() throws Exception {
     // cultivating() true → the scion asks for a live apply; the mock reconciler matches every row.
-    final String envelope =
+    final ScenarioOutcome outcome =
         playWith(cultivatingGate(true), allMatching(), null, new RecordingCellar());
-    final ReportModel runbook = rebuild(envelope);
+    final ReportModel runbook = outcome.runbook();
 
-    assertNotNull(runbook, "the front-door harvested the played model");
+    assertNotNull(runbook, "the player harvested the played model");
     assertEquals(1, runbook.getScenarios().size(), "one scenario played");
     assertEquals(
         ExecutionStatus.SUCCESS,
         runbook.getScenarios().get(0).getExecutionStatus(),
         "every desired row reconciled → the scenario plays green");
     assertTrue(
-        consultationsOf(envelope).isEmpty(), "a healthy run refused no row, so it consults no one");
+        outcome.consultations().isEmpty(), "a healthy run refused no row, so it consults no one");
 
     // The reversal, proven: the SCION harvested AND stored itself. The store is a cellar-entry on
     // the played model (the scion is a fragment; the host root drains at the boundary), read back
-    // through the cellar's OWN generic API — a ScenarioCellar over the rebuilt model with an empty
+    // through the cellar's OWN generic API — a ScenarioCellar over the LIVE model with an empty
     // durable side, so fetch returns the run's own write (read-your-writes). At the
-    // bbox-reservations
-    // coordinate, carrying the folded summary (12 MATCHING rows).
+    // bbox-reservations coordinate, carrying the folded summary (12 MATCHING rows).
     final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, RecordingCellar::new, "");
     final BboxHarvest summary =
         cellar
@@ -101,50 +102,50 @@ public class BboxReconciliationScenarioInContainerTest {
     // with and returns WOULD_* outcomes (the router is never mutated). The recorder proves the
     // SCION consulted the gate (A2) and passed the dry-run down.
     final RecordingReconciler reconciler = wouldCreate();
-    final String envelope =
+    final ScenarioOutcome outcome =
         playWith(cultivatingGate(false), reconciler, null, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.SUCCESS,
-        rebuild(envelope).getScenarios().get(0).getExecutionStatus(),
+        outcome.runbook().getScenarios().get(0).getExecutionStatus(),
         "a dry-run that would create every row still reconciles cleanly (no FAILED row)");
     assertTrue(reconciler.lastDryRun, "the scion consulted the RunGate and asked for a dry-run");
     assertTrue(
-        consultationsOf(envelope).isEmpty(),
-        "WOULD_CREATE is not a refusal, so it consults no one");
+        outcome.consultations().isEmpty(), "WOULD_CREATE is not a refusal, so it consults no one");
   }
 
   @Test
   void a_refused_row_makes_the_domain_consult_the_doctor_itself() throws Exception {
     // A FAILED row is a symptom; the scion resolves the doctor from its OWN registry and consults —
-    // the consultation rides the envelope back, the host no longer computes it (fork B).
+    // the consultation rides the outcome back, the host no longer computes it (fork B).
     final RecordingDoctor doctor = new RecordingDoctor();
-    final String envelope =
+    final ScenarioOutcome outcome =
         playWith(cultivatingGate(true), oneRefused(), doctor, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.FAILED,
-        rebuild(envelope).getScenarios().get(0).getExecutionStatus(),
+        outcome.runbook().getScenarios().get(0).getExecutionStatus(),
         "a refused reservation row fails the checkpoint (the row is surfaced, not dropped)");
     assertEquals(1, doctor.consultedCheckpoints.size(), "the domain consulted the doctor once");
     assertTrue(
         doctor.consultedCheckpoints.get(0).contains("reservation-refused"),
         "the consult carries the typed symptom the doctor routes on (to the NETWORK domain)");
 
-    final List<JsonNode> consultations = consultationsOf(envelope);
-    assertEquals(1, consultations.size(), "the consultation rides the envelope back to the host");
+    final List<SeedEnvelope> consultations = outcome.consultations();
+    assertEquals(1, consultations.size(), "the consultation rides the outcome back to the host");
     assertEquals(
         "bbox-reservations",
-        CODEC.decode(consultations.get(0).path("payload").asText()).path("scenarioId").asText(),
+        CODEC.decode(consultations.get(0).payload()).path("scenarioId").asText(),
         "the consultation names the checkpoint the host joins on");
   }
 
   /**
    * Register the mock collaborators into THIS bundle's registry, play the scenario in-container
-   * through the front-door, and return its serialized envelope. Registrations are removed in the
-   * {@code finally} so each test plays against exactly its own mocks.
+   * through the shared {@link ScenarioPlayer}, and return its live {@link ScenarioOutcome}.
+   * Registrations are removed in the {@code finally} so each test plays against exactly its own
+   * mocks.
    */
-  private static String playWith(
+  private static ScenarioOutcome playWith(
       RunGate gate, BboxReconciler reconciler, ConsultingService doctor, Cellar cellar)
       throws Exception {
     final BundleContext context = FrameworkUtil.getBundle(BboxBddTests.class).getBundleContext();
@@ -160,31 +161,10 @@ public class BboxReconciliationScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return BboxBddScenarios.run(Optional.empty(), List.of());
+      return new ScenarioPlayer().play(BboxReconciliationScenario.class, store -> {});
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
-  }
-
-  /** The consultations the run raised, read off the envelope with the host's own codec. */
-  private static List<JsonNode> consultationsOf(String envelopeJson) {
-    final List<JsonNode> consultations = new ArrayList<>();
-    CODEC.decode(envelopeJson).path("consultations").forEach(consultations::add);
-    return consultations;
-  }
-
-  /**
-   * Rebuild a host-realm {@link ReportModel} from the front-door's serialized envelope: read the
-   * {@code runbook} field with the host's own jackson, then round it through {@link
-   * ScenarioJsonReader} into a model of THIS realm. No jGiven type crosses live — the envelope is
-   * flat JSON.
-   */
-  private static ReportModel rebuild(String envelopeJson) throws Exception {
-    final String runbookJson = CODEC.decode(envelopeJson).path("runbook").asText();
-    final File tmp = Files.createTempFile("bbox-reconciliation-runbook", ".json").toFile();
-    tmp.deleteOnExit();
-    Files.writeString(tmp.toPath(), runbookJson);
-    return new ScenarioJsonReader().apply(tmp);
   }
 
   /** A RunGate the test pins to a chosen cultivating value. */

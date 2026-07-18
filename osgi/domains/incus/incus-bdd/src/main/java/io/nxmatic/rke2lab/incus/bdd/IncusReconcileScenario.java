@@ -19,6 +19,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -57,7 +58,7 @@ import org.junit.jupiter.api.Test;
 public class IncusReconcileScenario
     extends ScenarioTestBase<
         IncusReconcileScenario.Given, IncusReconcileScenario.When, IncusReconcileScenario.Then>
-    implements CellarReceiver<ScenarioCellar> {
+    implements CellarReceiver<ScenarioCellar>, ScenarioPlayer.Playable {
 
   private static final String NODE = "bioskop-master";
 

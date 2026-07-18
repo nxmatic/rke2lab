@@ -38,6 +38,13 @@
       <groupId>org.junit.platform</groupId>
       <artifactId>junit-platform-engine</artifactId>
     </dependency>
+    <!-- The Jupiter engine ScenarioPlayer names (JupiterTestEngine.class) so bnd wires the engine
+         bundle into whoever plays a scenario. The launcher machinery lives here now, so a domain
+         no longer carries this dep just to feed a front-door; the engine owns it. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
     <!-- jGiven — the runbook model a pipeline yields (ReportModel); a compile dep since a runtime
          pipeline played on this engine is a jGiven scenario. Not referenced by the src/main
          machinery yet (bnd computes no import for it until a class touches it), so it stays off the

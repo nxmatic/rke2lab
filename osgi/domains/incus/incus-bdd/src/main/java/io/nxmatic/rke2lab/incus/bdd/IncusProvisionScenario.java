@@ -43,6 +43,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
@@ -97,16 +98,17 @@ public class IncusProvisionScenario
         IncusProvisionScenario.Given, IncusProvisionScenario.When, IncusProvisionScenario.Then>
     implements CellarReceiver<ScenarioCellar>,
         InputReceiver<IncusRunbookInput>,
-        ConsultationSource {
+        ConsultationSource,
+        ScenarioPlayer.Playable {
 
   private static final String NODE = "bioskop-master";
 
   /**
-   * The inbound channel the front-door ({@code IncusBddScenarios.run}) seeds the {@link
+   * The inbound channel the runbook handler ({@code IncusRunbookHandler.seedFrom}) seeds the {@link
    * IncusRunbookInput} through and this scenario receives it from (via {@link InputReceiver}). It
-   * is single-sourced here — the receiver owns the key + type — and referenced by the front-door
-   * for the seeding end ({@code INPUT.into(input)}). Registered as a {@link RegisterExtension} so
-   * its {@code TestInstancePostProcessor} fires before the body reads {@link #input}, the way the
+   * is single-sourced here — the receiver owns the key + type — and referenced by the handler for
+   * the seeding end ({@code INPUT.into(input)}). Registered as a {@link RegisterExtension} so its
+   * {@code TestInstancePostProcessor} fires before the body reads {@link #input}, the way the
    * root's {@code SessionSeed} does.
    */
   @RegisterExtension

@@ -193,8 +193,9 @@ wire-record) is pending**:
 * *Piece 2 — pending.* No wire-record describes a runbook *input* yet: the trigger
   has always been `"{}"`, so there is nothing to project a schema FROM, and no
   domain contributes a `@Component SeedHandler` serving `new ShapeCoordinate(domain)`.
-  `RunbookEnvelope` (the reap/output) is duplicated per domain `*BddScenarios`, none
-  `@SeedContract`-annotated. Piece 2 lands with the manifests scion (a
+  `RunbookEnvelope` (the reap/output) is now ONE record in the engine (§ one generic handler,
+  a strategy per domain — the front-door dedup landed), not `@SeedContract`-annotated. Piece 2
+  lands with the manifests scion (a
   `@SeedContract("runbook")` input record + a `ManifestsShapeReflector` driving the
   projector). The `SCHEMA_CONCORD` build-time gate remains a spec-only name.
 
@@ -611,12 +612,15 @@ soil NAME (a `String`), routed by `equals`, so the host names no domain type.
   the play-scenario verb: two equal records route to the same handler, the seam names nothing a domain
   owns.
 * *the handler* — each scion domain contributes a `@Component SeedHandler` serving `new
-  RunbookCoordinate(itsDomain)`, whose `handle(trigger)` plays its OWN scenario in-container through
-  the front-door (`*BddScenarios.run()`, called from INSIDE the domain bundle — same loader,
-  legitimate) and returns the serialized `RunbookEnvelope` sealed in a `SeedEnvelope`.
+  RunbookCoordinate(itsDomain)`, whose `handle(trigger)` plays its OWN scenario in-container (on the
+  scenario class's own bundle loader — same loader, legitimate) and returns the serialized
+  `RunbookEnvelope` sealed in a `SeedEnvelope`. The handler is now a thin `ScenarioStrategy` over a
+  generic body (§ one generic handler, a strategy per domain) — it names only its coordinate, its
+  scenario class, and (for an input-bearing scion) how to decode the trigger; the play recipe lives
+  once in the engine.
 
-The reflection does not vanish — it MOVES INTO the domain, where the front-door invoking its own
-scenario on its own loader is ordinary. The host is left with one door and a soil name:
+The reflection does not vanish — it MOVES INTO the domain, where selecting its own scenario class on
+its own loader is ordinary. The host is left with one door and a soil name:
 
 [listing]
 ----
@@ -672,8 +676,91 @@ never throw-instead-of-render.
   manifests) consult no one and do not implement it — the outcome carries an empty list. No push sink,
   no static — the value is read after the body, so a refused row's consultation survives the FAILED
   runbook.
-* *`RunbookEnvelope`* — the reap the front-door serialises (runbook JSON + consultations) is still one
-  record per domain today; unifying it is the front-door dedup (whiteboarded, § planned evolution).
+* *`RunbookEnvelope`* — the reap the handler serialises (runbook JSON + consultations) is ONE record
+  in the engine's `.container` package (§ one generic handler, a strategy per domain), no longer
+  duplicated per domain.
+
+[[one-generic-handler-a-strategy-per-domain]]
+==== One generic handler, a strategy per domain — the front-door dedup (2026-07-18)
+
+The shape above left TWO artefacts per domain, near-identical: the `@Component *RunbookHandler`
+(cast the cellar, relay the transaction, wrap `InterruptedException`) and a static `*BddScenarios`
+front-door (build a `JUnitLauncherCore`, `selectClass`, execute, harvest the `ScenarioOutcome`,
+encode a per-domain `RunbookEnvelope`). Five domains × ~115 lines, varying only on THREE axes: the
+coordinate, the scenario class, and whether an activation input is decoded from the trigger. The rest
+was copy-paste — the classic signal for a generic body parameterised by the variation.
+
+*The collapse.* The play recipe and the handler body move ONCE into the engine's exported
+`.container` package (its natural home — it already holds `SeedHandler`, `SeedCodec`,
+`TransactionalCellar`, the launcher, jGiven):
+
+* *`ScenarioPlayer`* — the shared play recipe: build the launcher, `selectClass` on the scenario
+  class's OWN loader, execute, read the `ScenarioOutcome` back off the session store. It names the
+  Jupiter engine (`JupiterTestEngine`) HERE, so the engine bundle owns the launcher machinery — a
+  domain no longer carries the `junit-jupiter-engine` dep just to feed a front-door. It returns the
+  LIVE `ScenarioOutcome` (the `ReportModel` as an object): the production caller serialises it for
+  the realm crossing, an in-container test keeps it live and asserts on the model directly (no JSON
+  round-trip — the round-trip was a per-domain `rebuild` the tests now shed).
+* *`ScenarioStrategy`* — the three axes a domain varies: `coordinate()`, `scenarioClass()` (bounded
+  to `ScenarioPlayer.Playable`, OUR marker every scenario implements — so the bound stays in our
+  vocabulary, not jGiven's `ScenarioTestBase`), and `seedFrom(trigger)`. The last FOLDS the input
+  fork: a no-input scion leaves the default no-op; an input-bearing scion (manifests,
+  incus-provision) overrides it to decode its typed input and route it through the scenario's
+  `ScenarioInputSeed` channel.
+* *`GenericRunbookHandler`* — `implements SeedHandler, ScenarioStrategy`, abstract. Its `final
+  handle()` is the one body: cast to `TransactionalCellar`, compose `seedFrom(trigger)` with the
+  `TxIdSeed` + `CellarEntriesSeed` relay, play through `ScenarioPlayer`, serialise the outcome to the
+  unified `RunbookEnvelope`.
+
+*Why the domain `@Component` IS the strategy (composition, not a separate injected strategy).* The
+scenario class is bundle-private (the founding rule: the host never names a `*BddScenarios` type), so
+the naming `@Component` MUST live in the domain bundle regardless. Folding the strategy onto it — the
+component `extends GenericRunbookHandler` and answers the three methods on itself — keeps the
+piece-count at one irreducible artefact per domain, now carrying ZERO logic, only the three data
+answers. There is no multi-strategy per domain, so no `@Reference`-injected strategy earns its keep.
+
+.C4 L4 Code (static) — the generic handler, parameterised by the domain @Component as its own strategy
+[mermaid]
+----
+classDiagram
+  class SeedHandler {
+    <<interface, seed-broker-port>>
+    +serves() SeedCoordinate
+    +handle(Cellar, SeedEnvelope) SeedEnvelope
+  }
+  class ScenarioStrategy {
+    <<interface, engine .container>>
+    +coordinate() RunbookCoordinate
+    +scenarioClass() Class
+    +seedFrom(SeedEnvelope) Consumer
+  }
+  class GenericRunbookHandler {
+    <<abstract, engine .container>>
+    +final serves() SeedCoordinate
+    +final handle(Cellar, SeedEnvelope) SeedEnvelope
+  }
+  class ScenarioPlayer {
+    <<engine .container>>
+    +play(Class, Consumer) ScenarioOutcome
+  }
+  class BboxRunbookHandler {
+    <<Component, bbox-bdd>>
+    +coordinate() RunbookCoordinate
+    +scenarioClass() Class
+  }
+  SeedHandler <|.. GenericRunbookHandler
+  ScenarioStrategy <|.. GenericRunbookHandler
+  GenericRunbookHandler <|-- BboxRunbookHandler
+  GenericRunbookHandler ..> ScenarioPlayer : plays through
+  note for BboxRunbookHandler "the @Component IS the strategy — the input fork is seedFrom, no-op by default"
+----
+
+*What it removed.* The five `*BddScenarios` front-doors (deleted), their five identical nested
+`RunbookEnvelope` records (unified to one), and the `junit-jupiter-engine` dep from the five `-bdd`
+poms (the engine owns it now, wired transitively + by the engine's optional bnd import). Each of the
+six `*RunbookHandler`s shrinks to ~5 lines of data. The in-container proofs (`*BddInContainerTest`)
+re-point from `XxxBddScenarios.run(...)` to `new ScenarioPlayer().play(...)`, reading the live
+outcome — the same recipe production uses, so the test exercises the real play path.
 
 [[the-broker-closes-the-host-osgi-gap]]
 === The broker closes the HOST↔OSGi gap; in-container, a scion resolves by lookup
@@ -1334,10 +1421,11 @@ turns; the debunked framings are recorded so they are not re-attempted:
 . *The root/fragment role comes from the LAUNCHER, not the type.* A given scenario is a FRAGMENT when
   sown by the host, a ROOT when played alone (`IncusProvisionScenario` in its own in-container test) — so
   the role is not a property of the type; whoever LAUNCHES knows it. A `RunRole` (ROOT|FRAGMENT) is seeded
-  into the launcher session store (the same channel as `SessionSeed`/`SeedRun`): `Main` and
-  `*BddScenarios.run` (isolated test) seed ROOT, the sow-graft seeds FRAGMENT — and the extension READS it
-  from the `ExtensionContext`. No inference, no realm test (`FrameworkUtil.getBundle` would read the REALM
-  and be blind to OSGi→OSGi nesting).
+  into the launcher session store (the same channel as `SessionSeed`/`SeedRun`): `Main` seeds ROOT, the
+  sow-graft seeds FRAGMENT — and the extension READS it from the `ExtensionContext`. An isolated
+  in-container test plays through `ScenarioPlayer.play` seeding no role, so it defaults to FRAGMENT (its
+  read-your-writes assertions read the model's own tags, role-independent). No inference, no realm test
+  (`FrameworkUtil.getBundle` would read the REALM and be blind to OSGi→OSGi nesting).
 . *`txId` = a UUID minted by the root — for AUDIT correlation (no longer the discriminant).* A
   globally-unique transaction id, stable across serialization (valid remote/P2P). Minted by the root
   (`UUID.randomUUID()`) and propagated to fragments by the sow's `Optional<String>` param. It no longer

@@ -3,22 +3,24 @@ package io.nxmatic.rke2lab.incus.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.incus.contract.HostLiveEntry;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry.Provenance;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,8 +38,8 @@ import org.osgi.framework.ServiceRegistration;
  * The in-container proof of the incus RECONCILE scion, the twin of {@link
  * IncusProvisionScenarioInContainerTest} — run WHERE the scenario lives (this passenger shares the
  * incus-bdd host loader through the fragment). It plays {@link IncusReconcileScenario} through the
- * production front-door ({@link IncusBddScenarios#runReconcile}) and asserts the three NATURES the
- * reconcile splits on:
+ * shared {@link ScenarioPlayer} (the recipe the production {@code GenericRunbookHandler} also
+ * drives) and asserts the three NATURES the reconcile splits on:
  *
  * <ul>
  *   <li>a LIVE FLIP — the run's staging differs from the pivot and the gate is open: the staging is
@@ -58,10 +60,11 @@ import org.osgi.framework.ServiceRegistration;
  * test can run). Reconcile is played as a FRAGMENT (the front-door seeds no {@code RunRole}), so
  * the extension never drains to a durable {@code OpaqueCellar} — the stub is a read side only.
  *
- * <p>The commit is read back like the provision twin: a {@link ScenarioCellar} over the rebuilt
- * model with an EMPTY durable side, so {@code fetch(host-live)} returns ONLY the run's own store
- * (the inherited source having been stripped before the graft, § seed-broker-spec) — present on a
- * real flip, empty on a no-op or preview.
+ * <p>The commit is read back like the provision twin: a {@link ScenarioCellar} over the LIVE model
+ * with an EMPTY durable side, so {@code fetch(host-live)} returns ONLY the run's own store (the
+ * inherited source having been stripped before the graft, § seed-broker-spec) — present on a real
+ * flip, empty on a no-op or preview. Reconcile is played on the same in-container worker, so the
+ * outcome's {@code ReportModel} is read live — no JSON round-trip.
  */
 public class IncusReconcileScenarioInContainerTest {
 
@@ -75,8 +78,7 @@ public class IncusReconcileScenarioInContainerTest {
   @Test
   void a_live_change_promotes_the_staging_into_the_live_tree(@TempDir Path node) throws Exception {
     final HostTree tree = HostTree.laidOut(node, "image: v2", "image: v1");
-    final String envelope = play(cultivatingGate(true), tree);
-    final ReportModel runbook = rebuild(envelope);
+    final ReportModel runbook = play(cultivatingGate(true), tree).runbook();
 
     assertEquals(
         ExecutionStatus.SUCCESS,
@@ -101,8 +103,7 @@ public class IncusReconcileScenarioInContainerTest {
     // is
     // a no-op even under an open gate.
     final HostTree tree = HostTree.noChange(node, "image: v1");
-    final String envelope = play(cultivatingGate(true), tree);
-    final ReportModel runbook = rebuild(envelope);
+    final ReportModel runbook = play(cultivatingGate(true), tree).runbook();
 
     assertEquals(
         ExecutionStatus.SUCCESS,
@@ -122,8 +123,7 @@ public class IncusReconcileScenarioInContainerTest {
   void a_preview_run_promotes_nothing(@TempDir Path node) throws Exception {
     // A real change (v2 vs v1) but a CLOSED gate: the decision is computed, the live edge is gated.
     final HostTree tree = HostTree.laidOut(node, "image: v2", "image: v1");
-    final String envelope = play(cultivatingGate(false), tree);
-    final ReportModel runbook = rebuild(envelope);
+    final ReportModel runbook = play(cultivatingGate(false), tree).runbook();
 
     assertEquals(
         ExecutionStatus.SUCCESS,
@@ -141,10 +141,11 @@ public class IncusReconcileScenarioInContainerTest {
    * Register the ambient collaborators into THIS bundle's registry — the {@link RunGate} the scion
    * reads its run condition from, the current {@link Parcel}, and the durable {@link Cellar} (the
    * {@link StubCellar} carrying the pivot) — then play the reconcile in-container through the
-   * front-door, DESCENDING the source staging as the transaction's inherited write-set (the ALLER
-   * channel). Registrations are removed in the {@code finally} so each test plays its own state.
+   * shared {@link ScenarioPlayer}, DESCENDING the source staging as the transaction's inherited
+   * write-set (the ALLER channel), the {@code txId} + entries composed exactly as the handler does.
+   * Registrations are removed in the {@code finally} so each test plays its own state.
    */
-  private static String play(RunGate gate, HostTree tree) throws Exception {
+  private static ScenarioOutcome play(RunGate gate, HostTree tree) throws Exception {
     final BundleContext context = FrameworkUtil.getBundle(IncusBddTests.class).getBundleContext();
     final List<ServiceRegistration<?>> registrations = new ArrayList<>();
     registrations.add(context.registerService(RunGate.class, gate, new Hashtable<>()));
@@ -152,7 +153,11 @@ public class IncusReconcileScenarioInContainerTest {
     registrations.add(
         context.registerService(Cellar.class, tree.durablePivot(), new Hashtable<>()));
     try {
-      return IncusBddScenarios.runReconcile(Optional.of("tx-reconcile"), tree.descendingSource());
+      return new ScenarioPlayer()
+          .play(
+              IncusReconcileScenario.class,
+              TxIdSeed.into("tx-reconcile")
+                  .andThen(CellarEntriesSeed.into(tree.descendingSource())));
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
@@ -177,19 +182,6 @@ public class IncusReconcileScenarioInContainerTest {
     return cellar
         .fetch(PARCEL, IncusCoordinate.HOST_LIVE, HostLiveEntry.class)
         .map(HostLiveEntry::syncedFrom);
-  }
-
-  /**
-   * Rebuild a host-realm {@link ReportModel} from the front-door's serialized {@code
-   * RunbookEnvelope} — the same round-trip the provision twin uses (read the {@code runbook} field
-   * with the host's jackson, then through {@link ScenarioJsonReader}). No jGiven type crosses live.
-   */
-  private static ReportModel rebuild(String envelopeJson) throws Exception {
-    final String runbookJson = CODEC.decode(envelopeJson).path("runbook").asText();
-    final File tmp = Files.createTempFile("incus-reconcile-runbook", ".json").toFile();
-    tmp.deleteOnExit();
-    Files.writeString(tmp.toPath(), runbookJson);
-    return new ScenarioJsonReader().apply(tmp);
   }
 
   /** A RunGate the test pins to a chosen cultivating value. */

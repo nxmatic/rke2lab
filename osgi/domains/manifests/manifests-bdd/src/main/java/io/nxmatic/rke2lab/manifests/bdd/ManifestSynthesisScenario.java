@@ -20,6 +20,7 @@ import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
@@ -67,16 +68,16 @@ public class ManifestSynthesisScenario
         ManifestSynthesisScenario.Given,
         ManifestSynthesisScenario.When,
         ManifestSynthesisScenario.Then>
-    implements InputReceiver<ManifestsRunbookInput> {
+    implements InputReceiver<ManifestsRunbookInput>, ScenarioPlayer.Playable {
 
   private static final ManifestDomainCatalog CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   /**
-   * The inbound channel the front-door ({@code ManifestsBddScenarios.run}) seeds the {@link
-   * ManifestsRunbookInput} facet through and this scenario receives it from (via {@link
+   * The inbound channel the runbook handler ({@code ManifestsRunbookHandler.seedFrom}) seeds the
+   * {@link ManifestsRunbookInput} facet through and this scenario receives it from (via {@link
    * InputReceiver}). Single-sourced here — the receiver owns the key + type — and referenced by the
-   * front-door for the seeding end ({@code INPUT.into(facet)}). Registered as a {@link
+   * handler for the seeding end ({@code INPUT.into(facet)}). Registered as a {@link
    * RegisterExtension} so its {@code TestInstancePostProcessor} fires before the body reads {@link
    * #input}.
    */

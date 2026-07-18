@@ -1,47 +1,32 @@
 package io.nxmatic.rke2lab.incus.bdd;
 
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GenericRunbookHandler;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
-import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
-import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import org.osgi.service.component.annotations.Component;
 
 /**
  * The incus RECONCILE runbook handler — the twin of {@link IncusRunbookHandler}, behind a SECOND
- * host→scion door. It serves {@link IncusScenario#RECONCILE}'s runbook coordinate ({@code
- * incus-reconcile}), and its {@link #handle} plays {@link IncusReconcileScenario} in-container
- * through {@link IncusBddScenarios#runReconcile}. Its sibling is {@code IncusRunbookHandler}
- * serving {@link IncusScenario#PROVISION} ({@code incus-provision}) — the two incus scenarios are
- * peer coordinates, neither englobing the other (the single-source soils live on {@link
- * IncusScenario}). The trigger carries no input (reconcile derives its state from the cellar); the
- * ambient transaction {@code cellar} is flattened at the launcher boundary so the scion inherits
- * this run's in-flight staging (the one prepare published, § seed-broker-spec, the entries
- * descend).
+ * host→scion door. Extends {@link GenericRunbookHandler} and supplies only {@link
+ * IncusScenario#RECONCILE}'s coordinate ({@code incus-reconcile}) and its scenario. Unlike the
+ * provision handler it reads no trigger (reconcile derives its whole state from the ambient
+ * cellar), so it keeps the default no-op {@code seedFrom}. Its sibling {@link IncusRunbookHandler}
+ * serves {@link IncusScenario#PROVISION} — the two incus scenarios are peer coordinates, the
+ * single-source soils on {@link IncusScenario}.
  */
 @Component(service = SeedHandler.class)
-public final class IncusReconcileRunbookHandler implements SeedHandler {
+public final class IncusReconcileRunbookHandler extends GenericRunbookHandler {
 
   private static final RunbookCoordinate COORDINATE = IncusScenario.RECONCILE.runbook();
 
   @Override
-  public SeedCoordinate serves() {
+  public RunbookCoordinate coordinate() {
     return COORDINATE;
   }
 
   @Override
-  public SeedEnvelope handle(Cellar cellar, SeedEnvelope trigger) {
-    final TransactionalCellar transaction = (TransactionalCellar) cellar;
-    try {
-      return SeedEnvelope.of(
-          COORDINATE,
-          IncusBddScenarios.runReconcile(
-              transaction.transactionId(), transaction.entriesEncoded()));
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException(
-          "interrupted playing the incus reconcile scenario in-container", interrupted);
-    }
+  public Class<? extends ScenarioPlayer.Playable> scenarioClass() {
+    return IncusReconcileScenario.class;
   }
 }

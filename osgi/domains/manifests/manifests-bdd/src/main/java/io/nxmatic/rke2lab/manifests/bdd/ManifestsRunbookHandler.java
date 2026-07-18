@@ -1,55 +1,46 @@
 package io.nxmatic.rke2lab.manifests.bdd;
 
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GenericRunbookHandler;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
-import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
-import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
+import java.util.function.Consumer;
+import org.junit.platform.engine.support.store.Namespace;
+import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
 import org.osgi.service.component.annotations.Component;
 
 /**
  * The manifests domain's runbook handler — the OSGi-side grower behind the broker's one host→scion
- * door. It serves {@code RunbookCoordinate("manifests")} (a neutral value coordinate the host sows
- * holding only the soil name), and its {@link #handle} plays THIS bundle's scenario in-container
- * through the front-door {@link ManifestsBddScenarios#run}, on this bundle's own loader — so the
- * host never names a {@code *BddScenarios} type nor reaches into the manifests world.
- *
- * <p>THE one difference from {@code BboxRunbookHandler}: it READS the trigger. Bbox ignores its
- * trigger (its desired state is a static blueprint); manifests decodes the activation facet ({@link
- * ManifestsRunbookInput}) off {@code trigger.payload()} and threads it into the run, so the
- * operator's choice — which layers link, which debug — drives the synthesis. The reaped {@link
- * SeedEnvelope} carries the serialized {@code RunbookEnvelope} (runbook JSON, empty consultations).
- * See docs/architecture/osgi/manifests-bdd-spec.adoc (§ the scion trio).
+ * door. Extends {@link GenericRunbookHandler} and supplies the coordinate it serves ({@code
+ * manifests}) and its scenario. Like the incus provision scion it READS the trigger: it overrides
+ * {@link #seedFrom} to decode the activation facet ({@link ManifestsRunbookInput} — which layers
+ * link, which debug) off {@code trigger.payload()} and route it through the scenario's {@link
+ * ManifestSynthesisScenario#INPUT} channel, so the operator's choice drives the synthesis. See
+ * docs/architecture/osgi/manifests-bdd-spec.adoc (§ the scion trio).
  */
 @Component(service = SeedHandler.class)
-public final class ManifestsRunbookHandler implements SeedHandler {
+public final class ManifestsRunbookHandler extends GenericRunbookHandler {
 
   private static final RunbookCoordinate COORDINATE = new RunbookCoordinate("manifests");
 
   private final SeedCodec codec = new SeedCodec();
 
   @Override
-  public SeedCoordinate serves() {
+  public RunbookCoordinate coordinate() {
     return COORDINATE;
   }
 
   @Override
-  public SeedEnvelope handle(Cellar cellar, SeedEnvelope trigger) {
-    final ManifestsRunbookInput facet =
-        codec.decode(trigger.payload(), ManifestsRunbookInput.class);
-    final TransactionalCellar transaction = (TransactionalCellar) cellar;
-    try {
-      return SeedEnvelope.of(
-          COORDINATE,
-          ManifestsBddScenarios.run(
-              facet, transaction.transactionId(), transaction.entriesEncoded()));
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException(
-          "interrupted playing the manifests scenario in-container", interrupted);
-    }
+  public Class<? extends ScenarioPlayer.Playable> scenarioClass() {
+    return ManifestSynthesisScenario.class;
+  }
+
+  @Override
+  public Consumer<NamespacedHierarchicalStore<Namespace>> seedFrom(SeedEnvelope trigger) {
+    return ManifestSynthesisScenario.INPUT.into(
+        codec.decode(trigger.payload(), ManifestsRunbookInput.class));
   }
 }

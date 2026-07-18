@@ -23,6 +23,7 @@ import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
@@ -59,7 +60,7 @@ public class BboxReconciliationScenario
         BboxReconciliationScenario.Given,
         BboxReconciliationScenario.When,
         BboxReconciliationScenario.Then>
-    implements CellarReceiver<Cellar>, ConsultationSource {
+    implements CellarReceiver<Cellar>, ConsultationSource, ScenarioPlayer.Playable {
 
   /** The router base-URI the scion reconciles against; the mock edge ignores it. */
   private static final URI ROUTER = URI.create("http://bbox.local");

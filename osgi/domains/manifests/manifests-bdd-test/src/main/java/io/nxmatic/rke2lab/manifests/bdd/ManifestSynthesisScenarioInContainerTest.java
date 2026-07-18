@@ -3,17 +3,13 @@ package io.nxmatic.rke2lab.manifests.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
-import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import java.io.File;
-import java.nio.file.Files;
 import java.util.Hashtable;
-import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -26,26 +22,28 @@ import org.osgi.framework.ServiceRegistration;
  * {@code @Component}s (the {@code ManifestSynthesisService} + {@code NodeEnvOverlayService})
  * activate under SCR and the scenario drives them. So this passenger registers ONLY the mock {@link
  * RunGate} (the one collaborator the host, not SCR, publishes in prod) into the SAME registry the
- * scenario resolves from, then plays {@link ManifestsBddScenarios#run} (the production front-door)
- * with a known activation facet and asserts on the harvested runbook.
+ * scenario resolves from, then plays it in-container through {@link ScenarioPlayer} (the shared
+ * play recipe the production {@code GenericRunbookHandler} also drives) — seeding the activation
+ * facet through the scenario's own inbound {@link ManifestSynthesisScenario#INPUT} channel, exactly
+ * as the handler does — and asserts on the harvested {@link ScenarioOutcome}.
  *
  * <p>The assertion is the whole point of the chantier: given the operator's facet, the scenario's
  * WHEN stage — the transposition of {@code HostSlotManifest.Builder.policy()} — derives the policy,
  * synthesises, and writes the overlay, and the runbook plays GREEN. That is the control-plane
- * policy genuinely reactivated INSIDE synthesis, proven end-to-end, not merely compiled.
+ * policy genuinely reactivated INSIDE synthesis, proven end-to-end, not merely compiled. It reads
+ * the LIVE outcome (same in-container worker), no JSON round-trip.
  */
 public class ManifestSynthesisScenarioInContainerTest {
-
-  private static final SeedCodec CODEC = new SeedCodec();
 
   @Test
   void the_scion_synthesizes_from_the_activation_facet() throws Exception {
     // The operator's usual posture (everything on except mesh, debug off) — a complete facet, the
     // same shape a sower plucks from Pulumi.dev.yaml.
-    final String envelope = playWith(cultivatingGate(true), ManifestsRunbookInput.defaults());
-    final ReportModel runbook = rebuild(envelope);
+    final ScenarioOutcome outcome =
+        playWith(cultivatingGate(true), ManifestsRunbookInput.defaults());
+    final ReportModel runbook = outcome.runbook();
 
-    assertNotNull(runbook, "the front-door harvested the played model");
+    assertNotNull(runbook, "the player harvested the played model");
     assertEquals(1, runbook.getScenarios().size(), "one scenario played");
     assertEquals(
         ExecutionStatus.SUCCESS,
@@ -58,17 +56,21 @@ public class ManifestSynthesisScenarioInContainerTest {
 
   /**
    * Register the mock {@link RunGate} into THIS bundle's registry (the synthesis + overlay services
-   * are real SCR components, already published), play the scenario in-container through the
-   * front-door with the given facet, and return its serialized envelope. The registration is
-   * removed in the {@code finally} so the shared framework does not leak across tests.
+   * are real SCR components, already published), play the scenario in-container through the shared
+   * {@link ScenarioPlayer} — seeding the facet through the scenario's {@link
+   * ManifestSynthesisScenario#INPUT} channel — and return its live {@link ScenarioOutcome}. The
+   * registration is removed in the {@code finally} so the shared framework does not leak across
+   * tests.
    */
-  private static String playWith(RunGate gate, ManifestsRunbookInput facet) throws Exception {
+  private static ScenarioOutcome playWith(RunGate gate, ManifestsRunbookInput facet)
+      throws Exception {
     final BundleContext context =
         FrameworkUtil.getBundle(ManifestsBddTests.class).getBundleContext();
     final ServiceRegistration<RunGate> registration =
         context.registerService(RunGate.class, gate, new Hashtable<>());
     try {
-      return ManifestsBddScenarios.run(facet, Optional.empty(), List.of());
+      return new ScenarioPlayer()
+          .play(ManifestSynthesisScenario.class, ManifestSynthesisScenario.INPUT.into(facet));
     } finally {
       registration.unregister();
     }
@@ -77,19 +79,5 @@ public class ManifestSynthesisScenarioInContainerTest {
   /** The ambient run condition the scion reads — cultivating (live) or surveying (dry-run). */
   private static RunGate cultivatingGate(boolean cultivating) {
     return () -> cultivating;
-  }
-
-  /**
-   * Rebuild a host-realm {@link ReportModel} from the front-door's serialized envelope: read the
-   * {@code runbook} field with the host's own jackson, then round it through {@link
-   * ScenarioJsonReader} into a model of THIS realm. No jGiven type crosses live — the envelope is
-   * flat JSON.
-   */
-  private static ReportModel rebuild(String envelopeJson) throws Exception {
-    final String runbookJson = CODEC.decode(envelopeJson).path("runbook").asText();
-    final File tmp = Files.createTempFile("manifest-synthesis-runbook", ".json").toFile();
-    tmp.deleteOnExit();
-    Files.writeString(tmp.toPath(), runbookJson);
-    return new ScenarioJsonReader().apply(tmp);
   }
 }

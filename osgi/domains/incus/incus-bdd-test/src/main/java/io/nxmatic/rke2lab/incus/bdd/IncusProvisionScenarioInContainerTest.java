@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
@@ -22,6 +20,8 @@ import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisResult;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -29,8 +29,6 @@ import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
-import java.io.File;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -46,14 +44,16 @@ import org.osgi.framework.ServiceRegistration;
  * the incus-bdd host loader through the fragment). It registers the scion's collaborators — a mock
  * {@link ImageBuilder}, a mock {@link RunGate}, a recording {@link
  * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (and, for the failure case, a mock {@link
- * ConsultingService}) — into the SAME registry the scenario resolves from, then plays {@link
- * IncusBddScenarios#run} (the production front-door) and asserts on the harvested envelope. The
+ * ConsultingService}) — into the SAME registry the scenario resolves from, then plays it
+ * in-container through {@link ScenarioPlayer} (the shared play recipe the production {@code
+ * GenericRunbookHandler} also drives) and asserts on the harvested {@link ScenarioOutcome}. The
  * scion PREPARES the instance (image + manifests); the host makes it grow and probes reachability
  * (Shape C), so no instance contact is registered here.
  *
  * <p>No seam, no system-export: because the fragment shares the bundle's classloader, the mock this
  * passenger registers is the same {@code Class} the scenario reads. The {@code
- * BboxReconciliationScenarioInContainerTest} shape applied to the incus front-door play.
+ * BboxReconciliationScenarioInContainerTest} shape applied to the incus scenario play — it reads
+ * the LIVE outcome (same in-container worker), no JSON round-trip.
  */
 public class IncusProvisionScenarioInContainerTest {
 
@@ -66,22 +66,22 @@ public class IncusProvisionScenarioInContainerTest {
   void a_live_prepare_builds_and_consults_manifests_green() throws Exception {
     // cultivating() true → the scion builds the image and consults manifests; the mocks succeed. It
     // does NOT probe reachability — the host makes the instance grow and verifies it (Shape C).
-    final String envelope = playWith(cultivatingGate(true), builds(), null, new RecordingCellar());
-    final ReportModel runbook = rebuild(envelope);
+    final ScenarioOutcome outcome =
+        playWith(cultivatingGate(true), builds(), null, new RecordingCellar());
+    final ReportModel runbook = outcome.runbook();
 
-    assertNotNull(runbook, "the front-door harvested the played model");
+    assertNotNull(runbook, "the player harvested the played model");
     assertEquals(1, runbook.getScenarios().size(), "one scenario played");
     assertEquals(
         ExecutionStatus.SUCCESS,
         runbook.getScenarios().get(0).getExecutionStatus(),
         "a built image + cultivated manifests prepares the instance cleanly");
     assertTrue(
-        consultationsOf(envelope).isEmpty(),
-        "a clean prepare raised no symptom, so consults no one");
+        outcome.consultations().isEmpty(), "a clean prepare raised no symptom, so consults no one");
 
     // The reversal, proven: the SCION harvested AND stored its prep. The store is a cellar-entry on
     // the played model (the scion is a fragment; the host root drains at the boundary), read back
-    // through the cellar's OWN generic API — a ScenarioCellar over the rebuilt model with an empty
+    // through the cellar's OWN generic API — a ScenarioCellar over the LIVE model with an empty
     // durable side, so fetch returns the run's own write (read-your-writes). At the incus-prep
     // coordinate, carrying the recipe digest + the soil the tree was cultivated under (Shape C).
     final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, RecordingCellar::new, "");
@@ -101,14 +101,15 @@ public class IncusProvisionScenarioInContainerTest {
     // cultivating() false → the scion builds NOTHING; the mock records whether it was called, and
     // must not have been.
     final RecordingImageBuilder builder = recordingBuilder();
-    final String envelope = playWith(cultivatingGate(false), builder, null, new RecordingCellar());
+    final ScenarioOutcome outcome =
+        playWith(cultivatingGate(false), builder, null, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.SUCCESS,
-        rebuild(envelope).getScenarios().get(0).getExecutionStatus(),
+        outcome.runbook().getScenarios().get(0).getExecutionStatus(),
         "a preview run plans cleanly without touching the incus host");
     assertTrue(!builder.built, "under a closed gate the scion must NOT build the image");
-    assertTrue(consultationsOf(envelope).isEmpty(), "a preview raised no symptom");
+    assertTrue(outcome.consultations().isEmpty(), "a preview raised no symptom");
   }
 
   @Test
@@ -116,32 +117,34 @@ public class IncusProvisionScenarioInContainerTest {
     // A failed image build is a symptom; the scion resolves the doctor from its OWN registry and
     // consults — the consultation rides the envelope back (fork B).
     final RecordingDoctor doctor = new RecordingDoctor();
-    final String envelope =
+    final ScenarioOutcome outcome =
         playWith(cultivatingGate(true), failsToBuild(), doctor, new RecordingCellar());
 
     assertEquals(
         ExecutionStatus.FAILED,
-        rebuild(envelope).getScenarios().get(0).getExecutionStatus(),
+        outcome.runbook().getScenarios().get(0).getExecutionStatus(),
         "a failed image build fails the checkpoint");
     assertEquals(1, doctor.consultedCheckpoints.size(), "the domain consulted the doctor once");
     assertTrue(
         doctor.consultedCheckpoints.get(0).contains("image-build-failed"),
         "the consult carries the typed symptom the doctor routes on");
 
-    final List<JsonNode> consultations = consultationsOf(envelope);
-    assertEquals(1, consultations.size(), "the consultation rides the envelope back to the host");
+    final List<SeedEnvelope> consultations = outcome.consultations();
+    assertEquals(1, consultations.size(), "the consultation rides the outcome back to the host");
     assertEquals(
         "incus-provision",
-        CODEC.decode(consultations.get(0).path("payload").asText()).path("scenarioId").asText(),
+        CODEC.decode(consultations.get(0).payload()).path("scenarioId").asText(),
         "the consultation names the checkpoint the host joins on");
   }
 
   /**
    * Register the mock collaborators into THIS bundle's registry, play the scenario in-container
-   * through the front-door, and return its serialized envelope. Registrations are removed in the
-   * {@code finally} so each test plays against exactly its own mocks.
+   * through the shared {@link ScenarioPlayer} — seeding the default activation input through the
+   * scenario's {@link IncusProvisionScenario#INPUT} channel, as the handler does — and return its
+   * live {@link ScenarioOutcome}. Registrations are removed in the {@code finally} so each test
+   * plays against exactly its own mocks.
    */
-  private static String playWith(
+  private static ScenarioOutcome playWith(
       RunGate gate, ImageBuilder builder, ConsultingService doctor, Cellar cellar)
       throws Exception {
     final BundleContext context = FrameworkUtil.getBundle(IncusBddTests.class).getBundleContext();
@@ -172,31 +175,13 @@ public class IncusProvisionScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return IncusBddScenarios.run(IncusRunbookInput.defaults(), Optional.empty(), List.of());
+      return new ScenarioPlayer()
+          .play(
+              IncusProvisionScenario.class,
+              IncusProvisionScenario.INPUT.into(IncusRunbookInput.defaults()));
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
-  }
-
-  /** The consultations the run raised, read off the envelope with the host's own codec. */
-  private static List<JsonNode> consultationsOf(String envelopeJson) {
-    final List<JsonNode> consultations = new ArrayList<>();
-    CODEC.decode(envelopeJson).path("consultations").forEach(consultations::add);
-    return consultations;
-  }
-
-  /**
-   * Rebuild a host-realm {@link ReportModel} from the front-door's serialized envelope: read the
-   * {@code runbook} field with the host's own jackson, then round it through {@link
-   * ScenarioJsonReader} into a model of THIS realm. No jGiven type crosses live — the envelope is
-   * flat JSON.
-   */
-  private static ReportModel rebuild(String envelopeJson) throws Exception {
-    final String runbookJson = CODEC.decode(envelopeJson).path("runbook").asText();
-    final File tmp = Files.createTempFile("incus-provision-runbook", ".json").toFile();
-    tmp.deleteOnExit();
-    Files.writeString(tmp.toPath(), runbookJson);
-    return new ScenarioJsonReader().apply(tmp);
   }
 
   /** A RunGate the test pins to a chosen cultivating value. */
