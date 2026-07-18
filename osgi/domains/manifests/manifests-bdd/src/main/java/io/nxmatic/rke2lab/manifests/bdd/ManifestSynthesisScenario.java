@@ -7,8 +7,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.junit5.JGivenExtension;
-import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
@@ -19,7 +17,10 @@ import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvOverlayService;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -28,10 +29,9 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The manifests synthesis scenario, a production jGiven scenario told in the MANIFESTS DOMAIN's own
@@ -56,51 +56,59 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@link ManifestSynthesisService} + {@link NodeEnvOverlayService} (the SCR-published synthesis)
  * and the ambient {@link RunGate} (whose {@link RunGate#cultivating() cultivating} decides whether
  * materialisation targets the real tree or a survey temp dir). The activation facet is seeded by
- * the handler via {@link #seedInput} before the play (the input twin of bbox's {@code lastRunbook}
- * harvest).
+ * the front-door via the inbound {@link #INPUT} channel and received here ({@link InputReceiver})
+ * before the play; the outbound {@code ScenarioOutcome} channel harvests the played runbook.
  */
-@ExtendWith(JGivenExtension.class)
+@SeedScenario
 public class ManifestSynthesisScenario
     extends ScenarioTestBase<
         ManifestSynthesisScenario.Given,
         ManifestSynthesisScenario.When,
-        ManifestSynthesisScenario.Then> {
+        ManifestSynthesisScenario.Then>
+    implements InputReceiver<ManifestsRunbookInput> {
 
   private static final ManifestDomainCatalog CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
-  // The handler seeds the activation facet here before the launcher plays (same-loader static, the
-  // input twin of bbox's LAST_RUNBOOK); the front-door harvests the played model afterwards.
-  // Initialized (never null) so the null-hygiene gate stays green.
-  private static final AtomicReference<ManifestsRunbookInput> INPUT =
-      new AtomicReference<>(ManifestsRunbookInput.defaults());
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-
-  /** The handler sets the sown facet here before selecting this class into the launcher. */
-  public static void seedInput(ManifestsRunbookInput input) {
-    INPUT.set(input);
-  }
-
-  static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
-  }
+  /**
+   * The inbound channel the front-door ({@code ManifestsBddScenarios.run}) seeds the {@link
+   * ManifestsRunbookInput} facet through and this scenario receives it from (via {@link
+   * InputReceiver}). Single-sourced here — the receiver owns the key + type — and referenced by the
+   * front-door for the seeding end ({@code INPUT.into(facet)}). Registered as a {@link
+   * RegisterExtension} so its {@code TestInstancePostProcessor} fires before the body reads {@link
+   * #input}.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<ManifestsRunbookInput> INPUT =
+      new ScenarioInputSeed<>(ManifestsRunbookInput.class, "manifests-runbook-input");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The activation facet the front-door seeds before the body (InputReceiver) — the operator's
+  // choice (which layers link, which debug) the WHEN translates. @MonotonicNonNull: null until
+  // receiveInput sets it (before the body), then read.
+  @MonotonicNonNull private ManifestsRunbookInput input;
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
   }
 
+  @Override
+  public void receiveInput(ManifestsRunbookInput input) {
+    this.input = input;
+  }
+
   @Test
   void the_manifests_are_synthesized_from_the_activation_facet() {
-    final ManifestsRunbookInput input = INPUT.get();
+    final ManifestsRunbookInput facet =
+        Objects.requireNonNull(
+            input, "the activation facet was not seeded before the scenario ran");
     final ManifestSynthesisService synthesis = resolve(ManifestSynthesisService.class);
     final NodeEnvOverlayService overlay = resolve(NodeEnvOverlayService.class);
     final RunGate gate = resolveGate();
 
-    given().the_activation_facet(input).and().the_synthesis_services(synthesis, overlay, gate);
+    given().the_activation_facet(facet).and().the_synthesis_services(synthesis, overlay, gate);
     when()
         .the_policy_is_derived_from_the_facet()
         .and()
@@ -113,8 +121,6 @@ public class ManifestSynthesisScenario
         .the_manifests_file_is_written()
         .and()
         .the_overlay_carries_the_link_time_policy();
-
-    LAST_RUNBOOK.set(getScenario().getModel());
   }
 
   private <T> T resolve(Class<T> type) {

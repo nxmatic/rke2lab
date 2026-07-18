@@ -43,7 +43,6 @@ import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
@@ -96,17 +95,6 @@ public class ClusterSeedScenario
   public static final PulumiDeploymentSeed DEPLOYMENT = new PulumiDeploymentSeed();
 
   private final Scenario<Given, When, Then> scenario = createScenario();
-
-  // The driver (Main) renders the runbook AFTER the run from the played model — the launcher
-  // instantiates the scenario, so Main cannot reach `this`; the run stashes the model here (the
-  // same holder discipline as the scions' LAST_RUNBOOK). Never null once played.
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-
-  /** The played runbook model — for the driver to render after the run. */
-  public static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the cluster-seed scenario has not played yet — no runbook to render");
-  }
 
   /** Set once by {@link #receiveSeed} (the {@code SessionSeed} post-processor) before the GIVEN. */
   @MonotonicNonNull private SeedRun run;
@@ -171,12 +159,6 @@ public class ClusterSeedScenario
         .and()
         .the_cluster_becomes_ready(hostTree);
     then().the_harvest_is_stored();
-    // Stash the played model for the driver to render the runbook (adoc + json) into host.live.d
-    // after the run — the two-channel rule: the runbook is narration, rendered post-run. It cannot
-    // travel through the promotion (which ran mid-scenario), so the host writes it into the live
-    // tree directly, a live mutation seen as drift at the next rotation (§
-    // host-cellar-realisation).
-    LAST_RUNBOOK.set(hostTree);
   }
 
   /**

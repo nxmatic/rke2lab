@@ -7,7 +7,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.incus.contract.HostDriftEntry;
 import io.nxmatic.rke2lab.incus.contract.HostLiveEntry;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
@@ -26,9 +25,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 
@@ -64,13 +61,6 @@ public class IncusReconcileScenario
 
   private static final String NODE = "bioskop-master";
 
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-
-  static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the reconcile scenario has not played yet — no runbook to harvest");
-  }
-
   private final Scenario<Given, When, Then> scenario = createScenario();
 
   // The transactional cellar the extension injects before the body — reconcile READS the host-tree
@@ -104,7 +94,6 @@ public class IncusReconcileScenario
           .getModel()
           .addTag(GraftTag.PROMOTED.of(reconciliation.source().get().stagingRoot()));
     }
-    LAST_RUNBOOK.set(getScenario().getModel());
   }
 
   private RunGate resolveGate() {

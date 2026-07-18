@@ -4,6 +4,8 @@ import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -20,8 +22,8 @@ import org.junit.platform.engine.discovery.DiscoverySelectors;
  * of {@link ManifestSynthesisScenario}.
  *
  * <p>THE one difference from bbox's front-door: it takes the activation facet — bbox ignores its
- * trigger, this one seeds the sown {@link ManifestsRunbookInput} into the scenario ({@link
- * ManifestSynthesisScenario#seedInput}) before the launcher selects it, so the WHEN stage
+ * trigger, this one seeds the sown {@link ManifestsRunbookInput} through the scenario's inbound
+ * {@link ManifestSynthesisScenario#INPUT} channel before the launcher selects it, so the WHEN stage
  * translates the operator's choice. It returns a {@link RunbookEnvelope} of {@code (runbook,
  * consultations)} as one serialized JSON String; consultations are always empty (the manifests
  * scion consults no one — a synthesis failure is a build defect surfaced as a failed step, not a
@@ -47,21 +49,22 @@ public final class ManifestsBddScenarios {
   public static String run(
       ManifestsRunbookInput facet, Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
-    ManifestSynthesisScenario.seedInput(facet);
     final SeedCodec codec = new SeedCodec();
+    final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
     return new JUnitLauncherCore<String>()
         .run(
             ManifestsBddScenarios.class.getClassLoader(),
             JupiterTestEngine.class,
             wiring -> List.of(DiscoverySelectors.selectClass(ManifestSynthesisScenario.class)),
-            (launcher, request) -> {
+            (launcher, request, sessionStore) -> {
               launcher.execute(request);
-              final String runbook =
-                  new ScenarioJsonWriter(ManifestSynthesisScenario.lastRunbook()).toString();
-              return codec.encode(new RunbookEnvelope(runbook, List.of()));
+              final ScenarioOutcome outcome = outcomeSeed.read(sessionStore);
+              final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
+              return codec.encode(new RunbookEnvelope(runbook, outcome.consultations()));
             },
-            txId.map(TxIdSeed::into)
-                .orElse(store -> {})
+            ManifestSynthesisScenario.INPUT
+                .into(facet)
+                .andThen(txId.map(TxIdSeed::into).orElse(store -> {}))
                 .andThen(CellarEntriesSeed.into(inheritedEntries)));
   }
 }

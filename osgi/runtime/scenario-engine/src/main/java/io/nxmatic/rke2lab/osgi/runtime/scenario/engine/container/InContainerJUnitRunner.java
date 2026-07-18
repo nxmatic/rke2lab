@@ -7,6 +7,8 @@ import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.engine.support.store.Namespace;
+import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.TestExecutionListener;
@@ -93,8 +95,15 @@ public final class InContainerJUnitRunner<T extends TestEngine> {
     return selectors;
   }
 
-  /** Harvest one encoded PASS/FAIL line per finished test. */
-  private static List<String> harvest(Launcher launcher, LauncherDiscoveryRequest request) {
+  /**
+   * Harvest one encoded PASS/FAIL line per finished test. The {@code sessionStore} is unused here —
+   * this envelope enumerates test outcomes from a listener, not the scenario {@code
+   * ScenarioOutcome} channel (that is a scenario front-door's concern).
+   */
+  private static List<String> harvest(
+      Launcher launcher,
+      LauncherDiscoveryRequest request,
+      NamespacedHierarchicalStore<Namespace> sessionStore) {
     final List<String> results = new ArrayList<>();
     launcher.registerTestExecutionListeners(
         new TestExecutionListener() {

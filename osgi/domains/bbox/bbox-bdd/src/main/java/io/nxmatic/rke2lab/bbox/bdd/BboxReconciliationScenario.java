@@ -7,7 +7,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
 import io.nxmatic.rke2lab.bbox.contract.BboxCoordinate;
 import io.nxmatic.rke2lab.bbox.contract.BboxHarvest;
@@ -22,6 +21,7 @@ import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -33,9 +33,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 
@@ -61,29 +59,13 @@ public class BboxReconciliationScenario
         BboxReconciliationScenario.Given,
         BboxReconciliationScenario.When,
         BboxReconciliationScenario.Then>
-    implements CellarReceiver {
+    implements CellarReceiver, ConsultationSource {
 
   /** The router base-URI the scion reconciles against; the mock edge ignores it. */
   private static final URI ROUTER = URI.create("http://bbox.local");
 
   /** The bbox admin secret; the mock edge ignores it, a fixed marker suffices in the scenario. */
   private static final String ADMIN_PASSWORD = "admin";
-
-  // The front-door harvests the played model + any consultations off these holders (the same
-  // scaffolding as ClusterReadinessScenario). Initialized (never null) so the null-hygiene gate
-  // stays green; the run fills them.
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-  private static final AtomicReference<List<SeedEnvelope>> LAST_CONSULTATIONS =
-      new AtomicReference<>(List.of());
-
-  static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
-  }
-
-  static List<SeedEnvelope> lastConsultations() {
-    return LAST_CONSULTATIONS.get();
-  }
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
@@ -93,6 +75,11 @@ public class BboxReconciliationScenario
   // re-null.
   @MonotonicNonNull private Cellar cellar;
 
+  // The consultations the run raised on a refused row — the ScenarioOutcomeExtension PULLS them
+  // (ConsultationSource) at the run boundary. Set in the @Test after the body (jGiven defers a
+  // failed step's throw to scenario-end, so a refused row still reaches this); empty until then.
+  private List<SeedEnvelope> consultations = List.of();
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -101,6 +88,11 @@ public class BboxReconciliationScenario
   @Override
   public void receiveCellar(Cellar cellar) {
     this.cellar = cellar;
+  }
+
+  @Override
+  public List<SeedEnvelope> consultations() {
+    return consultations;
   }
 
   @Test
@@ -123,8 +115,7 @@ public class BboxReconciliationScenario
         .no_failed_row_is_silently_dropped()
         .and()
         .the_harvest_is_stored(cellar, resolveParcel());
-    LAST_RUNBOOK.set(getScenario().getModel());
-    LAST_CONSULTATIONS.set(consultOnRefusal(outcomes));
+    this.consultations = consultOnRefusal(outcomes);
   }
 
   /**

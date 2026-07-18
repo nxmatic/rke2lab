@@ -7,8 +7,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.junit5.JGivenExtension;
-import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.cluster.contract.ControllerRef;
@@ -18,18 +16,17 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The cluster-readiness checkpoint, a production jGiven scenario told in the CLUSTER DOMAIN's own
@@ -45,39 +42,29 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * controllers): a not-ready phase throws, jGiven marks it FAILED and skips the downstream chained
  * steps, so the runbook shows exactly where readiness broke.
  */
-@ExtendWith(JGivenExtension.class)
+@SeedScenario
 public class ClusterReadinessScenario
     extends ScenarioTestBase<
         ClusterReadinessScenario.Given,
         ClusterReadinessScenario.When,
-        ClusterReadinessScenario.Then> {
-
-  // Scaffolding for increment 1: the front-door harvests the played model off this holder. REPLACED
-  // in increment 2 by inject-the-model (the driver seeds its own ReportModel via the session store,
-  // jGiven writes into it), when the cross-world graft lifts the model into the host runbook. An
-  // initialized holder (never null) so the null-hygiene gate stays green; the run fills it.
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-
-  // The doctor consultations the run raised on a failing phase, harvested by the front-door into
-  // the
-  // envelope alongside the runbook. Empty when every phase passed (a healthy run consults no one).
-  private static final AtomicReference<List<SeedEnvelope>> LAST_CONSULTATIONS =
-      new AtomicReference<>(List.of());
-
-  static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
-  }
-
-  static List<SeedEnvelope> lastConsultations() {
-    return LAST_CONSULTATIONS.get();
-  }
+        ClusterReadinessScenario.Then>
+    implements ConsultationSource {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The consultations the run raised on a failing phase — the ScenarioOutcomeExtension PULLS them
+  // (ConsultationSource) at the run boundary. Set in the @Test after the body (jGiven defers a
+  // failing phase's throw to scenario-end, so it still reaches this); empty until then.
+  private List<SeedEnvelope> consultations = List.of();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
+  }
+
+  @Override
+  public List<SeedEnvelope> consultations() {
+    return consultations;
   }
 
   @Test
@@ -93,8 +80,7 @@ public class ClusterReadinessScenario
         .and()
         .the_required_controllers_are_effective();
     then().the_cluster_is_ready();
-    LAST_RUNBOOK.set(getScenario().getModel());
-    LAST_CONSULTATIONS.set(consultOnFailure(observations));
+    this.consultations = consultOnFailure(observations);
   }
 
   /**

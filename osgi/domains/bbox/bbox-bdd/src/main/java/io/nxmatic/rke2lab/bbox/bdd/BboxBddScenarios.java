@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.bbox.bdd;
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -48,17 +50,17 @@ public final class BboxBddScenarios {
   public static String run(Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
     final SeedCodec codec = new SeedCodec();
+    final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
     return new JUnitLauncherCore<String>()
         .run(
             BboxBddScenarios.class.getClassLoader(),
             JupiterTestEngine.class,
             wiring -> List.of(DiscoverySelectors.selectClass(BboxReconciliationScenario.class)),
-            (launcher, request) -> {
+            (launcher, request, sessionStore) -> {
               launcher.execute(request);
-              final String runbook =
-                  new ScenarioJsonWriter(BboxReconciliationScenario.lastRunbook()).toString();
-              return codec.encode(
-                  new RunbookEnvelope(runbook, BboxReconciliationScenario.lastConsultations()));
+              final ScenarioOutcome outcome = outcomeSeed.read(sessionStore);
+              final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
+              return codec.encode(new RunbookEnvelope(runbook, outcome.consultations()));
             },
             txId.map(TxIdSeed::into)
                 .orElse(store -> {})

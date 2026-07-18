@@ -32,7 +32,7 @@ class JUnitLauncherCoreTest {
                 getClass().getClassLoader(),
                 JupiterTestEngine.class,
                 wiring -> List.of(DiscoverySelectors.selectClass(TrivialGreenTest.class)),
-                (launcher, request) -> {
+                (launcher, request, sessionStore) -> {
                   final SummaryGeneratingListener listener = new SummaryGeneratingListener();
                   launcher.registerTestExecutionListeners(listener);
                   launcher.execute(request);

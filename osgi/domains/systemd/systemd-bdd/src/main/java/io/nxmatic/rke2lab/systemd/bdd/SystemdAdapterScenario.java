@@ -6,15 +6,15 @@ import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.junit5.JGivenExtension;
-import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest;
@@ -23,11 +23,8 @@ import io.nxmatic.rke2lab.systemd.contract.SystemdStatusSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The systemd-adapter readiness checkpoint, a production jGiven scenario told in the SYSTEMD
@@ -50,35 +47,27 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@code ClusterReadinessScenario} uses a fixed kubeconfig path): the offline mock ignores it, and
  * the live endpoint-config plumbing is the same deferral the cluster twin makes.
  */
-@ExtendWith(JGivenExtension.class)
+@SeedScenario
 public class SystemdAdapterScenario
     extends ScenarioTestBase<
-        SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then> {
-
-  // The played model, harvested by the front-door into the envelope. An initialized holder (never
-  // null) so the null-hygiene gate stays green; the run fills it.
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-
-  // The doctor consultations the run raised on a failing facet, harvested by the front-door into
-  // the
-  // envelope alongside the runbook. Empty when every facet passed (a healthy run consults no one).
-  private static final AtomicReference<List<SeedEnvelope>> LAST_CONSULTATIONS =
-      new AtomicReference<>(List.of());
-
-  static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
-  }
-
-  static List<SeedEnvelope> lastConsultations() {
-    return LAST_CONSULTATIONS.get();
-  }
+        SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then>
+    implements ConsultationSource {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The consultations the run raised on a failing facet — the ScenarioOutcomeExtension PULLS them
+  // (ConsultationSource) at the run boundary. Set in the @Test after the body (jGiven defers a
+  // failing facet's throw to scenario-end, so it still reaches this); empty until then.
+  private List<SeedEnvelope> consultations = List.of();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
+  }
+
+  @Override
+  public List<SeedEnvelope> consultations() {
+    return consultations;
   }
 
   @Test
@@ -93,8 +82,7 @@ public class SystemdAdapterScenario
         .and()
         .no_units_have_failed();
     then().the_systemd_adapter_is_reachable();
-    LAST_RUNBOOK.set(getScenario().getModel());
-    LAST_CONSULTATIONS.set(consultOnFailure(observations));
+    this.consultations = consultOnFailure(observations);
   }
 
   /**

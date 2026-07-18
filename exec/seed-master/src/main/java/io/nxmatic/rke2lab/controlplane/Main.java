@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane;
 
 import com.pulumi.Pulumi;
 import com.pulumi.deployment.Deployment;
+import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
@@ -14,6 +15,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRoleSeed;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
@@ -58,25 +60,26 @@ public final class Main {
                   UUID.randomUUID().toString());
 
           try {
-            new JUnitLauncherCore<Boolean>()
-                .run(
-                    Main.class.getClassLoader(),
-                    JupiterTestEngine.class,
-                    wiring -> List.of(DiscoverySelectors.selectClass(ClusterSeedScenario.class)),
-                    JUnitLauncherCore.failFast(
-                        line -> context.log().info(line),
-                        (launcher, request) -> {
+            final ReportModel runbook =
+                new JUnitLauncherCore<ReportModel>()
+                    .run(
+                        Main.class.getClassLoader(),
+                        JupiterTestEngine.class,
+                        wiring ->
+                            List.of(DiscoverySelectors.selectClass(ClusterSeedScenario.class)),
+                        (launcher, request, sessionStore) -> {
                           launcher.execute(request);
-                          return Boolean.TRUE;
-                        }),
-                    ClusterSeedScenario.SEED
-                        .into(run)
-                        .andThen(RunRoleSeed.into(RunRole.ROOT))
-                        .andThen(TxIdSeed.into(run.txId()))
-                        // The live Pulumi deployment, seeded onto the launcher worker so the GROW
-                        // beat's com.pulumi resources resolve there (the deployment is a plain
-                        // ThreadLocal, not inherited by the worker) — § PulumiDeploymentSeed.
-                        .andThen(PulumiDeploymentSeed.into(Deployment.getInstance())));
+                          return new ScenarioOutcomeSeed().read(sessionStore).runbook();
+                        },
+                        ClusterSeedScenario.SEED
+                            .into(run)
+                            .andThen(RunRoleSeed.into(RunRole.ROOT))
+                            .andThen(TxIdSeed.into(run.txId()))
+                            // The live Pulumi deployment, seeded onto the launcher worker so the
+                            // GROW beat's com.pulumi resources resolve there (the deployment is a
+                            // plain ThreadLocal, not inherited by the worker) — §
+                            // PulumiDeploymentSeed.
+                            .andThen(PulumiDeploymentSeed.into(Deployment.getInstance())));
             // Render the runbook (adoc + json) into host.live.d AFTER the play — the two-channel
             // rule: the runbook is narration, materialised post-run. It cannot travel through the
             // promotion (a mid-scenario beat), so the host writes it into the live tree directly, a
@@ -89,13 +92,25 @@ public final class Main {
             // inside the renderer, so it never fails the provisioning; a run with no live root (a
             // scion that did not pose it) simply renders nothing.
             final var graft = new ScenarioGraft();
-            final ReportModel runbook = ClusterSeedScenario.lastRunbook();
             graft
                 .graftedValue(runbook, GraftTag.LIVE_ROOT)
                 .ifPresent(
                     live ->
                         new RunbookRenderer(Path.of(live), line -> context.log().info(line))
                             .render(runbook));
+            // Only AFTER the diagnostic runbook is rendered does the run's verdict surface: the
+            // ReportModel is the fail-at-end collector (jGiven plays to completion, marking each
+            // failed step), so a FAILED or ABORTED scenario means the seed did not complete — fail
+            // the Pulumi run so the operator sees a non-zero exit, the runbook already written for
+            // the diagnosis. A clean run raises nothing.
+            final List<?> broken =
+                runbook.getScenariosWithStatus(ExecutionStatus.FAILED, ExecutionStatus.ABORTED);
+            if (!broken.isEmpty()) {
+              throw new IllegalStateException(
+                  "the cluster-seed scenario did not complete — see the rendered runbook ("
+                      + broken.size()
+                      + " failed/aborted)");
+            }
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("the cluster-seed run was interrupted", interrupted);

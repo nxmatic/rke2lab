@@ -4,6 +4,8 @@ import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -53,22 +55,22 @@ public final class IncusBddScenarios {
   public static String run(
       IncusRunbookInput input, Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
-    IncusProvisionScenario.seedInput(input);
     final SeedCodec codec = new SeedCodec();
+    final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
     return new JUnitLauncherCore<String>()
         .run(
             IncusBddScenarios.class.getClassLoader(),
             JupiterTestEngine.class,
             wiring -> List.of(DiscoverySelectors.selectClass(IncusProvisionScenario.class)),
-            (launcher, request) -> {
+            (launcher, request, sessionStore) -> {
               launcher.execute(request);
-              final String runbook =
-                  new ScenarioJsonWriter(IncusProvisionScenario.lastRunbook()).toString();
-              return codec.encode(
-                  new RunbookEnvelope(runbook, IncusProvisionScenario.lastConsultations()));
+              final ScenarioOutcome outcome = outcomeSeed.read(sessionStore);
+              final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
+              return codec.encode(new RunbookEnvelope(runbook, outcome.consultations()));
             },
-            txId.map(TxIdSeed::into)
-                .orElse(store -> {})
+            IncusProvisionScenario.INPUT
+                .into(input)
+                .andThen(txId.map(TxIdSeed::into).orElse(store -> {}))
                 .andThen(CellarEntriesSeed.into(inheritedEntries)));
   }
 
@@ -84,16 +86,17 @@ public final class IncusBddScenarios {
   public static String runReconcile(Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
     final SeedCodec codec = new SeedCodec();
+    final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
     return new JUnitLauncherCore<String>()
         .run(
             IncusBddScenarios.class.getClassLoader(),
             JupiterTestEngine.class,
             wiring -> List.of(DiscoverySelectors.selectClass(IncusReconcileScenario.class)),
-            (launcher, request) -> {
+            (launcher, request, sessionStore) -> {
               launcher.execute(request);
-              final String runbook =
-                  new ScenarioJsonWriter(IncusReconcileScenario.lastRunbook()).toString();
-              return codec.encode(new RunbookEnvelope(runbook, List.of()));
+              final ScenarioOutcome outcome = outcomeSeed.read(sessionStore);
+              final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
+              return codec.encode(new RunbookEnvelope(runbook, outcome.consultations()));
             },
             txId.map(TxIdSeed::into)
                 .orElse(store -> {})

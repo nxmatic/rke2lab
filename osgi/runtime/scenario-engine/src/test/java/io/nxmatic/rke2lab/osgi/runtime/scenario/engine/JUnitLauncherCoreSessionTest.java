@@ -26,12 +26,14 @@ class JUnitLauncherCoreSessionTest {
                 getClass().getClassLoader(),
                 JupiterTestEngine.class,
                 wiring -> List.of(DiscoverySelectors.selectClass(EmptyProbe.class)),
-                (launcher, request) -> {
+                (launcher, request, sessionStore) -> {
                   launcher.execute(request);
-                  return "harvested";
+                  // The harvest reads back what the seed put — the same session store both ends
+                  // address, the mechanism the outbound ScenarioOutcome channel rides.
+                  return sessionStore.get(NS, "fact", String.class);
                 },
                 store -> store.put(NS, "fact", "seeded-value"));
-    assertEquals("harvested", seeded);
+    assertEquals("seeded-value", seeded);
   }
 
   /** A trivial discovery target so the launcher has something to run. */

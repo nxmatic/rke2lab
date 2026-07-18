@@ -52,7 +52,7 @@ class SoclePipelineTest {
                 getClass().getClassLoader(),
                 JupiterTestEngine.class,
                 wiring -> List.of(DiscoverySelectors.selectClass(BulletproofPipeline.class)),
-                (launcher, request) -> {
+                (launcher, request, sessionStore) -> {
                   // Bind the exchange on THIS worker thread — the same thread the pipeline plays
                   // on, so its ConnectionSeeder and connect step resolve to this connection +
                   // model.

@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.cluster.bdd;
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -55,17 +57,17 @@ public final class ClusterBddScenarios {
   public static String run(Optional<String> txId, List<String> inheritedEntries)
       throws InterruptedException {
     final SeedCodec codec = new SeedCodec();
+    final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
     return new JUnitLauncherCore<String>()
         .run(
             ClusterBddScenarios.class.getClassLoader(),
             JupiterTestEngine.class,
             wiring -> List.of(DiscoverySelectors.selectClass(ClusterReadinessScenario.class)),
-            (launcher, request) -> {
+            (launcher, request, sessionStore) -> {
               launcher.execute(request);
-              final String runbook =
-                  new ScenarioJsonWriter(ClusterReadinessScenario.lastRunbook()).toString();
-              return codec.encode(
-                  new RunbookEnvelope(runbook, ClusterReadinessScenario.lastConsultations()));
+              final ScenarioOutcome outcome = outcomeSeed.read(sessionStore);
+              final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
+              return codec.encode(new RunbookEnvelope(runbook, outcome.consultations()));
             },
             txId.map(TxIdSeed::into)
                 .orElse(store -> {})

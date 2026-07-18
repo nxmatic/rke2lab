@@ -9,7 +9,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.auth.contract.AuthTokenContact;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -38,8 +37,11 @@ import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
 import io.nxmatic.rke2lab.incus.core.NocloudSeedWriter;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -55,11 +57,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The incus provisioning checkpoint, a production jGiven scenario told in the INCUS DOMAIN's own
@@ -93,37 +94,23 @@ import org.junit.jupiter.api.Test;
 public class IncusProvisionScenario
     extends ScenarioTestBase<
         IncusProvisionScenario.Given, IncusProvisionScenario.When, IncusProvisionScenario.Then>
-    implements CellarReceiver<ScenarioCellar> {
+    implements CellarReceiver<ScenarioCellar>,
+        InputReceiver<IncusRunbookInput>,
+        ConsultationSource {
 
   private static final String NODE = "bioskop-master";
 
-  // The handler seeds the activation input here before the launcher plays (same-loader static, the
-  // input twin of the manifests scion's INPUT); it carries the @Amendment(SOIL) the scenario
-  // forwards to the manifests scion it consults. Initialized (never null) so the null-hygiene gate
-  // stays green.
-  private static final AtomicReference<IncusRunbookInput> INPUT =
-      new AtomicReference<>(IncusRunbookInput.defaults());
-
-  // The front-door harvests the played model + any consultations off these holders (the same
-  // scaffolding as the other scions). Initialized (never null) so the null-hygiene gate stays
-  // green.
-  private static final AtomicReference<ReportModel> LAST_RUNBOOK = new AtomicReference<>();
-  private static final AtomicReference<List<SeedEnvelope>> LAST_CONSULTATIONS =
-      new AtomicReference<>(List.of());
-
-  /** The handler sets the sown input here before selecting this class into the launcher. */
-  public static void seedInput(IncusRunbookInput input) {
-    INPUT.set(input);
-  }
-
-  static ReportModel lastRunbook() {
-    return Objects.requireNonNull(
-        LAST_RUNBOOK.get(), "the scenario has not played yet — no runbook to harvest");
-  }
-
-  static List<SeedEnvelope> lastConsultations() {
-    return LAST_CONSULTATIONS.get();
-  }
+  /**
+   * The inbound channel the front-door ({@code IncusBddScenarios.run}) seeds the {@link
+   * IncusRunbookInput} through and this scenario receives it from (via {@link InputReceiver}). It
+   * is single-sourced here — the receiver owns the key + type — and referenced by the front-door
+   * for the seeding end ({@code INPUT.into(input)}). Registered as a {@link RegisterExtension} so
+   * its {@code TestInstancePostProcessor} fires before the body reads {@link #input}, the way the
+   * root's {@code SessionSeed} does.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<IncusRunbookInput> INPUT =
+      new ScenarioInputSeed<>(IncusRunbookInput.class, "incus-runbook-input");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
@@ -132,6 +119,16 @@ public class IncusProvisionScenario
   // Typed ScenarioCellar (not just Cellar): the manifests sub-sow reads transactionId() to pass the
   // run's tx on. @MonotonicNonNull: null until receiveCellar sets it (before the body), then read.
   @MonotonicNonNull private ScenarioCellar cellar;
+
+  // The activation input the front-door seeds before the body (InputReceiver) — it carries the
+  // @Amendment(SOIL) the scenario forwards to the manifests scion it consults. @MonotonicNonNull:
+  // null until receiveInput sets it (before the body), then read.
+  @MonotonicNonNull private IncusRunbookInput input;
+
+  // The consultations the run raised on a failed build/unreachable instance — the
+  // ScenarioOutcomeExtension PULLS them (ConsultationSource) at the run boundary. Set in the @Test
+  // after the body (jGiven defers a failed step's throw to scenario-end); empty until then.
+  private List<SeedEnvelope> consultations = List.of();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
@@ -143,6 +140,16 @@ public class IncusProvisionScenario
     this.cellar = cellar;
   }
 
+  @Override
+  public void receiveInput(IncusRunbookInput input) {
+    this.input = input;
+  }
+
+  @Override
+  public List<SeedEnvelope> consultations() {
+    return consultations;
+  }
+
   @Test
   void the_instance_is_prepared() {
     final ImageBuilder imageBuilder = resolveImageBuilder();
@@ -152,7 +159,7 @@ public class IncusProvisionScenario
     // amended (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE
     // —
     // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
-    final Resolved resolved = Resolved.from(INPUT.get().worktree(), cellar, resolveParcel());
+    final Resolved resolved = Resolved.from(input.worktree(), cellar, resolveParcel());
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -184,7 +191,7 @@ public class IncusProvisionScenario
         .and()
         .the_instance_grow_plan_is_published(
             resolved,
-            INPUT.get().image().orElse(new Image("", "", "", "")),
+            input.image().orElse(new Image("", "", "", "")),
             imageBuilder.recipeDigest(),
             cellar,
             resolveParcel());
@@ -195,8 +202,7 @@ public class IncusProvisionScenario
     if (resolved.isAmended()) {
       getScenario().getModel().addTag(GraftTag.LIVE_ROOT.of(resolved.liveRoot()));
     }
-    LAST_RUNBOOK.set(getScenario().getModel());
-    LAST_CONSULTATIONS.set(consultOnFailure(observations));
+    this.consultations = consultOnFailure(observations);
   }
 
   /**
