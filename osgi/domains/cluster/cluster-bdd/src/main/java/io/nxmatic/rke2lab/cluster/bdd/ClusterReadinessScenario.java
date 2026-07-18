@@ -17,7 +17,7 @@ import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -35,10 +35,10 @@ import org.junit.jupiter.api.Test;
  * real node of the OSGi world; it lives in {@code cluster-bdd} (only ports, no sealed internal),
  * not a {@code -test} fragment (it is live seeding logic).
  *
- * <p>It resolves its collaborator — the {@link ClusterReadinessContact} — from its OWN bundle's
- * service registry ({@link ScenarioRegistry}); the scenario is identical live and in test, only who
- * published the contact differs (the live {@code KubectlClusterContact}, or a mock a test seeds
- * into the registry before playing). The phases form a strict chain (kubeconfig → API →
+ * <p>Its collaborator — the {@link ClusterReadinessContact} — is INJECTED from its OWN bundle's
+ * service registry by the {@link OsgiService} bridge; the scenario is identical live and in test,
+ * only who published the contact differs (the live {@code KubectlClusterContact}, or a mock a test
+ * seeds into the registry before playing). The phases form a strict chain (kubeconfig → API →
  * controllers): a not-ready phase throws, jGiven marks it FAILED and skips the downstream chained
  * steps, so the runbook shows exactly where readiness broke.
  */
@@ -51,6 +51,15 @@ public class ClusterReadinessScenario
     implements ConsultationSource {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
+  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
+  // bridge owns presence): the contact awaits SCR (orElseThrow never fires — the bridge throws
+  // first if absent); the doctor is await=false, a snapshot, empty when a world booted without it.
+  @OsgiService private Optional<ClusterReadinessContact> contact = Optional.empty();
+
+  @OsgiService(await = false)
+  private Optional<ConsultingService> doctor = Optional.empty();
 
   // The consultations the run raised on a failing phase — the ScenarioOutcomeExtension PULLS them
   // (ConsultationSource) at the run boundary. Set in the @Test after the body (jGiven defers a
@@ -69,10 +78,12 @@ public class ClusterReadinessScenario
 
   @Test
   void the_cluster_becomes_ready() {
-    final ClusterReadinessContact contact = resolveContact();
     final Map<ClusterReadinessPhase, ObservationWire> observations =
         new EnumMap<>(ClusterReadinessPhase.class);
-    given().the_cluster("seed", kubeconfig()).and().probed_through(contact, observations);
+    given()
+        .the_cluster("seed", kubeconfig())
+        .and()
+        .probed_through(contact.orElseThrow(), observations);
     when()
         .the_kubeconfig_is_published()
         .and()
@@ -100,8 +111,8 @@ public class ClusterReadinessScenario
     if (!anySymptom) {
       return List.of();
     }
-    return resolveDoctor()
-        .map(doctor -> List.of(doctor.consult(consultCheckpoint(observations))))
+    return doctor
+        .map(consulting -> List.of(consulting.consult(consultCheckpoint(observations))))
         .orElseGet(List::of);
   }
 
@@ -128,28 +139,6 @@ public class ClusterReadinessScenario
    */
   private static Path kubeconfig() {
     return Path.of("/srv/host/kubeconfig");
-  }
-
-  /**
-   * Resolve the cluster contact from THIS bundle's registry (via {@link ScenarioRegistry}). A test
-   * seeds a mock under the same interface before playing; live, SCR has published {@code
-   * KubectlClusterContact}.
-   */
-  private ClusterReadinessContact resolveContact() {
-    return ScenarioRegistry.of(this)
-        .require(
-            ClusterReadinessContact.class,
-            "no ClusterReadinessContact in the registry (live edge or test mock must publish one)");
-  }
-
-  /**
-   * Resolve the doctor's {@link ConsultingService} from THIS bundle's registry, or {@link
-   * Optional#empty()} if none is published — a real runtime condition (a world booted without the
-   * doctor), so a failing phase without a doctor degrades to no consultation rather than a crash.
-   * Unlike the contact, the doctor is OPTIONAL: the checkpoint still fails, just unconsulted.
-   */
-  private Optional<ConsultingService> resolveDoctor() {
-    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /** Given: the kubeconfig to read the cluster through, the controllers to wait on, the contact. */

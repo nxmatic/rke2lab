@@ -17,8 +17,8 @@ import io.nxmatic.rke2lab.incus.core.HostTreeDiffer;
 import io.nxmatic.rke2lab.incus.core.HostTreePromoter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -68,6 +68,12 @@ public class IncusReconcileScenario
   // until receiveCellar sets it (before the body), then read.
   @MonotonicNonNull private ScenarioCellar cellar;
 
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
+  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
+  // bridge owns presence): both required, awaited from SCR, so their orElseThrow never fires.
+  @OsgiService private Optional<RunGate> gateService = Optional.empty();
+  @OsgiService private Optional<Parcel> parcelService = Optional.empty();
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -80,8 +86,8 @@ public class IncusReconcileScenario
 
   @Test
   void the_live_tree_is_reconciled() {
-    final RunGate gate = resolveGate();
-    final Parcel parcel = resolveParcel();
+    final RunGate gate = gateService.orElseThrow();
+    final Parcel parcel = parcelService.orElseThrow();
     final Reconciliation reconciliation = Reconciliation.foldFrom(cellar, parcel);
     given().the_host_tree(NODE).and().reconciling_through(gate, cellar, parcel, reconciliation);
     when().the_run_condition_is_read().and().the_change_is_decided().and().the_live_is_promoted();
@@ -94,22 +100,6 @@ public class IncusReconcileScenario
           .getModel()
           .addTag(GraftTag.PROMOTED.of(reconciliation.source().get().stagingRoot()));
     }
-  }
-
-  private RunGate resolveGate() {
-    return require(
-        RunGate.class,
-        "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
-  }
-
-  private Parcel resolveParcel() {
-    return require(
-        Parcel.class,
-        "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
-  }
-
-  private <T> T require(Class<T> type, String message) {
-    return ScenarioRegistry.of(this).require(type, message);
   }
 
   /**

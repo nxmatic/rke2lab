@@ -18,8 +18,8 @@ import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvOverlayService;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -52,12 +53,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * writeControlplaneOverlay} lands the {@code 99-…} overlay the master's install/ready scripts read
  * — invisible at the master frontier (the founding rule).
  *
- * <p>It resolves its collaborators from its OWN bundle's registry ({@link ScenarioRegistry}): the
- * {@link ManifestSynthesisService} + {@link NodeEnvOverlayService} (the SCR-published synthesis)
- * and the ambient {@link RunGate} (whose {@link RunGate#cultivating() cultivating} decides whether
- * materialisation targets the real tree or a survey temp dir). The activation facet is seeded by
- * the front-door via the inbound {@link #INPUT} channel and received here ({@link InputReceiver})
- * before the play; the outbound {@code ScenarioOutcome} channel harvests the played runbook.
+ * <p>Its collaborators are INJECTED from its OWN bundle's registry by the {@link OsgiService}
+ * bridge: the {@link ManifestSynthesisService} + {@link NodeEnvOverlayService} (the SCR-published
+ * synthesis) and the ambient {@link RunGate} (whose {@link RunGate#cultivating() cultivating}
+ * decides whether materialisation targets the real tree or a survey temp dir). The activation facet
+ * is seeded by the front-door via the inbound {@link #INPUT} channel and received here ({@link
+ * InputReceiver}) before the play; the outbound {@code ScenarioOutcome} channel harvests the played
+ * runbook.
  */
 @SeedScenario
 public class ManifestSynthesisScenario
@@ -89,6 +91,13 @@ public class ManifestSynthesisScenario
   // receiveInput sets it (before the body), then read.
   @MonotonicNonNull private ManifestsRunbookInput input;
 
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
+  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
+  // bridge owns presence): all three required, awaited from SCR, so their orElseThrow never fires.
+  @OsgiService private Optional<ManifestSynthesisService> synthesis = Optional.empty();
+  @OsgiService private Optional<NodeEnvOverlayService> overlay = Optional.empty();
+  @OsgiService private Optional<RunGate> gate = Optional.empty();
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -102,13 +111,11 @@ public class ManifestSynthesisScenario
   @Test
   void the_manifests_are_synthesized_from_the_activation_facet() {
     final ManifestsRunbookInput facet =
-        Objects.requireNonNull(
-            input, "the activation facet was not seeded before the scenario ran");
-    final ManifestSynthesisService synthesis = resolve(ManifestSynthesisService.class);
-    final NodeEnvOverlayService overlay = resolve(NodeEnvOverlayService.class);
-    final RunGate gate = resolveGate();
-
-    given().the_activation_facet(facet).and().the_synthesis_services(synthesis, overlay, gate);
+        Objects.requireNonNull(input, "the activation facet was not seeded before the body");
+    given()
+        .the_activation_facet(facet)
+        .and()
+        .the_synthesis_services(synthesis.orElseThrow(), overlay.orElseThrow(), gate.orElseThrow());
     when()
         .the_policy_is_derived_from_the_facet()
         .and()
@@ -121,20 +128,6 @@ public class ManifestSynthesisScenario
         .the_manifests_file_is_written()
         .and()
         .the_overlay_carries_the_link_time_policy();
-  }
-
-  private <T> T resolve(Class<T> type) {
-    return ScenarioRegistry.of(this)
-        .require(
-            type,
-            "no " + type.getSimpleName() + " in the registry (manifests-core must publish it)");
-  }
-
-  private RunGate resolveGate() {
-    return ScenarioRegistry.of(this)
-        .require(
-            RunGate.class,
-            "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
   }
 
   /** Given: the activation facet and the synthesis collaborators. */

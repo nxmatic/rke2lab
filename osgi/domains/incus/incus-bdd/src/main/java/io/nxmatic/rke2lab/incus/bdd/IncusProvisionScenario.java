@@ -40,9 +40,9 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
@@ -57,6 +57,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
@@ -76,13 +77,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * host-cellar-realisation CORRECTION 2026-07-14; the heavy Pulumi-bound instance grow stays
  * host-side). Not a {@code -test} fragment (it is live seeding logic).
  *
- * <p>The bbox/systemd/cluster twin: it resolves its collaborators from its OWN bundle's registry
- * ({@link ScenarioRegistry}) — the {@link ImageBuilder}, the {@link
+ * <p>The bbox/systemd/cluster twin: its collaborators are INJECTED from its OWN bundle's registry
+ * by the {@link OsgiService} bridge — the {@link ImageBuilder}, the {@link
  * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (to consult manifests), the ambient {@link
  * RunGate} (whose {@link RunGate#cultivating() cultivating} decides build-for-real vs plan-only),
- * and, on a failure, the doctor's {@link ConsultingService}. The scenario is identical live and in
- * test; only who published the collaborators differs (the live {@code DistrobuilderImageBuilder} +
- * the real broker + the host's RunGate, or the mocks a test seeds).
+ * and, on a failure, the doctor's {@link ConsultingService} (an optional snapshot). The scenario is
+ * identical live and in test; only who published the collaborators differs (the live {@code
+ * DistrobuilderImageBuilder} + the real broker + the host's RunGate, or the mocks a test seeds).
  *
  * <p>Preview inertness — the SCION consults the RunGate: under a closed gate it does NOT build the
  * image nor consult manifests (the real edge would ssh/build), it records the plan and the step
@@ -125,6 +126,25 @@ public class IncusProvisionScenario
   // null until receiveInput sets it (before the body), then read.
   @MonotonicNonNull private IncusRunbookInput input;
 
+  // The collaborators the OsgiServiceExtension injects from THIS bundle's registry before the body
+  // (the @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null —
+  // the
+  // bridge owns presence): the five required ones await SCR and the bridge throws if absent, so
+  // their orElseThrow never fires; authToken + doctor are await=false snapshots (a world may boot
+  // without either — secrets fall back to the environment, a failure without a doctor degrades to
+  // unconsulted).
+  @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
+  @OsgiService private Optional<RunGate> gate = Optional.empty();
+  @OsgiService private Optional<SeedBroker> broker = Optional.empty();
+  @OsgiService private Optional<Parcel> parcel = Optional.empty();
+  @OsgiService private Optional<NetplanSynthesisService> netplan = Optional.empty();
+
+  @OsgiService(await = false)
+  private Optional<AuthTokenContact> authToken = Optional.empty();
+
+  @OsgiService(await = false)
+  private Optional<ConsultingService> doctor = Optional.empty();
+
   // The consultations the run raised on a failed build/unreachable instance — the
   // ScenarioOutcomeExtension PULLS them (ConsultationSource) at the run boundary. Set in the @Test
   // after the body (jGiven defers a failed step's throw to scenario-end); empty until then.
@@ -152,14 +172,15 @@ public class IncusProvisionScenario
 
   @Test
   void the_instance_is_prepared() {
-    final ImageBuilder imageBuilder = resolveImageBuilder();
-    final RunGate gate = resolveGate();
-    final SeedBroker broker = resolveBroker();
+    final ImageBuilder imageBuilder = this.imageBuilder.orElseThrow();
+    final Parcel parcel = this.parcel.orElseThrow();
+    final IncusRunbookInput input =
+        Objects.requireNonNull(this.input, "the IncusRunbookInput was not seeded before the body");
     // The scion reconstructs the provisioning topology from the flat worktree scalars the host
     // amended (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE
     // —
     // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
-    final Resolved resolved = Resolved.from(input.worktree(), cellar, resolveParcel());
+    final Resolved resolved = Resolved.from(input.worktree(), cellar, parcel);
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -167,9 +188,9 @@ public class IncusProvisionScenario
     given()
         .the_seed_node(NODE)
         .and()
-        .prepared_through(imageBuilder, gate, observations, resolveNetplan())
+        .prepared_through(imageBuilder, gate.orElseThrow(), observations, netplan.orElseThrow())
         .and()
-        .consulting_manifests_through(broker, resolved.soil(), cellar);
+        .consulting_manifests_through(broker.orElseThrow(), resolved.soil(), cellar);
     when()
         .the_run_condition_is_read()
         .and()
@@ -179,22 +200,22 @@ public class IncusProvisionScenario
         .and()
         .the_nocloud_seed_is_unwrapped(resolved)
         .and()
-        .the_secrets_are_written(resolved, resolveAuthToken())
+        .the_secrets_are_written(resolved, authToken)
         .and()
         .the_network_is_resolved(resolved);
     then()
         .the_instance_is_prepared()
         .and()
-        .the_prep_is_stored(imageBuilder, resolved.soil(), cellar, resolveParcel())
+        .the_prep_is_stored(imageBuilder, resolved.soil(), cellar, parcel)
         .and()
-        .the_staging_is_published(resolved, cellar, resolveParcel())
+        .the_staging_is_published(resolved, cellar, parcel)
         .and()
         .the_instance_grow_plan_is_published(
             resolved,
             input.image().orElse(new Image("", "", "", "")),
             imageBuilder.recipeDigest(),
             cellar,
-            resolveParcel());
+            parcel);
     // Pose the live root the host renders the runbook into — a within-run fact whose layout
     // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
     // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
@@ -217,8 +238,8 @@ public class IncusProvisionScenario
     if (!anySymptom) {
       return List.of();
     }
-    return resolveDoctor()
-        .map(doctor -> List.of(doctor.consult(consultCheckpoint(observations))))
+    return doctor
+        .map(consulting -> List.of(consulting.consult(consultCheckpoint(observations))))
         .orElseGet(List::of);
   }
 
@@ -242,72 +263,6 @@ public class IncusProvisionScenario
    */
   private static ImageBuildRequest imageRequest() {
     return new ImageBuildRequest("distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "");
-  }
-
-  private ImageBuilder resolveImageBuilder() {
-    return require(
-        ImageBuilder.class,
-        "no ImageBuilder in the registry (live edge or test mock must publish one)");
-  }
-
-  /**
-   * Resolve the ambient {@link RunGate} from THIS bundle's registry — the whole-run live/preview
-   * fact. Required: a run without a published gate is a wiring bug (the host publishes it at boot,
-   * a test registers a mock), so this fails loud rather than guessing a default.
-   */
-  private RunGate resolveGate() {
-    return require(
-        RunGate.class,
-        "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
-  }
-
-  /**
-   * Resolve the {@link SeedBroker} from THIS bundle's registry — the door incus sows toward to
-   * consult the manifests scion (amend → runbook). Required: the broker is an SCR
-   * {@code @Component} the framework publishes; a run without it is a wiring bug (a test registers
-   * a mock broker).
-   */
-  private SeedBroker resolveBroker() {
-    return require(
-        SeedBroker.class,
-        "no SeedBroker in the registry (the framework publishes DefaultSeedBroker; a test mocks it)");
-  }
-
-  /**
-   * Resolve the current {@link Parcel} — the one plot this run cultivates, published as an ambient
-   * fact beside the Cellar (the twin of the RunGate). The scion stores under it without ever
-   * computing the stack identity.
-   */
-  private Parcel resolveParcel() {
-    return require(
-        Parcel.class,
-        "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
-  }
-
-  /**
-   * Resolve the {@link AuthTokenContact} from THIS bundle's registry, or {@link Optional#empty()}
-   * when no {@code auth-edge} is published — {@link LaunchSecretsWriter} still resolves tokens from
-   * the environment (its higher-precedence source), so a missing contact degrades gracefully rather
-   * than failing the prepare.
-   */
-  private Optional<AuthTokenContact> resolveAuthToken() {
-    return ScenarioRegistry.of(this).optional(AuthTokenContact.class);
-  }
-
-  /**
-   * Resolve the {@link NetplanSynthesisService} from THIS bundle's registry — the
-   * {@code @Component} the scion reads (like {@link ImageBuilder}) to derive the network blueprint
-   * it projects into the grow plan. Required: a run without it is a wiring bug (netplan-core
-   * publishes it; a test mocks it).
-   */
-  private NetplanSynthesisService resolveNetplan() {
-    return require(
-        NetplanSynthesisService.class,
-        "no NetplanSynthesisService in the registry (netplan-core publishes it; a test mocks it)");
-  }
-
-  private <T> T require(Class<T> type, String message) {
-    return ScenarioRegistry.of(this).require(type, message);
   }
 
   /**
@@ -358,15 +313,6 @@ public class IncusProvisionScenario
     boolean isAmended() {
       return !stagingRoot.isBlank();
     }
-  }
-
-  /**
-   * Resolve the doctor's {@link ConsultingService} from THIS bundle's registry, or {@link
-   * Optional#empty()} if none is published — a real runtime condition (a world booted without the
-   * doctor), so a failure without a doctor degrades to no consultation rather than a crash.
-   */
-  private Optional<ConsultingService> resolveDoctor() {
-    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /** Given: the seed node, the image builder, the run gate, the observation sink, and the door. */

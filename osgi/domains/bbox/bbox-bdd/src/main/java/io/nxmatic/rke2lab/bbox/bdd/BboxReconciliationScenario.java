@@ -22,7 +22,7 @@ import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
@@ -45,13 +45,13 @@ import org.junit.jupiter.api.Test;
  * bbox-bdd} (only ports + the pure {@link BlueprintRowEnumerator}, no sealed internal), not a
  * {@code -test} fragment (it is live seeding logic).
  *
- * <p>It resolves its collaborators from its OWN bundle's service registry ({@link
- * ScenarioRegistry}): the {@link BboxReconciler} contact, the ambient {@link RunGate} (whose {@link
- * RunGate#cultivating() cultivating} decides live-apply vs dry-run — the SCION consults it, not the
- * edge), and, on a refused row, the doctor's {@link ConsultingService}. The scenario is identical
- * live and in test; only who published the collaborators differs (the live {@code
- * LiveBboxReconciler} + the host's RunGate, or the mocks a test seeds into the registry before
- * playing).
+ * <p>Its collaborators are INJECTED from its OWN bundle's service registry by the {@link
+ * OsgiService} bridge: the {@link BboxReconciler} contact, the ambient {@link RunGate} (whose
+ * {@link RunGate#cultivating() cultivating} decides live-apply vs dry-run — the SCION consults it,
+ * not the edge), and, on a refused row, the doctor's {@link ConsultingService} (an optional
+ * snapshot). The scenario is identical live and in test; only who published the collaborators
+ * differs (the live {@code LiveBboxReconciler} + the host's RunGate, or the mocks a test seeds into
+ * the registry before playing).
  */
 @SeedScenario
 public class BboxReconciliationScenario
@@ -59,7 +59,7 @@ public class BboxReconciliationScenario
         BboxReconciliationScenario.Given,
         BboxReconciliationScenario.When,
         BboxReconciliationScenario.Then>
-    implements CellarReceiver, ConsultationSource {
+    implements CellarReceiver<Cellar>, ConsultationSource {
 
   /** The router base-URI the scion reconciles against; the mock edge ignores it. */
   private static final URI ROUTER = URI.create("http://bbox.local");
@@ -74,6 +74,19 @@ public class BboxReconciliationScenario
   // @MonotonicNonNull: null until receiveCellar sets it (before the body), then read, never
   // re-null.
   @MonotonicNonNull private Cellar cellar;
+
+  // The collaborators the OsgiServiceExtension injects from THIS bundle's registry before the body
+  // (the @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null —
+  // the
+  // bridge owns presence): the required ones await SCR and the bridge throws if absent, so their
+  // orElseThrow never fires; the doctor is await=false — a snapshot, empty when a world booted
+  // without it.
+  @OsgiService private Optional<BboxReconciler> contact = Optional.empty();
+  @OsgiService private Optional<RunGate> gate = Optional.empty();
+  @OsgiService private Optional<Parcel> parcel = Optional.empty();
+
+  @OsgiService(await = false)
+  private Optional<ConsultingService> doctor = Optional.empty();
 
   // The consultations the run raised on a refused row — the ScenarioOutcomeExtension PULLS them
   // (ConsultationSource) at the run boundary. Set in the @Test after the body (jGiven defers a
@@ -97,8 +110,6 @@ public class BboxReconciliationScenario
 
   @Test
   void the_reservations_are_reconciled() {
-    final BboxReconciler contact = resolveContact();
-    final RunGate gate = resolveGate();
     final List<BboxReservationRequest> desired = new BlueprintRowEnumerator().rows();
     // The @Test body OWNS the outcome sink (the same discipline as cluster's observations map): the
     // When fills it, and the consult below reads THIS reference — independent of jGiven's stage
@@ -107,14 +118,14 @@ public class BboxReconciliationScenario
     given()
         .the_desired_reservations(desired.size())
         .and()
-        .reconciled_through(contact, gate, outcomes);
+        .reconciled_through(contact.orElseThrow(), gate.orElseThrow(), outcomes);
     when().the_run_condition_is_read().and().the_reservations_are_reconciled_against_the_router();
     then()
         .every_row_has_an_outcome()
         .and()
         .no_failed_row_is_silently_dropped()
         .and()
-        .the_harvest_is_stored(cellar, resolveParcel());
+        .the_harvest_is_stored(cellar, parcel.orElseThrow());
     this.consultations = consultOnRefusal(outcomes);
   }
 
@@ -135,8 +146,8 @@ public class BboxReconciliationScenario
     if (refused.isEmpty()) {
       return List.of();
     }
-    return resolveDoctor()
-        .map(doctor -> List.of(doctor.consult(consultCheckpoint(refused))))
+    return doctor
+        .map(consulting -> List.of(consulting.consult(consultCheckpoint(refused))))
         .orElseGet(List::of);
   }
 
@@ -162,46 +173,6 @@ public class BboxReconciliationScenario
             refused);
     final SeedCodec codec = new SeedCodec();
     return SeedEnvelope.of(DoctorCoordinate.READINESS_CHECKPOINT, codec.encode(checkpoint));
-  }
-
-  private BboxReconciler resolveContact() {
-    return ScenarioRegistry.of(this)
-        .require(
-            BboxReconciler.class,
-            "no BboxReconciler in the registry (live edge or test mock must publish one)");
-  }
-
-  /**
-   * Resolve the ambient {@link RunGate} from THIS bundle's registry — the whole-run live/preview
-   * fact. Required: a run without a published gate is a wiring bug (the host publishes it at boot,
-   * a test registers a mock), so this fails loud rather than guessing a default.
-   */
-  private RunGate resolveGate() {
-    return ScenarioRegistry.of(this)
-        .require(
-            RunGate.class,
-            "no RunGate in the registry (the host publishes it at boot, a test registers a mock)");
-  }
-
-  /**
-   * Resolve the doctor's {@link ConsultingService} from THIS bundle's registry, or {@link
-   * Optional#empty()} if none is published — a real runtime condition (a world booted without the
-   * doctor), so a refused row without a doctor degrades to no consultation rather than a crash.
-   */
-  private Optional<ConsultingService> resolveDoctor() {
-    return ScenarioRegistry.of(this).optional(ConsultingService.class);
-  }
-
-  /**
-   * Resolve the current {@link Parcel} — the one plot this run cultivates, published as an ambient
-   * fact beside the Cellar (the twin of the RunGate). The scion stores under it without ever
-   * computing the stack identity.
-   */
-  private Parcel resolveParcel() {
-    return ScenarioRegistry.of(this)
-        .require(
-            Parcel.class,
-            "no current Parcel in the registry (the host publishes it at the GIVEN like the RunGate)");
   }
 
   /**

@@ -9,10 +9,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * The socle every seed scenario wears — jGiven ({@link JGivenExtension}), the transactional cellar
- * ({@link ScenarioCellarExtension}), and the outbound outcome channel ({@link
- * ScenarioOutcomeExtension}), the three extensions that ALWAYS go together on a scenario (whether a
- * host root or an in-container scion). One meta-annotation instead of repeating the trio, the way
- * {@code @SeedRuntime} composes its own extension.
+ * ({@link ScenarioCellarExtension}), the OSGi-service injection bridge ({@link
+ * OsgiServiceExtension}), and the outbound outcome channel ({@link ScenarioOutcomeExtension}), the
+ * extensions that ALWAYS go together on a scenario (whether a host root or an in-container scion).
+ * One meta-annotation instead of repeating them, the way {@code @SeedRuntime} composes its own
+ * extension.
  *
  * <p>It does NOT include {@code @SeedRuntime} (the world lifecycle): a scion plays INSIDE the world
  * the host booted and resolves through its own bundle registry, so only the host ROOT adds
@@ -30,5 +31,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @Target(ElementType.TYPE)
 @ExtendWith(JGivenExtension.class)
 @ExtendWith(ScenarioCellarExtension.class)
+@ExtendWith(OsgiServiceExtension.class)
 @ExtendWith(ScenarioOutcomeExtension.class)
 public @interface SeedScenario {}

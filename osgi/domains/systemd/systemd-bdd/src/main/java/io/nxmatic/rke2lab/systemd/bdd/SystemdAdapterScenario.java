@@ -13,7 +13,7 @@ import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioRegistry;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -36,12 +36,12 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The systemd twin of {@code ClusterReadinessScenario}: identical shape, one difference of
  * nature — systemd has no phase chain, so the single probe's snapshot is read across a small chain
- * of readable assertions rather than a chain of contact calls. It resolves its collaborator — the
- * {@link SystemdRuntimeProbe} — from its OWN bundle's registry ({@link ScenarioRegistry}); the
- * scenario is identical live and in test, only who published the probe differs (the live {@code
- * DbusSystemdProbe}, or a mock a test seeds into the registry before playing). A not-ready facet
- * throws, jGiven marks it FAILED and skips the downstream chained assertions, so the runbook shows
- * exactly which systemd fact broke.
+ * of readable assertions rather than a chain of contact calls. Its collaborator — the {@link
+ * SystemdRuntimeProbe} — is INJECTED from its OWN bundle's registry by the {@link OsgiService}
+ * bridge; the scenario is identical live and in test, only who published the probe differs (the
+ * live {@code DbusSystemdProbe}, or a mock a test seeds into the registry before playing). A
+ * not-ready facet throws, jGiven marks it FAILED and skips the downstream chained assertions, so
+ * the runbook shows exactly which systemd fact broke.
  *
  * <p>The endpoint the probe opens is described by a fixed {@link SystemdProbeRequest} marker (as
  * {@code ClusterReadinessScenario} uses a fixed kubeconfig path): the offline mock ignores it, and
@@ -54,6 +54,15 @@ public class SystemdAdapterScenario
     implements ConsultationSource {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
+  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
+  // bridge owns presence): the probe awaits SCR (orElseThrow never fires — the bridge throws first
+  // if absent); the doctor is await=false, a snapshot, empty when a world booted without it.
+  @OsgiService private Optional<SystemdRuntimeProbe> probe = Optional.empty();
+
+  @OsgiService(await = false)
+  private Optional<ConsultingService> doctor = Optional.empty();
 
   // The consultations the run raised on a failing facet — the ScenarioOutcomeExtension PULLS them
   // (ConsultationSource) at the run boundary. Set in the @Test after the body (jGiven defers a
@@ -72,9 +81,8 @@ public class SystemdAdapterScenario
 
   @Test
   void the_systemd_adapter_becomes_reachable() {
-    final SystemdRuntimeProbe probe = resolveProbe();
     final List<ObservationWire> observations = new ArrayList<>();
-    given().the_seed_node("seed").and().probed_through(probe, observations);
+    given().the_seed_node("seed").and().probed_through(probe.orElseThrow(), observations);
     when()
         .the_systemd_endpoint_is_probed()
         .and()
@@ -99,8 +107,8 @@ public class SystemdAdapterScenario
     if (!anySymptom) {
       return List.of();
     }
-    return resolveDoctor()
-        .map(doctor -> List.of(doctor.consult(consultCheckpoint(observations))))
+    return doctor
+        .map(consulting -> List.of(consulting.consult(consultCheckpoint(observations))))
         .orElseGet(List::of);
   }
 
@@ -126,27 +134,6 @@ public class SystemdAdapterScenario
    */
   private static SystemdProbeRequest endpoint() {
     return new SystemdProbeRequest("localhost", 0, "seed", "unknown");
-  }
-
-  /**
-   * Resolve the systemd runtime probe from THIS bundle's registry (via {@link ScenarioRegistry}). A
-   * test seeds a mock under the same interface before playing; live, SCR has published {@code
-   * DbusSystemdProbe}.
-   */
-  private SystemdRuntimeProbe resolveProbe() {
-    return ScenarioRegistry.of(this)
-        .require(
-            SystemdRuntimeProbe.class,
-            "no SystemdRuntimeProbe in the registry (live edge or test mock must publish one)");
-  }
-
-  /**
-   * Resolve the doctor's {@link ConsultingService} from THIS bundle's registry, or {@link
-   * Optional#empty()} if none is published — a real runtime condition (a world booted without the
-   * doctor), so a failing facet without a doctor degrades to no consultation rather than a crash.
-   */
-  private Optional<ConsultingService> resolveDoctor() {
-    return ScenarioRegistry.of(this).optional(ConsultingService.class);
   }
 
   /** Given: the seed node to reach, the probe, and the shared observation buffer the When fills. */
