@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
-import io.nxmatic.rke2lab.manifests.contract.ManifestUpdateGate;
-import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,18 +22,10 @@ public final class EntryGatePolicyEnforcer {
 
   private EntryGatePolicyEnforcer() {}
 
-  /**
-   * Run the entry-gate policies in order. {@code bootedFramework} is threaded only into the
-   * manifests-update gate, which reads its {@link ManifestUpdateGate} from the framework registry.
-   * The policy table is built here (rather than as a static field) so the manifests-gate check can
-   * close over that runtime.
-   */
-  public static void enforceAll(
-      Path worktreePath, boolean cleanWorktreeRequired, BootedFramework bootedFramework) {
+  /** Run the entry-gate policies in order — the host-side git checks on the worktree. */
+  public static void enforceAll(Path worktreePath, boolean cleanWorktreeRequired) {
     final List<EntryGatePolicy> policies =
         List.of(
-            new EntryGatePolicy(
-                "manifests-update-gate", path -> enforceManifestUpdateGate(path, bootedFramework)),
             new EntryGatePolicy(
                 "clean-git-worktree", EntryGatePolicyEnforcer::enforceCleanWorktree),
             new EntryGatePolicy(
@@ -53,17 +43,6 @@ public final class EntryGatePolicyEnforcer {
             "Entry-gate policy failed (" + policy.name() + "): " + ex.getMessage(), ex);
       }
     }
-  }
-
-  /** Read the single {@link ManifestUpdateGate} from the booted framework's registry. */
-  private static void enforceManifestUpdateGate(
-      Path worktreePath, BootedFramework bootedFramework) {
-    final ManifestUpdateGate gate = bootedFramework.awaitService(ManifestUpdateGate.class, 5000);
-    if (gate == null) {
-      throw new IllegalStateException(
-          "No ManifestUpdateGate published in the OSGi registry within 5s.");
-    }
-    gate.enforce(worktreePath);
   }
 
   private static void enforceCleanWorktree(Path worktreePath) {

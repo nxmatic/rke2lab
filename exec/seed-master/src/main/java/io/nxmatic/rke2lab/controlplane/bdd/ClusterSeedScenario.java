@@ -19,7 +19,6 @@ import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
-import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.SeedRuntime;
@@ -269,12 +268,10 @@ public class ClusterSeedScenario
           .context()
           .registerService(OpaqueCellar.class, cellarRealisation, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
-      final BootedFramework framework =
-          BootedFramework.attached(gardening.connection().framework());
       this.preflightGate =
           () ->
               EntryGatePolicyEnforcer.enforceAll(
-                  run.config().localWorktreePath(), run.cleanWorktreeRequired(), framework);
+                  run.config().localWorktreePath(), run.cleanWorktreeRequired());
       return self();
     }
   }

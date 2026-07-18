@@ -1280,11 +1280,23 @@ seed)`. The `Cellar` is ALWAYS present: every sow issues from a scenario whose c
 optionality lives INSIDE it (`transactionId()` is the `Optional`, empty for a non-transactional play). The
 type at the seam is the port interface `Cellar` (module direction: `scenario-engine` → `seed-broker-port`,
 so the port cannot name `ScenarioCellar`). The two handler natures stay: the 5 `*RunbookHandler`s
-(cluster/systemd/incus/manifests/bbox) LAUNCH an in-container run — they cast `(ScenarioCellar) cellar` (safe:
-the injected cellar is universally a `ScenarioCellar` at runtime) and FLATTEN the transaction at the launcher
-boundary (`TxIdSeed.into(transactionId())` + `WriteSetSeed.into(writeSet())`, both flat strings — the
+(cluster/systemd/incus/manifests/bbox) LAUNCH an in-container run — they cast the crossed cellar to
+`TransactionalCellar` and FLATTEN the transaction at the launcher boundary
+(`TxIdSeed.into(transactionId())` + `WriteSetSeed.into(writeSet())`, both flat strings — the
 isolation guard-rail); the 5 reflectors (Amend/Shape/Split/Intervention/Readiness) TRANSFORM and IGNORE the
-cellar. The boot is NOT a sow, so no sow precedes the root minting its `txId`.
+cellar.
+
+*The cast crosses a SEAM, never the realm-library.* A handler receives the neutral `Cellar` and needs the
+two transactional accessors (`transactionId()`, `entriesEncoded()`). It must NOT cast to the concrete
+`ScenarioCellar`: that class is a dual REALM-LIBRARY (flat host-side, a bundle package in-container), so it
+exists as two `Class` objects — casting the crossed cellar to it throws `ClassCastException`, the
+DUPLICATE_REALM_CLASS split (surfaced 2026-07-18 the first time a scion crossing actually ran host→bundle).
+The fix: a seam sub-interface `TransactionalCellar extends Cellar` in `seed-broker-port` (system-exported,
+ONE copy), carrying exactly the two flat-typed accessors (`Optional<String>`, `List<String>` — seam-eligible,
+nothing concrete crosses). `ScenarioCellar implements TransactionalCellar`; the handlers cast to the seam.
+It is a SUB-interface, not two methods folded onto `Cellar`, because a durable backend (`PulumiCellar`, the
+test doubles) is not transactional. The invariant: a seam type crosses the boundary as an object (one
+system-exported copy); a dual realm-library must never cross as an object, only its seam view. The boot is NOT a sow, so no sow precedes the root minting its `txId`.
 
 *The lifecycle — the host adopts `BaseWorldExtension`.* The connection to the shared framework is a WORLD
 fact (it lives as long as the framework). `BaseWorldExtension` (already written, used by the scions) opens

@@ -651,7 +651,6 @@ graph TB
       DDOC["DefaultManifestDocumentService"]
       DEXP["DefaultManifestExplodeService"]
       DNEO["DefaultNodeEnvOverlayService"]
-      DGATE["DefaultManifestUpdateGate"]
       DFLOX["DefaultFloxRuntimeAssetService"]
     end
     subgraph regs["domain registrars (ManifestsDomainRegistrar)"]
@@ -700,10 +699,6 @@ the seam.
 | `DefaultNodeEnvOverlayService`
 | Implements `NodeEnvOverlayService`: aggregates registered contributors and writes the ConfigMap
   overlay (seed variables + per-layer sections).
-
-| `DefaultManifestUpdateGate`
-| Implements `ManifestUpdateGate`: the manifests-owned Stage-A gate that runs synthesis smoke tests
-  (completeness + domain registration).
 
 | `DefaultFloxRuntimeAssetService`
 | Implements `FloxRuntimeAssetService`: materialises the flox installer assets and reports the

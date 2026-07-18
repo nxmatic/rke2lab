@@ -25,6 +25,7 @@ Service-Component: OSGI-INF/*.xml
 # JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
 Import-Package: \
     !org.jspecify.annotations, \
+    !org.checkerframework.checker.nullness.qual, \
     com.tngtech.jgiven.impl, \
     com.tngtech.jgiven.impl.intercept, \
     com.tngtech.jgiven.*, \

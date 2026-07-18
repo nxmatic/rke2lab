@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,7 +35,7 @@ import java.util.function.Supplier;
  * store}), so the extension can inject this cellar before jGiven has bound the model to the
  * scenario — the order between the two post-processors is a non-issue.
  */
-public final class ScenarioCellar implements Cellar {
+public final class ScenarioCellar implements TransactionalCellar {
 
   private final Supplier<ReportModel> model;
   private final Supplier<Cellar> durableReads;
@@ -65,6 +66,7 @@ public final class ScenarioCellar implements Cellar {
    * correlation. So "error if transactional, tolerated otherwise" is encoded by the value itself —
    * no ad-hoc emptiness check at the call site.
    */
+  @Override
   public Optional<String> transactionId() {
     return txId.isEmpty() ? Optional.empty() : Optional.of(txId);
   }
@@ -76,6 +78,7 @@ public final class ScenarioCellar implements Cellar {
    * sense, § seed-broker-spec, the entries descend); the sub-scion's extension re-posts them via
    * {@link #inheritEntries}. Flat by construction, so nothing live crosses the launcher membrane.
    */
+  @Override
   public List<String> entriesEncoded() {
     return entriesEncodedOf(model.get());
   }

@@ -1,13 +1,13 @@
 package io.nxmatic.rke2lab.manifests.bdd;
 
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -40,7 +40,7 @@ public final class ManifestsRunbookHandler implements SeedHandler {
   public SeedEnvelope handle(Cellar cellar, SeedEnvelope trigger) {
     final ManifestsRunbookInput facet =
         codec.decode(trigger.payload(), ManifestsRunbookInput.class);
-    final ScenarioCellar transaction = (ScenarioCellar) cellar;
+    final TransactionalCellar transaction = (TransactionalCellar) cellar;
     try {
       return SeedEnvelope.of(
           COORDINATE,

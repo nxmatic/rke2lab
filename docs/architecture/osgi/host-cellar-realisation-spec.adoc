@@ -642,6 +642,13 @@ instance mounts from. That is why the plan carries NO device view: the host, hol
 scalars + `BootstrapPaths`, derives the mounts itself (`fromLocalWorktree(...).asAutomountView(...)` +
 the `HostPathCatalog` guest paths) — the scion-projects/host-actualises rule applied to paths.
 
+*The scion-side producers (incus-core, OSGi-only).* Three collaborators assemble the plan, each named
+by `IncusProvisionScenario`'s PREPARE beats: `GrowNetworkResolver` (resolves `NetplanSynthesisService`
+→ the `GrowNetworkView`), `GrowPlanAssembler` (folds network + image + cloud-init into the one
+`InstanceGrowPlan`, computing `buildChecksum` and probing the readable NFS artifact dir), and
+`GitProvenanceReader` (reads the worktree HEAD provenance the checksum folds in). They are incus-core
+computation, consumed only by the incus scion — the same domain across the realm boundary.
+
 *What the scion computes and projects (all OSGi-side, none host):*
 
 * *the network view* — the scion resolves `NetplanSynthesisService` from its own registry (a published

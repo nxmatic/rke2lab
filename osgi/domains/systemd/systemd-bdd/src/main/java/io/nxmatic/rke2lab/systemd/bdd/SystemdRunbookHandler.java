@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.systemd.bdd;
 
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -30,7 +30,7 @@ public final class SystemdRunbookHandler implements SeedHandler {
 
   @Override
   public SeedEnvelope handle(Cellar cellar, SeedEnvelope trigger) {
-    final ScenarioCellar transaction = (ScenarioCellar) cellar;
+    final TransactionalCellar transaction = (TransactionalCellar) cellar;
     try {
       return SeedEnvelope.of(
           COORDINATE,

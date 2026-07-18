@@ -179,6 +179,39 @@
       <artifactId>bbox-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The domain SCION bundles (*-bdd): each carries the @Component SeedHandler that GROWS its
+         runbook coordinate — BboxRunbookHandler serves RunbookCoordinate("bbox"), and so on for
+         incus (provision + reconcile), manifests (sub-sown by incus), systemd, cluster. The broker
+         resolves a grower by coordinate from the registry when the root sows a crossing; without the
+         scion bundle staged + its SCR component active, DefaultSeedBroker.sow throws "no SeedHandler
+         serves coordinate". runtime scope — seed-master never compiles against a scion; it speaks
+         only the neutral RunbookCoordinate through the broker membrane. embed;type=model, so each is
+         staged INTACT under META-INF/bundles like the edges. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bbox-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>cluster-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
          flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
          the launch-secrets updater resolves AuthTokenContact from the registry (singleSpiProvider).

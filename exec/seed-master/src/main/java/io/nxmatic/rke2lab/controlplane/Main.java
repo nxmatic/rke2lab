@@ -63,10 +63,12 @@ public final class Main {
                     Main.class.getClassLoader(),
                     JupiterTestEngine.class,
                     wiring -> List.of(DiscoverySelectors.selectClass(ClusterSeedScenario.class)),
-                    (launcher, request) -> {
-                      launcher.execute(request);
-                      return Boolean.TRUE;
-                    },
+                    JUnitLauncherCore.failFast(
+                        line -> context.log().info(line),
+                        (launcher, request) -> {
+                          launcher.execute(request);
+                          return Boolean.TRUE;
+                        }),
                     ClusterSeedScenario.SEED
                         .into(run)
                         .andThen(RunRoleSeed.into(RunRole.ROOT))

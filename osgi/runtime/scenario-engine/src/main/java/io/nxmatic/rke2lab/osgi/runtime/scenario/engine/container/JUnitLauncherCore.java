@@ -13,6 +13,8 @@ import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.core.LauncherConfig;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
+import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
+import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import org.osgi.framework.wiring.BundleWiring;
 
 /**
@@ -135,5 +137,45 @@ public final class JUnitLauncherCore<R> {
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException("cannot instantiate TestEngine " + engineClass.getName(), e);
     }
+  }
+
+  /**
+   * Decorate a harvest so a scenario FAILURE surfaces as a thrown exception instead of a silent
+   * pass. The JUnit Platform records test failures in listeners and returns from {@code
+   * launcher.execute} normally — so a plain harvest that runs a scenario and returns a value
+   * SWALLOWS the failure, and a driver reading a post-run holder (the runbook) then dies on a blind
+   * NPE that masks the real cause. This attaches a {@link SummaryGeneratingListener}, delegates to
+   * {@code inner} (which calls {@code execute}), logs the run tally, and — if any test failed —
+   * rethrows the FIRST failure's own throwable (the scenario-step exception), so the driver sees
+   * the true cause.
+   *
+   * <p>OPT-IN, never the default: the in-container front-doors ({@code *BddScenarios.run}) and
+   * {@code InContainerJUnitRunner} deliberately HARVEST failure (a scion consults its doctor and
+   * returns a FAILED envelope; the runner enumerates PASS/FAIL) — they must NOT rethrow. Only a
+   * driver that plays a scenario expected to PASS (the host {@code Main}) wraps its harvest in
+   * {@code failFast}.
+   */
+  public static <R> HarvestStrategy<R> failFast(Consumer<String> log, HarvestStrategy<R> inner) {
+    return (launcher, request) -> {
+      final SummaryGeneratingListener summary = new SummaryGeneratingListener();
+      launcher.registerTestExecutionListeners(summary);
+      final R result = inner.harvest(launcher, request);
+      final TestExecutionSummary played = summary.getSummary();
+      log.accept(
+          "scenario run: "
+              + played.getTestsSucceededCount()
+              + " passed, "
+              + played.getTestsFailedCount()
+              + " failed, "
+              + played.getTestsSkippedCount()
+              + " skipped");
+      if (played.getTotalFailureCount() > 0) {
+        final TestExecutionSummary.Failure first = played.getFailures().get(0);
+        throw new IllegalStateException(
+            "the scenario failed at " + first.getTestIdentifier().getDisplayName(),
+            first.getException());
+      }
+      return result;
+    };
   }
 }
