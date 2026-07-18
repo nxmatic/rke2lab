@@ -35,6 +35,12 @@
       <groupId>io.nxmatic.rke2lab.sdks</groupId>
       <artifactId>incus</artifactId>
     </dependency>
+    <!-- The dual-realm host face of the incus contract: the host GROW fetches the InstanceGrowPlan
+         the scion projected and actualises it on the Pulumi graph (type=library, flat host-side). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-contract-host</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pulumi-edge</artifactId>

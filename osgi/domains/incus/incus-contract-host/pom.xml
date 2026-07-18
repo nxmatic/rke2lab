@@ -12,16 +12,18 @@
 
   <artifactId>incus-contract-host</artifactId>
   <name>osgi/domains/incus/incus-contract-host</name>
-  <description>The HOST face of the incus contract — the flat value views the pure-host GROW consumes.
-    The GROW runs host-flat (outside Felix, com.pulumi lives there) yet is still the incus domain
-    talking to itself across the realm boundary com.pulumi imposes: the scion (OSGi) PROJECTS an
-    InstanceGrowPlan and the host GROW ACTUALISES it. type=library dual-realm, like seed-broker-codec:
-    staged as a bundle OSGi-side (the scion assembles the plan) AND kept flat host-side (the GROW
-    fetches and decodes it via the dual-realm SeedCodec). RECORDS OF FLAT VALUES ONLY — zero
-    method-logic, zero com.pulumi, zero OSGi service reference; if behaviour crept in, this module
-    would be the door through which it leaks host-side. Legitimate — and NOT a seam transgression —
-    because producer and consumer are the SAME domain (intra-domain dual-realm), orthogonal to the
-    inter-domain seam purity the contract-purity guard protects. See
+  <description>The HOST face of the incus contract — what BOTH realms genuinely consume. The GROW
+    runs host-flat (outside Felix, com.pulumi lives there) yet is still the incus domain talking to
+    itself across the realm boundary com.pulumi imposes: the scion (OSGi) PROJECTS an InstanceGrowPlan
+    and the host GROW ACTUALISES it. type=library dual-realm, like seed-broker-codec: staged as a
+    bundle OSGi-side AND kept flat host-side (the GROW fetches and decodes via the dual-realm codec).
+    It carries the flat value views (InstanceGrowPlan + sub-views) AND the pure path logic both realms
+    share (BootstrapPaths — the scion materialises into it, the host derives the instance mounts from
+    it, so the plan needs no device view). Governance (dual-realm library rule): the red line is NOT
+    "no logic" but "no dependency absent from either realm" — a type may carry pure logic here iff it
+    depends only on the JDK + jspecify (no OSGi type, no other domain, no service reference) and is
+    owned by this one domain. Legitimate and NOT a seam transgression — producer and consumer are the
+    SAME domain (intra-domain dual-realm), orthogonal to the contract-purity guard. See
     docs/architecture/osgi/host-cellar-realisation-spec.adoc § the-grow-anatomy.</description>
 
   <dependencies>

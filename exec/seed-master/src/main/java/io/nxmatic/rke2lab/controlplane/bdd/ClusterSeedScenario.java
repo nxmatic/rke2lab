@@ -13,7 +13,11 @@ import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
+import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
+import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
@@ -22,6 +26,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
+import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.seed.bdd.CellarStage;
 import io.nxmatic.rke2lab.seed.bdd.PreflightGate;
 import io.nxmatic.rke2lab.seed.bdd.PreflightStage;
@@ -29,6 +34,7 @@ import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
 import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
@@ -79,6 +85,15 @@ public class ClusterSeedScenario
    */
   @RegisterExtension
   public static final SessionSeed<SeedRun> SEED = new SessionSeed<>(SeedRun.class, "seed-run");
+
+  /**
+   * Installs the live Pulumi deployment on the launcher worker thread before the body, so the GROW
+   * beat's {@code com.pulumi} resources resolve (the deployment is a plain ThreadLocal the worker
+   * does not inherit). Registered like {@link #SEED} — its {@code beforeEach} fires before the
+   * WHEN.
+   */
+  @RegisterExtension
+  public static final PulumiDeploymentSeed DEPLOYMENT = new PulumiDeploymentSeed();
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
@@ -150,6 +165,8 @@ public class ClusterSeedScenario
         .and()
         .the_live_tree_is_reconciled(hostTree)
         .and()
+        .the_instance_grows()
+        .and()
         .the_systemd_adapter_is_launched(hostTree)
         .and()
         .the_cluster_becomes_ready(hostTree);
@@ -180,6 +197,9 @@ public class ClusterSeedScenario
     @ProvidedScenarioState Parcel parcel;
     @ProvidedScenarioState JsonNode worktreeScalars;
     @ProvidedScenarioState JsonNode imageScalars;
+    // The run's provisioning config — the host GROW derives the instance mounts from it (via the
+    // dual-realm BootstrapPaths) and builds the provider context from it.
+    @ProvidedScenarioState BootstrapConfig config;
     // The run's working cellar — the root's own ScenarioCellar (the seam type Cellar here),
     // injected
     // onto the scenario instance and published for SowAndGraftStage; every sow carries it, so a
@@ -216,6 +236,8 @@ public class ClusterSeedScenario
       imageScalars.put("builderHost", run.config().imageBuilderHost());
       imageScalars.put("sharedFolder", run.config().imageSharedFolder().toString());
       this.imageScalars = imageScalars;
+      // The host GROW derives the instance mounts + provider context from the run's config.
+      this.config = run.config();
       // Publish the ambient RunGate the scions resolve — projected from the run mode.
       // registerService,
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).
@@ -262,6 +284,11 @@ public class ClusterSeedScenario
     @ScenarioState Parcel parcel;
     @ScenarioState JsonNode worktreeScalars;
     @ScenarioState JsonNode imageScalars;
+    @ScenarioState BootstrapConfig config;
+
+    // Decodes the InstanceGrowPlan envelope the GROW fetches — the host's flat copy of the codec
+    // (dual-realm), the same the cellar drains through.
+    private final SeedCodec codec = new SeedCodec();
 
     @NestedSteps
     @As("the entry gates are enforced")
@@ -315,6 +342,26 @@ public class ClusterSeedScenario
       sowAndGraft
           .sowing("incus-reconcile", gardening, hostTree)
           .the_scion_is_sown_and_grafted("the live tree is reconciled");
+      return self();
+    }
+
+    @As("the instance grows")
+    public When the_instance_grows() {
+      // The pure-host GROW (§ host-cellar § the-grow-anatomy): NOT a scion — the com.pulumi graph
+      // cannot enter Felix, so it runs here, host-flat, between the promote (reconcile) and systemd
+      // (which runs inside the instance). It fetches the InstanceGrowPlan the incus scion projected
+      // (decoded host-side via the dual-realm codec) and actualises it: Project→{Network,Profile,
+      // Image}→Instance + the 17 mounts it derives from BootstrapPaths. Gated on a live Pulumi
+      // deployment on THIS worker thread (PulumiDeploymentSeed installs it) — absent in a
+      // standalone
+      // /offline run, where there is nothing to grow.
+      if (!PulumiDeploymentSeed.isDeploymentPresent()) {
+        return self();
+      }
+      cellarRealisation
+          .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN)
+          .map(envelope -> codec.decode(envelope, InstanceGrowPlan.class))
+          .ifPresent(plan -> new InstanceGrow(config, line -> {}).grow(plan));
       return self();
     }
 

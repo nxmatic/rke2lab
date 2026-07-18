@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane;
 
 import com.pulumi.Pulumi;
+import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSeedScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
@@ -14,6 +15,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCo
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRoleSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
+import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import java.nio.file.Path;
@@ -68,7 +70,11 @@ public final class Main {
                     ClusterSeedScenario.SEED
                         .into(run)
                         .andThen(RunRoleSeed.into(RunRole.ROOT))
-                        .andThen(TxIdSeed.into(run.txId())));
+                        .andThen(TxIdSeed.into(run.txId()))
+                        // The live Pulumi deployment, seeded onto the launcher worker so the GROW
+                        // beat's com.pulumi resources resolve there (the deployment is a plain
+                        // ThreadLocal, not inherited by the worker) — § PulumiDeploymentSeed.
+                        .andThen(PulumiDeploymentSeed.into(Deployment.getInstance())));
             // Render the runbook (adoc + json) into host.live.d AFTER the play — the two-channel
             // rule: the runbook is narration, materialised post-run. It cannot travel through the
             // promotion (a mid-scenario beat), so the host writes it into the live tree directly, a

@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.incus.core;
+package io.nxmatic.rke2lab.incus.contract.host;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -47,7 +47,17 @@ public record BootstrapPaths(
     RKE2_CONFIG("/srv/host/rke2-config.d"),
     CLOUDCONFIG_NOCLOUD("/srv/host/cloudconfig-nocloud.d"),
     SHARE("/srv/host/rke2lab-share.d"),
-    KUBECONFIG("/srv/host/rke2lab-kube.d");
+    KUBECONFIG("/srv/host/rke2lab-kube.d"),
+    // The daemonset device's guest mount target. In main this lived apart (a nested
+    // DaemonsetLogPolicy in the host monolith, deleted with it); now that HostPathCatalog is the
+    // dual-realm single source of the instance's mount targets, this guest path belongs here with
+    // the others. (manifests owns its OWN /srv/host/k8s-daemonset.d/runtime/... literals — a
+    // different domain, a different realm; they cannot share this constant and don't need to.)
+    DAEMONSET("/srv/host/k8s-daemonset.d"),
+    // The NoCloud seed's guest mount target — cloud-init's fixed convention (where the agent reads
+    // at first boot), not a /srv/host root, but still a mount TARGET the instance takes, so it is
+    // single-sourced here with the rest rather than left a literal at the grow site.
+    NOCLOUD_SEED("/var/lib/cloud/seed/nocloud");
 
     private final String containerPath;
 
