@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
-import java.util.Objects;
+import java.util.Optional;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.StoreScope;
 import org.junit.platform.engine.support.store.Namespace;
@@ -49,10 +49,22 @@ public final class ScenarioOutcomeSeed {
    * as a blind NPE on the caller's {@code .runbook()}.
    */
   public ScenarioOutcome read(NamespacedHierarchicalStore<Namespace> sessionStore) {
+    return find(sessionStore)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "no ScenarioOutcome in the session store — the scenario did not wear"
+                        + " @SeedScenario (the ScenarioOutcomeExtension never seeded it)"));
+  }
+
+  /**
+   * READ the seeded outcome, or {@code null} when none was seeded — the raw form {@link
+   * ScenarioPlayer} uses to tell "a body ran and produced an outcome" apart from "the body never
+   * ran" (a before-phase failure aborted the node), so it can surface the captured node failure
+   * rather than a blind NPE. {@link #read} is the strict form for callers that know it is present.
+   */
+  public Optional<ScenarioOutcome> find(NamespacedHierarchicalStore<Namespace> sessionStore) {
     final Namespace ns = Namespace.create((Object[]) nsParts);
-    return Objects.requireNonNull(
-        sessionStore.get(ns, KEY, ScenarioOutcome.class),
-        "no ScenarioOutcome in the session store — the scenario did not wear @SeedScenario"
-            + " (the ScenarioOutcomeExtension never seeded it)");
+    return Optional.ofNullable(sessionStore.get(ns, KEY, ScenarioOutcome.class));
   }
 }

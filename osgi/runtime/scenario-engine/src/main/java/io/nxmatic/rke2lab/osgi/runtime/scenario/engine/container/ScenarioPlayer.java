@@ -1,11 +1,15 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.engine.JupiterTestEngine;
+import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.engine.support.store.Namespace;
 import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
+import org.junit.platform.launcher.TestExecutionListener;
+import org.junit.platform.launcher.TestIdentifier;
 
 /**
  * The one recipe that plays a {@code @SeedScenario} in-container and harvests its {@link
@@ -40,6 +44,22 @@ public final class ScenarioPlayer {
    */
   public interface Playable {}
 
+  /** First-wins holder for the earliest node failure a run reported (the root cause to surface). */
+  private static final class NodeFailure {
+    private @org.jspecify.annotations.Nullable Throwable first;
+
+    void recordFirst(Throwable t) {
+      if (first == null) {
+        first = t;
+      }
+    }
+
+    /** The earliest captured failure — empty when the run reported none (the frontier rule). */
+    Optional<Throwable> first() {
+      return Optional.ofNullable(first);
+    }
+  }
+
   private final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
 
   /**
@@ -58,8 +78,29 @@ public final class ScenarioPlayer {
             JupiterTestEngine.class,
             wiring -> List.of(DiscoverySelectors.selectClass(scenarioClass)),
             (launcher, request, sessionStore) -> {
+              // Capture any node failure — a BEFORE-phase throw (test-instance post-processing,
+              // @OsgiService injection, a beforeAll) aborts the node BEFORE the body runs, so
+              // ScenarioOutcomeExtension (an afterTestExecution callback) never seeds the outcome.
+              // Without this listener the harvest would read null and NPE, MASKING the real cause;
+              // instead we surface the captured failure (§ the outcome channel is fail-at-end only
+              // for a body that RAN).
+              final NodeFailure nodeFailure = new NodeFailure();
+              launcher.registerTestExecutionListeners(
+                  new TestExecutionListener() {
+                    @Override
+                    public void executionFinished(TestIdentifier id, TestExecutionResult result) {
+                      result.getThrowable().ifPresent(nodeFailure::recordFirst);
+                    }
+                  });
               launcher.execute(request);
-              return outcomeSeed.read(sessionStore);
+              return outcomeSeed
+                  .find(sessionStore)
+                  .orElseThrow(
+                      () ->
+                          new IllegalStateException(
+                              "the scenario produced no outcome — its body never ran (a"
+                                  + " before-phase failure aborted the node); see the cause",
+                              nodeFailure.first().orElse(null)));
             },
             seedSessionStore);
   }

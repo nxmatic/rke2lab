@@ -14,6 +14,8 @@ import org.junit.platform.launcher.core.LauncherConfig;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.osgi.framework.wiring.BundleWiring;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs a JUnit Platform {@link Launcher} inside Felix on a dedicated host-bound thread, the engine
@@ -46,6 +48,8 @@ import org.osgi.framework.wiring.BundleWiring;
  * @param <R> the harvested result type (see {@link HarvestStrategy})
  */
 public final class JUnitLauncherCore<R> {
+
+  private static final Logger log = LoggerFactory.getLogger(JUnitLauncherCore.class);
 
   /**
    * Run {@code engineClass} against {@code discovery}'s selectors on a dedicated thread bound to
@@ -95,6 +99,12 @@ public final class JUnitLauncherCore<R> {
     worker.join();
 
     if (failure.get() != null) {
+      // The wrapper below loses the cause chain when jGiven serialises only the head stack into the
+      // rendered runbook; a remote debugger deadlocks here (any console write blocks the paused
+      // JVM,
+      // § pax-logging), so the ONLY way to see the root cause on a live run is to log it — runtime
+      // logging works. Prints the full "Caused by:" chain to pulumi.log.
+      log.error("in-container JUnit run failed — full root-cause chain follows", failure.get());
       throw new IllegalStateException("in-container JUnit run failed", failure.get());
     }
     return out.get();

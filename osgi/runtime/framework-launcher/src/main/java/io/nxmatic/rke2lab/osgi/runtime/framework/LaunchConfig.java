@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.osgi.runtime.framework;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -13,13 +14,47 @@ import java.util.Optional;
  *       bypassing import/export wiring. For JDK-internal packages a library reaches reflectively
  *       without importing them — notably {@code sun.misc} for byte-buddy's {@code
  *       ClassInjector.UsingReflection}. A system-bundle EXPORT cannot serve these (the consumer
- *       never declares the import to wire to). Empty in prod; set by the test executor.
+ *       never declares the import to wire to). BOTH executors set {@code sun.misc}: the live boot
+ *       ({@code FrameworkLaunch.embedded}) and the test executor ({@code ScenarioTestkit.felix})
+ *       both play jGiven scenarios, so byte-buddy needs it in both. {@link #defaults} leaves it
+ *       empty — each executor adds what it needs via {@link #withBootDelegation}.
  *   <li>{@link #felixLogLevel} — Felix's own {@code felix.log.level} (the resolver's internal
  *       trace, the only place a failed resolve explains WHICH requirement could not be wired). Null
  *       leaves the Felix default; the test executor raises it via {@code @FrameworkLog}.
  * </ul>
  */
 public record LaunchConfig(List<String> bootDelegation, Optional<Integer> felixLogLevel) {
+
+  /**
+   * The boot-delegation every jGiven-PLAYING boot needs — the single source both executors derive
+   * from, so the requirement can never be set in one and forgotten in the other (the live boot once
+   * was: byte-buddy failed in-container while the tests, which had it, stayed green). jGiven's
+   * {@code beforeEach} generates each stage subclass via byte-buddy's {@code
+   * ClassInjector.UsingReflection}, which reaches {@code sun.misc.Unsafe} reflectively — a
+   * JDK-internal package no system-bundle export can serve. The live boot ({@code
+   * FrameworkLaunch.embedded}) and the test executor ({@code ScenarioTestkit.felix}) both reference
+   * THIS, never the bare {@code "sun.misc"} literal.
+   */
+  public static final List<String> SCENARIO_PLAY_BOOT_DELEGATION = List.of("sun.misc");
+
+  /**
+   * Stamp the Felix properties that must be IDENTICAL in every boot — the single source both
+   * executors derive from, the twin discipline of {@link #SCENARIO_PLAY_BOOT_DELEGATION} (a
+   * requirement set in one boot and forgotten in the other is exactly the class of bug that let the
+   * live boot diverge). Today one invariant: {@code felix.bootdelegation.implicit=false} — Felix
+   * defaults it TRUE, guessing by stack inspection when an outside-a-bundle load should fall
+   * through to the parent classloader; that silent escape hatch would let a non-wired (seam)
+   * package resolve by accident, so a typed-seam proof could pass for the wrong reason. Off = every
+   * load not satisfied by a bundle's imports / Bundle-ClassPath / the system bundle fails loudly.
+   * Both the live {@code FrameworkLauncher} and the test {@code OutOfContainerFrameworkExtension}
+   * apply this.
+   *
+   * @param config the mutable Felix property map each executor is building (values are {@code
+   *     String} in the test, {@code Object} in the live boot — {@code ? super String} accepts both)
+   */
+  public static void applyFrameworkInvariants(Map<String, ? super String> config) {
+    config.put("felix.bootdelegation.implicit", "false");
+  }
 
   public LaunchConfig {
     bootDelegation = List.copyOf(bootDelegation);
@@ -31,7 +66,11 @@ public record LaunchConfig(List<String> bootDelegation, Optional<Integer> felixL
   }
 
   public LaunchConfig withBootDelegation(String... packages) {
-    return new LaunchConfig(List.of(packages), felixLogLevel);
+    return withBootDelegation(List.of(packages));
+  }
+
+  public LaunchConfig withBootDelegation(List<String> packages) {
+    return new LaunchConfig(packages, felixLogLevel);
   }
 
   public LaunchConfig withFelixLogLevel(int level) {

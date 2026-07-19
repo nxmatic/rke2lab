@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.scenario.testkit;
 
+import io.nxmatic.rke2lab.osgi.runtime.framework.LaunchConfig;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
 
 /**
@@ -23,10 +24,11 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkEx
  * docs/architecture/osgi/jgiven-osgi-wrap-spike-report.adoc}):
  *
  * <ul>
- *   <li>{@code bootDelegation(sun.misc)} — byte-buddy's {@code ClassInjector.UsingReflection}
- *       reaches {@code Unsafe} reflectively WITHOUT importing it, so no system-export can serve it;
- *       it must be parent-loaded. One JDK-internal package, NOT a viral {@code
- *       DynamicImport-Package}.
+ *   <li>{@code bootDelegation(...)} — byte-buddy's {@code ClassInjector.UsingReflection} reaches
+ *       {@code Unsafe} reflectively WITHOUT importing it, so no system-export can serve it; it must
+ *       be parent-loaded. One JDK-internal package, NOT a viral {@code DynamicImport-Package}. From
+ *       the ONE shared source {@link LaunchConfig#SCENARIO_PLAY_BOOT_DELEGATION} the live boot also
+ *       uses — so the requirement is stated once, never set here and forgotten there.
  *   <li>{@code installFromClasspath(...)} — jGiven's whole dependency tail, every one ALREADY an
  *       OSGi bundle, installed as bundles. guava splits {@code util.concurrent.internal} into the
  *       failureaccess companion, so that ships too. Plus {@code jgiven-wrap} itself.
@@ -61,7 +63,7 @@ public final class ScenarioTestkit {
         // is on every -test module's classpath via bundle-test-parent. The rare jGiven test whose
         // module lacks felix.scr (the ScenarioTestkitGuardTest in scenario-testkit) opts out with
         // .withoutScr() at its own call site.
-        .bootDelegation("sun.misc")
+        .bootDelegation(LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION.toArray(String[]::new))
         .systemPackages(
             "org.slf4j;version=2.0.17",
             "org.slf4j.spi;version=2.0.17",

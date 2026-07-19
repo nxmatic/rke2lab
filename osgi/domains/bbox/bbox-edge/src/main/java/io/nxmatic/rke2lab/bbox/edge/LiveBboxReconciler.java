@@ -13,6 +13,8 @@ import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -28,18 +30,44 @@ public final class LiveBboxReconciler implements BboxReconciler {
   @Override
   public List<BboxRowOutcome> reconcile(
       URI baseUri, String adminPassword, boolean dryRun, List<BboxReservationRequest> requests) {
-    final Mode mode = dryRun ? Mode.DRY_RUN : Mode.APPLY;
+    // Dry-run (preview) touches NOTHING — no session, no login, no read (§ RunGate: touching the
+    // live system in preview would hang or lie; here the router login even 400s). Each row is a
+    // speculative WOULD_CREATE without opening the client. Only a live apply opens a session.
+    if (dryRun) {
+      return requests.stream().map(LiveBboxReconciler::wouldCreate).toList();
+    }
     final List<BboxRowOutcome> outcomes = new ArrayList<>(requests.size());
     try (BboxApiClient client = openClient(baseUri, adminPassword)) {
       final ReservationReconciler reconciler = new ReservationReconciler(client);
       for (BboxReservationRequest request : requests) {
         final RowOutcome outcome =
             reconciler.apply(
-                new DesiredReservation(request.mac(), request.ip(), request.hostname()), mode);
+                new DesiredReservation(request.mac(), request.ip(), request.hostname()),
+                Mode.APPLY);
         outcomes.add(toHome(request, outcome));
       }
     }
     return outcomes;
+  }
+
+  /**
+   * The speculative outcome a dry-run projects for a desired row without contacting the router: it
+   * WOULD create the reservation (no bbox-side id, no previous state, no failure). A preview that
+   * cannot read the live table cannot tell CREATE from UPDATE/MATCHING, so it reports the honest
+   * upper bound — WOULD_CREATE — never a false MATCHING.
+   */
+  private static BboxRowOutcome wouldCreate(BboxReservationRequest request) {
+    return new BboxRowOutcome(
+        request.cluster(),
+        request.node(),
+        BboxAction.WOULD_CREATE,
+        request.mac(),
+        request.ip(),
+        request.hostname(),
+        OptionalInt.empty(),
+        Optional.empty(),
+        Optional.empty(),
+        Optional.empty());
   }
 
   private static BboxApiClient openClient(URI baseUri, String adminPassword) {

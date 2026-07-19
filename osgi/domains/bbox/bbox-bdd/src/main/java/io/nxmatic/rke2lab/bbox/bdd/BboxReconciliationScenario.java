@@ -63,7 +63,7 @@ public class BboxReconciliationScenario
     implements CellarReceiver<Cellar>, ConsultationSource, ScenarioPlayer.Playable {
 
   /** The router base-URI the scion reconciles against; the mock edge ignores it. */
-  private static final URI ROUTER = URI.create("http://bbox.local");
+  private static final URI ROUTER = URI.create("http://mabbox.bytel.fr");
 
   /** The bbox admin secret; the mock edge ignores it, a fixed marker suffices in the scenario. */
   private static final String ADMIN_PASSWORD = "admin";

@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleInstaller;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
+import io.nxmatic.rke2lab.osgi.runtime.framework.LaunchConfig;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -305,12 +306,9 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     Map<String, String> config = new HashMap<>();
     config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
-    // Off (Felix defaults it true): no stack-inspection guesswork falling a non-wired class through
-    // to the parent (app) classloader. Every load must be satisfied by a bundle's imports /
-    // Bundle-ClassPath / the system bundle, or fail loudly — deterministic, and a seam package can
-    // never be served by the flat parent instead of its single declared exporter. Mirrors the prod
-    // FrameworkLauncher.
-    config.put("felix.bootdelegation.implicit", "false");
+    // The Felix invariants every boot shares — the SAME source the live FrameworkLauncher uses, so
+    // this executor can never drift from it (§ LaunchConfig.applyFrameworkInvariants).
+    LaunchConfig.applyFrameworkInvariants(config);
     // The test class may opt into louder framework diagnostics via @FrameworkLog — the only place a
     // failed resolve()/activation explains WHICH requirement could not be wired. Default ERROR.
     context

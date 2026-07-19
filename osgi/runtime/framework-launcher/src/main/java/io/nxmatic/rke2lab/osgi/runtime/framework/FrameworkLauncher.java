@@ -117,15 +117,10 @@ public final class FrameworkLauncher {
     final Map<String, Object> config = new HashMap<>();
     config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
-    // Felix defaults felix.bootdelegation.implicit=true: it GUESSES, by stack inspection, when a
-    // class-load instigated from OUTSIDE a bundle should fall through to the parent (app)
-    // classloader. That is the silent escape hatch that lets a non-wired package resolve by
-    // accident
-    // — and would let a seam package be served by the flat parent instead of the single declared
-    // exporter, making a typed-seam proof pass for the wrong reason. Off: every load not satisfied
-    // by
-    // a bundle's imports / Bundle-ClassPath / the system bundle fails loudly.
-    config.put("felix.bootdelegation.implicit", "false");
+    // The Felix invariants every boot shares (felix.bootdelegation.implicit=false) — one source,
+    // so the live and test boots can never diverge on them (§
+    // LaunchConfig.applyFrameworkInvariants).
+    LaunchConfig.applyFrameworkInvariants(config);
     // Felix's own internal logger routes into JUL (→ the bridge → logback) instead of System.out.
     config.put("felix.log.logger", new FelixJulLogger());
     if (config.get("felix.log.level") == null) {

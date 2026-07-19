@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.SeedRun;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
@@ -45,6 +46,26 @@ public final class Main {
   private Main() {}
 
   public static void main(String[] args) {
+    // Point logback's FILE appender at the project state dir BEFORE the first log line (logback
+    // initialises lazily on first use, so this must precede any logging). One source for the
+    // ".local.d" convention — BootstrapPaths.STATE_DIR — not a literal duplicated into logback.xml.
+    // The XML reads ${seed.log.dir} with a safe default if this is ever absent.
+    System.setProperty("seed.log.dir", BootstrapPaths.STATE_DIR);
+
+    // Silence the process's raw console. pax-logging (in-container, its own default config, NOT our
+    // host logback.xml) and any stray printStackTrace write straight to System.out/err — and under
+    // a remote debugger that console is not drained, so the native FileOutputStream.write BLOCKS
+    // the
+    // FelixStartLevel thread and the whole boot deadlocks (proven by jstack). Every real log
+    // already
+    // goes to .local.d/seed-master.log via the logback FILE appender, so the raw streams carry
+    // nothing we need; routing them to a sink makes the JVM debuggable. Pulumi reads the engine
+    // gRPC
+    // channel, not stdout, so it is unaffected.
+    final java.io.PrintStream sink =
+        new java.io.PrintStream(java.io.OutputStream.nullOutputStream(), true);
+    System.setOut(sink);
+    System.setErr(sink);
     Pulumi.run(
         context -> {
           final RunMode runMode = RunMode.detect(true);

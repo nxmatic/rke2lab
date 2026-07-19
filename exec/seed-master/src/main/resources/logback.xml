@@ -7,6 +7,21 @@
     </encoder>
   </appender>
 
+  <!-- File appender: Pulumi redirects/truncates the launched seed-master's stdout, so console
+       output is unreliable when debugging the launched process. Main sets ${seed.log.dir} from
+       BootstrapPaths.STATE_DIR before the first log line (the single source for the .local.d
+       convention — no literal duplicated here); the default keeps it working if ever unset. The
+       path is relative to the CWD Pulumi launches `java -jar` from (the worktree root), so it lands
+       at <worktree>/.local.d/seed-master.log — tail -f it while a `pulumi up` runs (logback creates
+       the parent dir). Overwrites each run (append=false) so the file reflects the latest launch. -->
+  <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>${seed.log.dir:-.local.d}/seed-master.log</file>
+    <append>false</append>
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
   <!-- Suppress Netty debug/trace logging -->
   <logger name="io.netty" level="ERROR"/>
   <logger name="io.grpc.netty" level="ERROR"/>
@@ -19,6 +34,7 @@
 
   <!-- Root logger -->
   <root level="INFO">
-    <appender-ref ref="CONSOLE"/>
+    <!--appender-ref ref="CONSOLE"/-->
+    <appender-ref ref="FILE"/>
   </root>
 </configuration>

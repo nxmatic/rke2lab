@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tngtech.jgiven.report.json.ScenarioJsonReader;
+import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.bbox.contract.BboxAction;
@@ -25,7 +27,9 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.io.File;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -94,6 +98,22 @@ public class BboxReconciliationScenarioInContainerTest {
                 () -> new AssertionError("the scion stored no harvest at bbox-reservations"));
     assertEquals(DESIRED_COUNT, summary.desiredCount(), "the summary counts every row");
     assertEquals(DESIRED_COUNT, summary.matchingCount(), "a live all-matching run: all matched");
+
+    // The HOST-CROSSING round-trip the GenericRunbookHandler + ScenarioGraft actually run in prod:
+    // serialise the outcome's model to JSON (ScenarioJsonWriter) and rebuild it
+    // (ScenarioJsonReader,
+    // exactly what ScenarioGraft.rebuild does — that base-package type is not bundle-exported). The
+    // live-outcome assertions above never exercise this — the coverage gap that let the live graft
+    // fail with "no scenario to graft" while the tests stayed green.
+    final String runbookJson = new ScenarioJsonWriter(runbook).toString();
+    final File tmp = File.createTempFile("bbox-graft-roundtrip", ".json");
+    tmp.deleteOnExit();
+    Files.writeString(tmp.toPath(), runbookJson);
+    final ReportModel rebuilt = new ScenarioJsonReader().apply(tmp);
+    assertEquals(
+        1,
+        rebuilt.getScenarios().size(),
+        "the serialised-then-rebuilt runbook still carries its scenario (the graft's input)");
   }
 
   @Test

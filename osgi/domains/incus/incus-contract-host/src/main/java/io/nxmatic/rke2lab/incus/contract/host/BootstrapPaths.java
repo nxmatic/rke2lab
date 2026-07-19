@@ -86,13 +86,20 @@ public record BootstrapPaths(
   }
 
   /**
+   * The per-run state dir under the worktree root — {@code .local.d}, the DARWIN-local convention
+   * this class lays out. Named once here (the single source) rather than spelled as a literal at
+   * every site that reaches into the state tree (the host log file, the kubeconfig ref, …).
+   */
+  public static final String STATE_DIR = ".local.d";
+
+  /**
    * The DARWIN-local layout: {@code .local.d/<cluster>/<node>/} owns everything per-node, with the
    * cluster-scoped kubeconfig at {@code .local.d/<cluster>/kubeconfig.yaml}. One short {@code cd}
    * lands in the per-node tree — no {@code var/{run,lib}/incus/...} split to mentally translate.
    */
   public static BootstrapPaths fromLocalWorktree(
       Path worktreeRoot, String clusterName, String nodeName) {
-    final Path stateRoot = worktreeRoot.resolve(".local.d");
+    final Path stateRoot = worktreeRoot.resolve(STATE_DIR);
     final Path clusterRoot = stateRoot.resolve(clusterName);
     final Path nodeRoot = clusterRoot.resolve(nodeName);
     final Path hostResourceRoot = nodeRoot.resolve("host");

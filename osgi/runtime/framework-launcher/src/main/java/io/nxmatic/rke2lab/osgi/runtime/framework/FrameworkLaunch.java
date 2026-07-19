@@ -48,10 +48,6 @@ public final class FrameworkLaunch {
      * degraded run mode).
      */
     public BootedFramework launch() {
-      if (!hasEmbeddedBundles()) {
-        throw new IllegalStateException(
-            "exec-jar assembled without its embedded OSGi bundles under META-INF/bundles/");
-      }
       try {
         return bootEmbedded();
       } catch (IOException ex) {
@@ -63,7 +59,14 @@ public final class FrameworkLaunch {
       final BootPlan plan =
           new BootPlanner(HOST.stagedBundles(), HOST::resolves)
               .plan(BootRequest.create().embedBootStack());
-      return new FrameworkLauncher(LaunchConfig.defaults()).launch(plan, true);
+      // The live boot PLAYS jGiven scenarios (the seeding IS jGiven), so it needs the same
+      // byte-buddy boot-delegation the test executor does — from the ONE shared source, so it can
+      // never be set in one and forgotten in the other (§
+      // LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION).
+      return new FrameworkLauncher(
+              LaunchConfig.defaults()
+                  .withBootDelegation(LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION))
+          .launch(plan, true);
     }
   }
 
