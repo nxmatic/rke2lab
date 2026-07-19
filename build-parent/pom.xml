@@ -119,6 +119,12 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bbox-bdd-test</artifactId>
+        <version>${rke2lab.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>bbox-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -179,6 +185,12 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>cluster-bdd-test</artifactId>
+        <version>${rke2lab.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>cluster-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -234,6 +246,12 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>incus-bdd-test</artifactId>
+        <version>${rke2lab.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>incus-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -269,6 +287,12 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests-bdd-test</artifactId>
+        <version>${rke2lab.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>manifests-cdk8s</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -282,6 +306,12 @@
         <artifactId>manifests-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests-core-test</artifactId>
+        <version>${rke2lab.version}</version>
+        <scope>test</scope>
+      </dependency>      
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>netplan-contract</artifactId>
@@ -361,6 +391,12 @@
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>systemd-bdd</artifactId>
         <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>systemd-bdd-test</artifactId>
+        <version>${rke2lab.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
