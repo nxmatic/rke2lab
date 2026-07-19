@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import io.nxmatic.rke2lab.manifests.cdk8s.Cdk8sApps;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
+import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
+import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeService;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
@@ -72,6 +74,15 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
    * The deterministic YAML service, threaded into each unit's context (units are not components).
    */
   @Reference private YamlMapper yaml;
+
+  /**
+   * The explode service — splits the consolidated {@code manifests.yaml} into the per-resource tree
+   * the node consumes ({@code <domain>/<package>/…}). {@code local-config} resources land as hidden
+   * dotfiles the RKE2 auto-deploy skips but host consumers read (e.g. the incus scion's NoCloud
+   * seed from {@code runtime/cloud-config}). Run at synth time (the exploded tree is the applied
+   * source; the consolidated file stays for traceability, no other consumer).
+   */
+  @Reference private ManifestExplodeService explodeService;
 
   /**
    * The ssh-to-age edge, bound from the registry. Mandatory: without the edge the component never
@@ -660,6 +671,18 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             LOG.info(
                 "Synthesized K8s manifests and systemd units from canonical manifest units (manifest unit hits={})",
                 state.registry().manifestUnitHitCount());
+
+            // Explode the consolidated manifest into the per-resource tree the node consumes and
+            // the
+            // host artifacts read: cluster-apply resources become visible files (RKE2 auto-deploys
+            // them), local-config resources become hidden dotfiles (skipped by apply, read by host
+            // consumers — e.g. runtime/cloud-config/.configmap-cloud-config.yml, the NoCloud seed
+            // the incus scion unwraps). Into synthOutdir, alongside the systemd/ carve-out.
+            explodeService.explode(
+                new ManifestExplodeRequest(scaffold.synthManifestFile(), scaffold.synthOutdir()));
+            LOG.info(
+                "Exploded consolidated manifest into the per-resource tree at {}",
+                scaffold.synthOutdir());
 
             return this;
           } catch (IOException e) {
