@@ -179,6 +179,17 @@
       <artifactId>bbox-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- netplan-core: the @Component DefaultNetplanSynthesisService publishing NetplanSynthesisService.
+         The incus-provision scion's network-view beat resolves it via @OsgiService (require); without
+         this bundle staged, the registry holds only the netplan CONTRACT and the scion's before-phase
+         fails ("the scenario produced no outcome"). runtime scope — seed-master never compiles against
+         it; it is embedded INTACT under META-INF/bundles like the edges, its SCR component publishing
+         the service. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-core</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The domain SCION bundles (*-bdd): each carries the @Component SeedHandler that GROWS its
          runbook coordinate — BboxRunbookHandler serves RunbookCoordinate("bbox"), and so on for
          incus (provision + reconcile), manifests (sub-sown by incus), systemd, cluster. The broker
