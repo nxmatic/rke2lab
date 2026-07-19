@@ -414,10 +414,13 @@ reaps the runbook as JSON; the domain's runbook handler plays its scenario in-co
 front-door `*BddScenarios.run()`, on its own loader — the host never names it) and seals the runbook into
 the reaped envelope (see link:../osgi/seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the runbook
 handler]). `RunbookCoordinate` is a neutral value-coordinate in the foundation seam, so the host names no
-domain type. To *graft* (`graft`) is played HOST-side — `ScenarioGraft.rebuild(json)` +
-`graftUnder(hostTree, …)` folds that JSON into the host's own runbook tree. The graft is host-side by construction: a `@NestedSteps` composes within ONE jGiven engine,
+domain type. To *graft* (`graft`) is played where the runbook is owned — for the root's four callers,
+HOST-side — `ScenarioGraft.rebuild(json)` + `graftUnder(hostTree, …)` folds that JSON into the owner's
+runbook tree. The graft is realm-LOCAL by construction: a `@NestedSteps` composes within ONE jGiven engine,
 so a live jGiven object cannot cross realms (it would `ClassCastException` on the flat host loader) — only
-the flat JSON crosses, and the host rebuilds a model of ITS OWN realm to graft. There is one host tree
+the flat JSON crosses, and the owner rebuilds a model of ITS OWN realm to graft. (The same mechanism lets
+a SCION graft a sub-scion in-world: the incus provisioning scion grafts the manifests scion under its own
+step, so `ScenarioGraft` lives in the engine's exported `.container`.) There is one host tree
 (the trunk the operator reads top-down); the four callers each graft one scion INTO it. So `sow` appears
 four times in-container, `graft` four times host-side, and they meet at the JSON — "sow-and-graft caller"
 names the composition of both, not the graft alone.
@@ -446,7 +449,7 @@ flowchart TB
     s3["SystemdAdapterScenario (systemd)"]
     s4["ClusterReadinessScenario (cluster)"]
   end
-  doctor["doctor — CONSULTED by a scion on trouble; orchestrates none"]
+  doctor["doctor — CONSULTED by a scion on trouble, orchestrates none"]
   r1 -."sow(RUNBOOK)".-> s1
   r2a -."sow(RUNBOOK, +WORKTREE)".-> s2p
   r2r -."sow(RUNBOOK)".-> s2r

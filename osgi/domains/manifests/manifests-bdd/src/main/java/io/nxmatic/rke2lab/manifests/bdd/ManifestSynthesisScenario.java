@@ -22,7 +22,6 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
-import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -56,11 +55,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p>Its collaborators are INJECTED from its OWN bundle's registry by the {@link OsgiService}
  * bridge: the {@link ManifestSynthesisService} + {@link NodeEnvOverlayService} (the SCR-published
- * synthesis) and the ambient {@link RunGate} (whose {@link RunGate#cultivating() cultivating}
- * decides whether materialisation targets the real tree or a survey temp dir). The activation facet
- * is seeded by the front-door via the inbound {@link #INPUT} channel and received here ({@link
- * InputReceiver}) before the play; the outbound {@code ScenarioOutcome} channel harvests the played
- * runbook.
+ * synthesis). MODE-BLIND — it injects no run gate: manifests is a pure FS materialiser with no live
+ * touch (no {@code Cultivating}/{@code Surveying} pair), so it runs identically in both modes; the
+ * materialisation target is carried by the SOIL amendment alone (the real tree when the host
+ * amended a plot, a temp dir for a bare survey), and rendering the run PENDING under a surveying
+ * gate is the frontier's business (the engine's survey executor), not the scenario's. The
+ * activation facet is seeded by the front-door via the inbound {@link #INPUT} channel and received
+ * here ({@link InputReceiver}) before the play; the outbound {@code ScenarioOutcome} channel
+ * harvests the played runbook.
  */
 @SeedScenario
 public class ManifestSynthesisScenario
@@ -97,7 +99,6 @@ public class ManifestSynthesisScenario
   // bridge owns presence): all three required, awaited from SCR, so their orElseThrow never fires.
   @OsgiService private Optional<ManifestSynthesisService> synthesis = Optional.empty();
   @OsgiService private Optional<NodeEnvOverlayService> overlay = Optional.empty();
-  @OsgiService private Optional<RunGate> gate = Optional.empty();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
@@ -116,7 +117,7 @@ public class ManifestSynthesisScenario
     given()
         .the_activation_facet(facet)
         .and()
-        .the_synthesis_services(synthesis.orElseThrow(), overlay.orElseThrow(), gate.orElseThrow());
+        .the_synthesis_services(synthesis.orElseThrow(), overlay.orElseThrow());
     when()
         .the_policy_is_derived_from_the_facet()
         .and()
@@ -137,7 +138,6 @@ public class ManifestSynthesisScenario
     @ProvidedScenarioState ManifestsRunbookInput facet;
     @ProvidedScenarioState ManifestSynthesisService synthesis;
     @ProvidedScenarioState NodeEnvOverlayService overlay;
-    @ProvidedScenarioState RunGate gate;
 
     @Hidden
     public Given the_activation_facet(ManifestsRunbookInput facet) {
@@ -147,10 +147,9 @@ public class ManifestSynthesisScenario
 
     @Hidden
     public Given the_synthesis_services(
-        ManifestSynthesisService synthesis, NodeEnvOverlayService overlay, RunGate gate) {
+        ManifestSynthesisService synthesis, NodeEnvOverlayService overlay) {
       this.synthesis = synthesis;
       this.overlay = overlay;
-      this.gate = gate;
       return self();
     }
   }
@@ -159,15 +158,14 @@ public class ManifestSynthesisScenario
    * When: the transposition of {@code HostSlotManifest.Builder.policy()}. Derives the {@link
    * ManifestDomainPolicy} + {@link FloxDebugPolicy} + the {@code RKE2LAB_POLICY_LINK_*} seed vars
    * from the facet, synthesises, then writes the controlplane overlay — the two policy ends from
-   * one payload. The gate is read so the scion plays honestly (survey targets a temp dir; the live
-   * materialisation target is Family-2/checksum-glue territory, still a temp dir here).
+   * one payload. Mode-blind: the materialisation target follows the SOIL amendment alone (the live
+   * target is Family-2/checksum-glue territory, still a temp dir here), never a run gate.
    */
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState ManifestsRunbookInput facet;
     @ExpectedScenarioState ManifestSynthesisService synthesis;
     @ExpectedScenarioState NodeEnvOverlayService overlay;
-    @ExpectedScenarioState RunGate gate;
 
     @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
     @ProvidedScenarioState Map<String, String> linkSeedVariables;
@@ -182,10 +180,9 @@ public class ManifestSynthesisScenario
     Path stagingRoot;
 
     // The run's one output tree — created once, reused by both synthesis beats (units + overlay),
-    // so
-    // the Then can read the overlay the WHEN wrote. The gate is read so the scion plays honestly;
-    // the live materialisation target is Family-2 territory (the checksum glue), a survey temp dir
-    // here regardless of cultivating(). @MonotonicNonNull: set once by outdir(), then read.
+    // so the Then can read the overlay the WHEN wrote. The materialisation target follows the SOIL
+    // amendment alone (the live target is Family-2 territory, the checksum glue — a temp dir here);
+    // the run is mode-blind. @MonotonicNonNull: set once by outdir(), then read.
     @MonotonicNonNull private Path outdir;
 
     public When the_policy_is_derived_from_the_facet() {
@@ -266,20 +263,15 @@ public class ManifestSynthesisScenario
       if (outdir == null) {
         // The SOIL amendment: when the host amended the plot to materialise into, synthesise there
         // (the real provisioning tree). Blank soil = a survey / bare probe — materialise into a
-        // temp dir so the run stays inert against the host FS. The gate only picks the temp prefix;
-        // the SOIL amendment is what carries the live target.
+        // temp dir so the run stays inert against the host FS. Mode-blind: the SOIL amendment alone
+        // carries the live target; whether this run is a survey is the frontier's business, not the
+        // scenario's, so there is no mode-tinted temp prefix.
         final String soil = facet.materializationRoot();
         if (!soil.isBlank()) {
           outdir = Path.of(soil).toAbsolutePath().normalize();
         } else {
           try {
-            outdir =
-                Files.createTempDirectory(
-                        gate.cultivating()
-                            ? "rke2lab-manifests-live-"
-                            : "rke2lab-manifests-survey-")
-                    .toAbsolutePath()
-                    .normalize();
+            outdir = Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
           } catch (IOException ex) {
             throw new UncheckedIOException("cannot create the synthesis outdir", ex);
           }

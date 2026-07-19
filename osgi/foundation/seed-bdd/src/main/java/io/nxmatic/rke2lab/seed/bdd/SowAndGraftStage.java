@@ -6,7 +6,7 @@ import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioGraft;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import java.util.Map;

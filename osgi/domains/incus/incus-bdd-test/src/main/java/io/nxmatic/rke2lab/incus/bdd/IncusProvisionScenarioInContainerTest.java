@@ -1,11 +1,18 @@
 package io.nxmatic.rke2lab.incus.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tngtech.jgiven.Stage;
+import com.tngtech.jgiven.annotation.As;
+import com.tngtech.jgiven.impl.Scenario;
+import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.StepModel;
+import com.tngtech.jgiven.report.model.StepStatus;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -19,6 +26,7 @@ import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisResult;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunbookEnvelope;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
@@ -26,6 +34,7 @@ import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -79,6 +88,16 @@ public class IncusProvisionScenarioInContainerTest {
     assertTrue(
         outcome.consultations().isEmpty(), "a clean prepare raised no symptom, so consults no one");
 
+    // Decision (a): the manifests scion is GRAFTED under its crossing step, so the runbook is
+    // faithful — the manifests synthesis renders as a nested sub-tree of "the manifests are
+    // cultivated", not a consumed-and-discarded sow. The broker reaps a real manifests
+    // RunbookEnvelope
+    // (a two-step stub, PASSED here); the graft folds its steps under the rootstock.
+    final StepModel cultivated = stepNamed(runbook, "the manifests are cultivated");
+    assertFalse(
+        cultivated.getNestedSteps().isEmpty(),
+        "the manifests scion grafted as a nested sub-tree under its crossing step");
+
     // The reversal, proven: the SCION harvested AND stored its prep. The store is a cellar-entry on
     // the played model (the scion is a fragment; the host root drains at the boundary), read back
     // through the cellar's OWN generic API — a ScenarioCellar over the LIVE model with an empty
@@ -114,8 +133,14 @@ public class IncusProvisionScenarioInContainerTest {
     registrations.add(
         context.registerService(
             NetplanSynthesisService.class, synthesizesNetwork(), new Hashtable<>()));
+    // The broker reaps a PENDING manifests runbook — mirroring prod, where a surveyed manifests
+    // scion
+    // renders PENDING through its own survey executor. So the grafted sub-tree is pending too, and
+    // the
+    // whole scenario (its own steps + the graft) stays all-pending → SCENARIO_PENDING.
     registrations.add(
-        context.registerService(SeedBroker.class, new RecordingBroker(), new Hashtable<>()));
+        context.registerService(
+            SeedBroker.class, new RecordingBroker(StepStatus.PENDING), new Hashtable<>()));
     registrations.add(
         context.registerService(Cellar.class, new RecordingCellar(), new Hashtable<>()));
     registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
@@ -132,6 +157,11 @@ public class IncusProvisionScenarioInContainerTest {
           ExecutionStatus.SCENARIO_PENDING,
           outcome.runbook().getScenarios().get(0).getExecutionStatus(),
           "a surveyed scenario renders PENDING — a plan, not a result");
+      // Even a surveyed manifests scion is grafted (§ decision a — every scion played is rendered):
+      // its pending steps nest under the crossing step, so the runbook stays complete.
+      assertFalse(
+          stepNamed(outcome.runbook(), "the manifests are cultivated").getNestedSteps().isEmpty(),
+          "the surveyed manifests scion still grafts (pending) under its crossing step");
       assertTrue(outcome.consultations().isEmpty(), "a survey raised no symptom");
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
@@ -198,7 +228,8 @@ public class IncusProvisionScenarioInContainerTest {
     // manifests; the real routing to the manifests amend/runbook handlers is a fact of prod). The
     // recorder proves incus sowed amend THEN runbook toward manifests.
     registrations.add(
-        context.registerService(SeedBroker.class, new RecordingBroker(), new Hashtable<>()));
+        context.registerService(
+            SeedBroker.class, new RecordingBroker(StepStatus.PASSED), new Hashtable<>()));
     // The two ambient facts the scion needs to store its own prep harvest — the host publishes them
     // at the GIVEN in prod; here the passenger seeds a recording cellar and a fixed current parcel.
     registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
@@ -323,16 +354,82 @@ public class IncusProvisionScenarioInContainerTest {
   /**
    * A broker that records the coordinates it was sown toward — the twin of the real {@code
    * DefaultSeedBroker} for the test, minus the SCR handler roster. It proves incus consulted
-   * manifests through the door (AMEND then RUNBOOK); it echoes the seed back (the scenario does not
-   * consume the manifests runbook on this path — the tree is a fresh graft, used by the instance).
+   * manifests through the door (AMEND then RUNBOOK). The AMEND sow is echoed back (the reconciled
+   * trigger); the RUNBOOK sow reaps a real manifests {@link RunbookEnvelope} — a two-step stub the
+   * incus scion GRAFTS under its crossing step (§ decision a) — so the test exercises the real
+   * graft, not a discarded sow. The stub's steps carry {@code manifestsStepStatus}: PASSED for a
+   * green run, PENDING for a survey (mirroring prod, where the manifests scion renders through its
+   * own survey executor).
    */
   private static final class RecordingBroker implements SeedBroker {
     final List<SeedCoordinate> sown = new ArrayList<>();
+    private final StepStatus manifestsStepStatus;
+
+    RecordingBroker(StepStatus manifestsStepStatus) {
+      this.manifestsStepStatus = manifestsStepStatus;
+    }
 
     @Override
     public SeedEnvelope sow(SeedCoordinate wanted, Cellar cellar, SeedEnvelope seed) {
       sown.add(wanted);
+      if (wanted instanceof RunbookCoordinate) {
+        return SeedEnvelope.of(
+            wanted,
+            CODEC.encode(
+                new RunbookEnvelope(manifestsRunbookJson(manifestsStepStatus), List.of())));
+      }
       return seed;
+    }
+  }
+
+  /**
+   * Fabricate a real manifests runbook — a two-step scenario played to a {@link ReportModel}, then
+   * serialised as {@code ScenarioJsonWriter} text (the flat form that crosses the realm, exactly
+   * what a production {@code GenericRunbookHandler} reaps). Its steps carry {@code status} so the
+   * graft folds a faithful pending (survey) or passed (live) sub-tree under the incus crossing
+   * step.
+   */
+  private static String manifestsRunbookJson(StepStatus status) {
+    final ReportModel model = new ReportModel();
+    model.setClassName(ManifestsStubStage.class.getSimpleName());
+    final Scenario<ManifestsStubStage, ManifestsStubStage, ManifestsStubStage> scenario =
+        Scenario.create(ManifestsStubStage.class);
+    scenario.setModel(model);
+    scenario.startScenario("the manifests are synthesized");
+    scenario.getGivenStage().the_manifests_are_synthesized().the_overlay_is_written();
+    try {
+      scenario.finished();
+    } catch (Throwable ignored) {
+      // a green stub does not throw; guarded only to mirror the play recipe.
+    }
+    model
+        .getScenarios()
+        .get(0)
+        .getScenarioCases()
+        .get(0)
+        .getSteps()
+        .forEach(step -> step.setStatus(status));
+    return new ScenarioJsonWriter(model).toString();
+  }
+
+  /** The named top-level step of the played scenario — the crossing the graft folds under. */
+  private static StepModel stepNamed(ReportModel runbook, String name) {
+    return runbook.getScenarios().get(0).getScenarioCases().get(0).getSteps().stream()
+        .filter(step -> name.equals(step.getName()))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("no step named '" + name + "' in the runbook"));
+  }
+
+  /** A stub manifests scenario — two steps — the broker reaps so the incus graft has a sub-tree. */
+  public static class ManifestsStubStage extends Stage<ManifestsStubStage> {
+    @As("the manifests are synthesized")
+    public ManifestsStubStage the_manifests_are_synthesized() {
+      return self();
+    }
+
+    @As("the overlay is written")
+    public ManifestsStubStage the_overlay_is_written() {
+      return self();
     }
   }
 

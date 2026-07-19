@@ -311,7 +311,7 @@
         <artifactId>manifests-core-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
-      </dependency>      
+      </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>netplan-contract</artifactId>

@@ -45,12 +45,15 @@ not by module.
   driver holds the open gardening host-side today (embedded), but a scion-peer could hold one in-container
   tomorrow (remote — the same door, the same gesture, § REST embedded-today / remote-tomorrow). So the
   reusable half travels; the package is exported for that future in-realm reuse.
-* *The GRAFT half + the rest of the spine are NOT exported* — the base package `seed.bdd`
-  (`SowAndGraftStage` composing `ScenarioGraft`, the `CellarStage`, the `PreflightStage`/`PreflightGate`).
-  The graft is LOCAL to whoever owns the runbook tree (`ScenarioGraft` is host-side by construction — one
-  jGiven engine, only JSON crosses), so it runs on the flat host classpath, never wired in-container.
-  Exporting a host-side stage would let a bundle load a second copy of a seam class (the
-  `DUPLICATE_REALM_CLASS` collision the engine's bnd guards against).
+* *The GRAFT COMPOSITION + the rest of the spine are NOT exported* — the base package `seed.bdd`
+  (`SowAndGraftStage`, the `CellarStage`, the `PreflightStage`/`PreflightGate`). `SowAndGraftStage`
+  composes `ScenarioGraft` for the HOST ROOT's crossings and runs on the flat host classpath, never
+  wired in-container — exporting a host stage would let a bundle load a second copy of a seam class
+  (the `DUPLICATE_REALM_CLASS` collision the engine's bnd guards against). `ScenarioGraft` ITSELF,
+  though, is NOT host-only: the graft is local to whoever owns a runbook tree, and a scion can own a
+  sub-runbook (the incus provisioning scion grafts the manifests scion under its own step,
+  in-container), so `ScenarioGraft` lives in the engine's EXPORTED `.container` package — stateless,
+  only flat JSON crosses the realm, so no live jGiven object is ever shared between loaders.
 * *Host-only imports are `resolution:=optional`* (framework-launch, jGiven, `org.osgi.framework`) — exactly
   as `scenario-engine`, so the bundle still RESOLVES when installed in-container to provide `seed.bdd.sow`.
 
@@ -114,10 +117,11 @@ only a soil NAME (a `String`) and reaps the runbook as JSON, never naming a `*Co
 reaching a `*BddScenarios` front-door (that reflection lives INSIDE the domain's runbook handler, on its
 own loader). `RunbookCoordinate` is a neutral value-coordinate in `seed-broker-port` (the twin of
 `SplitCoordinate`), so the seam names nothing a domain owns. The GRAFT half is
-`ScenarioGraft.rebuild(payload)` + `graftUnder(hostTree, step)`, host-side. One gesture — one door out,
-one graft home — four times in the root scenario. `seed-bdd` therefore depends on `seed-broker-port`
-(the `SeedBroker` door + `RunbookCoordinate`) and the neutral `ScenarioGraft`, never on a domain's
-`*BddScenarios` or `*Coordinate`.
+`ScenarioGraft.rebuild(payload)` + `graftUnder(hostTree, step)`, on the runbook owner's side (host-side
+for the root; a scion owning a sub-runbook grafts in-world — incus grafts manifests). One gesture — one
+door out, one graft home — four times in the root scenario. `seed-bdd` therefore depends on
+`seed-broker-port` (the `SeedBroker` door + `RunbookCoordinate`) and the neutral `ScenarioGraft` (in the
+engine's exported `.container`), never on a domain's `*BddScenarios` or `*Coordinate`.
 
 .C4 L4 Code (static) — the sow/graft split in classes: the realm-agnostic sow, the tree-local graft
 [mermaid]

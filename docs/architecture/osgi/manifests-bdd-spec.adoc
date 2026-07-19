@@ -32,7 +32,7 @@ flowchart TB
   subgraph felix["OSGi realm — manifests-bdd bundle (its own loader)"]
     handler["ManifestsRunbookHandler<br/>serves RunbookCoordinate('manifests')"]
     front["ManifestsBddScenarios.run(trigger)<br/>in-container JUnit launcher"]
-    scen["ManifestSynthesisScenario<br/>resolves service + RunGate from registry"]
+    scen["ManifestSynthesisScenario<br/>resolves synthesis service from registry (mode-blind)"]
     svc["ManifestSynthesisService (SCR)"]
     overlay["NodeEnvOverlayService.writeControlplaneOverlay"]
   end
@@ -309,15 +309,18 @@ Mirrors bbox's trio (link:bbox-edge-spec.adoc[bbox-edge-spec]), adapted:
 
 A production jGiven scenario in the MANIFESTS domain's vocabulary. Resolves its
 collaborators from THIS bundle's registry (`FrameworkUtil`): the
-`ManifestSynthesisService` (the SCR-published synthesis), and the ambient `RunGate`
-(whose `cultivating()` decides whether materialization writes to the real target or
-a dry-run temp — the preview inertness the map requires).
+`ManifestSynthesisService` (the SCR-published synthesis). MODE-BLIND — it injects no
+`RunGate`: manifests is a pure FS materializer with no live touch (no
+`Cultivating`/`Surveying` pair), so it runs identically in both modes. The
+materialization target is carried by the SOIL amendment alone (the real staging tree
+when the host amended a plot, a temp dir for a bare survey); rendering the run PENDING
+under a surveying gate is the frontier's business (the engine's survey executor), not
+the scenario's — the preview inertness the map requires, lifted out of the scenario.
 
 [listing]
 ----
 GIVEN the activation payload (which domains the operator enabled)
   AND the synthesis service, resolved from this bundle's registry
-  AND the run gate (cultivate vs survey)
 WHEN the policy is derived from the payload          [the scion builds BOTH ends: ManifestDomainPolicy + the RKE2LAB_POLICY_LINK_* seed vars]
   AND the manifests are synthesized                  [service.synthesize(request) → the K8s/systemd/rke2-config tree, filtered synth-time]
   AND the controlplane overlay is written             [writeControlplaneOverlay(seedVars) → the 99-… env-config with RKE2LAB_POLICY_LINK_*]
@@ -328,8 +331,9 @@ THEN every enabled domain produced its units         [domainCount matches the en
 
 No doctor consult. A synthesis `IOException` or an empty domain set fails the step —
 jGiven marks it, the runbook shows the failure. The output tree location is the
-run's `outdir` (dry-run: a temp dir; live: the staging slot incus PREPARE chose, later
-promoted to `host.live.d` and mounted; the only surviving replace-trigger is the
+run's `outdir`, chosen by the SOIL amendment alone (blank SOIL — a bare survey: a temp
+dir; an amended SOIL: the staging slot incus PREPARE chose, later promoted to
+`host.live.d` and mounted); the only surviving replace-trigger is the
 nocloud→`replaceOnChanges` wire, NOT the removed `TargetChecksumPipeline` — see
 host-cellar § the-grow-anatomy). The two synthesis
 beats (units tree + controlplane overlay) are the two policy ends above: the scion

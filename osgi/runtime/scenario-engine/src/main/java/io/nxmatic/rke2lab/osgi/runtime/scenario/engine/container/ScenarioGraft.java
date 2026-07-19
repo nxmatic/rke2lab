@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
+package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
 import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -7,7 +7,6 @@ import com.tngtech.jgiven.report.model.ScenarioModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
 import com.tngtech.jgiven.report.model.Tag;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -28,8 +27,11 @@ import java.util.Optional;
  * <p>Generic by construction — it speaks only jGiven's report model, never a domain vocabulary — so
  * EVERY domain whose scenario blooms in-container reuses it: cluster, systemd, and the rest. The
  * observability twin of the seed-broker (which carries the crossing's EXECUTION); this carries the
- * crossing's NARRATION. Host-side (this base package is the flat-host half of the engine, never
- * installed as a bundle), because the graft happens where the host owns its runbook.
+ * crossing's NARRATION. In the engine's EXPORTED {@code .container} package because the graft runs
+ * wherever a runbook is owned: host-side ({@code Main} folds the scions into the root runbook on
+ * the flat classpath) AND in-container (a scion that itself consults a sub-scion — the incus
+ * provisioning scion grafts the manifests scion under its own step — folds it in-world). Stateless,
+ * and only flat JSON crosses the realm, so no live jGiven object is ever shared between loaders.
  *
  * <p>The vocabulary is horticultural, one register end to end: the host sows a seed toward the
  * other world (the seed-broker's {@code sow}), it grows there into a scion (played in-container),

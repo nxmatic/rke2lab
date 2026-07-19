@@ -102,7 +102,7 @@ public class BboxReconciliationScenarioInContainerTest {
     // The HOST-CROSSING round-trip the GenericRunbookHandler + ScenarioGraft actually run in prod:
     // serialise the outcome's model to JSON (ScenarioJsonWriter) and rebuild it
     // (ScenarioJsonReader,
-    // exactly what ScenarioGraft.rebuild does — that base-package type is not bundle-exported). The
+    // exactly what ScenarioGraft.rebuild does). The
     // live-outcome assertions above never exercise this — the coverage gap that let the live graft
     // fail with "no scenario to graft" while the tests stayed green.
     final String runbookJson = new ScenarioJsonWriter(runbook).toString();

@@ -147,7 +147,9 @@ SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-contain
   GIVEN the image build request (recipe + digest), the run gate, the broker, the cellar   [CODED]
     AND the staging slot host.N.staging.d chosen by incus (it owns the tree, HostSlotSelector)   [CODED]
   WHEN the_image_is_built — built, or found current by its recipe-digest cache key       [CODED]
-    AND the_manifests_are_cultivated — the manifests SUB-SOW (broker.sow AMEND+RUNBOOK → the SOIL, passing the Cellar that carries the tx)  [CODED]
+    AND the_manifests_are_cultivated — the manifests SUB-SOW (broker.sow AMEND+RUNBOOK → the SOIL, passing the Cellar that carries the tx),
+        then GRAFTS the reaped manifests runbook under this step (ScenarioGraft.rebuild + graftUnder) — a scion grafting a sub-scion in-world,
+        so the manifests synthesis renders as a nested sub-tree, faithful in the runbook (§ decision a: every scion played is rendered)  [CODED]
     AND the_nocloud_seed_is_unwrapped (#2 — read the cloud-config ConfigMap on FS, strip the envelope →
         user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [CODED]
     AND the_secrets_are_written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets;

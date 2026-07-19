@@ -14,6 +14,7 @@ import com.tngtech.jgiven.report.model.ScenarioModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioGraft;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;

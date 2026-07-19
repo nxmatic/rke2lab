@@ -466,7 +466,7 @@ flowchart LR
   end
   subgraph seam["SEAM — seed-broker (shared, minimal)"]
     door["SeedBroker.sow(Coordinate wanted, Document seed)→Document"]
-    sh["SeedHandler { Coordinate serves(); Document handle(Document) }"]
+    sh["SeedHandler { Coordinate serves() · Document handle(Document) }"]
   end
   subgraph osgi["OSGi — authority (verbs now internal handlers)"]
     disp["DefaultSeedBroker: @Reference(MULTIPLE) List&lt;SeedHandler&gt;<br/>indexed by serves(), dispatched by wanted"]
@@ -626,11 +626,13 @@ its own loader is ordinary. The host is left with one door and a soil name:
 ----
   broker.sow(new RunbookCoordinate(soil), trigger)   // one door; soil is a String, no domain type
      → reaps a SeedEnvelope (the runbook as neutral JSON)
-     → ScenarioGraft.rebuild(payload) + graftUnder(hostScenario, hostTree, step)   // host-side graft
+     → ScenarioGraft.rebuild(payload) + graftUnder(hostScenario, hostTree, step)   // graft where the runbook is owned
 ----
 
 So the SOW half of a sow-and-graft caller (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario
-map]) is `broker.sow` at a neutral `RunbookCoordinate`; the GRAFT half is `ScenarioGraft`, host-side.
+map]) is `broker.sow` at a neutral `RunbookCoordinate`; the GRAFT half is `ScenarioGraft`, run wherever
+the runbook is owned — host-side for the root, in-container for a scion that owns a sub-runbook (the
+incus provisioning scion grafts the manifests scion under its own step through the same gesture).
 The host never names `*BddScenarios` nor a `*Coordinate` enum — only the foundation seam and a soil
 string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
 verdict.

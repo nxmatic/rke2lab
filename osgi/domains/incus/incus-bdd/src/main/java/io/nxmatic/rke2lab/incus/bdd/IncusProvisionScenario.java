@@ -9,6 +9,8 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
+import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.auth.contract.AuthTokenContact;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -42,6 +44,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioGraft;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
@@ -189,6 +192,14 @@ public class IncusProvisionScenario
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
     final List<ObservationWire> observations = new ArrayList<>();
+    // The two live handles the manifests graft folds the scion under — the same pair the root uses
+    // per crossing (§ SowAndGraftStage): the current ScenarioModel, the trunk carrying the
+    // rootstock
+    // step "the manifests are cultivated" mid-run (jGiven appends the scenario to the ReportModel
+    // only at scenario end, so getModel().getScenarios() is empty here), and the ReportModel, whose
+    // live tag map the scion's within-run tags merge into.
+    final ScenarioModel hostScenario = getScenario().getScenarioModel();
+    final ReportModel hostTree = getScenario().getModel();
     given()
         .the_seed_node(NODE)
         .and()
@@ -198,7 +209,7 @@ public class IncusProvisionScenario
     when()
         .the_image_is_built()
         .and()
-        .the_manifests_are_cultivated()
+        .the_manifests_are_cultivated(hostScenario, hostTree)
         .and()
         .the_nocloud_seed_is_unwrapped(resolved)
         .and()
@@ -389,6 +400,7 @@ public class IncusProvisionScenario
     @ProvidedScenarioState GrowNetworkView networkView;
 
     private final SeedCodec codec = new SeedCodec();
+    private final ScenarioGraft graft = new ScenarioGraft();
 
     public When the_image_is_built() {
       // Mode-blind: the frontier already chose the builder — CultivatingDistrobuilderImageBuilder
@@ -413,7 +425,8 @@ public class IncusProvisionScenario
      * the host-tree model wants at preview too (only the rsync into {@code host.live.d} is gated).
      * The manifests scion picks a temp dir itself when the SOIL is blank (a bare survey).
      */
-    public When the_manifests_are_cultivated() {
+    public When the_manifests_are_cultivated(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       // AMEND: hand the broker {soil → path} by neutral role; the manifests amend reflector binds
       // it
       // onto ManifestsRunbookInput and returns the reconciled input, still under the runbook
@@ -427,11 +440,19 @@ public class IncusProvisionScenario
               new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)));
       // RUNBOOK: play the manifests synthesis with the reconciled input; the fresh tree is the
       // graft
-      // the instance will mount (consumed at once, never cellared — cultivated fresh). No
-      // observation
-      // recorded here: the consult sink is for probe symptoms (build/reachability), not for the
-      // sub-scenario's own outcome — a manifests failure surfaces as the sow throwing.
-      broker.sow(new RunbookCoordinate("manifests"), cellar, amended);
+      // the instance will mount (consumed at once, never cellared — cultivated fresh). The reaped
+      // envelope carries the manifests RunbookEnvelope, so GRAFT its runbook under THIS step: the
+      // manifests scion renders as a nested sub-tree of "the manifests are cultivated", and the
+      // runbook stays faithful to the operation it names (§ decision a — every scion played is
+      // rendered under its crossing). Pull the runbook JSON the way the host Gardening.sow does,
+      // rebuild the model in THIS realm (only flat JSON crosses), and fold it under the rootstock —
+      // a scion GRAFTING a sub-scion in-world, the same mechanism the root uses host-side. A
+      // manifests failure rides IN the model: graftUnder marks this step FAILED and fail-fasts the
+      // steps after it, so a broken synthesis is no longer silently green.
+      final SeedEnvelope reaped = broker.sow(new RunbookCoordinate("manifests"), cellar, amended);
+      final String runbookJson = codec.decode(reaped.payload()).path("runbook").asText();
+      graft.graftUnder(
+          hostScenario, hostTree, "the manifests are cultivated", graft.rebuild(runbookJson));
       return self();
     }
 

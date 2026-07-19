@@ -8,24 +8,20 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
-import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import java.util.Hashtable;
 import org.junit.jupiter.api.Test;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceRegistration;
 
 /**
  * The in-container proof of the manifests scion, run WHERE the scenario lives (this passenger
  * shares the manifests-bdd host loader through the fragment). Unlike the bbox proof — which mocks
  * every collaborator — the manifests scenario resolves the REAL synthesis: manifests-core's DS
  * {@code @Component}s (the {@code ManifestSynthesisService} + {@code NodeEnvOverlayService})
- * activate under SCR and the scenario drives them. So this passenger registers ONLY the mock {@link
- * RunGate} (the one collaborator the host, not SCR, publishes in prod) into the SAME registry the
- * scenario resolves from, then plays it in-container through {@link ScenarioPlayer} (the shared
- * play recipe the production {@code GenericRunbookHandler} also drives) — seeding the activation
- * facet through the scenario's own inbound {@link ManifestSynthesisScenario#INPUT} channel, exactly
- * as the handler does — and asserts on the harvested {@link ScenarioOutcome}.
+ * activate under SCR and the scenario drives them. It registers NOTHING: manifests is a MODE-BLIND
+ * pure FS materialiser (no {@code Cultivating}/{@code Surveying} pair, no run gate — it runs
+ * identically in both modes), so its only collaborators are the two real SCR components. It plays
+ * in-container through {@link ScenarioPlayer} (the shared play recipe the production {@code
+ * GenericRunbookHandler} also drives) — seeding the activation facet through the scenario's own
+ * inbound {@link ManifestSynthesisScenario#INPUT} channel, exactly as the handler does — and
+ * asserts on the harvested {@link ScenarioOutcome}.
  *
  * <p>The assertion is the whole point of the chantier: given the operator's facet, the scenario's
  * WHEN stage — the transposition of {@code HostSlotManifest.Builder.policy()} — derives the policy,
@@ -39,8 +35,7 @@ public class ManifestSynthesisScenarioInContainerTest {
   void the_scion_synthesizes_from_the_activation_facet() throws Exception {
     // The operator's usual posture (everything on except mesh, debug off) — a complete facet, the
     // same shape a sower plucks from Pulumi.dev.yaml.
-    final ScenarioOutcome outcome =
-        playWith(cultivatingGate(true), ManifestsRunbookInput.defaults());
+    final ScenarioOutcome outcome = playWith(ManifestsRunbookInput.defaults());
     final ReportModel runbook = outcome.runbook();
 
     assertNotNull(runbook, "the player harvested the played model");
@@ -55,29 +50,13 @@ public class ManifestSynthesisScenarioInContainerTest {
   }
 
   /**
-   * Register the mock {@link RunGate} into THIS bundle's registry (the synthesis + overlay services
-   * are real SCR components, already published), play the scenario in-container through the shared
-   * {@link ScenarioPlayer} — seeding the facet through the scenario's {@link
-   * ManifestSynthesisScenario#INPUT} channel — and return its live {@link ScenarioOutcome}. The
-   * registration is removed in the {@code finally} so the shared framework does not leak across
-   * tests.
+   * Play the scenario in-container through the shared {@link ScenarioPlayer} — seeding the facet
+   * through the scenario's {@link ManifestSynthesisScenario#INPUT} channel — and return its live
+   * {@link ScenarioOutcome}. Nothing is registered: the synthesis + overlay services are real SCR
+   * components, and the scenario is mode-blind (no run gate to publish).
    */
-  private static ScenarioOutcome playWith(RunGate gate, ManifestsRunbookInput facet)
-      throws Exception {
-    final BundleContext context =
-        FrameworkUtil.getBundle(ManifestsBddTests.class).getBundleContext();
-    final ServiceRegistration<RunGate> registration =
-        context.registerService(RunGate.class, gate, new Hashtable<>());
-    try {
-      return new ScenarioPlayer()
-          .play(ManifestSynthesisScenario.class, ManifestSynthesisScenario.INPUT.into(facet));
-    } finally {
-      registration.unregister();
-    }
-  }
-
-  /** The ambient run condition the scion reads — cultivating (live) or surveying (dry-run). */
-  private static RunGate cultivatingGate(boolean cultivating) {
-    return () -> cultivating;
+  private static ScenarioOutcome playWith(ManifestsRunbookInput facet) throws Exception {
+    return new ScenarioPlayer()
+        .play(ManifestSynthesisScenario.class, ManifestSynthesisScenario.INPUT.into(facet));
   }
 }
