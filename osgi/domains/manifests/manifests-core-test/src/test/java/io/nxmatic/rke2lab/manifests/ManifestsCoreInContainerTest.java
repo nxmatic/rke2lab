@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
-import org.osgi.service.log.LogLevel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.osgi.framework.Bundle;
+import org.osgi.service.log.LogLevel;
 
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs manifests-core's actor tests IN-CONTAINER. It
@@ -52,14 +52,19 @@ class ManifestsCoreInContainerTest {
           // Requires the DS extender (osgi.extender=osgi.component); felix.scr must run for
           // manifests-core to resolve and activate.
           .withScr()
+          // The ONE package system-exported is seed.broker.port (the host↔OSGi membrane —
+          // SeedHandler / SeedEnvelope, published by the host in prod). manifests-core's
+          // SeedHandler
+          // reflectors import it, and it is a MEMBRANE package the closure walk never stages (it is
+          // host-provided, not a normal bundle); the test mirrors prod by system-exporting it. The
+          // synthesis grammar itself is internal to manifests-core (un-exported), not a seam, and
+          // everything else the runtime graph needs — manifests-contract, the cdk8s carrier and its
+          // systemd fragment, seed-broker-codec/shape (+ victools-wrap for the shape engine),
+          // unitrepo-core, jackson, ipaddress, snakeyaml, commons-compress — is derived from the
+          // host's manifest in the test body via installImportClosureOf.
+          .systemPackages("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
           // The JUnit runner world — the proxy's own infrastructure, the single shared declaration.
           .withJUnitRunner()
-          // No systemPackages: the synthesis grammar is now internal to manifests-core (package
-          // io.nxmatic.rke2lab.manifests.internal.synthesis, un-exported), not a seam. Everything
-          // manifests-core's runtime graph needs — manifests-contract (a DE-SEAMED installed
-          // bundle), the cdk8s carrier and its systemd fragment, unitrepo-core, jackson, ipaddress,
-          // snakeyaml, commons-compress — is derived from the host's manifest in the test body via
-          // installImportClosureOf.
           .build();
 
   @TestFactory

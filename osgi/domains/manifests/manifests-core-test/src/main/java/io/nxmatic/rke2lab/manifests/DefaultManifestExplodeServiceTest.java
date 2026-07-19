@@ -7,7 +7,6 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeResult;
 import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeService;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -41,8 +40,7 @@ class DefaultManifestExplodeServiceTest {
     assertNotNull(
         reference,
         "SCR must publish ManifestExplodeService — DefaultManifestExplodeService activated with its"
-            + " @Reference to the YamlMapper @Component satisfied."
-            + ScrDiagnostics.of(context).map(ScrDiagnostics::report).orElse(""));
+            + " @Reference to the YamlMapper @Component satisfied.");
     final ManifestExplodeService service = context.getService(reference);
     assertNotNull(service, "the ManifestExplodeService reference must resolve to an instance");
     return service;
@@ -52,10 +50,7 @@ class DefaultManifestExplodeServiceTest {
     final BundleContext context =
         FrameworkUtil.getBundle(DefaultManifestExplodeServiceTest.class).getBundleContext();
     final var reference = context.getServiceReference(YamlMapper.class);
-    assertNotNull(
-        reference,
-        "SCR must publish the YamlMapper @Component."
-            + ScrDiagnostics.of(context).map(ScrDiagnostics::report).orElse(""));
+    assertNotNull(reference, "SCR must publish the YamlMapper @Component.");
     return context.getService(reference);
   }
 

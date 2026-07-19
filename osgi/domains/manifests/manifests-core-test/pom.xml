@@ -40,6 +40,30 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- The seed-broker seam manifests-core imports (its SeedHandler reflectors name
+         seed.broker.port; the reconcilers encode with the codec). On the test classpath so
+         installImportClosureOf can stage them — the closure walk locates bundles by classpath, and
+         without a provider of seed.broker.port the whole manifests-core graph fails to resolve. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- victools-wrap on the test classpath so installImportClosureOf can install it: manifests-core
+         (via seed-broker-shape's RecordSchemaProjector) imports com.github.victools.*, whose only
+         exporter is this wrap bundle. Without it the whole synthesis graph fails to resolve. The
+         jgiven-wrap treatment, for the shape engine (mirrors manifests-bdd-test). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>victools-wrap</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <!-- Jupiter, the engine, jgiven-junit5, junit-platform-launcher AND the DS test stack (felix.scr
          + the org.osgi.service.component / util.promise / util.function trio for withScr()) are all
          inherited from bundle-test-parent. -->
