@@ -50,7 +50,6 @@ import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
-import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
@@ -78,19 +77,23 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * host-cellar-realisation CORRECTION 2026-07-14; the heavy Pulumi-bound instance grow stays
  * host-side). Not a {@code -test} fragment (it is live seeding logic).
  *
- * <p>The bbox/systemd/cluster twin: its collaborators are INJECTED from its OWN bundle's registry
- * by the {@link OsgiService} bridge — the {@link ImageBuilder}, the {@link
- * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (to consult manifests), the ambient {@link
- * RunGate} (whose {@link RunGate#cultivating() cultivating} decides build-for-real vs plan-only),
- * and, on a failure, the doctor's {@link ConsultingService} (an optional snapshot). The scenario is
- * identical live and in test; only who published the collaborators differs (the live {@code
- * DistrobuilderImageBuilder} + the real broker + the host's RunGate, or the mocks a test seeds).
+ * <p>The bbox/systemd/cluster twin, MODE-BLIND: its collaborators are INJECTED from its OWN
+ * bundle's registry by the {@link OsgiService} bridge — the {@link ImageBuilder}, the {@link
+ * io.nxmatic.rke2lab.seed.broker.port.SeedBroker} (to consult manifests), and, on a failure, the
+ * doctor's {@link ConsultingService} (an optional snapshot). It injects NO {@code RunGate}: the
+ * frontier reads the ambient gate once and hands it the cultivating or surveying {@link
+ * ImageBuilder} impl by LDAP filter on {@code rke2lab.gardening}. The scenario is identical live
+ * and in test; only who published the collaborators differs (the {@code Cultivating}/{@code
+ * SurveyingImageBuilder} pair the frontier picks between + the real broker, or the mocks a test
+ * seeds).
  *
- * <p>Preview inertness — the SCION consults the RunGate: under a closed gate it does NOT build the
- * image nor consult manifests (the real edge would ssh/build), it records the plan and the step
- * renders PENDING via E9. The image markers are fixed (the offline mock ignores them; the live
- * config-derived plumbing is the same deferral the cluster/systemd twins make for their kubeconfig
- * / endpoint).
+ * <p>Preview inertness lives at the FRONTIER, not in the scenario: under a surveying gate the scion
+ * gets the {@link SurveyingImageBuilder} (plans the build, shells nothing) and no {@code
+ * AuthTokenContact} at all (the optional CLI probe is tagged cultivating, so it resolves empty and
+ * secrets fall back to the environment — no CLI). The manifests synthesis is pure FS, so it runs in
+ * both modes. Every step renders PENDING via E9. The image markers are fixed (the offline mock
+ * ignores them; the live config-derived plumbing is the same deferral the cluster/systemd twins
+ * make for their kubeconfig / endpoint).
  */
 @SeedScenario
 public class IncusProvisionScenario
@@ -136,7 +139,6 @@ public class IncusProvisionScenario
   // without either — secrets fall back to the environment, a failure without a doctor degrades to
   // unconsulted).
   @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
-  @OsgiService private Optional<RunGate> gate = Optional.empty();
   @OsgiService private Optional<SeedBroker> broker = Optional.empty();
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
   @OsgiService private Optional<NetplanSynthesisService> netplan = Optional.empty();
@@ -190,12 +192,10 @@ public class IncusProvisionScenario
     given()
         .the_seed_node(NODE)
         .and()
-        .prepared_through(imageBuilder, gate.orElseThrow(), observations, netplan.orElseThrow())
+        .prepared_through(imageBuilder, observations, netplan.orElseThrow())
         .and()
         .consulting_manifests_through(broker.orElseThrow(), resolved.soil(), cellar);
     when()
-        .the_run_condition_is_read()
-        .and()
         .the_image_is_built()
         .and()
         .the_manifests_are_cultivated()
@@ -317,11 +317,10 @@ public class IncusProvisionScenario
     }
   }
 
-  /** Given: the seed node, the image builder, the run gate, the observation sink, and the door. */
+  /** Given: the seed node, the image builder, the observation sink, and the door. */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState ImageBuilder imageBuilder;
-    @ProvidedScenarioState RunGate gate;
     @ProvidedScenarioState List<ObservationWire> observations;
     @ProvidedScenarioState SeedBroker broker;
     @ProvidedScenarioState String soil;
@@ -341,11 +340,9 @@ public class IncusProvisionScenario
     @Hidden
     public Given prepared_through(
         ImageBuilder imageBuilder,
-        RunGate gate,
         List<ObservationWire> observations,
         NetplanSynthesisService netplan) {
       this.imageBuilder = imageBuilder;
-      this.gate = gate;
       this.observations = observations;
       this.netplan = netplan;
       return self();
@@ -361,24 +358,24 @@ public class IncusProvisionScenario
   }
 
   /**
-   * When: the scion reads the run condition (the {@link RunGate}), builds the image ONLY when
-   * cultivating (an edge effect — distrobuilder/ssh), and ALWAYS consults manifests, recording each
-   * facet's {@link ObservationWire} (ok, or failed with a typed {@link SymptomKind}) into the
-   * shared sink, fail-fast on the first failure. It PREPARES the instance's material (image +
-   * manifests); the host makes the instance grow and verifies its reachability (Shape C — the gRPC
-   * push and its post-push probe are host-side).
+   * When: the scion drives its image builder (mode-blind — the frontier chose cultivating or
+   * surveying), and ALWAYS consults manifests, recording each facet's {@link ObservationWire} (ok,
+   * or failed with a typed {@link SymptomKind}) into the shared sink, fail-fast on the first
+   * failure. It PREPARES the instance's material (image + manifests); the host makes the instance
+   * grow and verifies its reachability (Shape C — the gRPC push and its post-push probe are
+   * host-side).
    *
-   * <p>The gate splits by NATURE of effect (§ host-cellar-realisation, Live vs preview): the image
-   * build is an edge effect, so a closed gate builds nothing (the plan renders PENDING via E9, no
-   * edge contacted); the manifests synthesis is a pure FS materialisation into {@code
-   * host.N.staging.d}, inert against the live instance, so it runs at preview too — a preview run
-   * materialises its staging replica and its host-manifest (traceable from the cellar), only the
-   * rsync into {@code host.live.d} is gated (I6). So consulting manifests is NOT gated.
+   * <p>The split by NATURE of effect now lives at the frontier, not in the scenario: the image
+   * build is an edge effect, so a surveying run gets the {@code SurveyingImageBuilder} (contacts
+   * nothing, the plan renders PENDING via E9); the manifests synthesis is a pure FS materialisation
+   * into {@code host.N.staging.d}, inert against the live instance, so it runs in both modes — a
+   * survey run materialises its staging replica and its host-manifest (traceable from the cellar),
+   * only the rsync into {@code host.live.d} is gated at reconcile (I6). So consulting manifests is
+   * unconditional.
    */
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState ImageBuilder imageBuilder;
-    @ExpectedScenarioState RunGate gate;
     @ExpectedScenarioState List<ObservationWire> observations;
     @ExpectedScenarioState SeedBroker broker;
     @ExpectedScenarioState String soil;
@@ -386,7 +383,6 @@ public class IncusProvisionScenario
 
     @ExpectedScenarioState Cellar cellar;
 
-    @ProvidedScenarioState boolean cultivating;
     // The flat network view the scion projects for the host GROW — assembled here (WHEN
     // fabricates),
     // sealed into the plan by the THEN. Null for an unamended survey (no cluster to resolve).
@@ -394,15 +390,10 @@ public class IncusProvisionScenario
 
     private final SeedCodec codec = new SeedCodec();
 
-    public When the_run_condition_is_read() {
-      this.cultivating = gate.cultivating();
-      return self();
-    }
-
     public When the_image_is_built() {
-      if (!cultivating) {
-        return self();
-      }
+      // Mode-blind: the frontier already chose the builder — CultivatingDistrobuilderImageBuilder
+      // (shells distrobuilder/ssh) or SurveyingImageBuilder (plans, shells nothing). The scion just
+      // drives it; a surveying run touches nothing and the step renders PENDING.
       final Optional<String> failure = imageBuilder.build(imageRequest());
       if (failure.isPresent()) {
         record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failure.get());
@@ -467,15 +458,15 @@ public class IncusProvisionScenario
      * Upsert the gh/flox launch tokens into the worktree's {@code .secrets} (§ provisioning-slice
      * delta #10) — a WHEN because it FABRICATES material (a file materialisation), BEFORE the
      * {@code worktree.dir} mount binds it into the instance. {@link LaunchSecretsWriter} resolves
-     * each token from the environment first, else the {@link AuthTokenContact} edge. GATED on
-     * {@code cultivating}: the contact shells {@code gh}/{@code flox} (an edge effect), so a closed
-     * gate touches no CLI and leaves the file untouched — the plan renders PENDING via E9, the same
-     * deferral the image build makes. Skipped for an unamended survey (no worktree {@code .secrets}
-     * to upsert).
+     * each token from the environment first, else the {@link AuthTokenContact} edge. Mode-blind:
+     * the inertness lives at the frontier — the {@code AuthTokenContact} CLI probe is tagged {@code
+     * cultivating}, so a surveying run resolves it empty (no {@code gh}/{@code flox} shelled) and
+     * the writer falls back to the environment; the step renders PENDING via E9. Skipped only for
+     * an unamended survey (no worktree {@code .secrets} to upsert).
      */
     public When the_secrets_are_written(
         @Hidden Resolved resolved, @Hidden Optional<AuthTokenContact> authToken) {
-      if (!resolved.isAmended() || !cultivating) {
+      if (!resolved.isAmended()) {
         return self();
       }
       new LaunchSecretsWriter(authToken).ensureTokensPresent(resolved.secretsFile());

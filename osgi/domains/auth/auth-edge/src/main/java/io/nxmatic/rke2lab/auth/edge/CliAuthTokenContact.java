@@ -21,8 +21,15 @@ import org.slf4j.LoggerFactory;
  * after its own environment-variable precedence comes up empty.
  *
  * <p><b>Runtime dependency:</b> {@code gh} / {@code flox} on {@code PATH}, authenticated.
+ *
+ * <p>Tagged {@code rke2lab.gardening=cultivating} — a token contact is a PURE PROBE (its output IS
+ * the live credential, so a surveying impl could only fabricate one), and it is an OPTIONAL
+ * collaborator ({@code @OsgiService(await = false)}). So it needs no surveying twin: under a
+ * surveying gate the frontier's filter matches neither this (tagged {@code cultivating}) nor an
+ * absent one, so the scion resolves it empty and falls back to the environment — no CLI shelled, no
+ * fabricated token, honest inertness.
  */
-@Component(service = AuthTokenContact.class)
+@Component(service = AuthTokenContact.class, property = "rke2lab.gardening=cultivating")
 public final class CliAuthTokenContact implements AuthTokenContact {
 
   private static final Logger LOG = LoggerFactory.getLogger(CliAuthTokenContact.class);

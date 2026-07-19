@@ -13,29 +13,26 @@ import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
 import org.osgi.service.component.annotations.Component;
 
 /**
- * The realised bbox edge: opens one session to the Bouygues Bbox router via the embedded {@code
- * java-bbox-api-client}, hands it to the library's {@link ReservationReconciler} (which fetches the
- * reservation table once), and applies each desired reservation. The single door toward this one
- * external contact — the client and its gson dependency are nested in this bundle, so no library
- * type ever reaches the host; the seam speaks only the home vocabulary.
+ * The CULTIVATING bbox edge — the single live door. Opens one session to the Bouygues Bbox router
+ * via the embedded {@code java-bbox-api-client}, hands it to the library's {@link
+ * ReservationReconciler} (which fetches the reservation table once), and APPLIES each desired
+ * reservation. The client and its gson dependency are nested in this bundle, so no library type
+ * ever reaches the host; the seam speaks only the home vocabulary.
+ *
+ * <p>One of the bbox reconciler PAIR: registered with {@code rke2lab.gardening=cultivating} so the
+ * {@code @OsgiService} frontier picks it when the ambient RunGate is cultivating. Its twin, {@link
+ * SurveyingBboxReconciler}, projects the plan without touching the router. Neither knows the mode —
+ * the frontier chose; this one simply cultivates.
  */
-@Component(service = BboxReconciler.class)
-public final class LiveBboxReconciler implements BboxReconciler {
+@Component(service = BboxReconciler.class, property = "rke2lab.gardening=cultivating")
+public final class CultivatingBboxReconciler implements BboxReconciler {
 
   @Override
   public List<BboxRowOutcome> reconcile(
-      URI baseUri, String adminPassword, boolean dryRun, List<BboxReservationRequest> requests) {
-    // Dry-run (preview) touches NOTHING — no session, no login, no read (§ RunGate: touching the
-    // live system in preview would hang or lie; here the router login even 400s). Each row is a
-    // speculative WOULD_CREATE without opening the client. Only a live apply opens a session.
-    if (dryRun) {
-      return requests.stream().map(LiveBboxReconciler::wouldCreate).toList();
-    }
+      URI baseUri, String adminPassword, List<BboxReservationRequest> requests) {
     final List<BboxRowOutcome> outcomes = new ArrayList<>(requests.size());
     try (BboxApiClient client = openClient(baseUri, adminPassword)) {
       final ReservationReconciler reconciler = new ReservationReconciler(client);
@@ -48,26 +45,6 @@ public final class LiveBboxReconciler implements BboxReconciler {
       }
     }
     return outcomes;
-  }
-
-  /**
-   * The speculative outcome a dry-run projects for a desired row without contacting the router: it
-   * WOULD create the reservation (no bbox-side id, no previous state, no failure). A preview that
-   * cannot read the live table cannot tell CREATE from UPDATE/MATCHING, so it reports the honest
-   * upper bound — WOULD_CREATE — never a false MATCHING.
-   */
-  private static BboxRowOutcome wouldCreate(BboxReservationRequest request) {
-    return new BboxRowOutcome(
-        request.cluster(),
-        request.node(),
-        BboxAction.WOULD_CREATE,
-        request.mac(),
-        request.ip(),
-        request.hostname(),
-        OptionalInt.empty(),
-        Optional.empty(),
-        Optional.empty(),
-        Optional.empty());
   }
 
   private static BboxApiClient openClient(URI baseUri, String adminPassword) {

@@ -30,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @ExtendWith(JGivenExtension.class)
+@ExtendWith(SurveyRenderExtension.class)
 @ExtendWith(ScenarioCellarExtension.class)
 @ExtendWith(OsgiServiceExtension.class)
 @ExtendWith(ScenarioOutcomeExtension.class)

@@ -1,10 +1,13 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.Filter;
 import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceReference;
 import org.osgi.util.tracker.ServiceTracker;
 
@@ -70,11 +73,57 @@ public final class ScenarioRegistry {
   }
 
   /**
+   * A required collaborator matching {@code gardeningFilter}, AWAITING SCR to publish it — the
+   * frontier form of {@link #require(Class, String)}. The filter (from {@link
+   * GardeningSelection#filter()}) picks the cultivating or surveying half of a mode-sensitive pair;
+   * an unpaired service matches it too. Combined with {@code objectClass} into the tracker filter.
+   */
+  public <T> T require(Class<T> type, String gardeningFilter, String absenceMessage) {
+    final ServiceTracker<T, T> tracker =
+        new ServiceTracker<>(context, filter(type, gardeningFilter), null);
+    tracker.open();
+    try {
+      return Objects.requireNonNull(tracker.waitForService(AWAIT_MILLIS), absenceMessage);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("interrupted awaiting service " + type.getName(), ex);
+    } finally {
+      tracker.close();
+    }
+  }
+
+  /**
    * An optional collaborator — a snapshot of the registry, empty when none is published (e.g. a
    * world without the doctor). Does not await: absence is a legitimate outcome, not a race.
    */
   public <T> Optional<T> optional(Class<T> type) {
     return Optional.ofNullable(context.getServiceReference(type)).map(this::service);
+  }
+
+  /**
+   * An optional collaborator matching {@code gardeningFilter} — the frontier form of {@link
+   * #optional(Class)}. Snapshot, no await; the type is the {@code objectClass}, so the filter
+   * carries only the gardening clause.
+   */
+  public <T> Optional<T> optional(Class<T> type, String gardeningFilter) {
+    try {
+      final Collection<ServiceReference<T>> refs =
+          context.getServiceReferences(type, gardeningFilter);
+      return refs.stream().findFirst().map(this::service);
+    } catch (InvalidSyntaxException ex) {
+      throw new IllegalStateException(
+          "malformed gardening filter for " + type.getName() + ": " + gardeningFilter, ex);
+    }
+  }
+
+  /** The tracker filter combining the service {@code objectClass} with the gardening clause. */
+  private <T> Filter filter(Class<T> type, String gardeningFilter) {
+    final String expression = "(&(objectClass=" + type.getName() + ")" + gardeningFilter + ")";
+    try {
+      return context.createFilter(expression);
+    } catch (InvalidSyntaxException ex) {
+      throw new IllegalStateException("malformed gardening filter: " + expression, ex);
+    }
   }
 
   private <T> T service(ServiceReference<T> ref) {

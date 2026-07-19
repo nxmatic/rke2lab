@@ -10,11 +10,9 @@ import com.tngtech.jgiven.impl.Scenario;
 import io.nxmatic.rke2lab.incus.contract.HostDriftEntry;
 import io.nxmatic.rke2lab.incus.contract.HostLiveEntry;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
+import io.nxmatic.rke2lab.incus.contract.HostTreePromoter;
+import io.nxmatic.rke2lab.incus.contract.HostTreePromoter.Promotion;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
-import io.nxmatic.rke2lab.incus.core.HostTreeDelta;
-import io.nxmatic.rke2lab.incus.core.HostTreeDeltaRenderer;
-import io.nxmatic.rke2lab.incus.core.HostTreeDiffer;
-import io.nxmatic.rke2lab.incus.core.HostTreePromoter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
@@ -23,10 +21,10 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
-import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 
@@ -44,15 +42,16 @@ import org.junit.jupiter.api.Test;
  * this run — the cellar's overlay returns the in-flight one, § seed-broker-spec, the entries
  * descend); the {@code pivot} is the {@code host-live} entry's {@code syncedFrom} (a prior-run
  * committed fact, empty on the first run); the {@code live} root is the {@code host.live.d} sibling
- * of the staging slot. So the whole cycle reads from the ambient {@link Cellar} + {@link RunGate}
- * this bundle's registry holds.
+ * of the staging slot. So the whole cycle reads from the ambient {@link Cellar} this bundle's
+ * registry holds; it is MODE-BLIND — it injects no {@code RunGate}.
  *
- * <p>The gate splits by NATURE (§ Live vs preview): the {@code change} delta (a checksum-map
- * compare, no FS touch) is the DECISION, computed always; the promotion is the live edge effect, so
- * a closed gate promotes nothing (the step renders PENDING via E9, the cellar is not written). The
- * {@code drift} (the live's out-of-band deviation vs the pivot) is OBSERVED on the FS before the
- * sync and reported — NEVER a decision gate (if the source changed we promote, the staging is
- * authoritative, the drift is overwritten; the report is its only role).
+ * <p>The split by NATURE lives at the FRONTIER, not in the scion: the {@code change} delta (a
+ * checksum-map compare, no FS touch) is the DECISION, computed in both modes; the promotion is the
+ * live edge effect, so a surveying run gets the surveying promoter impl (touches nothing, the step
+ * renders PENDING via E9, the cellar is not written). The {@code drift} (the live's out-of-band
+ * deviation vs the pivot) is OBSERVED — inside the cultivating impl, before the sync — and
+ * reported, NEVER a decision (if the source changed we promote, the staging is authoritative, the
+ * drift is overwritten; the report is its only role).
  */
 @SeedScenario
 public class IncusReconcileScenario
@@ -72,7 +71,7 @@ public class IncusReconcileScenario
   // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
   // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
   // bridge owns presence): both required, awaited from SCR, so their orElseThrow never fires.
-  @OsgiService private Optional<RunGate> gateService = Optional.empty();
+  @OsgiService private Optional<HostTreePromoter> promoter = Optional.empty();
   @OsgiService private Optional<Parcel> parcelService = Optional.empty();
 
   @Override
@@ -87,16 +86,25 @@ public class IncusReconcileScenario
 
   @Test
   void the_live_tree_is_reconciled() {
-    final RunGate gate = gateService.orElseThrow();
+    final HostTreePromoter promoter = this.promoter.orElseThrow();
     final Parcel parcel = parcelService.orElseThrow();
     final Reconciliation reconciliation = Reconciliation.foldFrom(cellar, parcel);
-    given().the_host_tree(NODE).and().reconciling_through(gate, cellar, parcel, reconciliation);
-    when().the_run_condition_is_read().and().the_change_is_decided().and().the_live_is_promoted();
+    // The @Test-owned sink the When fills with the promoter's factual outcome — read below for the
+    // tag, independent of jGiven's stage state. Mode-blind: the tag follows what ACTUALLY flipped
+    // (promotion.promoted()), which the frontier's cultivating/surveying impl decides, never a
+    // gate.
+    final AtomicReference<Promotion> promotion = new AtomicReference<>(Promotion.notPromoted());
+    given()
+        .the_host_tree(NODE)
+        .and()
+        .reconciling_through(promoter, cellar, parcel, reconciliation, promotion);
+    when().the_change_is_decided().and().the_live_is_promoted();
     then().the_live_tree_is_reconciled();
     // Narrate a real promotion on the model — the PROMOTED tag projects the committed HostLiveEntry
     // (one truth, two renderings): the durable store is the fact, this rides the graft up so the
-    // host tree shows "promoted from host.N.staging.d". Only on a real flip (change + live gate).
-    if (gate.cultivating() && reconciliation.hasSource() && reconciliation.changed()) {
+    // host tree shows "promoted from host.N.staging.d". Only on a real flip (the cultivating impl
+    // promoted; a surveying run reports notPromoted, so no tag).
+    if (promotion.get().promoted()) {
       getScenario()
           .getModel()
           .addTag(GraftTag.PROMOTED.of(reconciliation.source().get().stagingRoot()));
@@ -162,13 +170,16 @@ public class IncusReconcileScenario
     }
   }
 
-  /** Given: the node under reconcile, the run gate, and the folded host-tree state. */
+  /**
+   * Given: the node under reconcile, the promoter contact, the folded state, and the outcome sink.
+   */
   public static class Given extends Stage<Given> {
 
-    @ProvidedScenarioState RunGate gate;
+    @ProvidedScenarioState HostTreePromoter promoter;
     @ProvidedScenarioState Cellar cellar;
     @ProvidedScenarioState Parcel parcel;
     @ProvidedScenarioState Reconciliation reconciliation;
+    @ProvidedScenarioState AtomicReference<Promotion> promotionSink;
 
     public Given the_host_tree(@Quoted String node) {
       return self();
@@ -176,69 +187,60 @@ public class IncusReconcileScenario
 
     @Hidden
     public Given reconciling_through(
-        RunGate gate, Cellar cellar, Parcel parcel, Reconciliation reconciliation) {
-      this.gate = gate;
+        HostTreePromoter promoter,
+        Cellar cellar,
+        Parcel parcel,
+        Reconciliation reconciliation,
+        AtomicReference<Promotion> promotionSink) {
+      this.promoter = promoter;
       this.cellar = cellar;
       this.parcel = parcel;
       this.reconciliation = reconciliation;
+      this.promotionSink = promotionSink;
       return self();
     }
   }
 
   /**
-   * When: read the run condition, decide on the {@code change} (a checksum-map compare), and — only
-   * when cultivating and the source changed — OBSERVE the drift on the FS then PROMOTE the staging
-   * into {@code host.live.d}. A closed gate promotes nothing (the plan renders PENDING via E9); an
-   * empty change is a NO-OP (the live already mirrors this staging).
+   * When: decide on the {@code change} (a checksum-map compare), and — only when the source changed
+   * — drive the promoter contact once, MODE-BLIND. The frontier already chose the impl: cultivating
+   * (observes drift + syncs into {@code host.live.d}) or surveying (touches nothing). An empty
+   * change is a NO-OP (the live already mirrors this staging), reported {@link
+   * Promotion#notPromoted()}. The factual {@link Promotion} rides the sink to the @Test and the
+   * stage state to the Then.
    */
   public static class When extends Stage<When> {
 
-    @ExpectedScenarioState RunGate gate;
+    @ExpectedScenarioState HostTreePromoter promoter;
     @ExpectedScenarioState Reconciliation reconciliation;
+    @ExpectedScenarioState AtomicReference<Promotion> promotionSink;
 
-    @ProvidedScenarioState boolean cultivating;
-    @ProvidedScenarioState boolean promoted;
-    @ProvidedScenarioState Optional<HostDriftEntry> drift;
-
-    private final HostTreePromoter promoter = new HostTreePromoter();
-    private final HostTreeDiffer differ = new HostTreeDiffer();
-    private final HostTreeDeltaRenderer renderer = new HostTreeDeltaRenderer();
-
-    public When the_run_condition_is_read() {
-      this.cultivating = gate.cultivating();
-      this.drift = Optional.empty();
-      this.promoted = false;
-      return self();
-    }
+    @ProvidedScenarioState Promotion promotion;
 
     public When the_change_is_decided() {
       // A checksum-map compare, no FS touch: empty change ⇒ the live already mirrors this staging,
-      // a NO-OP. The gate does NOT enter here — the decision is computed live AND preview.
+      // a NO-OP. The mode does NOT enter here — the decision is computed live AND survey.
       return self();
     }
 
     public When the_live_is_promoted() {
-      if (!reconciliation.hasSource() || !reconciliation.changed()) {
-        return self(); // NO-OP — nothing to flip
-      }
-      if (!cultivating) {
-        return self(); // preview — the live edge is gated (PENDING via E9), the cellar not written
-      }
-      // OBSERVE the live's out-of-band deviation vs the pivot BEFORE the sync overwrites it, and
-      // record it as a drift entry (its report rendered beside the staging). Never a decision gate.
-      final HostTreeDelta driftDelta =
-          differ.diff(reconciliation.pivotRoot(), reconciliation.liveRoot());
-      if (!driftDelta.isEmpty()) {
-        final Path report = renderer.render(reconciliation.driftBase(), driftDelta);
-        this.drift =
-            Optional.of(
-                HostDriftEntry.of(report.toString(), reconciliation.pivotRoot().toString()));
-      }
-      // ACT — sync the staging into host.live.d (jsync, --delete, skip-flox).
-      final HostStagingEntry source = reconciliation.source().orElseThrow();
-      promoter.promote(Path.of(source.stagingRoot()), reconciliation.liveRoot());
-      this.promoted = true;
+      this.promotion = promote();
+      promotionSink.set(promotion);
       return self();
+    }
+
+    private Promotion promote() {
+      if (!reconciliation.hasSource() || !reconciliation.changed()) {
+        return Promotion.notPromoted(); // NO-OP — nothing to flip
+      }
+      // Mode-blind: the cultivating impl observes the drift + syncs; the surveying impl touches
+      // nothing and reports notPromoted. The step renders PENDING under a survey via E9.
+      final HostStagingEntry source = reconciliation.source().orElseThrow();
+      return promoter.promote(
+          Path.of(source.stagingRoot()),
+          reconciliation.liveRoot(),
+          reconciliation.pivotRoot(),
+          reconciliation.driftBase());
     }
   }
 
@@ -253,16 +255,15 @@ public class IncusReconcileScenario
     @ExpectedScenarioState Cellar cellar;
     @ExpectedScenarioState Parcel parcel;
     @ExpectedScenarioState Reconciliation reconciliation;
-    @ExpectedScenarioState boolean promoted;
-    @ExpectedScenarioState Optional<HostDriftEntry> drift;
+    @ExpectedScenarioState Promotion promotion;
 
     public Then the_live_tree_is_reconciled() {
-      if (!promoted) {
+      if (!promotion.promoted()) {
         return self();
       }
       final HostStagingEntry source = reconciliation.source().orElseThrow();
       cellar.store(parcel, IncusCoordinate.HOST_LIVE, HostLiveEntry.of(source.stagingRoot()));
-      drift.ifPresent(entry -> cellar.store(parcel, IncusCoordinate.HOST_DRIFT, entry));
+      promotion.drift().ifPresent(entry -> cellar.store(parcel, IncusCoordinate.HOST_DRIFT, entry));
       return self();
     }
   }

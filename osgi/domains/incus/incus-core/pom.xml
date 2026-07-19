@@ -24,6 +24,14 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
     </dependency>
+    <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header. incus-core
+         declares its FIRST services here — the HostTreePromoter cultivating/surveying pair — because
+         the jsync ACT is embedded in this bundle, so the live door lives where jsync does. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <!-- The flat grow views the scion projects (GrowNetworkView): GrowNetworkResolver assembles it. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

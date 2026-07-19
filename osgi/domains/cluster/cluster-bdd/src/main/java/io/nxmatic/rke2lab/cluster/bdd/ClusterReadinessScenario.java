@@ -20,6 +20,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSou
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SurveyInert;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
@@ -49,7 +50,7 @@ public class ClusterReadinessScenario
         ClusterReadinessScenario.Given,
         ClusterReadinessScenario.When,
         ClusterReadinessScenario.Then>
-    implements ConsultationSource, ScenarioPlayer.Playable {
+    implements ConsultationSource, ScenarioPlayer.Playable, SurveyInert {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 

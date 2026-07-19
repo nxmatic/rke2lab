@@ -97,19 +97,52 @@ public class IncusProvisionScenarioInContainerTest {
   }
 
   @Test
-  void a_preview_run_builds_nothing() throws Exception {
-    // cultivating() false → the scion builds NOTHING; the mock records whether it was called, and
-    // must not have been.
-    final RecordingImageBuilder builder = recordingBuilder();
-    final ScenarioOutcome outcome =
-        playWith(cultivatingGate(false), builder, null, new RecordingCellar());
+  void a_survey_run_selects_surveying_and_renders_pending() throws Exception {
+    // Mode-blind scion. TOUCH: under a surveying gate the FRONTIER hands it the surveying builder,
+    // never the cultivating one (which would shell distrobuilder/ssh). Register BOTH halves tagged,
+    // and prove the frontier picked surveying. RENDER: every step narrates PENDING.
+    final RecordingImageBuilder cultivating = new RecordingImageBuilder();
+    final RecordingImageBuilder surveying = new RecordingImageBuilder();
+    final BundleContext context = FrameworkUtil.getBundle(IncusBddTests.class).getBundleContext();
+    final List<ServiceRegistration<?>> registrations = new ArrayList<>();
+    registrations.add(
+        context.registerService(RunGate.class, cultivatingGate(false), new Hashtable<>()));
+    registrations.add(
+        context.registerService(ImageBuilder.class, cultivating, gardening("cultivating")));
+    registrations.add(
+        context.registerService(ImageBuilder.class, surveying, gardening("surveying")));
+    registrations.add(
+        context.registerService(
+            NetplanSynthesisService.class, synthesizesNetwork(), new Hashtable<>()));
+    registrations.add(
+        context.registerService(SeedBroker.class, new RecordingBroker(), new Hashtable<>()));
+    registrations.add(
+        context.registerService(Cellar.class, new RecordingCellar(), new Hashtable<>()));
+    registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
+    try {
+      final ScenarioOutcome outcome =
+          new ScenarioPlayer()
+              .play(
+                  IncusProvisionScenario.class,
+                  IncusProvisionScenario.INPUT.into(IncusRunbookInput.defaults()));
+      assertTrue(surveying.built, "the frontier handed the scion the surveying builder");
+      assertTrue(
+          !cultivating.built, "the frontier never resolved the cultivating builder in survey");
+      assertEquals(
+          ExecutionStatus.SCENARIO_PENDING,
+          outcome.runbook().getScenarios().get(0).getExecutionStatus(),
+          "a surveyed scenario renders PENDING — a plan, not a result");
+      assertTrue(outcome.consultations().isEmpty(), "a survey raised no symptom");
+    } finally {
+      registrations.forEach(ServiceRegistration::unregister);
+    }
+  }
 
-    assertEquals(
-        ExecutionStatus.SUCCESS,
-        outcome.runbook().getScenarios().get(0).getExecutionStatus(),
-        "a preview run plans cleanly without touching the incus host");
-    assertTrue(!builder.built, "under a closed gate the scion must NOT build the image");
-    assertTrue(outcome.consultations().isEmpty(), "a preview raised no symptom");
+  /** The service properties tagging one half of a mode-sensitive collaborator pair. */
+  private static Hashtable<String, Object> gardening(String mode) {
+    final Hashtable<String, Object> properties = new Hashtable<>();
+    properties.put("rke2lab.gardening", mode);
+    return properties;
   }
 
   @Test
@@ -244,11 +277,9 @@ public class IncusProvisionScenarioInContainerTest {
     };
   }
 
-  private static RecordingImageBuilder recordingBuilder() {
-    return new RecordingImageBuilder();
-  }
-
-  /** An ImageBuilder that records whether it was called — proves preview inertness. */
+  /**
+   * An ImageBuilder that records whether it was called — proves which half the frontier resolved.
+   */
   private static final class RecordingImageBuilder implements ImageBuilder {
     boolean built;
 

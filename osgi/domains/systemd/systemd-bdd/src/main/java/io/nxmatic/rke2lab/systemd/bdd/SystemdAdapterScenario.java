@@ -16,6 +16,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSou
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SurveyInert;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest;
@@ -52,7 +53,7 @@ import org.junit.jupiter.api.Test;
 public class SystemdAdapterScenario
     extends ScenarioTestBase<
         SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then>
-    implements ConsultationSource, ScenarioPlayer.Playable {
+    implements ConsultationSource, ScenarioPlayer.Playable, SurveyInert {
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 

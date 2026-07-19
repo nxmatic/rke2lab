@@ -8,7 +8,10 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.incus.contract.HostLiveEntry;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry.Provenance;
+import io.nxmatic.rke2lab.incus.contract.HostTreePromoter;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
+import io.nxmatic.rke2lab.incus.core.CultivatingHostTreePromoter;
+import io.nxmatic.rke2lab.incus.core.SurveyingHostTreePromoter;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarEntriesSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
@@ -126,9 +129,9 @@ public class IncusReconcileScenarioInContainerTest {
     final ReportModel runbook = play(cultivatingGate(false), tree).runbook();
 
     assertEquals(
-        ExecutionStatus.SUCCESS,
+        ExecutionStatus.SCENARIO_PENDING,
         runbook.getScenarios().get(0).getExecutionStatus(),
-        "a preview reconcile plans cleanly without touching the live tree");
+        "a preview reconcile renders PENDING — an honest plan, not a green result");
     assertTrue(posedPromotedFrom(runbook).isEmpty(), "a gated preview poses no PROMOTED tag");
     assertTrue(committedLive(runbook).isEmpty(), "a preview commits no host-live");
     assertEquals(
@@ -152,6 +155,15 @@ public class IncusReconcileScenarioInContainerTest {
     registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
     registrations.add(
         context.registerService(Cellar.class, tree.durablePivot(), new Hashtable<>()));
+    // The promoter PAIR the frontier picks between by the gate. Registered here (not SCR-published
+    // in this fragment world) with the REAL impls, tagged — so the cultivating case does the real
+    // jsync onto the fixture FS this test asserts on, and a survey picks the inert surveying one.
+    registrations.add(
+        context.registerService(
+            HostTreePromoter.class, new CultivatingHostTreePromoter(), gardening("cultivating")));
+    registrations.add(
+        context.registerService(
+            HostTreePromoter.class, new SurveyingHostTreePromoter(), gardening("surveying")));
     try {
       return new ScenarioPlayer()
           .play(
@@ -161,6 +173,13 @@ public class IncusReconcileScenarioInContainerTest {
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
+  }
+
+  /** The service properties tagging one half of a mode-sensitive collaborator pair. */
+  private static Hashtable<String, Object> gardening(String mode) {
+    final Hashtable<String, Object> properties = new Hashtable<>();
+    properties.put("rke2lab.gardening", mode);
+    return properties;
   }
 
   /** The staging paths the PROMOTED tag posed on the rebuilt model — empty when none was posed. */

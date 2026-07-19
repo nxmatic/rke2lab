@@ -16,6 +16,7 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -99,6 +100,32 @@ public class ClusterReadinessScenarioInContainerTest {
         "the consultation names the checkpoint the host joins on");
   }
 
+  @Test
+  void a_survey_run_does_not_probe_and_renders_pending() throws Exception {
+    // A pure probe is SURVEY-INERT: it has no honest plan-only shape (its output IS the live
+    // state),
+    // so under a surveying gate its bodies are SKIPPED — the live contact is never called (no
+    // kubectl), and every step renders PENDING. Register a recording contact + a surveying gate and
+    // prove both: the probe was not called, and the scenario reads SCENARIO_PENDING.
+    final RecordingContact contact = new RecordingContact();
+    final BundleContext context = FrameworkUtil.getBundle(ClusterBddTests.class).getBundleContext();
+    final List<ServiceRegistration<?>> registrations = new ArrayList<>();
+    registrations.add(context.registerService(RunGate.class, () -> false, new Hashtable<>()));
+    registrations.add(
+        context.registerService(ClusterReadinessContact.class, contact, new Hashtable<>()));
+    try {
+      final ScenarioOutcome outcome =
+          new ScenarioPlayer().play(ClusterReadinessScenario.class, store -> {});
+      assertTrue(!contact.probed, "a survey-inert probe never contacts the live cluster");
+      assertEquals(
+          ExecutionStatus.SCENARIO_PENDING,
+          outcome.runbook().getScenarios().get(0).getExecutionStatus(),
+          "a surveyed pure probe renders PENDING — it planned nothing, it touched nothing");
+    } finally {
+      registrations.forEach(ServiceRegistration::unregister);
+    }
+  }
+
   /**
    * Register the mock collaborators into THIS bundle's registry, play the scenario in-container
    * through the shared {@link ScenarioPlayer}, and return its live {@link ScenarioOutcome}.
@@ -141,6 +168,23 @@ public class ClusterReadinessScenarioInContainerTest {
     @Override
     public boolean areControllersEffective(Path kubeconfig, List<ControllerRef> controllers) {
       return controllersEffective;
+    }
+  }
+
+  /** A contact that records whether it was ever asked — proves a survey-inert run never probes. */
+  private static final class RecordingContact implements ClusterReadinessContact {
+    boolean probed;
+
+    @Override
+    public boolean isApiReady(Path kubeconfig) {
+      this.probed = true;
+      return true;
+    }
+
+    @Override
+    public boolean areControllersEffective(Path kubeconfig, List<ControllerRef> controllers) {
+      this.probed = true;
+      return true;
     }
   }
 

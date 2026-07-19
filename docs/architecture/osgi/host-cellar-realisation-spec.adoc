@@ -823,9 +823,14 @@ applying an inverse patch, never the evicted bytes. That is why `host.N.drift` i
 
 *Packaging — CORRECTED 2026-07-15 (the reconcile is a SCION, not host-side).* The earlier note said the
 GROW/reconcile runs host-side, so both libs were plain host Maven deps. That was WRONG: the reconcile is
-an INCUS SCION (played in-container), and its promoter (`HostTreePromoter`) lives in `incus-core` (a
-`type=model` bundle) — the host tree is incus's, and putting the promoter host-side would re-open the
-realm leak §1-§3 closed. So the tooling is IN-CONTAINER: `java-diff-utils` carries a BSN
+an INCUS SCION (played in-container), and its promoter lives in `incus-core` (a `type=model` bundle) —
+the host tree is incus's, and putting the promoter host-side would re-open the realm leak §1-§3 closed.
+*Survey/cultivate (2026-07-19):* the promoter is now a CONTRACT (`HostTreePromoter` in `incus-contract`,
+returning a home `Promotion`) realised by a mode-pure PAIR in incus-core — `CultivatingHostTreePromoter`
+(observes drift + syncs) and `SurveyingHostTreePromoter` (touches nothing, reports `notPromoted()`) —
+tagged `rke2lab.gardening=cultivating|surveying`, the frontier picks one. The jsync ACT is factored into
+`HostTreeSync` (a reusable core helper both would-be callers share, no duplication). So the tooling is
+IN-CONTAINER: `java-diff-utils` carries a BSN
 (`io.github.java-diff-utils`), a first-class bundle incus-core imports normally; `jsync-engine` +
 `jsync-vfs` (1.5.0) ship WITHOUT a BSN (nu manifests), so a bundle cannot import them — they are EMBEDDED
 in incus-core's `Bundle-ClassPath` (`-includeresource: jsync-*.jar;lib:=true`, the manifests-cdk8s
@@ -840,14 +845,17 @@ what?". Its GIVEN FETCHES the cellar and folds `HostTreeHead` → the `pivot` (`
 `source` (the staging to promote, determined FROM the folded entries, never guessed). Prepare must have
 published a `HostStagingEntry(stagingRoot, checksums)` for the source to exist — that publish is
 prepare's own new Then (`HostTreeChecksummer.checksum(staging)` → `cellar.store`). The WHEN decides on
-ONE comparison — `change = diff(pivot, source)` (checksum maps, no FS touch to decide): empty → NO-OP;
-gate closed (preview) → PENDING (nothing flips, cellar not written); else → `HostTreePromoter.promote`.
-The drift (`live ↔ pivot`) is OBSERVED and reported, NEVER a decision gate — if the source changed we
-promote (the staging is authoritative, the drift is overwritten); the report is its only role. The THEN
-commits `HostLiveEntry(syncedFrom=source)` to the cellar ONLY on a real promotion — the cellar is the
-committed truth, written once at the end when the flip is actually done. So `HostTreePromoter` is ALLEVIATED:
-no no-op-detect (the WHEN already decided by checksums), it only syncs — `jsync.setDelete(true)
-.addExclude(".flox").sync(source, live, MERGE)`, the skip-flox the manual walk needed, native here.
+ONE comparison — `change = diff(pivot, source)` (checksum maps, no FS touch to decide): empty → NO-OP
+(`Promotion.notPromoted()`); else → `promoter.promote(source, live, pivot, driftBase)`, MODE-BLIND. The
+scion injects no `RunGate`: the frontier hands it the cultivating impl (drift-observe + sync) or the
+surveying impl (touches nothing) and every step renders PENDING via E9 under a survey. The drift
+(`live ↔ pivot`) is OBSERVED and reported inside the cultivating impl, NEVER a decision gate — if the
+source changed we promote (the staging is authoritative, the drift is overwritten); the report is its
+only role. The THEN commits `HostLiveEntry(syncedFrom=source)` to the cellar ONLY when the returned
+`Promotion.promoted()` is true — the cellar is the committed truth, written once when the flip is
+actually done; the PROMOTED tag follows the same `promoted()` fact, so the mode never leaks into the
+scion. The jsync ACT is `HostTreeSync`: no no-op-detect (the WHEN already decided by checksums), it only
+syncs — `jsync.setDelete(true).addIgnore(".flox").sync(source, live, MERGE)`, skip-flox native here.
 Ordering: the reconcile's sow-and-graft WHEN sits in `ClusterSeedScenario` BEFORE the grow (the live must
 be current before the VM mounts it).
 

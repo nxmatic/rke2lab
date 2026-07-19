@@ -16,9 +16,9 @@ import org.junit.jupiter.api.io.TempDir;
  * demands before trusting live mounts — a mount dir survives {@code setDelete(true)}, and {@code
  * .flox/} is neither copied nor deleted.
  */
-class HostTreePromoterTest {
+class HostTreeSyncTest {
 
-  private final HostTreePromoter promoter = new HostTreePromoter();
+  private final HostTreeSync sync = new HostTreeSync();
 
   @Test
   void it_syncs_content_deletes_stale_and_preserves_flox(@TempDir Path tmp) throws IOException {
@@ -36,7 +36,7 @@ class HostTreePromoterTest {
     write(live.resolve("rke2-manifests.d/stale.yaml"), "removed in v2");
     write(live.resolve("env.d/.flox/run/socket"), "LIVE-flox-must-survive");
 
-    promoter.promote(source, live);
+    sync.sync(source, live);
 
     // content synced: the manifest updated to the staging's version.
     assertEquals("image: v2", read(live.resolve("rke2-manifests.d/deployment.yaml")));

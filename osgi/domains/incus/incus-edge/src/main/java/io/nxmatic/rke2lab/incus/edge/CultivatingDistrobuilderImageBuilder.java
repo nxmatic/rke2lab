@@ -4,15 +4,11 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -20,32 +16,25 @@ import java.util.Set;
 import org.osgi.service.component.annotations.Component;
 
 /**
- * The realised incus image-build edge: produces the seed image's distrobuilder artifacts by
- * shelling {@code distrobuilder build-incus} when the binary is on {@code PATH}, otherwise by
- * streaming the bundled build recipe over {@code ssh} to the builder host. The single door toward
- * this one external contact — the {@code ProcessBuilder} mechanism formerly inlined in the host
- * {@code PulumiIncusImageProvider}. {@code ProcessBuilder} is playable, so this edge lives in the
- * OSGi world; SCR publishes it and the host provider composes it from the registry when a rebuild
- * is needed.
+ * The CULTIVATING incus image-build edge — the single live door. Produces the seed image's
+ * distrobuilder artifacts by shelling {@code distrobuilder build-incus} when the binary is on
+ * {@code PATH}, otherwise by streaming the bundled build recipe over {@code ssh} to the builder
+ * host. The {@code ProcessBuilder} mechanism formerly inlined in the host {@code
+ * PulumiIncusImageProvider}.
  *
- * <p>The edge is the SOLE owner of the build recipe: BOTH the {@code remote-build-incus-image.sh}
- * driver AND the {@code incus-distrobuilder.yaml} distrobuilder config are its bundle resources. A
- * local build materialises the config to a temp file; a remote build delivers both resources over
- * the SAME ssh/stdin channel (base64 heredocs — no NFS hand-off, no quoting hazard). {@link
- * #recipeDigest()} folds both resources' bytes, so a change to EITHER invalidates the host's image
- * cache — the host never holds the recipe, only its digest.
+ * <p>One of the ImageBuilder PAIR: registered with {@code rke2lab.gardening=cultivating} so the
+ * frontier picks it when the ambient RunGate is cultivating. Its twin, {@link
+ * SurveyingImageBuilder}, plans the build without shelling anything. The build recipe (both bundle
+ * resources) is owned by the shared {@link BuildRecipe}, so both impls report the SAME {@link
+ * #recipeDigest()} — the host's image-cache key must not move between the two modes.
  *
  * <p><b>Runtime dependency:</b> {@code distrobuilder} (+ {@code sudo}) locally, or {@code ssh} and
  * key-based access to the builder host.
  */
-@Component(service = ImageBuilder.class)
-public final class DistrobuilderImageBuilder implements ImageBuilder {
+@Component(service = ImageBuilder.class, property = "rke2lab.gardening=cultivating")
+public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder {
 
-  private static final String REMOTE_BUILD_SCRIPT_RESOURCE =
-      "io/nxmatic/rke2lab/incus/edge/remote-build-incus-image.sh";
-  private static final String DISTROBUILDER_CONFIG_RESOURCE =
-      "io/nxmatic/rke2lab/incus/edge/incus-distrobuilder.yaml";
-  private static final String CONFIG_FILENAME = "incus-distrobuilder.yaml";
+  private final BuildRecipe recipe = new BuildRecipe();
 
   @Override
   public Optional<String> build(ImageBuildRequest request) {
@@ -73,15 +62,7 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
 
   @Override
   public String recipeDigest() {
-    try {
-      final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      digest.update(loadResource(REMOTE_BUILD_SCRIPT_RESOURCE));
-      digest.update((byte) '\n');
-      digest.update(loadResource(DISTROBUILDER_CONFIG_RESOURCE));
-      return HexFormat.of().formatHex(digest.digest());
-    } catch (NoSuchAlgorithmException ex) {
-      throw new ImageBuildException("SHA-256 is not available", ex);
-    }
+    return recipe.digest();
   }
 
   private void runLocalBuildOrThrow(Path workspace, String executable, String artifactDir) {
@@ -123,7 +104,7 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
   private Path materializeConfig() {
     try {
       final Path configFile = Files.createTempFile("incus-distrobuilder-", ".yaml");
-      Files.write(configFile, loadResource(DISTROBUILDER_CONFIG_RESOURCE));
+      Files.write(configFile, recipe.load(BuildRecipe.DISTROBUILDER_CONFIG_RESOURCE));
       return configFile;
     } catch (IOException ex) {
       throw new ImageBuildException(
@@ -290,9 +271,9 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
    */
   private String remoteBootstrap() {
     final String scriptB64 =
-        Base64.getEncoder().encodeToString(loadResource(REMOTE_BUILD_SCRIPT_RESOURCE));
+        Base64.getEncoder().encodeToString(recipe.load(BuildRecipe.REMOTE_BUILD_SCRIPT_RESOURCE));
     final String configB64 =
-        Base64.getEncoder().encodeToString(loadResource(DISTROBUILDER_CONFIG_RESOURCE));
+        Base64.getEncoder().encodeToString(recipe.load(BuildRecipe.DISTROBUILDER_CONFIG_RESOURCE));
     return String.join(
         "\n",
         "set -eu",
@@ -302,21 +283,12 @@ public final class DistrobuilderImageBuilder implements ImageBuilder {
         "base64 -d > \"$tmp_dir/build.sh\" <<'B64SCRIPT'",
         scriptB64,
         "B64SCRIPT",
-        "base64 -d > \"$tmp_dir/" + CONFIG_FILENAME + "\" <<'B64CONFIG'",
+        "base64 -d > \"$tmp_dir/" + BuildRecipe.CONFIG_FILENAME + "\" <<'B64CONFIG'",
         configB64,
         "B64CONFIG",
         "chmod 700 \"$tmp_dir/build.sh\"",
-        "\"$tmp_dir/build.sh\" \"$1\" \"$tmp_dir/" + CONFIG_FILENAME + "\" \"$2\" \"$3\"");
-  }
-
-  private byte[] loadResource(String resource) {
-    try (var in = getClass().getClassLoader().getResourceAsStream(resource)) {
-      if (in == null) {
-        throw new ImageBuildException("Bundle resource not found: " + resource);
-      }
-      return in.readAllBytes();
-    } catch (IOException ex) {
-      throw new UncheckedIOException("Failed to load bundle resource: " + resource, ex);
-    }
+        "\"$tmp_dir/build.sh\" \"$1\" \"$tmp_dir/"
+            + BuildRecipe.CONFIG_FILENAME
+            + "\" \"$2\" \"$3\"");
   }
 }

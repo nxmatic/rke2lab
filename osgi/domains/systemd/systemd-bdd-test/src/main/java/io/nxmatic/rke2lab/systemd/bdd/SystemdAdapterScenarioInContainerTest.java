@@ -14,6 +14,7 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.systemd.contract.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.contract.SystemdStatusSnapshot;
@@ -99,6 +100,29 @@ public class SystemdAdapterScenarioInContainerTest {
         "the consultation names the checkpoint the host joins on");
   }
 
+  @Test
+  void a_survey_run_does_not_probe_and_renders_pending() throws Exception {
+    // A pure probe is SURVEY-INERT: its output IS the live dbus/systemd state, so it has no honest
+    // plan-only shape. Under a surveying gate its bodies are SKIPPED — the probe is never called
+    // (no dbus connection), and every step renders PENDING. Prove both: not probed, and PENDING.
+    final RecordingProbe probe = new RecordingProbe();
+    final BundleContext context = FrameworkUtil.getBundle(SystemdBddTests.class).getBundleContext();
+    final List<ServiceRegistration<?>> registrations = new ArrayList<>();
+    registrations.add(context.registerService(RunGate.class, () -> false, new Hashtable<>()));
+    registrations.add(context.registerService(SystemdRuntimeProbe.class, probe, new Hashtable<>()));
+    try {
+      final ScenarioOutcome outcome =
+          new ScenarioPlayer().play(SystemdAdapterScenario.class, store -> {});
+      assertTrue(!probe.probed, "a survey-inert probe never opens a dbus connection");
+      assertEquals(
+          ExecutionStatus.SCENARIO_PENDING,
+          outcome.runbook().getScenarios().get(0).getExecutionStatus(),
+          "a surveyed pure probe renders PENDING — it planned nothing, it touched nothing");
+    } finally {
+      registrations.forEach(ServiceRegistration::unregister);
+    }
+  }
+
   /**
    * Register the mock collaborators into THIS bundle's registry, play the scenario in-container
    * through the shared {@link ScenarioPlayer}, and return its live {@link ScenarioOutcome}.
@@ -148,6 +172,24 @@ public class SystemdAdapterScenarioInContainerTest {
             .failedUnits(1)
             .summary("mandatory target failed")
             .build();
+  }
+
+  /** A probe that records whether it was ever asked — proves a survey-inert run never probes. */
+  private static final class RecordingProbe implements SystemdRuntimeProbe {
+    boolean probed;
+
+    @Override
+    public SystemdStatusSnapshot probe(
+        io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest request) {
+      this.probed = true;
+      return SystemdStatusSnapshot.builder()
+          .runtimePrecheckReady(true)
+          .mandatoryTargetHealthy(true)
+          .mandatoryTargetState("active")
+          .failedUnits(0)
+          .summary("all green")
+          .build();
+    }
   }
 
   /**

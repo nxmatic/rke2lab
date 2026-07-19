@@ -7,10 +7,15 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 
 /**
- * The ACT of the host-tree reconcile — syncs a chosen staging slot into the physical {@code
+ * The jsync ACT of the host-tree reconcile — syncs a chosen staging slot into the physical {@code
  * host.live.d} (§ host-cellar-realisation, the reconcile cycle). It only SYNCS: the reconcile scion
  * already decided (a checksum diff of source vs pivot) that a promotion is due, so there is no
  * no-op detection here (main's {@code directoriesAreIdentical} folds into the scion's decision).
+ *
+ * <p>A reusable core helper (not a service): the CULTIVATING {@code HostTreePromoter} impl composes
+ * it with {@link HostTreeDiffer}/{@link HostTreeDeltaRenderer} for the full live gesture. Kept HERE
+ * because the jsync engine is embedded in this bundle (see below), so the sync cannot move to
+ * another bundle without a jsync wrap — and the common logic must not be duplicated.
  *
  * <p>{@code jsync} with {@code setDelete(true)} gives the rsync-like {@code --delete} — a mount
  * directory present on both sides survives, only its content is synced (R1). The {@code .flox}
@@ -22,7 +27,7 @@ import java.nio.file.Path;
  * <p>jsync ships a nu manifest (no BSN); it is embedded in this bundle's Bundle-ClassPath, so this
  * class loads {@code com.fizzed.jsync.*} from within the bundle, never as an OSGi import.
  */
-public final class HostTreePromoter {
+public final class HostTreeSync {
 
   // The flox runtime-state skip. jsync distinguishes EXCLUDE (do not COPY from the source) from
   // IGNORE (do not touch on EITHER side — copy nor delete). skip-flox needs IGNORE: a --delete pass
@@ -42,7 +47,7 @@ public final class HostTreePromoter {
    * imported across a bundle boundary (the resolution would fail in-container). The promotion's
    * factual outcome is narrated by the scion from the cellar entries, not from a jsync type.
    */
-  public void promote(Path source, Path live) {
+  public void sync(Path source, Path live) {
     try {
       new JsyncEngine()
           .setDelete(true)

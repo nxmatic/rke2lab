@@ -6,10 +6,14 @@ import java.util.List;
 /**
  * The bbox scion's HARVEST — the reservation-reconciliation summary it stores at the cellar, the
  * home of what the former host {@code BboxReservationsResource} exposed as its Pulumi outputs
- * ({@code dryRun}, {@code desiredCount}, one count per {@link BboxAction}). On the Pulumi
- * realisation the scion's {@code Cellar.store} of this record PRODUCES the bbox resource — the
- * dissolution of the former {@code ResourceManager} into the scion's own store (see
+ * ({@code desiredCount}, one count per {@link BboxAction}). On the Pulumi realisation the scion's
+ * {@code Cellar.store} of this record PRODUCES the bbox resource — the dissolution of the former
+ * {@code ResourceManager} into the scion's own store (see
  * docs/architecture/osgi/host-cellar-realisation-spec.adoc § every-scion-contributes).
+ *
+ * <p>No {@code dryRun} field: the mode lives at the reconciler frontier, and the cellar consults
+ * the RunGate itself to route conserve vs pre-reserve — the harvest stays mode-blind, its {@code
+ * WOULD_*} counts already telling a surveyed run from a cultivated one.
  *
  * <p>It carries no {@code @Scion}/{@code @Rootstock}: bbox reaps a single conservable part (the
  * summary) with no forward {@code sowing} to separate, so the whole record IS the fruit — stored
@@ -20,7 +24,6 @@ import java.util.List;
  */
 @SeedContract("bbox-reservations")
 public record BboxHarvest(
-    boolean dryRun,
     int desiredCount,
     int createdCount,
     int updatedCount,
@@ -30,9 +33,8 @@ public record BboxHarvest(
     int failedCount) {
 
   /** Fold a run's row outcomes into the summary — the counts per {@link BboxAction}. */
-  public static BboxHarvest of(boolean dryRun, List<BboxRowOutcome> outcomes) {
+  public static BboxHarvest of(List<BboxRowOutcome> outcomes) {
     return new BboxHarvest(
-        dryRun,
         outcomes.size(),
         count(outcomes, BboxAction.CREATED),
         count(outcomes, BboxAction.UPDATED),

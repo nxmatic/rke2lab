@@ -28,7 +28,6 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
-import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.net.URI;
 import java.util.ArrayList;
@@ -46,13 +45,13 @@ import org.junit.jupiter.api.Test;
  * bbox-bdd} (only ports + the pure {@link BlueprintRowEnumerator}, no sealed internal), not a
  * {@code -test} fragment (it is live seeding logic).
  *
- * <p>Its collaborators are INJECTED from its OWN bundle's service registry by the {@link
- * OsgiService} bridge: the {@link BboxReconciler} contact, the ambient {@link RunGate} (whose
- * {@link RunGate#cultivating() cultivating} decides live-apply vs dry-run — the SCION consults it,
- * not the edge), and, on a refused row, the doctor's {@link ConsultingService} (an optional
- * snapshot). The scenario is identical live and in test; only who published the collaborators
- * differs (the live {@code LiveBboxReconciler} + the host's RunGate, or the mocks a test seeds into
- * the registry before playing).
+ * <p>MODE-BLIND: it injects the {@link BboxReconciler} contact and NO {@code RunGate}. The bridge
+ * reads the ambient gate ONCE and resolves the cultivating or surveying impl by LDAP filter on
+ * {@code rke2lab.gardening} — the scenario body is identical either way, it just drives the
+ * reconciler it was handed. On a refused row it also injects the doctor's {@link ConsultingService}
+ * (an optional snapshot). The scenario is identical live and in test; only who published the
+ * collaborators differs (the live {@code Cultivating}/{@code SurveyingBboxReconciler} pair the
+ * frontier picks between, or the mocks a test seeds into the registry before playing).
  */
 @SeedScenario
 public class BboxReconciliationScenario
@@ -83,7 +82,6 @@ public class BboxReconciliationScenario
   // orElseThrow never fires; the doctor is await=false — a snapshot, empty when a world booted
   // without it.
   @OsgiService private Optional<BboxReconciler> contact = Optional.empty();
-  @OsgiService private Optional<RunGate> gate = Optional.empty();
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
 
   @OsgiService(await = false)
@@ -119,8 +117,8 @@ public class BboxReconciliationScenario
     given()
         .the_desired_reservations(desired.size())
         .and()
-        .reconciled_through(contact.orElseThrow(), gate.orElseThrow(), outcomes);
-    when().the_run_condition_is_read().and().the_reservations_are_reconciled_against_the_router();
+        .reconciled_through(contact.orElseThrow(), outcomes);
+    when().the_reservations_are_reconciled_against_the_router();
     then()
         .every_row_has_an_outcome()
         .and()
@@ -176,14 +174,11 @@ public class BboxReconciliationScenario
     return SeedEnvelope.of(DoctorCoordinate.READINESS_CHECKPOINT, codec.encode(checkpoint));
   }
 
-  /**
-   * Given: the desired reservations, the reconciler contact, the run gate, and the outcome sink.
-   */
+  /** Given: the desired reservations, the reconciler contact, and the outcome sink. */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState int desiredCount;
     @ProvidedScenarioState BboxReconciler contact;
-    @ProvidedScenarioState RunGate gate;
     @ProvidedScenarioState List<BboxRowOutcome> outcomes;
 
     public Given the_desired_reservations(@Quoted int count) {
@@ -192,39 +187,29 @@ public class BboxReconciliationScenario
     }
 
     @Hidden
-    public Given reconciled_through(
-        BboxReconciler contact, RunGate gate, List<BboxRowOutcome> outcomes) {
+    public Given reconciled_through(BboxReconciler contact, List<BboxRowOutcome> outcomes) {
       this.contact = contact;
-      this.gate = gate;
       this.outcomes = outcomes;
       return self();
     }
   }
 
   /**
-   * When: the scion reads the run condition (the {@link RunGate}), derives {@code dryRun =
-   * !cultivating()}, and drives the reconciler once. Under a closed gate the edge diffs but does
-   * not write (its native DRY_RUN mode → {@code WOULD_*} outcomes), so the scion plays honestly
-   * without touching the router. The outcomes are the material the Then asserts and the domain's
-   * consult reads.
+   * When: the scion drives the reconciler once, MODE-BLIND. The frontier already chose which impl
+   * it holds — cultivating (opens the session, applies) or surveying ({@code WOULD_*} projection,
+   * no contact) — so the scion just reconciles; it never branches on the mode. The outcomes are the
+   * material the Then asserts and the domain's consult reads.
    */
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState BboxReconciler contact;
-    @ExpectedScenarioState RunGate gate;
     @ExpectedScenarioState List<BboxRowOutcome> outcomes;
-    @ProvidedScenarioState boolean dryRun;
-
-    public When the_run_condition_is_read() {
-      this.dryRun = !gate.cultivating();
-      return self();
-    }
 
     public When the_reservations_are_reconciled_against_the_router() {
       // Fill the @Test-owned sink (not a fresh field) so the consult reads the outcomes even after
       // the Then's fail-fast on a refused row.
       outcomes.addAll(
-          contact.reconcile(ROUTER, ADMIN_PASSWORD, dryRun, new BlueprintRowEnumerator().rows()));
+          contact.reconcile(ROUTER, ADMIN_PASSWORD, new BlueprintRowEnumerator().rows()));
       return self();
     }
   }
@@ -238,7 +223,6 @@ public class BboxReconciliationScenario
 
     @ExpectedScenarioState int desiredCount;
     @ExpectedScenarioState List<BboxRowOutcome> outcomes;
-    @ExpectedScenarioState boolean dryRun;
 
     public Then every_row_has_an_outcome() {
       if (outcomes.size() != desiredCount) {
@@ -264,7 +248,7 @@ public class BboxReconciliationScenario
      * preview}), so the scion never picks the mode.
      */
     public Then the_harvest_is_stored(@Hidden Cellar cellar, @Hidden Parcel parcel) {
-      final BboxHarvest harvest = BboxHarvest.of(dryRun, outcomes);
+      final BboxHarvest harvest = BboxHarvest.of(outcomes);
       cellar.store(parcel, BboxCoordinate.BBOX_RESERVATIONS, harvest);
       return self();
     }

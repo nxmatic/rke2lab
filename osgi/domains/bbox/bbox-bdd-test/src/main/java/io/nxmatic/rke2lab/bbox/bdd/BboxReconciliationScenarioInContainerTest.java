@@ -117,21 +117,53 @@ public class BboxReconciliationScenarioInContainerTest {
   }
 
   @Test
-  void a_preview_run_asks_for_a_dry_run() throws Exception {
-    // cultivating() false → the scion derives dryRun=true; the mock records the flag it was called
-    // with and returns WOULD_* outcomes (the router is never mutated). The recorder proves the
-    // SCION consulted the gate (A2) and passed the dry-run down.
-    final RecordingReconciler reconciler = wouldCreate();
-    final ScenarioOutcome outcome =
-        playWith(cultivatingGate(false), reconciler, null, new RecordingCellar());
+  void a_survey_run_selects_surveying_and_renders_pending() throws Exception {
+    // One survey run proves the TWO orthogonal axes at once. The scion is mode-blind — it holds one
+    // BboxReconciler and drives it. TOUCH axis: under a surveying gate the FRONTIER (the
+    // @OsgiService
+    // bridge, LDAP filter on rke2lab.gardening) hands it the SURVEYING impl, never the cultivating
+    // one. RENDER axis: SurveyRenderExtension swaps in the PendingMarkingScenarioExecutor, so the
+    // bodies still run (the surveying reconciler IS called, the harvest IS stored) but every step
+    // is
+    // narrated PENDING → the scenario reads SCENARIO_PENDING, a plan, not a green result.
+    final RecordingReconciler cultivating = new RecordingReconciler(BboxAction.MATCHING);
+    final RecordingReconciler surveying = new RecordingReconciler(BboxAction.WOULD_CREATE);
+    final BundleContext context = FrameworkUtil.getBundle(BboxBddTests.class).getBundleContext();
+    final List<ServiceRegistration<?>> registrations = new ArrayList<>();
+    registrations.add(
+        context.registerService(RunGate.class, cultivatingGate(false), new Hashtable<>()));
+    registrations.add(
+        context.registerService(BboxReconciler.class, cultivating, gardening("cultivating")));
+    registrations.add(
+        context.registerService(BboxReconciler.class, surveying, gardening("surveying")));
+    registrations.add(
+        context.registerService(Cellar.class, new RecordingCellar(), new Hashtable<>()));
+    registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
+    try {
+      final ScenarioOutcome outcome =
+          new ScenarioPlayer().play(BboxReconciliationScenario.class, store -> {});
+      // TOUCH: the frontier resolved the surveying half, and only it.
+      assertTrue(surveying.called, "the frontier handed the scion the surveying reconciler");
+      assertTrue(
+          !cultivating.called, "the frontier never resolved the cultivating reconciler in survey");
+      // RENDER: a survey narrates a PENDING plan, not a green result — even though the body ran.
+      assertEquals(
+          ExecutionStatus.SCENARIO_PENDING,
+          outcome.runbook().getScenarios().get(0).getExecutionStatus(),
+          "a surveyed scenario renders PENDING — a plan, not a result");
+      assertTrue(
+          outcome.consultations().isEmpty(),
+          "WOULD_CREATE is not a refusal, so it consults no one");
+    } finally {
+      registrations.forEach(ServiceRegistration::unregister);
+    }
+  }
 
-    assertEquals(
-        ExecutionStatus.SUCCESS,
-        outcome.runbook().getScenarios().get(0).getExecutionStatus(),
-        "a dry-run that would create every row still reconciles cleanly (no FAILED row)");
-    assertTrue(reconciler.lastDryRun, "the scion consulted the RunGate and asked for a dry-run");
-    assertTrue(
-        outcome.consultations().isEmpty(), "WOULD_CREATE is not a refusal, so it consults no one");
+  /** The service properties tagging one half of a mode-sensitive collaborator pair. */
+  private static Hashtable<String, Object> gardening(String mode) {
+    final Hashtable<String, Object> properties = new Hashtable<>();
+    properties.put("rke2lab.gardening", mode);
+    return properties;
   }
 
   @Test
@@ -194,18 +226,13 @@ public class BboxReconciliationScenarioInContainerTest {
 
   /** A reconciler that matches every desired row (a healthy live run). */
   private static BboxReconciler allMatching() {
-    return (baseUri, adminPassword, dryRun, requests) ->
+    return (baseUri, adminPassword, requests) ->
         requests.stream().map(r -> outcome(r, BboxAction.MATCHING)).toList();
-  }
-
-  /** A reconciler that would create every row and records the dry-run flag it was called with. */
-  private static RecordingReconciler wouldCreate() {
-    return new RecordingReconciler(BboxAction.WOULD_CREATE);
   }
 
   /** A reconciler whose first row is refused (FAILED) and the rest match. */
   private static BboxReconciler oneRefused() {
-    return (baseUri, adminPassword, dryRun, requests) -> {
+    return (baseUri, adminPassword, requests) -> {
       final List<BboxRowOutcome> outcomes = new ArrayList<>(requests.size());
       for (int i = 0; i < requests.size(); i++) {
         outcomes.add(outcome(requests.get(i), i == 0 ? BboxAction.FAILED : BboxAction.MATCHING));
@@ -230,10 +257,10 @@ public class BboxReconciliationScenarioInContainerTest {
             : Optional.empty());
   }
 
-  /** A reconciler that records the dry-run flag the scion passed — proving the A2 gate consult. */
+  /** A reconciler that records whether it was called — proving which half the frontier resolved. */
   private static final class RecordingReconciler implements BboxReconciler {
     private final BboxAction action;
-    boolean lastDryRun;
+    boolean called;
 
     RecordingReconciler(BboxAction action) {
       this.action = action;
@@ -241,8 +268,8 @@ public class BboxReconciliationScenarioInContainerTest {
 
     @Override
     public List<BboxRowOutcome> reconcile(
-        URI baseUri, String adminPassword, boolean dryRun, List<BboxReservationRequest> requests) {
-      this.lastDryRun = dryRun;
+        URI baseUri, String adminPassword, List<BboxReservationRequest> requests) {
+      this.called = true;
       return requests.stream().map(r -> outcome(r, action)).toList();
     }
   }

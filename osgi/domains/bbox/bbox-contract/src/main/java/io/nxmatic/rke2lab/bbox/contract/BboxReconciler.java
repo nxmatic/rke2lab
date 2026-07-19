@@ -5,15 +5,17 @@ import java.util.List;
 
 /**
  * The bbox domain's contact: reconcile a set of desired DHCP reservations against the Bouygues Bbox
- * router. The bbox-edge provides it by opening one session to the router (it embeds {@code
- * java-bbox-api-client}) and applying each row; the scion composes it, enumerating the desired rows
- * from the blueprint and driving the reconciler resolved from the registry.
+ * router. The scion composes it MODE-BLIND — it enumerates the desired rows from the blueprint and
+ * drives the reconciler resolved from the registry, with no notion of live vs preview.
  *
- * <p>One call, one session: the edge fetches the router's reservation table once and diffs every
- * request against it. {@code dryRun} maps to the library's DRY_RUN mode (no writes — matches {@code
- * pulumi preview}); otherwise APPLY. The scion derives {@code dryRun} from the ambient RunGate
- * ({@code dryRun = !cultivating()}). The outcomes come back in request order, each carrying its
- * {@code (cluster, node)} identity so the caller correlates without re-matching.
+ * <p>The mode lives at the FRONTIER, not in this contract: bbox-edge provides a PAIR of impls, a
+ * cultivating one (opens one session to the router via the embedded {@code java-bbox-api-client},
+ * diffs the live table once and APPLIES each row) and a surveying one (contacts the router zero
+ * times and projects the honest {@code WOULD_CREATE} upper bound). The {@code @OsgiService} bridge
+ * reads the ambient {@link io.nxmatic.rke2lab.seed.broker.port.RunGate RunGate} once and resolves
+ * the matching impl by LDAP filter on {@code rke2lab.gardening} — so no {@code dryRun} boolean is
+ * ever passed in. The outcomes come back in request order, each carrying its {@code (cluster,
+ * node)} identity so the caller correlates without re-matching.
  *
  * <p>A consumer-side service interface — so it lives in {@code bbox-contract} (type=contract,
  * installed + wired bundle-to-bundle) alongside the flat reservation vocabulary it speaks. Both the
@@ -29,5 +31,5 @@ public interface BboxReconciler {
    * outcomes, not exceptions.
    */
   List<BboxRowOutcome> reconcile(
-      URI baseUri, String adminPassword, boolean dryRun, List<BboxReservationRequest> requests);
+      URI baseUri, String adminPassword, List<BboxReservationRequest> requests);
 }

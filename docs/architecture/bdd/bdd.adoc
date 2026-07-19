@@ -659,13 +659,18 @@ PENDING. So any mechanism that skips step bodies (the `jgiven.report.dry-run` pr
 dry-run skips the step bodies, so a `guaranteed` state stays `null` → the DAG enforcement throws. *DAG
 enforcement XOR dry-run — not both.*
 
-*The resolution, proven (E9):* a `PendingMarkingScenarioExecutor` decorates the `ScenarioListener` the
-executor installs. The interceptor keeps its local mode NORMAL — so it `proceed()`s, the entire tree
-builds — but the mode that REACHES the model is rewritten `NORMAL → PENDING`. Result: the full plan,
-each step `(pending)`; and because the bodies still run, the tree is COMPLETE — every scenario the run
-plays is rendered, placed under its crossing (the runbook invariant). It decorates the listener via
-the public `setListener` seam — no reflection, no `@Pending`, no fork. Installed by the socle when the
-run surveys, off a `SurveySeed` the host seeds from `RunMode` and the sow relays to every scion.
+*The resolution, proven (E9):* a `PendingMarkingScenarioExecutor` — a `ScenarioExecutor` subclass that
+overrides `setListener` to WRAP the model-building listener in one that rewrites `NORMAL → PENDING` on
+the way to the model. The interceptor keeps its local mode NORMAL — so it `proceed()`s, the entire tree
+builds — but the mode that REACHES the model is rewritten. Result: the full plan, each step `(pending)`;
+and because the bodies still run, the tree is COMPLETE — every scenario the run plays is rendered,
+placed under its crossing (the runbook invariant). It rides the public `setExecutor`/`setListener` seams
+— no reflection, no touching the `protected final` interceptor field, no `@Pending`, no fork. Installed
+by the socle's `SurveyRenderExtension` (on `@SeedScenario`) when the run surveys — the extension reads
+the ambient `RunGate` ONCE (the SAME source the touch frontier reads, via `GardeningSelection` — the
+mode has one representation, no separate seed) and swaps the executor before jGiven hands it the
+listener. Only SCIONS are surveyed; the host-flat root orchestrates for real (its `sow` steps run to
+place the scions), so it is never rendered pending.
 
 === The touch — a live collaborator or a surveying one, chosen at the frontier
 
