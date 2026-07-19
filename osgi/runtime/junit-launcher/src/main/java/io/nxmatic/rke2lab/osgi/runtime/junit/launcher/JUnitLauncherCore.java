@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
+package io.nxmatic.rke2lab.osgi.runtime.junit.launcher;
 
 import io.nxmatic.rke2lab.osgi.boot.discovery.ClassRealm;
 import java.util.Optional;

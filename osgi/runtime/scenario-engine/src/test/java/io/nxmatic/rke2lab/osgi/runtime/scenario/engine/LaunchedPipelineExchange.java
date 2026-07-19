@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
 import java.util.Objects;
 
 /**

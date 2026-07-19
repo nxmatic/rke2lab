@@ -67,11 +67,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * host handles carry the graft, because jGiven appends the current scenario to its {@link
  * ReportModel} only when the scenario FINISHES — so mid-run, inside a WHEN, {@code
  * getModel().getScenarios()} is still empty. The scion STEPS graft into the live current {@code
- * getScenario().getScenarioModel()} (the trunk that already carries the rootstock step — jGiven adds
- * it when it invokes this {@code @NestedSteps} method), while the scion's within-run tags merge into
- * the {@link ReportModel} ({@code getScenario().getModel()}), whose tag map IS live and which {@code
- * Main} reads back via {@code ScenarioGraft.graftedValue}. Fishing the host scenario out of {@code
- * getModel().getScenarios()} mid-run was the "no scenario to graft" defect.
+ * getScenario().getScenarioModel()} (the trunk that already carries the rootstock step — jGiven
+ * adds it when it invokes this {@code @NestedSteps} method), while the scion's within-run tags
+ * merge into the {@link ReportModel} ({@code getScenario().getModel()}), whose tag map IS live and
+ * which {@code Main} reads back via {@code ScenarioGraft.graftedValue}. Fishing the host scenario
+ * out of {@code getModel().getScenarios()} mid-run was the "no scenario to graft" defect.
  */
 @SeedScenario
 @SeedRuntime

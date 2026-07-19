@@ -1,7 +1,9 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.junit.testkit
 
-# The runtime-playable machinery (the two framework envelopes, the SCR diagnostic, the launcher core)
-# moved to osgi/runtime/scenario-engine. What stays is the TEST-ONLY tag annotations (@Osgi/@OsgiWorld,
+# The runtime-playable machinery moved out: the jGiven-free JUnit-Platform runner (JUnitLauncherCore
+# + strategies + InContainerJUnitRunner) now lives in osgi/runtime/junit-launcher, the framework
+# envelopes + SCR diagnostic in osgi/runtime/scenario-engine. What stays is the TEST-ONLY tag
+# annotations (@Osgi/@OsgiWorld,
 # @Pipeline) a test wears out-of-container to classify itself for surefire selection — used on the
 # flat surefire classpath, never wired in-container, so nothing is exported. An attachable test
 # bundle: being a bundle is a superset of a plain jar, kept so a -test fixture can attach to it.

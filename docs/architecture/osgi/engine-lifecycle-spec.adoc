@@ -495,9 +495,11 @@ migration (*increment 2*) consumes it:
 [[the-launcher]]
 == Related — the launcher core it rests on
 
-The launcher is `JUnitLauncherCore`, extracted from `InContainerJUnitRunner` into the new
-`osgi/runtime/scenario-engine` module (the runtime owns it, the test consumes it — the sound dependency
-direction, and the dogfooding promotion of JUnit to runtime scope). It runs a JUnit Platform
+The launcher is `JUnitLauncherCore`, in the jGiven-FREE `osgi/runtime/junit-launcher` bundle
+(with its `DiscoveryStrategy`/`HarvestStrategy` seams + `InContainerJUnitRunner`) — extracted OUT of
+`scenario-engine` so a runner-only world installs it alone, without dragging jGiven. `scenario-engine`
+depends on it (the runtime owns the runner, the test consumes it — the sound dependency direction,
+and the dogfooding promotion of JUnit to runtime scope). It runs a JUnit Platform
 `Launcher` inside Felix on a dedicated host-bound thread, engine registered explicitly, the three
 OSGi crossings handled; discovery + harvest are injected strategies so both the test envelope
 (`*Test` + PASS/FAIL) and the seed (a named scenario + `ReportModel`) reuse one core. Full task

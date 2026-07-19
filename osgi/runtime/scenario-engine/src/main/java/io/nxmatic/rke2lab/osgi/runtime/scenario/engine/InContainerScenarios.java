@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InContainerJUnitRunner;
+import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.InContainerJUnitRunner;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.stream.Stream;

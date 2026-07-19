@@ -12,20 +12,17 @@ Export-Package: \
 
 # The seam half (OutOfContainerFrameworkExtension) pulls the framework-launch API + felix + slf4j
 # (the resolution-failure diagnostic logger), needed only on the flat host classpath; marking them
-# optional lets the bundle still RESOLVE when installed in-container to provide the runner package.
-# jGiven (report.* AND impl) is the same case, optional for TWO runner-only worlds that install this
-# bundle for its runner package alone: (1) ScenarioGraft (base, host-side) rebuilds a ReportModel via
-# ScenarioJsonReader on the flat host classpath; (2) ScenarioCellarExtension (.container) reads the
-# current ReportModel via com.tngtech.jgiven.impl.ScenarioHolder — but only when a @SeedScenario runs,
-# which itself pulls jGiven. A pure-JUnit proxy (the *EdgeBootTest / *ContractInContainerTest that
-# call builder().withJUnitRunner() without JGivenTestkit.felix()) installs scenario-engine for
-# JUnitLauncherCore and never triggers the cellar, so jGiven is legitimately absent there — optional
-# keeps that resolution green. A world that DOES run a @SeedScenario has jgiven-wrap installed (the
-# testkit stages the whole jGiven closure), so the optional import wires.
-# boot.discovery is NOT optional: the IN-CONTAINER runner path (JUnitLauncherCore.wiringOf →
-# ClassRealm.of) loads it unconditionally, so a consumer must wire it or fail at resolution rather
-# than with a late NoClassDefFoundError — its package is system-exported by the in-container test
-# harness (withJUnitRunner). A bundle is a superset of a plain jar — this keeps both uses true.
+# optional lets the bundle still RESOLVE when installed in-container to provide only the scenario
+# machinery.
+# jGiven (report.* AND impl) + jupiter.engine are now MANDATORY (not optional): the jGiven-free
+# JUnit-Platform runner (JUnitLauncherCore + strategies) has moved OUT to the io.nxmatic...junit.
+# launcher bundle, so a runner-only world (a *ContractInContainerTest / *EdgeBootTest via
+# withJUnitRunner) installs THAT bundle, never this one. scenario-engine is now installed ONLY in a
+# world that plays a @SeedScenario — which stages jgiven-wrap + the jupiter engine — so its
+# jGiven/jupiter imports are honestly required. The former optional markers were the smell (an
+# exported package that genuinely needs jGiven declaring it optional); erased with the extraction.
+# boot.discovery is MANDATORY too: OutOfContainerFrameworkExtension reads ClasspathBundleIndex from
+# it (system-exported by the in-container harness), so a consumer wires it or fails at resolution.
 Import-Package: \
     !org.jspecify.annotations, \
     !org.checkerframework.checker.nullness.qual, \
@@ -35,9 +32,6 @@ Import-Package: \
     io.nxmatic.rke2lab.osgi.runtime.framework;resolution:=optional, \
     io.nxmatic.rke2lab.osgi.bnd;resolution:=optional, \
     org.slf4j;resolution:=optional, \
-    com.tngtech.jgiven.impl;resolution:=optional, \
-    com.tngtech.jgiven.report.*;resolution:=optional, \
-    org.junit.jupiter.engine;resolution:=optional, \
     *
 
 -noimportjava: true

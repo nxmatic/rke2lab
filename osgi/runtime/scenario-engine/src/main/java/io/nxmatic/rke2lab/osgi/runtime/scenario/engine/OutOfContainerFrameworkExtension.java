@@ -139,7 +139,7 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
             "junit-jupiter-api",
             "junit-jupiter-params",
             "junit-jupiter-engine",
-            "io.nxmatic.rke2lab.osgi.runtime.scenario.engine");
+            "io.nxmatic.rke2lab.osgi.runtime.junit.launcher");
 
     private final List<String> systemPackages = new ArrayList<>();
     private final List<String> bootDelegation = new ArrayList<>();

@@ -18,6 +18,7 @@
   <modules>
     <module>boot</module>
     <module>framework-launcher</module>
+    <module>junit-launcher</module>
     <module>scenario-engine</module>
     <module>jgiven-wrap</module>
     <module>scenario-testkit</module>

@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
+import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;

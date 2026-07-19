@@ -148,7 +148,7 @@ The seeding phases are jGiven `Stage`s; the value-DAG is carried by scenario-sta
 | the value-DAG | scenario-state runtime **+ a build-time DAG gate** | vertical: the value-DAG; gate = the closing task
 | phase composition | intro-words + `@NestedSteps` | vertical: the composing When stage
 | the runbook node label | `@As("…")` | vertical: per-phase `@As`
-| the launcher | the embedded JUnit Platform launcher | *socle SHIPPED:* `JUnitLauncherCore`
+| the launcher | the embedded JUnit Platform launcher | *socle SHIPPED:* `JUnitLauncherCore` (jGiven-free, in its own `osgi/runtime/junit-launcher` bundle since 2026-07-19 — a runner-only world installs it without dragging jGiven; `scenario-engine` depends on it)
 | the boot | `@SeedRuntime` self-boots via `OsgiConnection.embedded` (`FrameworkLaunch.embedded().launch()` under the hood) | *socle SHIPPED:* `SeedRuntime` + `OsgiConnection`
 | ambient host-facts | `ExtensionContext.Store` | *socle SHIPPED:* `BaseWorldExtension` Store; vertical seeds host-facts
 | the DAG safety gate | `SCENARIO_STATE_DAG` (`provided`/`required` topological) | vertical closing task (a `StagingGate`, existing ASM+`@GovernedBy` mould)

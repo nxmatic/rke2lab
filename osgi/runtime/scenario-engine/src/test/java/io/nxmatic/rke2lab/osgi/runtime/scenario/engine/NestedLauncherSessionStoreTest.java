@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;

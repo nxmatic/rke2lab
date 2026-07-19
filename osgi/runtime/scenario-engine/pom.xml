@@ -11,15 +11,18 @@
 
   <artifactId>scenario-engine</artifactId>
   <name>osgi/runtime/scenario-engine</name>
-  <description>The runtime home of everything PLAYABLE on the OSGi framework: the two framework
-    envelopes (InContainerJUnitRunner in-container, OutOfContainerFrameworkExtension + FrameworkLog
-    out-of-container), the SCR diagnostic (ScrDiagnostics), the neutral JUnitLauncherCore extracted
-    from the in-container runner, and the engine-lifecycle socle (OsgiConnection, StartLevelLever,
-    the @IsolatedWorld/@SeedRuntime disciplines). JUnit + jGiven are runtime-scope here (the
-    dogfooding promotion): the seeding is a tree of jGiven scenarios played by an embedded JUnit
-    launcher inside Felix, so that machinery is no longer test-only. A bundle — the in-container half
-    must be importable by a host -test fragment as a real bundle export; it degrades to a plain jar
-    on the flat host classpath for the out-of-container half.</description>
+  <description>The runtime home of the jGiven SCENARIO machinery played on the OSGi framework: the
+    @SeedScenario extensions (the transactional ScenarioCellar, the ScenarioOutcome channel, the
+    OsgiService bridge), the cross-world graft (ScenarioGraft), the out-of-container framework
+    envelope (OutOfContainerFrameworkExtension + FrameworkLog), the SCR diagnostic (ScrDiagnostics),
+    and the engine-lifecycle socle (OsgiConnection, StartLevelLever, the @IsolatedWorld/@SeedRuntime
+    disciplines). The jGiven-FREE JUnit-Platform runner (JUnitLauncherCore + strategies +
+    InContainerJUnitRunner) lives in osgi/runtime/junit-launcher, which this depends on — so a
+    runner-only world installs the runner alone while this bundle, whose exported package genuinely
+    needs jGiven, is installed only where a @SeedScenario plays (jgiven-wrap staged). jGiven is
+    runtime-scope here (the dogfooding promotion): the seeding is a tree of jGiven scenarios. A
+    bundle — the in-container half is a real bundle export; it degrades to a plain jar on the flat
+    host classpath for the out-of-container half.</description>
 
   <dependencies>
     <!-- Dogfooding promotion: the JUnit/jGiven machinery is runtime code now, so the launcher +
@@ -82,6 +85,13 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
+    </dependency>
+    <!-- The jGiven-free JUnit-Platform runner (JUnitLauncherCore + its strategies): ScenarioPlayer
+         plays a scenario THROUGH it. Extracted so a runner-only world installs the runner bundle
+         alone (no jGiven); scenario-engine keeps only the jGiven-bearing scenario machinery. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
     </dependency>
     <!-- The shared boot-discovery model the out-of-container envelope reads (ClasspathBundleIndex:
          locate / embeddableBundles / exportsForImportsOf) so test and prod agree on boot discovery

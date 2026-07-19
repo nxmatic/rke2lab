@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InContainerJUnitRunner;
+import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.InContainerJUnitRunner;
 import java.util.List;
 import org.junit.jupiter.engine.JupiterTestEngine;
 
