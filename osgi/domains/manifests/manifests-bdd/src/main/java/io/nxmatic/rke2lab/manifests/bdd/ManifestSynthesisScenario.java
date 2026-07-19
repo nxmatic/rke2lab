@@ -205,8 +205,8 @@ public class ManifestSynthesisScenario
               .cicd(link.cicd())
               .clusterApi(link.clusterApi())
               .build();
-      // Link-time: the 6 RKE2LAB_POLICY_LINK_* vars ManifestLinkPolicy.toEnvMap() exported (the
-      // subset the master's install/ready scripts read), verbatim.
+      // Link-time: the 6 RKE2LAB_POLICY_LINK_* vars the master's install/ready scripts read — owned
+      // by this domain (the host no longer projects them; the pre-migration host copy is gone).
       final Map<String, String> vars = new LinkedHashMap<>();
       vars.put("RKE2LAB_POLICY_LINK_HIGH_AVAILABILITY_ENABLED", bool(link.highAvailability()));
       vars.put("RKE2LAB_POLICY_LINK_NETWORKING_ENABLED", bool(link.networking()));

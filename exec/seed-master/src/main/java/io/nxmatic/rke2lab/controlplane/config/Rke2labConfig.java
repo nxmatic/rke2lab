@@ -14,7 +14,7 @@ import org.osgi.service.log.LogLevel;
  * InfraDomain} (via {@link InfraConfigRegistry}); cross-cutting identity is loaded directly.
  * Mandatory fields are plain types validated at load; optional fields are {@code Optional} with NO
  * defaults — defaults are applied in the derivation layer ({@code BootstrapConfig.from} / {@code
- * ControlplanePolicy.from} / {@code BootstrapOptions.from}).
+ * BootstrapOptions.from}).
  */
 public record Rke2labConfig(
     InfraConfigRegistry infra,

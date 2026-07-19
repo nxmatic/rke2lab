@@ -4,8 +4,7 @@ import java.util.Optional;
 
 /**
  * How a failed readiness scenario affects provisioning. A scenario declares its intrinsic severity
- * from domain knowledge; the operator can override it per scenario (see {@code
- * ControlplanePolicy.readiness}).
+ * from domain knowledge; the operator can override it per scenario.
  */
 public enum Severity {
   /** Failure stops provisioning — nothing downstream can proceed. */

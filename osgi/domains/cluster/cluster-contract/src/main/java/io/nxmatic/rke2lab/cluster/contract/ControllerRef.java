@@ -4,9 +4,10 @@ package io.nxmatic.rke2lab.cluster.contract;
  * A neutral reference to a control-plane controller the readiness gate waits on — a Kubernetes
  * workload identified by {@code kind} (deployment/daemonset), {@code name}, and {@code namespace}.
  *
- * <p>It is the contact vocabulary, free of any host policy type: the host projects its {@code
- * ControlplanePolicy} into a {@code List<ControllerRef>} and hands them to the edge, which does
- * pure kubectl over the refs it is given. The edge never sees the policy — only these refs.
+ * <p>It is the contact vocabulary, free of any host policy type: the host projects its
+ * control-plane readiness policy into a {@code List<ControllerRef>} and hands them to the edge,
+ * which does pure kubectl over the refs it is given. The edge never sees the policy — only these
+ * refs.
  */
 public record ControllerRef(String kind, String name, String namespace) {
 
