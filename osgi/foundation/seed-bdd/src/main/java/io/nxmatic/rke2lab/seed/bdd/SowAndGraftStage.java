@@ -81,7 +81,17 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    */
   public SowAndGraftStage the_scion_is_sown_and_grafted(@Hidden String rootStepName) {
     final String runbookJson = gardening.sow(soil, amendments, cellar);
-    graft.graftUnder(hostTree, rootStepName, graft.rebuild(runbookJson));
+    // DIAGNOSTIC (live "no scenario to graft"): the sow returns a full runbook (logged there), yet
+    // rebuild yields an empty model — log what rebuild receives and produces to pin the drop.
+    final ReportModel rebuilt = graft.rebuild(runbookJson);
+    org.slf4j.LoggerFactory.getLogger(SowAndGraftStage.class)
+        .info(
+            "graft {}: runbookJson length={}, rebuilt scenarios={}, json head={}",
+            rootStepName,
+            runbookJson.length(),
+            rebuilt.getScenarios().size(),
+            runbookJson.substring(0, Math.min(160, runbookJson.length())));
+    graft.graftUnder(hostTree, rootStepName, rebuilt);
     return self();
   }
 }
