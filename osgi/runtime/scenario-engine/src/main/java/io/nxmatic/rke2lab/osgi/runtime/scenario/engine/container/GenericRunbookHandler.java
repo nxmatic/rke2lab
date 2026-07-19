@@ -50,14 +50,6 @@ public abstract class GenericRunbookHandler implements SeedHandler, ScenarioStra
                   .andThen(transaction.transactionId().map(TxIdSeed::into).orElse(store -> {}))
                   .andThen(CellarEntriesSeed.into(transaction.entriesEncoded())));
       final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
-      // DIAGNOSTIC (live "no scenario to graft"): the outcome's scenario count at capture vs after
-      // serialisation — tells apart an empty-at-harvest (nested play/holder) from a lost-in-writer.
-      org.slf4j.LoggerFactory.getLogger(getClass())
-          .info(
-              "handled {}: outcome scenarios={}, serialized runbook={}",
-              coordinate().domain(),
-              outcome.runbook().getScenarios().size(),
-              runbook);
       return SeedEnvelope.of(
           coordinate(), codec.encode(new RunbookEnvelope(runbook, outcome.consultations())));
     } catch (InterruptedException interrupted) {

@@ -5,6 +5,7 @@ import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
@@ -25,11 +26,15 @@ import java.util.Map;
  *       whoever owns the runbook tree, so it stays in this non-exported base package.
  * </ul>
  *
- * <p>The root scenario passes its OWN live {@link ReportModel} ({@code getScenario().getModel()})
- * as {@code hostTree} — the single trunk every caller grafts into, read top-down by the operator.
- * The collaborators (the open {@link Gardening}, the host tree, the soil) are handed in through a
- * {@link Hidden} step, the way a domain scenario receives its contact — no injection machinery. See
- * docs/architecture/osgi/seed-broker-spec.adoc (§ playing a scion scenario is a sow).
+ * <p>The root scenario passes TWO of its own live handles: its current {@link ScenarioModel}
+ * ({@code getScenario().getScenarioModel()}) — the trunk the scion steps graft into, the ONLY one
+ * that carries the rootstock step mid-run (jGiven appends the scenario to its {@link ReportModel}
+ * only once it FINISHES, so {@code getModel().getScenarios()} is empty here) — and its {@link
+ * ReportModel} ({@code getScenario().getModel()}), whose live tag map receives the scion's
+ * within-run tags. The collaborators (the open {@link Gardening}, the two host handles, the soil)
+ * are handed in through a {@link Hidden} step, the way a domain scenario receives its contact — no
+ * injection machinery. See docs/architecture/osgi/seed-broker-spec.adoc (§ playing a scion scenario
+ * is a sow).
  */
 public class SowAndGraftStage extends Stage<SowAndGraftStage> {
 
@@ -37,6 +42,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
 
   @ScenarioState private String soil;
   @ScenarioState private Gardening gardening;
+  @ScenarioState private ScenarioModel hostScenario;
   @ScenarioState private ReportModel hostTree;
   @ScenarioState private Map<String, JsonNode> amendments;
 
@@ -48,14 +54,16 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
 
   /**
    * Hand in the crossing's collaborators: the {@code soil} name to sow toward, the open {@link
-   * Gardening}, and the root scenario's own {@link ReportModel} to graft into. Hidden — it carries
-   * wiring, not narration. The crossing sows with no amendment (the scion falls back to its own
-   * defaults); a crossing that must fill an amendment role uses {@link #sowing(String, Gardening,
-   * ReportModel, Map)}.
+   * Gardening}, and the root scenario's two live handles — its current {@link ScenarioModel} (the
+   * trunk the scion steps graft into) and its {@link ReportModel} (the tag map the scion's
+   * within-run tags merge into). Hidden — it carries wiring, not narration. The crossing sows with
+   * no amendment (the scion falls back to its own defaults); a crossing that must fill an amendment
+   * role uses {@link #sowing(String, Gardening, ScenarioModel, ReportModel, Map)}.
    */
   @Hidden
-  public SowAndGraftStage sowing(String soil, Gardening gardening, ReportModel hostTree) {
-    return sowing(soil, gardening, hostTree, Map.<String, JsonNode>of());
+  public SowAndGraftStage sowing(
+      String soil, Gardening gardening, ScenarioModel hostScenario, ReportModel hostTree) {
+    return sowing(soil, gardening, hostScenario, hostTree, Map.<String, JsonNode>of());
   }
 
   /**
@@ -63,13 +71,18 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    * neutral {@link io.nxmatic.rke2lab.seed.broker.port.Amendment} roles (e.g. the incus crossing
    * fills {@code worktree} with the flat provisioning scalars the scion rebuilds its topology
    * from), each value a {@link JsonNode} — a flat scalar or a sub-record. Empty behaves exactly
-   * like {@link #sowing(String, Gardening, ReportModel)}.
+   * like {@link #sowing(String, Gardening, ScenarioModel, ReportModel)}.
    */
   @Hidden
   public SowAndGraftStage sowing(
-      String soil, Gardening gardening, ReportModel hostTree, Map<String, JsonNode> amendments) {
+      String soil,
+      Gardening gardening,
+      ScenarioModel hostScenario,
+      ReportModel hostTree,
+      Map<String, JsonNode> amendments) {
     this.soil = soil;
     this.gardening = gardening;
+    this.hostScenario = hostScenario;
     this.hostTree = hostTree;
     this.amendments = amendments;
     return self();
@@ -81,17 +94,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
    */
   public SowAndGraftStage the_scion_is_sown_and_grafted(@Hidden String rootStepName) {
     final String runbookJson = gardening.sow(soil, amendments, cellar);
-    // DIAGNOSTIC (live "no scenario to graft"): the sow returns a full runbook (logged there), yet
-    // rebuild yields an empty model — log what rebuild receives and produces to pin the drop.
-    final ReportModel rebuilt = graft.rebuild(runbookJson);
-    org.slf4j.LoggerFactory.getLogger(SowAndGraftStage.class)
-        .info(
-            "graft {}: runbookJson length={}, rebuilt scenarios={}, json head={}",
-            rootStepName,
-            runbookJson.length(),
-            rebuilt.getScenarios().size(),
-            runbookJson.substring(0, Math.min(160, runbookJson.length())));
-    graft.graftUnder(hostTree, rootStepName, rebuilt);
+    graft.graftUnder(hostScenario, hostTree, rootStepName, graft.rebuild(runbookJson));
     return self();
   }
 }

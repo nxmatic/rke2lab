@@ -10,6 +10,7 @@ import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.ScenarioModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
@@ -40,7 +41,7 @@ class ScenarioGraftTest {
     final String crossed = new ScenarioJsonWriter(scion).toString();
     assertFalse(crossed.isBlank(), "the scion scenario serializes to cross the seam");
 
-    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(crossed));
+    graft.graftUnder(host.getScenarios().get(0), host, ROOTSTOCK, graft.rebuild(crossed));
 
     final StepModel rootstock = stepNamed(host, ROOTSTOCK);
     assertFalse(
@@ -59,7 +60,11 @@ class ScenarioGraftTest {
         scion.getScenarios().get(0).getExecutionStatus(),
         "the scion scenario failed");
 
-    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(new ScenarioJsonWriter(scion).toString()));
+    graft.graftUnder(
+        host.getScenarios().get(0),
+        host,
+        ROOTSTOCK,
+        graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
     assertEquals(
         StepStatus.FAILED, stepNamed(host, ROOTSTOCK).getStatus(), "the scion failure propagates");
@@ -78,7 +83,11 @@ class ScenarioGraftTest {
     final ReportModel host = playHost();
 
     // Round-trip across the seam (serialize → rebuild) before grafting, as production does.
-    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(new ScenarioJsonWriter(scion).toString()));
+    graft.graftUnder(
+        host.getScenarios().get(0),
+        host,
+        ROOTSTOCK,
+        graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
     assertEquals(
         Optional.of("/x/.local.d/bioskop/master/host.live.d"),
@@ -91,7 +100,11 @@ class ScenarioGraftTest {
     final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
     final ReportModel host = playHost();
 
-    graft.graftUnder(host, ROOTSTOCK, graft.rebuild(new ScenarioJsonWriter(scion).toString()));
+    graft.graftUnder(
+        host.getScenarios().get(0),
+        host,
+        ROOTSTOCK,
+        graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
     assertEquals(
         Optional.empty(),
@@ -107,8 +120,36 @@ class ScenarioGraftTest {
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> graft.graftUnder(host, "no such step", rebuilt),
+        () -> graft.graftUnder(host.getScenarios().get(0), host, "no such step", rebuilt),
         "grafting under a missing rootstock step fails loudly, not silently");
+  }
+
+  @Test
+  void a_scion_grafts_into_the_live_scenario_when_the_report_model_has_no_scenario_yet() {
+    // The live condition every other test missed: a host WHEN step grafts MID-run, and jGiven does
+    // not append the current scenario to its ReportModel until the scenario FINISHES — so
+    // getModel().getScenarios() is empty here, while the current ScenarioModel already carries the
+    // rootstock step. The graft must target that live ScenarioModel, not the empty ReportModel;
+    // fishing the host scenario out of the ReportModel was the live "no scenario to graft".
+    final ScenarioModel hostScenario = playHost().getScenarios().get(0);
+    final ReportModel emptyReportModel = new ReportModel(); // scenarios still empty, as mid-run
+    final ReportModel scion = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
+
+    graft.graftUnder(
+        hostScenario,
+        emptyReportModel,
+        ROOTSTOCK,
+        graft.rebuild(new ScenarioJsonWriter(scion).toString()));
+
+    final StepModel rootstock =
+        hostScenario.getScenarioCases().get(0).getSteps().stream()
+            .filter(s -> ROOTSTOCK.equals(s.getName()))
+            .findFirst()
+            .orElseThrow();
+    assertFalse(
+        rootstock.getNestedSteps().isEmpty(),
+        "the scion grafts into the live ScenarioModel even though the ReportModel holds no scenario"
+            + " yet (the live mid-run condition)");
   }
 
   /** The host runbook: a rootstock step (the crossing) followed by a downstream phase. */

@@ -14,6 +14,7 @@ import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
 import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
@@ -62,10 +63,15 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * everything else from it. Opening the gardening is the GIVEN's work, never a WHEN.
  *
  * <p>Each sow-and-graft WHEN is a {@code @NestedSteps} step named for its crossing; its body sows
- * the soil's runbook through the gardening and grafts the reaped scion under THIS step, into the
- * live root {@link ReportModel} ({@code getScenario().getModel()} — the single trunk). jGiven adds
- * a top-level step to the model at invocation time, so the rootstock step already exists when its
- * body grafts under it.
+ * the soil's runbook through the gardening and grafts the reaped scion under THIS step. TWO live
+ * host handles carry the graft, because jGiven appends the current scenario to its {@link
+ * ReportModel} only when the scenario FINISHES — so mid-run, inside a WHEN, {@code
+ * getModel().getScenarios()} is still empty. The scion STEPS graft into the live current {@code
+ * getScenario().getScenarioModel()} (the trunk that already carries the rootstock step — jGiven adds
+ * it when it invokes this {@code @NestedSteps} method), while the scion's within-run tags merge into
+ * the {@link ReportModel} ({@code getScenario().getModel()}), whose tag map IS live and which {@code
+ * Main} reads back via {@code ScenarioGraft.graftedValue}. Fishing the host scenario out of {@code
+ * getModel().getScenarios()} mid-run was the "no scenario to graft" defect.
  */
 @SeedScenario
 @SeedRuntime
@@ -134,6 +140,11 @@ public class ClusterSeedScenario
     final SeedRun seedRun =
         Objects.requireNonNull(
             run, "the SeedRun was not seeded before the scenario ran (the driver must seed it)");
+    // Two live handles the crossings graft into: the current ScenarioModel (the trunk the scion
+    // steps attach to — the ONLY handle carrying the rootstock step mid-run, since jGiven appends
+    // the scenario to the ReportModel only at scenario end) and the ReportModel (its live tag map
+    // receives the scions' within-run tags, read back by Main via ScenarioGraft.graftedValue).
+    final ScenarioModel hostScenario = getScenario().getScenarioModel();
     final ReportModel hostTree = getScenario().getModel();
     final OsgiConnection world =
         Objects.requireNonNull(
@@ -147,17 +158,17 @@ public class ClusterSeedScenario
         .and()
         .the_parcels_state_is_fetched()
         .and()
-        .the_network_reservations_are_settled(hostTree)
+        .the_network_reservations_are_settled(hostScenario, hostTree)
         .and()
-        .the_instance_is_provisioned(hostTree)
+        .the_instance_is_provisioned(hostScenario, hostTree)
         .and()
-        .the_live_tree_is_reconciled(hostTree)
+        .the_live_tree_is_reconciled(hostScenario, hostTree)
         .and()
         .the_instance_grows()
         .and()
-        .the_systemd_adapter_is_launched(hostTree)
+        .the_systemd_adapter_is_launched(hostScenario, hostTree)
         .and()
-        .the_cluster_becomes_ready(hostTree);
+        .the_cluster_becomes_ready(hostScenario, hostTree);
     then().the_harvest_is_stored();
   }
 
@@ -300,16 +311,18 @@ public class ClusterSeedScenario
 
     @NestedSteps
     @As("the network reservations are settled")
-    public When the_network_reservations_are_settled(@Hidden ReportModel hostTree) {
+    public When the_network_reservations_are_settled(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       sowAndGraft
-          .sowing("bbox", gardening, hostTree)
+          .sowing("bbox", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the network reservations are settled");
       return self();
     }
 
     @NestedSteps
     @As("the instance is provisioned")
-    public When the_instance_is_provisioned(@Hidden ReportModel hostTree) {
+    public When the_instance_is_provisioned(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       // Two amendments hand incus the flat scalars from BootstrapConfig. WORKTREE — the worktree
       // root, cluster/node, NFS automount: the scion reconstructs the topology, picks its own
       // rotation slot, and derives the manifests SOIL itself. IMAGE — the seed-image build scalars
@@ -320,6 +333,7 @@ public class ClusterSeedScenario
           .sowing(
               "incus-provision",
               gardening,
+              hostScenario,
               hostTree,
               Map.of(Amendment.WORKTREE, worktreeScalars, Amendment.IMAGE, imageScalars))
           .the_scion_is_sown_and_grafted("the instance is provisioned");
@@ -328,13 +342,14 @@ public class ClusterSeedScenario
 
     @NestedSteps
     @As("the live tree is reconciled")
-    public When the_live_tree_is_reconciled(@Hidden ReportModel hostTree) {
+    public When the_live_tree_is_reconciled(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       // Reconcile promotes the fresh staging (incus just published it) into host.live.d BEFORE the
       // instance mounts it — so it sits after the provision crossing and before systemd/cluster,
       // which run inside the instance. No amendment: the scion derives its whole state from the
       // cellar it inherits (source + pivot), the twin transaction the provision crossing wrote to.
       sowAndGraft
-          .sowing("incus-reconcile", gardening, hostTree)
+          .sowing("incus-reconcile", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the live tree is reconciled");
       return self();
     }
@@ -361,18 +376,20 @@ public class ClusterSeedScenario
 
     @NestedSteps
     @As("the systemd adapter is launched")
-    public When the_systemd_adapter_is_launched(@Hidden ReportModel hostTree) {
+    public When the_systemd_adapter_is_launched(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       sowAndGraft
-          .sowing("systemd", gardening, hostTree)
+          .sowing("systemd", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the systemd adapter is launched");
       return self();
     }
 
     @NestedSteps
     @As("the cluster becomes ready")
-    public When the_cluster_becomes_ready(@Hidden ReportModel hostTree) {
+    public When the_cluster_becomes_ready(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       sowAndGraft
-          .sowing("cluster", gardening, hostTree)
+          .sowing("cluster", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the cluster becomes ready");
       return self();
     }

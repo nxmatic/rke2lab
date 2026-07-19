@@ -626,7 +626,7 @@ its own loader is ordinary. The host is left with one door and a soil name:
 ----
   broker.sow(new RunbookCoordinate(soil), trigger)   // one door; soil is a String, no domain type
      → reaps a SeedEnvelope (the runbook as neutral JSON)
-     → ScenarioGraft.rebuild(payload) + graftUnder(hostTree, step)   // host-side graft
+     → ScenarioGraft.rebuild(payload) + graftUnder(hostScenario, hostTree, step)   // host-side graft
 ----
 
 So the SOW half of a sow-and-graft caller (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario
@@ -634,6 +634,17 @@ map]) is `broker.sow` at a neutral `RunbookCoordinate`; the GRAFT half is `Scena
 The host never names `*BddScenarios` nor a `*Coordinate` enum — only the foundation seam and a soil
 string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
 verdict.
+
+NOTE: *The host side of the graft is TWO live handles, not one (learnt live, 2026-07-19).* jGiven
+appends the current `ScenarioModel` to its `ReportModel` only when the scenario FINISHES, so mid-run —
+inside the WHEN doing the graft — `getModel().getScenarios()` is EMPTY. The scion STEPS therefore
+graft into the live current `ScenarioModel` (`getScenario().getScenarioModel()`, the trunk already
+carrying the rootstock step), while the scion `tagMap` merges into the `ReportModel`
+(`getScenario().getModel()`, whose tag map is live and which the host reads back via `graftedValue`).
+Reading the host scenario from `getModel().getScenarios()` mid-run was the "no scenario to graft"
+defect — green in every isolated test (they played the host to completion before reading its model),
+fatal on the first live run. `ScenarioGraft.graftUnder(hostScenario, hostTree, rootstock, scion)`
+takes both handles; `ScenarioGraft` stays report-model-pure, the caller supplies the two.
 
 [[the-scenario-outcome-channel]]
 ==== How the played model comes back — the `ScenarioOutcome` channel, not a static holder (2026-07-18)

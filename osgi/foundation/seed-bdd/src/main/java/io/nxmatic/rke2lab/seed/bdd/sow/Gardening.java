@@ -84,18 +84,7 @@ public record Gardening(OsgiConnection connection, SeedBroker gardener) implemen
                 cellar,
                 new SeedEnvelope(soil, coordinate.slug(), codec.encode(amendments)));
     final SeedEnvelope reaped = gardener.sow(coordinate, cellar, trigger);
-    // DIAGNOSTIC (live "no scenario to graft"): the handler serialises a complete runbook, yet the
-    // graft rebuilds an empty model — log the reaped payload + the extracted runbook to see which
-    // link drops it (the codec round-trip of the RunbookEnvelope, or the .path("runbook") read).
-    final String extracted = codec.decode(reaped.payload()).path("runbook").asText();
-    org.slf4j.LoggerFactory.getLogger(Gardening.class)
-        .info(
-            "sow {}: reaped payload length={}, extracted runbook length={}, payload head={}",
-            soil,
-            reaped.payload().length(),
-            extracted.length(),
-            reaped.payload().substring(0, Math.min(200, reaped.payload().length())));
-    return extracted;
+    return codec.decode(reaped.payload()).path("runbook").asText();
   }
 
   /** Close the gardening — stop the framework the connection owns. */

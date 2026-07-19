@@ -69,13 +69,26 @@ public final class ScenarioGraft {
    * When the scion scenario is FAILED, the rootstock step is marked FAILED and every top-level host
    * step after it is set SKIPPED (fail-fast across the frontier).
    *
+   * <p>The host side is given as TWO live handles, not one: the crossing happens MID-run (inside a
+   * host WHEN step), and jGiven does not append the current {@link ScenarioModel} to its {@link
+   * ReportModel#getScenarios()} until the scenario FINISHES — so mid-run that list is still empty.
+   * The steps therefore graft into {@code hostScenario} (the live current model, reached by the
+   * caller via {@code getScenario().getScenarioModel()}), while the scion's tag map merges into
+   * {@code hostTree} (the {@link ReportModel}, whose tag map IS live and which the host reads back
+   * through {@link #graftedValue}). Fishing the host scenario out of {@code
+   * hostTree.getScenarios()} was the "no scenario to graft" defect — it read empty every live run.
+   *
    * @throws IllegalArgumentException if no top-level host step is named {@code rootstockStepName},
    *     or the scion model carries no scenario — a wiring bug, surfaced loudly rather than silently
    *     grafting nothing.
    */
-  public void graftUnder(ReportModel hostTree, String rootstockStepName, ReportModel scion) {
+  public void graftUnder(
+      ScenarioModel hostScenario,
+      ReportModel hostTree,
+      String rootstockStepName,
+      ReportModel scion) {
     final ScenarioModel scionScenario = firstScenarioOf(scion);
-    final List<StepModel> hostSteps = topLevelStepsOf(hostTree);
+    final List<StepModel> hostSteps = topLevelStepsOf(hostScenario);
     final int rootstockIndex = indexOfStep(hostSteps, rootstockStepName);
     if (rootstockIndex < 0) {
       throw new IllegalArgumentException(
@@ -114,18 +127,18 @@ public final class ScenarioGraft {
         .findFirst();
   }
 
-  private static ScenarioModel firstScenarioOf(ReportModel model) {
+  private ScenarioModel firstScenarioOf(ReportModel model) {
     if (model.getScenarios().isEmpty()) {
       throw new IllegalArgumentException("the scion model carries no scenario to graft");
     }
     return model.getScenarios().get(0);
   }
 
-  private static List<StepModel> topLevelStepsOf(ReportModel host) {
-    return firstScenarioOf(host).getScenarioCases().get(0).getSteps();
+  private List<StepModel> topLevelStepsOf(ScenarioModel scenario) {
+    return scenario.getScenarioCases().get(0).getSteps();
   }
 
-  private static int indexOfStep(List<StepModel> steps, String name) {
+  private int indexOfStep(List<StepModel> steps, String name) {
     for (int i = 0; i < steps.size(); i++) {
       if (name.equals(steps.get(i).getName())) {
         return i;
