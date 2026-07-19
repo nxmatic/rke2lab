@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.osgi.framework.Bundle;
+import org.osgi.service.log.LogLevel;
 
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs the bbox scion's in-container proof. It boots a
@@ -31,9 +32,9 @@ import org.osgi.framework.Bundle;
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
 @OsgiWorld
-// Flip to FrameworkLog.Level.DEBUG to troubleshoot a failed in-container resolve/activation
+// Flip to LogLevel.DEBUG to troubleshoot a failed in-container resolve/activation
 // (Felix then traces WHICH requirement could not be wired); WARNING is the quiet committed default.
-@FrameworkLog(FrameworkLog.Level.WARNING)
+@FrameworkLog(LogLevel.WARN)
 class BboxBddInContainerTest {
 
   // The bbox scion fixture, selected by what it declares (its host bbox-bdd is found through the

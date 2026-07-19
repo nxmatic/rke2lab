@@ -125,8 +125,11 @@ public final class FrameworkLauncher {
     config.put("felix.log.logger", new FelixJulLogger());
     if (config.get("felix.log.level") == null) {
       this.config
-          .felixLogLevel()
-          .ifPresent(level -> config.put("felix.log.level", Integer.toString(level)));
+          .frameworkLogLevel()
+          .ifPresent(
+              level ->
+                  config.put(
+                      "felix.log.level", Integer.toString(LaunchConfig.felixLevelOf(level))));
     }
     config.put(
         Constants.FRAMEWORK_BEGINNING_STARTLEVEL, Integer.toString(plan.beginningStartLevel()));

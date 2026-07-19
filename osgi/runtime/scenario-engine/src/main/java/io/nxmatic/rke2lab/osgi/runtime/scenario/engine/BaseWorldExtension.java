@@ -45,7 +45,10 @@ public abstract class BaseWorldExtension
 
     OsgiConnection connection = store.get(CONNECTION, OsgiConnection.class);
     if (connection == null) {
-      connection = OsgiConnection.embedded();
+      connection =
+          LogLevelSeed.read(context)
+              .map(OsgiConnection::embedded)
+              .orElseGet(OsgiConnection::embedded);
       store.put(CONNECTION, connection);
     }
 

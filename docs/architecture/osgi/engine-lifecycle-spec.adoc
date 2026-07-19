@@ -212,6 +212,40 @@ The rule generalises: any framework property both executors need is a can't-drif
 belongs on `LaunchConfig` (a named constant or `applyFrameworkInvariants`), referenced by both, never
 a literal in each enclosure.
 
+==== The framework log-level knob — one currency, one operator knob, two planes (2026-07-19)
+
+When the framework errors at boot (a failed resolve), the ONLY lever that explains WHICH requirement
+could not be wired is Felix's own internal log, `felix.log.level`. The operator (the Pulumi actor)
+must be able to raise it WITHOUT knowing the framework/bundle distinction — one knob.
+
+* *Currency — `org.osgi.service.log.LogLevel`.* The single vocabulary the whole chain speaks: the
+  `@FrameworkLog` test annotation, the `logging:level` operator knob, and the boot all name the OSGi
+  standard enum. No second (custom) enum exists. It comes from `osgi.core` in the OSGi realm (which
+  bundles the package at v1.5) and from the slim `org.osgi:org.osgi.service.log` spec artifact in the
+  host exec realm — never the same classpath (broker-mediated), so no split-package. Felix's system
+  bundle does NOT export `org.osgi.service.log`; the type is a boot-CONSTRUCTION parameter consumed
+  host-side before Felix exists, never by in-container code, so scenario-engine's bundle imports it
+  `resolution:=optional` (the base seam package is host-only — the established optional-import pattern,
+  NOT the junit5 anti-pattern of an optional import on an EXPORTED package).
+* *The felix-owner primitive — `LaunchConfig.felixLevelOf(LogLevel)`.* The ONE place the OSGi level
+  collapses to Felix's proprietary int (1=error … 4=debug; Felix has no AUDIT/TRACE — they pin to the
+  nearest step). Reached by BOTH boot paths: the live `FrameworkLauncher.frameworkConfig` (via
+  `LaunchConfig.frameworkLogLevel`, threaded by `FrameworkLaunch.embedded(LogLevel)` /
+  `OsgiConnection.embedded(LogLevel)`) and the test `OutOfContainerFrameworkExtension` (reading
+  `@FrameworkLog`). One mapping, can't drift — the same discipline as `applyFrameworkInvariants`.
+* *One knob → two planes.* The operator sets `logging:level` once; the host (`seed-master`) drives:
+  ** *Plane A — the framework's own log* (`felix.log.level`, set at construction): the level is sown
+     onto the launcher via `LogLevelSeed`, read host-side by `BaseWorldExtension` before it boots
+     Felix, and threaded into the `LaunchConfig`. (Threaded, not a sysprop — the value is only knowable
+     in `Main`, and the seed is the same session-store channel the other run-facts cross on.)
+  ** *Plane B — the host logback root* (the application log): `Main` sets the live `LoggerContext`
+     root level from the same value (`Main.logbackLevelOf`, the host-realm twin of `felixLevelOf`).
+     Programmatic, not a sysprop the XML reads — logback has already initialised by the time the config
+     is knowable, so setting the level on the live context is what takes effect.
+* *Absent knob ⇒ no override.* `BootstrapConfig.logLevel()` is `Optional`; empty leaves the Felix
+  default (a no-op seed) and the `logback.xml` root untouched — the two CLIs, which thread nothing,
+  keep the no-arg `embedded()`.
+
 [[the-lever]]
 == The lever — the start level, driven by the depth of the JUnit scope
 

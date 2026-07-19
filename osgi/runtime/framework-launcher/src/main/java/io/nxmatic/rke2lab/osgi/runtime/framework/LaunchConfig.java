@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.osgi.runtime.framework;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.osgi.service.log.LogLevel;
 
 /**
  * The launch KNOBS that genuinely differ between executors — everything else the {@link
@@ -18,12 +19,17 @@ import java.util.Optional;
  *       ({@code FrameworkLaunch.embedded}) and the test executor ({@code ScenarioTestkit.felix})
  *       both play jGiven scenarios, so byte-buddy needs it in both. {@link #defaults} leaves it
  *       empty — each executor adds what it needs via {@link #withBootDelegation}.
- *   <li>{@link #felixLogLevel} — Felix's own {@code felix.log.level} (the resolver's internal
- *       trace, the only place a failed resolve explains WHICH requirement could not be wired). Null
- *       leaves the Felix default; the test executor raises it via {@code @FrameworkLog}.
+ *   <li>{@link #frameworkLogLevel} — the framework's own internal log verbosity (the resolver's
+ *       internal trace, the only place a failed resolve explains WHICH requirement could not be
+ *       wired). The currency is the OSGi {@link LogLevel} — the single vocabulary the operator knob
+ *       ({@code logging:level}) and the {@code @FrameworkLog} test annotation both speak, so no
+ *       second enum exists. Empty leaves the Felix default; both the config knob and the test
+ *       executor raise it. This record is felix-owner: {@link #felixLevelOf(LogLevel)} is the ONE
+ *       place the OSGi level collapses to Felix's proprietary {@code felix.log.level} int (Felix
+ *       has no AUDIT/TRACE — they pin to the nearest step), used by both boot paths.
  * </ul>
  */
-public record LaunchConfig(List<String> bootDelegation, Optional<Integer> felixLogLevel) {
+public record LaunchConfig(List<String> bootDelegation, Optional<LogLevel> frameworkLogLevel) {
 
   /**
    * The boot-delegation every jGiven-PLAYING boot needs — the single source both executors derive
@@ -70,10 +76,26 @@ public record LaunchConfig(List<String> bootDelegation, Optional<Integer> felixL
   }
 
   public LaunchConfig withBootDelegation(List<String> packages) {
-    return new LaunchConfig(packages, felixLogLevel);
+    return new LaunchConfig(packages, frameworkLogLevel);
   }
 
-  public LaunchConfig withFelixLogLevel(int level) {
+  public LaunchConfig withFrameworkLogLevel(LogLevel level) {
     return new LaunchConfig(bootDelegation, Optional.of(level));
+  }
+
+  /**
+   * Collapse the OSGi {@link LogLevel} to Felix's proprietary {@code felix.log.level} int (1=error,
+   * 2=warning, 3=info, 4=debug). The ONE place the two vocabularies meet — reached by the live boot
+   * (via {@link #frameworkLogLevel}) and the test executor (reading {@code @FrameworkLog}) alike,
+   * so the mapping can never diverge. Felix has no AUDIT or TRACE step: AUDIT pins to error (least
+   * verbose), TRACE to debug (most verbose).
+   */
+  public static int felixLevelOf(LogLevel level) {
+    return switch (level) {
+      case AUDIT, ERROR -> 1;
+      case WARN -> 2;
+      case INFO -> 3;
+      case DEBUG, TRACE -> 4;
+    };
   }
 }

@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.controlplane.config;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Optional;
+import org.osgi.service.log.LogLevel;
 
 /**
  * Runtime configuration for provider-native Stage A bootstrap, derived from {@link Rke2labConfig}.
@@ -27,7 +29,8 @@ public record BootstrapConfig(
     String systemdAdapterDbusHost,
     int systemdAdapterDbusPort,
     int hostAssetRotationRetentionCount,
-    Duration readinessTimeout) {
+    Duration readinessTimeout,
+    Optional<LogLevel> logLevel) {
 
   // Defaults applied here, at the single derivation site — formerly the Builder field initializers
   // and the env/JGit/user.home detection in the deleted Defaults class.
@@ -91,7 +94,11 @@ public record BootstrapConfig(
             .hostAsset()
             .rotationRetentionCount()
             .orElse(DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT),
-        config.readiness().timeout().orElse(DEFAULT_READINESS_TIMEOUT));
+        config.readiness().timeout().orElse(DEFAULT_READINESS_TIMEOUT),
+        // No default: absent ⇒ no override — the boot keeps the Felix default and the host logback
+        // keeps its logback.xml root level. A present value drives BOTH planes (felix.log.level at
+        // construction + the host logback root).
+        config.logging().level());
   }
 
   public String imageBuilderBinary() {

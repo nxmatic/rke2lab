@@ -4,8 +4,10 @@ import com.pulumi.Config;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.osgi.service.log.LogLevel;
 
 /**
  * Root configuration DTO and single source of truth. Infra fragments are contributed by each {@link
@@ -25,10 +27,29 @@ public record Rke2labConfig(
     ProvisioningPolicyConfig provisioning,
     ReadinessConfig readiness,
     EntryGateConfig entryGate,
-    BboxConfig bbox) {
+    BboxConfig bbox,
+    LoggingConfig logging) {
 
   public static Rke2labConfig from(Config config) {
     return from(ConfigLoader.of(config));
+  }
+
+  /**
+   * Parse the {@code logging:level} knob into the OSGi {@link LogLevel} — the SAME enum the
+   * framework boot and the {@code @FrameworkLog} test annotation speak, so the operator's one knob
+   * has one vocabulary. Case-insensitive over the OSGi names (AUDIT/ERROR/WARN/INFO/DEBUG/TRACE);
+   * an unknown value fails loudly with the accepted set rather than defaulting silently.
+   */
+  private static LogLevel parseLogLevel(String raw) {
+    try {
+      return LogLevel.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException(
+          "logging:level '"
+              + raw
+              + "' is not an org.osgi.service.log.LogLevel (AUDIT, ERROR, WARN, INFO, DEBUG, TRACE)",
+          ex);
+    }
   }
 
   /** Offline path: empty config, no mandatory validation. Derivation applies all defaults. */
@@ -64,7 +85,9 @@ public record Rke2labConfig(
                 loader.optionalBoolean("readiness", "enabled"),
                 loader.optionalDuration("readiness", "timeout")),
             new EntryGateConfig(loader.optionalBoolean("entryGate.cleanWorktree", "required")),
-            new BboxConfig(loader.optionalBoolean("bbox.reconcile", "failOnError")));
+            new BboxConfig(loader.optionalBoolean("bbox.reconcile", "failOnError")),
+            new LoggingConfig(
+                loader.optional("logging", "level").map(Rke2labConfig::parseLogLevel)));
 
     if (validate) {
       loader.diagnoseIfIncomplete();
@@ -178,4 +201,10 @@ public record Rke2labConfig(
   public record EntryGateConfig(Optional<Boolean> cleanWorktreeRequired) {}
 
   public record BboxConfig(Optional<Boolean> failOnError) {}
+
+  /**
+   * The framework log-level knob ({@code logging:level}). Empty ⇒ no override: the boot keeps the
+   * Felix default and the host logback keeps its {@code logback.xml} root level.
+   */
+  public record LoggingConfig(Optional<LogLevel> level) {}
 }

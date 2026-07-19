@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import com.pulumi.Pulumi;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -12,6 +14,7 @@ import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
 import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.LogLevelSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ScenarioGraft;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
@@ -26,6 +29,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.osgi.service.log.LogLevel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The Pulumi entry point — Layer 1 of the amorce (see
@@ -71,6 +77,13 @@ public final class Main {
           final RunMode runMode = RunMode.detect(true);
           final Rke2labConfig config = Rke2labConfig.from(ConfigLoader.of(context.config()));
           final BootstrapConfig bootstrap = BootstrapConfig.from(config);
+          // Plane B of the one log-level knob: the host's own logback root. Set programmatically
+          // (not via a sysprop the XML reads) because the config is only knowable HERE, after
+          // logback has already initialised on the first log line — a late sysprop would not be
+          // re-read, but setting the level on the live LoggerContext takes effect immediately. The
+          // named loggers (io.netty, …) keep their explicit levels; only the root moves. Plane A
+          // (Felix's own felix.log.level) is threaded separately, via LogLevelSeed below.
+          bootstrap.logLevel().ifPresent(Main::applyHostLogLevel);
           final Parcel parcel = new Parcel(context.projectName(), context.stackName());
           final SeedRun run =
               new SeedRun(
@@ -100,7 +113,13 @@ public final class Main {
                             // GROW beat's com.pulumi resources resolve there (the deployment is a
                             // plain ThreadLocal, not inherited by the worker) — §
                             // PulumiDeploymentSeed.
-                            .andThen(PulumiDeploymentSeed.into(Deployment.getInstance())));
+                            .andThen(PulumiDeploymentSeed.into(Deployment.getInstance()))
+                            // Plane A of the one log-level knob: the framework's own log verbosity,
+                            // seeded onto the launcher so BaseWorldExtension raises felix.log.level
+                            // before booting Felix (the only lever that explains a failed resolve).
+                            // Absent ⇒ a no-op seed, so the boot keeps the Felix default.
+                            .andThen(
+                                bootstrap.logLevel().map(LogLevelSeed::into).orElse(store -> {})));
             // Render the runbook (adoc + json) into host.live.d AFTER the play — the two-channel
             // rule: the runbook is narration, materialised post-run. It cannot travel through the
             // promotion (a mid-scenario beat), so the host writes it into the live tree directly, a
@@ -137,5 +156,27 @@ public final class Main {
             throw new IllegalStateException("the cluster-seed run was interrupted", interrupted);
           }
         });
+  }
+
+  /** Set the host logback root level from the knob — plane B of the one log-level knob. */
+  private static void applyHostLogLevel(LogLevel level) {
+    final LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+    context.getLogger(Logger.ROOT_LOGGER_NAME).setLevel(logbackLevelOf(level));
+  }
+
+  /**
+   * Collapse the OSGi {@link LogLevel} to a logback {@link Level} for the host root. logback has no
+   * AUDIT (pins to ERROR, the least-verbose threshold); the rest map by name. The host-realm twin
+   * of {@code LaunchConfig.felixLevelOf} (plane A) — the two planes read the SAME knob, each
+   * translating to its own backend's vocabulary.
+   */
+  private static Level logbackLevelOf(LogLevel level) {
+    return switch (level) {
+      case AUDIT, ERROR -> Level.ERROR;
+      case WARN -> Level.WARN;
+      case INFO -> Level.INFO;
+      case DEBUG -> Level.DEBUG;
+      case TRACE -> Level.TRACE;
+    };
   }
 }

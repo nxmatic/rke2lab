@@ -315,7 +315,9 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
         .getElement()
         .map(element -> element.getAnnotation(FrameworkLog.class))
         .ifPresent(
-            log -> config.put("felix.log.level", Integer.toString(log.value().felixLevel())));
+            log ->
+                config.put(
+                    "felix.log.level", Integer.toString(LaunchConfig.felixLevelOf(log.value()))));
     systemPackagesExtra.ifPresent(
         value -> config.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, value));
     bootDelegation.ifPresent(value -> config.put(Constants.FRAMEWORK_BOOTDELEGATION, value));

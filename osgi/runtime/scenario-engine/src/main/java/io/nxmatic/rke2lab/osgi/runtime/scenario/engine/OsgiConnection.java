@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.launch.Framework;
+import org.osgi.service.log.LogLevel;
 import org.osgi.util.tracker.ServiceTracker;
 
 /**
@@ -120,6 +121,17 @@ public interface OsgiConnection extends AutoCloseable {
    */
   static OsgiConnection embedded() {
     final BootedFramework booted = FrameworkLaunch.embedded().launch();
+    return over(booted.context(), true, booted::close);
+  }
+
+  /**
+   * As {@link #embedded()}, but raise the framework's own log verbosity to {@code
+   * frameworkLogLevel} — the operator's {@code logging:level} knob threaded to the live boot so a
+   * failed resolve explains WHICH requirement could not be wired (the only place it does). Empty
+   * knob ⇒ callers use the no-arg form and get the Felix default.
+   */
+  static OsgiConnection embedded(LogLevel frameworkLogLevel) {
+    final BootedFramework booted = FrameworkLaunch.embedded(frameworkLogLevel).launch();
     return over(booted.context(), true, booted::close);
   }
 

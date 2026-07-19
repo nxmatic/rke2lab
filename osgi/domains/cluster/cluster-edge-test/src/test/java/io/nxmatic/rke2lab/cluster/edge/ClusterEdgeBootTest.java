@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.cluster.edge;
 
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
+import org.osgi.service.log.LogLevel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
@@ -29,9 +30,9 @@ import org.osgi.framework.Bundle;
  * typed.
  */
 @OsgiWorld
-// Flip to FrameworkLog.Level.DEBUG to troubleshoot a failed in-container resolve/activation
+// Flip to LogLevel.DEBUG to troubleshoot a failed in-container resolve/activation
 // (Felix then traces WHICH requirement could not be wired); WARNING is the quiet committed default.
-@FrameworkLog(FrameworkLog.Level.WARNING)
+@FrameworkLog(LogLevel.WARN)
 class ClusterEdgeBootTest {
 
   // The cluster edge fixture-test fragment, selected by what it declares; its host cluster-edge is

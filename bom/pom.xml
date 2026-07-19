@@ -88,6 +88,14 @@
     <osgi.component.version>1.5.1</osgi.component.version>
     <osgi.util.promise.version>1.3.0</osgi.util.promise.version>
     <osgi.util.function.version>1.2.0</osgi.util.function.version>
+    <!--
+      The org.osgi.service.log API (LogLevel + Logger). Felix's system bundle does NOT export it and
+      osgi.core carries it only where osgi.core is on-classpath; the host exec (seed-master) is flat
+      and keeps osgi.core test-scoped (it would duplicate org.osgi.framework.* on the runtime JCL and
+      break framework.init()). So the host names LogLevel through this SLIM spec artifact — the log
+      packages ALONE, no framework classes — as the currency of the framework log-level knob.
+    -->
+    <osgi.service.log.version>1.5.0</osgi.service.log.version>
   </properties>
 
   <dependencyManagement>
@@ -363,6 +371,13 @@
         <groupId>org.osgi</groupId>
         <artifactId>org.osgi.service.component</artifactId>
         <version>${osgi.component.version}</version>
+      </dependency>
+      <!-- The org.osgi.service.log API (LogLevel currency of the framework log-level knob) — the
+           slim spec artifact, host-side only (see the version property note). -->
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.service.log</artifactId>
+        <version>${osgi.service.log.version}</version>
       </dependency>
       <dependency>
         <groupId>org.osgi</groupId>

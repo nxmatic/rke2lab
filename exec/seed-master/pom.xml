@@ -355,6 +355,16 @@
       <artifactId>osgi.core</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The org.osgi.service.log API (LogLevel) — the currency of the framework log-level knob. The
+         SLIM spec artifact (log packages ALONE), compile+runtime on the host's flat JCL: it carries
+         NO org.osgi.framework.*, so unlike osgi.core (kept test-scope above) it cannot duplicate the
+         framework classes felix.framework provides and break framework.init(). The host reads the
+         knob (BootstrapConfig.logLevel) and threads it to the boot; the OSGi realm gets the same API
+         from osgi.core, and the two realms never share a classpath (broker-mediated). -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.log</artifactId>
+    </dependency>
     <!-- Declarative Services on the test classpath: felix.scr + the DS-runtime API trio it wires to,
          so the in-container SystemdAdapterStageTest can start SCR (withScr()) and have it activate
          the fragment-contributed @Components. Not inherited (seed-master uses bundle-parent, not

@@ -7,6 +7,8 @@ import io.nxmatic.rke2lab.osgi.boot.discovery.BootRequest;
 import io.nxmatic.rke2lab.osgi.boot.discovery.HostClassRealm;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Optional;
+import org.osgi.service.log.LogLevel;
 
 /**
  * The embedded-OSGi boot: plan then launch (via {@link BootPlanner} + {@link FrameworkLauncher})
@@ -34,13 +36,27 @@ public final class FrameworkLaunch {
    * (a packaging defect, not a degraded run mode). The shape every entrypoint uses.
    */
   public static Embedded embedded() {
-    return new Embedded();
+    return new Embedded(Optional.empty());
+  }
+
+  /**
+   * The prod preset raised to a chosen framework {@link LogLevel} — the operator's {@code
+   * logging:level} knob threaded to the live boot so a failed resolve explains itself. Empty leaves
+   * the Felix default (what the two CLIs, which never thread a level, get from {@link
+   * #embedded()}).
+   */
+  public static Embedded embedded(LogLevel frameworkLogLevel) {
+    return new Embedded(Optional.of(frameworkLogLevel));
   }
 
   /** The boot preset over the fixed embedded topology; {@link #launch()} hands the world out. */
   public static final class Embedded {
 
-    private Embedded() {}
+    private final Optional<LogLevel> frameworkLogLevel;
+
+    private Embedded(Optional<LogLevel> frameworkLogLevel) {
+      this.frameworkLogLevel = frameworkLogLevel;
+    }
 
     /**
      * Boot and HAND the live {@link BootedFramework} OUT — the caller owns the lifecycle (closes it
@@ -55,7 +71,7 @@ public final class FrameworkLaunch {
       }
     }
 
-    private static BootedFramework bootEmbedded() throws IOException {
+    private BootedFramework bootEmbedded() throws IOException {
       final BootPlan plan =
           new BootPlanner(HOST.stagedBundles(), HOST::resolves)
               .plan(BootRequest.create().embedBootStack());
@@ -63,10 +79,12 @@ public final class FrameworkLaunch {
       // byte-buddy boot-delegation the test executor does — from the ONE shared source, so it can
       // never be set in one and forgotten in the other (§
       // LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION).
-      return new FrameworkLauncher(
-              LaunchConfig.defaults()
-                  .withBootDelegation(LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION))
-          .launch(plan, true);
+      LaunchConfig config =
+          LaunchConfig.defaults().withBootDelegation(LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION);
+      if (frameworkLogLevel.isPresent()) {
+        config = config.withFrameworkLogLevel(frameworkLogLevel.get());
+      }
+      return new FrameworkLauncher(config).launch(plan, true);
     }
   }
 

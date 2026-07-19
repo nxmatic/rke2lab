@@ -433,10 +433,19 @@ config:
     timeout: PT10M
   rke2lab:hostAsset:
     rotationRetentionCount: 3
+  rke2lab:logging:
+    level: DEBUG                                    # optional — AUDIT|ERROR|WARN|INFO|DEBUG|TRACE
 ----
 
 NOTE: `policy.readiness.simulate` (fake-incident ordering) is read here but *consumed* by the
 runbook-doctor subsystem - it is a config key this spec loads, not behavior this spec defines.
+
+NOTE: `logging.level` is the framework log-level knob — one knob the operator flips when the
+framework errors at boot, without knowing the framework/bundle distinction. Its currency is the OSGi
+`org.osgi.service.log.LogLevel`; it drives BOTH planes from one value — Felix's own `felix.log.level`
+at construction (the resolver trace, the only lever that explains a failed resolve) AND the host
+logback root. Absent ⇒ no override (Felix default + `logback.xml` root). See the engine-lifecycle
+spec § "The framework log-level knob".
 
 == Remediation via the doctor pattern
 
