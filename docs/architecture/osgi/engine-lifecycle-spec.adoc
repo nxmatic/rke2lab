@@ -158,11 +158,11 @@ lifetime changes.*
 ....
 flowchart TB
   subgraph abs["OsgiConnection — reach the OSGi world, own the lifecycle"]
-    emb["embedded() — REALISED<br/>bootstraps Felix in-process<br/>ownsLifecycle = true<br/>close() → stop the world"]
-    rem["remote(endpoint) — NAMED, not built<br/>attaches to a running world<br/>ownsLifecycle = false<br/>close() → detach, world survives"]
+    emb["embedded() — REALISED<br/>bootstraps Felix in-process<br/>ownsLifecycle = true<br/>close() stops the world"]
+    rem["remote(endpoint) — NAMED, not built<br/>attaches to a running world<br/>ownsLifecycle = false<br/>close() detaches, world survives"]
   end
-  test["REAL TEST — root scope = the test run<br/>embedded() in the session Store<br/>close() at run end → framework falls (acceptable)"]
-  run["LIVE SEED — root scope = the seed run (pulumi up)<br/>embedded() in the session Store<br/>close() at pulumi-up end → framework falls"]
+  test["REAL TEST — root scope = the test run<br/>embedded() in the session Store<br/>close() at run end, framework falls (acceptable)"]
+  run["LIVE SEED — root scope = the seed run (pulumi up)<br/>embedded() in the session Store<br/>close() at pulumi-up end, framework falls"]
   future["a future client-framework case"]
   emb --> test
   emb --> run
@@ -173,10 +173,44 @@ flowchart TB
   class rem,future named
 ....
 
-Only `embedded()` is built in this increment; `remote()` throws `UnsupportedOperationException` until
-a real client-framework case arrives (see § <<yagni>>). This is the same detached-by-design frame the
-pipeline-spec already grave — here applied to the *first step* of the seed scenario ("the OSGi world
-is connected").
+`embedded()` is the built connection; `remote()` throws `UnsupportedOperationException` until a real
+client-framework case arrives (see § <<yagni>>) — a still-live YAGNI, not a pending increment. This is
+the same detached-by-design frame the pipeline-spec already grave, applied to the seed scenario's
+connect step ("the OSGi world is connected"). The seed vertical is no longer a first step in flight:
+the whole tree (bbox · incus · systemd · cluster · manifests) plays, sows and grafts end-to-end
+through this connection — what remains open is live-run hardening, not the mechanism.
+
+[[the-boot-invariants-one-source]]
+=== The boot config the two executors MUST share — one source, or it drifts (2026-07-19)
+
+"Test vs runtime is only WHERE the root scope lives; the code is identical" holds for the lifecycle
+mechanism — but the FRAMEWORK PROPERTIES the boot sets are built by two different enclosures (the
+live `FrameworkLauncher` from a `LaunchConfig`; the test `OutOfContainerFrameworkExtension` from its
+builder), and a property set in one and forgotten in the other is invisible until a live run hits it.
+It DID: the live boot shipped without `org.osgi.framework.bootdelegation=sun.misc`, so byte-buddy's
+`ClassInjector.UsingReflection` — which jGiven's `beforeEach` drives to generate each stage subclass —
+could not reach `sun.misc.Unsafe` in-container, and EVERY scion aborted before its body ran, while the
+tests (which had it) stayed green. A JDK-internal package no system-bundle export can serve: it must
+be parent-delegated, and both boots play jGiven, so both need it.
+
+The fix is a discipline, not a value: the shared requirements live ONCE, on `LaunchConfig`, and both
+executors derive from that source — never a literal spelled twice.
+
+* *`LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION`* (`= List.of("sun.misc")`) — the boot-delegation
+  every jGiven-playing boot needs. `FrameworkLaunch.embedded` sets it via `withBootDelegation(...)`;
+  `ScenarioTestkit.felix` sets the same list. One source, so the live↔test drift that caused this
+  cannot recur.
+* *`LaunchConfig.applyFrameworkInvariants(config)`* — the Felix properties that must be IDENTICAL in
+  every boot, stamped by one call both enclosures make. Today one invariant:
+  `felix.bootdelegation.implicit=false` (Felix defaults it TRUE — it would guess by stack inspection
+  when an outside-a-bundle load falls through to the parent, the silent escape hatch that lets a
+  non-wired seam package resolve by accident, so a typed-seam proof could pass for the wrong reason).
+  It was already duplicated verbatim in both boots with the same rationale — the exact twin of the
+  `sun.misc` drift, closed the same way.
+
+The rule generalises: any framework property both executors need is a can't-drift invariant → it
+belongs on `LaunchConfig` (a named constant or `applyFrameworkInvariants`), referenced by both, never
+a literal in each enclosure.
 
 [[the-lever]]
 == The lever — the start level, driven by the depth of the JUnit scope

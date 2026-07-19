@@ -679,6 +679,14 @@ never throw-instead-of-render.
 * *`RunbookEnvelope`* — the reap the handler serialises (runbook JSON + consultations) is ONE record
   in the engine's `.container` package (§ one generic handler, a strategy per domain), no longer
   duplicated per domain.
+* *A body that never ran surfaces the REAL cause, not a null (hardening 2026-07-19).* The outcome
+  channel is fail-at-END only for a body that RAN — but a BEFORE-phase failure (test-instance
+  post-processing, `@OsgiService` injection, a `beforeAll`) aborts the node before the body, so the
+  extension never seeds an outcome. Reading it back then NPE'd on the null, MASKING the true cause
+  (this is how a live byte-buddy boot failure first showed only as a downstream NPE). `ScenarioPlayer`
+  now registers a failure-capturing `TestExecutionListener` and, on a missing outcome, throws the
+  CAPTURED node failure — so the before-phase cause is what the operator sees. `ScenarioOutcomeSeed`
+  gained `find` (returns `Optional`, the frontier rule) beside the strict `read`.
 
 [[one-generic-handler-a-strategy-per-domain]]
 ==== One generic handler, a strategy per domain — the front-door dedup (2026-07-18)
@@ -1671,6 +1679,17 @@ neither the port nor the edge. Structural, not preference: collaborators are res
 `ClusterReadinessScenario`), never off a sown seed — so a seed-borne gate could never reach them; the gate
 must live in the registry, where the scion looks its collaborators up. When it is closed the scion asks
 the edge for the inert crossing (a dry-run / synthetic observation) — the REAL edge inert, never a fake.
+
+*INERT means NO CONTACT, not "connect then don't write" (correction 2026-07-19).* A closed gate is a
+preview: touching the live system "would hang or lie" (§ RunMode). So a dry-run edge must reach the
+world ZERO times — not open a session and then pass a native dry-run flag. `LiveBboxReconciler` first
+shipped the wrong shape: it derived `Mode.DRY_RUN` but STILL opened the router session (`POST /login`)
+before honouring it, so a `pulumi preview` hit the real Bbox and 400'd on login — the exact failure the
+gate exists to prevent. Fixed by short-circuiting AT THE TOP: `if (dryRun) return each-row
+WOULD_CREATE` with no client opened. A preview that cannot read the live table cannot tell CREATE from
+UPDATE/MATCHING, so it reports the honest upper bound (`WOULD_CREATE`), never a fabricated MATCHING —
+still an honest plan, now genuinely contact-free. The rule for every edge: a closed gate is checked
+BEFORE the first byte of I/O, not folded into the protocol's own dry-run mode.
 
 Two orthogonal axes the earlier "mock pattern" wrongly conflated:
 
