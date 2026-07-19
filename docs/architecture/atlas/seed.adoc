@@ -49,8 +49,10 @@ action (`through(live, deferred)`) and drives the write once (`registry.add(...)
 .The living gate half is re-posed by the BDD-as-engine turn
 ====
 The *living gate* framing below (`LiveGate` as a preview/up state) is superseded: BDD-as-engine
-(§ <<the-bdd-as-engine-turn>>) erases `LiveGate` and re-poses preview as an `ExecutionCondition`
-selecting a `PreviewExecutor` (rendering decoupled from execution, E9). What survives from Diagram P is
+(§ <<the-bdd-as-engine-turn>>) erases `LiveGate`. Preview becomes the gardening SURVEY/CULTIVATE mode,
+resolved at the collaborator frontier (the `@OsgiService` bridge picks a `Cultivating`/`Surveying`
+impl by LDAP filter on `rke2lab.gardening`; scenarios are mode-blind), with the render decoupled from
+execution (`PendingMarkingScenarioExecutor` marks steps PENDING, E9). What survives from Diagram P is
 the *named erasure of the seven scattered `isDryRun()` reads* and the whole *output gate* half
 (`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) — the output axis is
 orthogonal to the turn and stays exactly as drawn. Read Diagram P for those; read the turn section for
@@ -152,7 +154,7 @@ The seeding phases are jGiven `Stage`s; the value-DAG is carried by scenario-sta
 | the boot | `@SeedRuntime` self-boots via `OsgiConnection.embedded` (`FrameworkLaunch.embedded().launch()` under the hood) | *socle SHIPPED:* `SeedRuntime` + `OsgiConnection`
 | ambient host-facts | `ExtensionContext.Store` | *socle SHIPPED:* `BaseWorldExtension` Store; vertical seeds host-facts
 | the DAG safety gate | `SCENARIO_STATE_DAG` (`provided`/`required` topological) | vertical closing task (a `StagingGate`, existing ASM+`@GovernedBy` mould)
-| preview | an `ExecutionCondition` + `PreviewExecutor` | vertical (Q3, not yet designed)
+| preview | the SURVEY/CULTIVATE mode chosen at the collaborator frontier (paired `Cultivating`/`Surveying` impls by LDAP filter, mode-blind scenarios) + the `PendingMarkingScenarioExecutor` render (E9) | vertical (Q3, designed 2026-07-19)
 | the runbook | `ReportModel`, single source; outputs a projection of the value-DAG | vertical: `SeedRun(runbook, outputs)` harvest return
 |===
 
@@ -230,7 +232,7 @@ connected scenario, green) rather than on the disposable bench.
 |===
 
 *Conclusion.* The seeding rests on the launcher-substrate, the disciplines, and the value-DAG (with the
-`PreviewExecutor` still to design). The fluent grammar, `Topic`/`Sink`/`State<I,B>`, `PipelineContext`,
+`PendingMarkingScenarioExecutor` still to design). The fluent grammar, `Topic`/`Sink`/`State<I,B>`, `PipelineContext`,
 `LiveGate`, `FluentTopicRunner` and the host-side boot are gone — the grammar engine dissolved into
 manifests-core's internal synthesis, the boot into `FrameworkLaunch`; the `SCENARIO_STATE_DAG` gate is
 the value-DAG's build-time safety. It rests on four invariants (above). The orchestration substrate
@@ -249,7 +251,7 @@ CONSUMED: the proof is no longer "a bench shows it viable" but "the socle realiz
 seven-mechanism registry lived here to decide the GO; that decision is made, so it collapses to a
 pointer — see link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec] for the shipped socle and
 its increment boundary, and the migration plan for the vertical sequence. Three mechanisms are NOT yet
-productionised and belong to the vertical (increment 2) or its close: the `PreviewExecutor`
+productionised and belong to the vertical (increment 2) or its close: the `PendingMarkingScenarioExecutor`
 (preview-as-`ExecutionCondition`, Q3, not yet designed), the `SCENARIO_STATE_DAG` gate (the closing
 task — a sixth `StagingGate` on the existing ASM+`@GovernedBy` mould), and the cross-world
 `ScenarioModel` graft (only when an OSGi-world scenario is grafted). The bench code survives at tag
@@ -364,7 +366,7 @@ in the SAME run (§ link:../osgi/host-cellar-realisation-spec.adoc[the reconcile
 
 *Coverage of this view:* 2 capabilities, 2 scenarios — complete per <<scenario-completeness>>. Both
 narrated-green. Scenario 1's substrate (launcher, disciplines, connection) SHIPPED with the socle
-(§ <<the-bdd-as-engine-turn>>); its preview mechanism (`ExecutionCondition` + `PreviewExecutor`) is the
+(§ <<the-bdd-as-engine-turn>>); its preview mechanism (`ExecutionCondition` + `PendingMarkingScenarioExecutor`) is the
 one piece still to design, and the whole flips playable when the ClusterSeed-vertical increment ships.
 Scenario 2 (the output registry) is orthogonal and flips playable when the registry ships.
 

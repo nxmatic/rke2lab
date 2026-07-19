@@ -251,21 +251,29 @@ VA CHERCHER (`fetch`). Les deux registres ne partagent aucun verbe.
 == Live vs preview — arpenter le jardin plutôt que le cultiver
 
 Un fait AMBIANT du run entier (pas une propriété d'une graine) : le commanditaire veut-il un vrai
-travail, ou seulement un PLAN ? Publié comme un service neutre unique dans Felix (`RunGate`, dérivé de
-`RunMode`/`LiveGate`) ; chaque outil le consulte et s'abstient quand il est fermé.
+travail, ou seulement un PLAN ? Publié comme un service neutre unique dans Felix (`RunGate`). Sa VOIX
+est le jardinage — NI le mot Pulumi (« preview »), NI le mot jGiven (« pending »). Trois couches,
+chacune sa voix : la *pulumi-edge* DÉCLENCHE (`RunMode`/`isDryRun`), le *pipeline* (nous, le milieu)
+ARPENTE ou CULTIVE, *jGiven* REND en `PENDING`. Un survey PRODUIT des steps pending ; « arpenter »
+n'est pas « pending » — c'est le mode qui les produit.
 
 |===
 | Français | English | Terme modèle seed
 
-| cultiver | to cultivate | **run live** — l'outil touche le vrai sol (kubectl, dbus, le backend Pulumi)
-| arpenter | to survey / walk | **preview / dry-run** — le jardinier planifie sans cultiver ; l'outil reste à l'abri, rien n'est touché
-| l'abri | the shed | **la gate fermée** — sous une gate fermée l'outil ne touche rien et répond « pas atteint / vide » (l'outil RÉEL inerte, jamais un faux outil)
-| RunGate | RunGate | le fait ambiant publié dans Felix ; le rendu du plan (runbook PENDING) est un souci ORTHOGONAL, porté par `PendingMarkingScenarioExecutor` (E9)
+| cultiver | cultivate | **run live** — l'outil touche le vrai sol (kubectl, dbus, le backend Pulumi)
+| arpenter | survey | le mode où le jardinier PLANIFIE sans cultiver — le mot dans lequel le pipeline raisonne
+| l'abri | the shed | l'outil RÉEL, inerte — jamais un faux outil qui invente une récolte
+| RunGate | RunGate | le fait ambiant dans Felix ; il ne se consulte PLUS par-step — le bridge `@OsgiService` le lit UNE fois et SÉLECTIONNE l'impl du collaborateur à la frontière (filtre LDAP `rke2lab.gardening`)
 |===
 
-CAUTION: arpenter (preview) ≠ fabriquer une fausse récolte. La gate fermée = on N'UTILISE PAS l'outil ;
-ce n'est pas « on utilise un faux outil qui invente une récolte verte ». Les fakes/mocks statiques sont
-écartés (décision 2026-07-11b) : le collaborateur sous gate fermée est l'outil réel, inerte.
+CAUTION: arpenter ≠ fabriquer une fausse récolte (la loi no-fake, décision 2026-07-11b). Deux
+mécaniques, par NATURE du collaborateur, jamais un fake : un *matérialiseur* a un plan honnête → une
+paire `Cultivating`/`Surveying` (le `Surveying` projette « ce que je ferais », WOULD_CREATE, touche
+rien) ; une *sonde pure* n'a pas de plan (sa sortie EST l'état vivant) → elle NE TOURNE PAS en survey
+(step PENDING), car une sonde-survey serait le fake interdit. Le rendu du plan (runbook PENDING) est
+ORTHOGONAL, porté par `PendingMarkingScenarioExecutor` (E9). *La décision 2026-07-11 « le scion
+consulte la gate par-step » est renversée : le scion est mode-aveugle, le bridge choisit à la
+frontière.*
 
 == Related documentation
 

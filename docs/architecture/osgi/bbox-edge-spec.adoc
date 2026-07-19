@@ -26,13 +26,18 @@ mode)`. Five host files imported `io.nxmatic.bbox.*` — the library's `Action`/
   io.nxmatic.bbox.api.client`, exports its two API packages, imports `com.google.gson` (itself a
   bundle). No embedding — the edge imports it, and the staging closure stages it (and gson) as
   carriers because an edge imports their packages.
-* *bbox-core* (`type=model`): `BboxReconciler` — `reconcile(baseUri, password, dryRun,
+* *bbox-core* (`type=model`): `BboxReconciler` — `reconcile(baseUri, password,
   List<BboxReservationRequest>) → List<BboxRowOutcome>` — over a HOME vocabulary
-  (`BboxReservationRequest`, `BboxRowOutcome`, `BboxAction` mirroring the library enum). No
-  `io.nxmatic.bbox.*` type crosses the contract boundary.
-* *bbox-edge* (`type=edge`, `@Component`): `LiveBboxReconciler` opens the session, rebuilds the
-  library `DesiredReservation` from each request, applies, and maps the library `RowOutcome`/`Action`
-  back to the home records. The single door — the library resolves only in this bundle's realm.
+  (`BboxReservationRequest`, `BboxRowOutcome`, `BboxAction` mirroring the library enum). NO `dryRun`
+  parameter: the mode is chosen at the frontier, never passed in. No `io.nxmatic.bbox.*` type crosses.
+* *bbox-edge* (`type=edge`, a PAIR of `@Component`s, each tagged `rke2lab.gardening` so the
+  `@OsgiService` frontier picks one under the ambient RunGate):
+  ** `CultivatingBboxReconciler` (`rke2lab.gardening=cultivating`) opens the session, rebuilds the
+     library `DesiredReservation` from each request, applies, and maps `RowOutcome`/`Action` back to
+     the home records. The single live door.
+  ** `SurveyingBboxReconciler` (`rke2lab.gardening=surveying`) contacts the router ZERO times: it
+     projects each request's `WOULD_CREATE` — the honest upper bound (a survey cannot read the live
+     table, so never a fabricated MATCHING). Real production code, not a fake.
 * *seed-master* (host): purified off `io.nxmatic.bbox.*` — it builds `BboxReservationRequest`s from
   the blueprint, calls the reconciler resolved from the registry, and projects `BboxRowOutcome`s into
   its counts and Pulumi resource graph. The library types no longer live host-side.
@@ -75,20 +80,22 @@ collaborators. `BlueprintRowEnumerator` (pure — `bbox-core` + `netplan-contrac
 ----
 SCENARIO: the desired reservations are reconciled against the router
   GIVEN the desired (mac, ip, hostname) reservations for the run
-    AND the BboxReconciler contact (edge) + the RunGate — both resolved from the registry
-  WHEN the scion asks the RunGate whether to cultivate, derives dryRun = !cultivating()
-    AND the edge opens one session, fetches the router's reservation table once, diffs each desired row
+    AND the BboxReconciler contact resolved from the registry — mode-blind, the frontier picks
+        cultivating or surveying
+  WHEN the reconciler is driven once over the desired rows
+    AND it diffs each row against the router table (cultivating) or projects WOULD_CREATE (surveying)
   THEN every desired row has a BboxRowOutcome — present-already / created / corrected (BboxAction)
     AND a row that could not be reconciled is SURFACED, never silently dropped
 ----
 
-*Preview inertness — the SCION consults the RunGate (A2), not the edge.* The scion resolves `RunGate`
-from its own `BundleContext` and derives `dryRun = !gate.cultivating()`, passed to the existing
-`BboxReconciler.reconcile(..., dryRun, ...)` — under a closed gate the edge diffs but does not write
-(native DRY_RUN mode → `WOULD_CREATE`/`WOULD_UPDATE`), so the scion plays honestly without touching the
-router (no separate fake). The port + edge are untouched. *On a refused row* the domain MAY consult the
-doctor itself (a symptom), the same transversal-consult pattern as systemd/cluster — the host never sees
-it.
+*Preview inertness — the FRONTIER selects, the scion is mode-blind.* The scenario injects
+`@OsgiService BboxReconciler` and NO `RunGate`; the bridge reads the ambient gate once and resolves the
+`CultivatingBboxReconciler` or the `SurveyingBboxReconciler` by LDAP filter on `rke2lab.gardening`
+(`(|(rke2lab.gardening=<mode>)(!(rke2lab.gardening=*)))`). The scenario body is identical either way —
+it just drives the reconciler. Under survey it gets the surveying impl (WOULD_CREATE, zero contact);
+under cultivate, the live one. No `dryRun` flag, no per-step gate. *On a refused row* the domain MAY
+consult the doctor itself (a symptom), the same transversal-consult pattern as systemd/cluster — the
+host never sees it.
 
 The scion grafts back under the host step; its `@Scion("fruit")`/`@Scion("sowing")` roles (if it consults)
 project through the neutral port exactly as the doctor's do (see

@@ -1671,36 +1671,37 @@ Felix, resolved by the bundle because `Cellar` is a `type=seam` interface (host 
   wiring bug that must fail loud, not be papered over with `OPTIONAL`/`dynamic`.
 
 [[live-preview-rungate]]
-=== Live vs preview — the ambient RunGate, not a fake
+=== Live vs preview — the ambient RunGate selects the collaborator at the frontier
 
 Whether a run TOUCHES the world (kubectl, dbus, the Pulumi backend) or only PLANS is a fact of the whole
-run, not a property of any seed — so it is published ONCE as a neutral ambient service, `RunGate` (derived
-from `RunMode`/`LiveGate`), into Felix at boot. Its VALUE depends on `pulumi-edge` (projected from
-`RunMode.detect()` → Pulumi's `isDryRun`), so the HOST publishes it live; but because it is a `type=seam`
-resolved from the registry, a test `registerService`s its own — mockable exactly where a contact is.
+run, not a property of any seed — so it is published ONCE as a neutral ambient service, `RunGate`, into
+Felix at boot. Its VALUE depends on `pulumi-edge` (projected from `RunMode.detect()` → Pulumi's
+`isDryRun`), so the HOST publishes it live; a test `registerService`s its own.
 
-*The SCION consults it, not the edge (decided 2026-07-11).* The scion resolves `RunGate` from its own
-`BundleContext` alongside its contact and the doctor, and derives its touch decision — for bbox, `dryRun =
-!gate.cultivating()`, passed to the existing `reconcile(…, dryRun, …)` the edge already honours natively.
-This keeps the gate a TESTED OSGi citizen now (the in-container test registers a mock `RunGate` and a mock
-contact; a `cultivating()=false` case proves preview inertness without touching the world), whereas an
-edge-side check would leave the gate unexercised until the host wiring — a deferral we refuse. It touches
-neither the port nor the edge. Structural, not preference: collaborators are resolved by
-`context.getServiceReference(...)` (a registry lookup, verified in `SystemdAdapterScenario`/
-`ClusterReadinessScenario`), never off a sown seed — so a seed-borne gate could never reach them; the gate
-must live in the registry, where the scion looks its collaborators up. When it is closed the scion asks
-the edge for the inert crossing (a dry-run / synthetic observation) — the REAL edge inert, never a fake.
+*The FRONTIER selects; the scenario is mode-blind (reverses "the scion consults it per-step", 2026-07-11).*
+The mode is no longer read inside a scenario. The `@OsgiService` bridge reads the ambient `RunGate` ONCE
+and resolves every collaborator with an LDAP filter that picks the right implementation:
+`(|(rke2lab.gardening=<mode>)(!(rke2lab.gardening=*)))` — the matching half of a paired collaborator, OR
+any un-paired service (which carries no `rke2lab.gardening` property, so the `!(…=*)` clause takes it: the
+`RunGate` itself, the doctor, manifests). So a scenario declares `@OsgiService BboxReconciler` and receives
+the cultivating or surveying impl transparently; it NO LONGER injects `RunGate` at all. The mode-branch is
+aspirated out of the scenario AND the edge, into the one place the mode is known — the frontier.
 
-*INERT means NO CONTACT, not "connect then don't write" (correction 2026-07-19).* A closed gate is a
-preview: touching the live system "would hang or lie" (§ RunMode). So a dry-run edge must reach the
-world ZERO times — not open a session and then pass a native dry-run flag. `LiveBboxReconciler` first
-shipped the wrong shape: it derived `Mode.DRY_RUN` but STILL opened the router session (`POST /login`)
-before honouring it, so a `pulumi preview` hit the real Bbox and 400'd on login — the exact failure the
-gate exists to prevent. Fixed by short-circuiting AT THE TOP: `if (dryRun) return each-row
-WOULD_CREATE` with no client opened. A preview that cannot read the live table cannot tell CREATE from
-UPDATE/MATCHING, so it reports the honest upper bound (`WOULD_CREATE`), never a fabricated MATCHING —
-still an honest plan, now genuinely contact-free. The rule for every edge: a closed gate is checked
-BEFORE the first byte of I/O, not folded into the protocol's own dry-run mode.
+*Two implementations, not a `dryRun` flag (supersedes the 2026-07-19 short-circuit-in-one-impl).* A
+materialiser's contract DROPS its `dryRun` parameter; it becomes a PAIR, each impl mode-pure:
+* `Cultivating…` — the live tool: opens the session, applies, promotes.
+* `Surveying…` — the plan tool: it projects the honest plan from the real desired input, contacting the
+  world ZERO times (INERT = no contact — a preview login "would hang or lie"). For bbox it returns each
+  row's `WOULD_CREATE`, the honest upper bound (a survey cannot read the table, so never a fabricated
+  MATCHING). Both are real production code registered with `rke2lab.gardening=cultivating|surveying`;
+  the frontier's LDAP filter chooses.
+
+*The criterion — is there an honest plan? (the no-fake law).* Not every collaborator is a pair. A PURE
+PROBE (systemd adapter, cluster readiness) has NO honest plan — its output IS the live state — so a
+surveying probe would FABRICATE an observation, the forbidden fake. A pure probe therefore does NOT run in
+survey: its scenario is survey-inert and every step renders PENDING (E9), touching nothing. A materialiser
+HAS a plan → it gets the pair. Manifests (pure FS synthesis) touches nothing live → no pair, runs in both
+modes (the staging is wanted at survey).
 
 Two orthogonal axes the earlier "mock pattern" wrongly conflated:
 
@@ -1708,7 +1709,7 @@ Two orthogonal axes the earlier "mock pattern" wrongly conflated:
 |===
 | axis | governs | lever
 | RENDER | how the runbook reads (plan vs result) | `PendingMarkingScenarioExecutor` (E9) — bodies still `proceed()` so the tree builds, `InvocationMode` rewritten `NORMAL → PENDING` as it reaches the model
-| TOUCH | whether a real side-effect happens | the collaborator itself, inert under a closed `RunGate`
+| TOUCH | whether a real side-effect happens | the collaborator CHOSEN at the frontier — a `Surveying…` impl for a materialiser, or a survey-inert scenario for a pure probe; the `RunGate` is read once by the bridge, never per-step in a scenario
 |===
 
 So preview is an HONEST plan (E9 narrates it PENDING), not a green lie fed by fabricated data. The static

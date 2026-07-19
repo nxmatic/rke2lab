@@ -219,7 +219,7 @@ class moved host→OSGi drops one `-port`'s host-import count toward 0.
   a pipeline verb. `PipelineContext` died with the host. The gate `PIPELINE_PATTERN` became
   `SYNTHESIS_PATTERN`.
 
-The mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate) have their
+The mechanisms not yet productionised (the `PendingMarkingScenarioExecutor`, the `SCENARIO_STATE_DAG` gate) have their
 reference sketch pinned at tag `spike/bdd-pipeline-poc`: `DagGateSpikeTest` (the topological gate),
 `PollUntilReadyExtension` (adaptive poll — live form `SeedSystemdAdapterEndpointGate`). The graft
 shipped; the rest shipped with the socle.
@@ -227,7 +227,7 @@ shipped; the rest shipped with the socle.
 == Related documentation
 
 * link:../bdd/bdd.adoc[BDD-as-engine] — the engine pattern the seed is expressed on (transverse; the
-  scenario tree, the founding constraint, RunMode/PreviewExecutor, the DAG gate, the placement rule).
+  scenario tree, the founding constraint, RunMode/PendingMarkingScenarioExecutor, the DAG gate, the placement rule).
 * link:../atlas/seed.adoc[Seed orchestration L1 (atlas)] — the figures + verdicts view of this design.
 * link:seed-broker-spec.adoc[The seed-broker] — the conceived form of the host↔OSGi seam this spec's
   ownership section describes (one broker door instead of N service verbs).

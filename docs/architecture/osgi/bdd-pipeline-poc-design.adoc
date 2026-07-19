@@ -292,7 +292,7 @@ preview riche — c'est le cousin de E1.
 
 *La sortie, trouvée et vérifiée dans le POC :* séparer _exécuter_ de _comment rendre_. Le seul seam
 natif « exécute ET marque » est `@Pending(executeSteps=true)`, mais il est statique (par méthode,
-pas un mode runtime). On obtient l'équivalent **au runtime** avec un `PreviewExecutor` qui
+pas un mode runtime). On obtient l'équivalent **au runtime** avec un `PendingMarkingScenarioExecutor` qui
 **décore le `ScenarioListener`** que l'exécuteur installe (`ScenarioBase.performInitialization`
 appelle `executor.setListener(modelBuilder)`) : l'intercepteur garde son mode local NORMAL — donc il
 `proceed()`, l'arbre entier se construit contre des probes inertes — mais le mode qui ATTEINT le
@@ -357,7 +357,7 @@ laissées ouvertes :
   besoin (E9 prouve même que jGiven sépare proprement modèle / exécution / rendu, ce qui a permis
   chaque adaptation par extension publique — pas de moteur maison).
 * *Garde-t-on RunMode ?* → *NON, dissous.* RunMode devient une `ExecutionCondition` + le
-  `PreviewExecutor` (E9) ; `LiveGate` est effacé. Le tag `wip/runmode-absorbs-livegate` est
+  `PendingMarkingScenarioExecutor` (E9) ; `LiveGate` est effacé. Le tag `wip/runmode-absorbs-livegate` est
   *abandonné* (il présupposait un `LiveGate` à absorber, qui n'existe plus).
 * *La grammaire fluent disparaît-elle entièrement ?* → *OUI.* jGiven compose tout (`@NestedSteps` +
   intro-words) ; aucun ordonnanceur mince ne mérite de subsister — le launcher JUnit porte

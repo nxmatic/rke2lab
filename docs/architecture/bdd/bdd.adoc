@@ -44,8 +44,11 @@ fact, the Pulumi output sink), and renders/writes what the OSGi world produces.
   runbook). The turn does not weaken them — it makes the founding constraint the model itself.
 * *Owner:* the OSGi world owns the pipeline (scenarios + engine + reasoning). The host boots the
   framework, injects the `RunMode` fact + Pulumi context, renders/writes. jGiven bundle-per-world.
-* *Preview:* `RunMode` is re-posed as an `ExecutionCondition` + a `PreviewExecutor` that decouples
-  *rendering* from *execution* (E9) — a rich PENDING plan, no dry-run blindness. `LiveGate` is erased.
+* *Preview:* the pipeline SURVEYS or CULTIVATES (gardening voice; `RunMode` stays a Pulumi trigger at
+  the edge). The mode is resolved at the collaborator FRONTIER — the `@OsgiService` bridge picks a
+  `Cultivating`/`Surveying` impl by LDAP filter — so the scenario is MODE-BLIND; the render is
+  decoupled from execution, `PendingMarkingScenarioExecutor` marking every step PENDING (E9).
+  `LiveGate` is erased.
 * *Compile-time safety kept:* the value-DAG moves from type-state (`State<I,B>`) to scenario-state
   *plus* a build-time ASM DAG gate (topological: every `required` has a `guaranteed` upstream) — a
   `StagingGate` sibling of `SYNTHESIS_PATTERN`.
@@ -263,7 +266,7 @@ Five decisions, taken together (2026-07-04), fix the model:
 ** *The trade accepted:* the compile-time safety of the former type-state `State<I,B>` becomes a
    *declared runtime state + a build-time gate*. Not a flat bag — a typed, annotated model with a
    topological gate. The POC judged this cran acceptable (E1 named the one incompatibility: DAG
-   enforcement XOR dry-run — resolved by the `PreviewExecutor`, § <<runmode-preview>>).
+   enforcement XOR dry-run — resolved by the `PendingMarkingScenarioExecutor`, § <<runmode-preview>>).
 --
 
 *The missing dynamics = contributed Jupiter extensions.* JUnit does not ship the temporal/DAG/gate
@@ -622,41 +625,76 @@ graft N sub-scenarios from N domains without naming them — that is the future 
 (`manifests-core` imports four); `REALM_BOUNDARY` governs "no type outside its realm", not the port count.
 
 [[runmode-preview]]
-== RunMode re-posed — an ExecutionCondition + a PreviewExecutor (LiveGate erased)
+== Survey vs cultivate — the mode lives at the frontier, never in the scenario (LiveGate erased)
 
 *Lead: preview is NOT a Pulumi-only capability, and it is NOT jGiven's naive dry-run (which renders
-blind). It is the launcher-native `ExecutionCondition` selecting a `PreviewExecutor` that decouples
-RENDERING from EXECUTION — a rich PENDING plan. `RunMode` produces the condition; `LiveGate` is erased.*
+blind). It is a fact of the WHOLE run — the pipeline SURVEYS (plans, touches nothing) or CULTIVATES
+(runs live) — and it is resolved ONCE at the collaborator frontier, never branched inside a scenario.
+Two orthogonal mechanisms carry it: the RENDER (every step marked PENDING) and the TOUCH (a live
+collaborator vs a surveying one). `LiveGate` is erased; `RunMode` stays a Pulumi fact at the edge.*
 
-The former model had two gates (a `LiveGate` state + an output gate) derived from a `RunMode` enum. The
-turn dissolves the living gate into the launcher's own vocabulary:
+*Three vocabularies, one per layer — do not borrow across.* The pipeline is OURS, in the middle, so it
+speaks neither Pulumi nor jGiven but the gardening lexicon:
 
-* *The preview CAPABILITY* — play the reasoning WITHOUT touching the real system — is OSGi-native
-  (jGiven is a bundle) and works detached, remote, anywhere.
-* *The TRIGGER* — what puts the world in preview. In the embedded/bootstrap host it is
-  `Deployment.isDryRun()` (a Pulumi fact). Detached in-cluster it is an operator command / CRD field
-  (OPEN — the detached trigger ties to the doctor what-if, `preview-whatif-replay-exploration`).
+* the *pulumi-edge* (the TRIGGER) speaks Pulumi — `RunMode`, `PULUMI_PREVIEW`, `Deployment.isDryRun()`.
+  In the embedded host that is what puts the run in survey; detached in-cluster it is an operator
+  command / CRD field (OPEN — ties to the doctor what-if, `preview-whatif-replay-exploration`).
+* the *pipeline* (OURS, the middle) speaks GARDENING — `survey` (arpenter) vs `cultivate` (cultiver).
+  This is the run mode the whole pipeline reasons in; the ambient `RunGate` publishes it once.
+* *jGiven* (the engine's report model) keeps its own word — `PENDING`. A survey run PRODUCES steps
+  rendered PENDING; we never rename PENDING, and "survey" is not "pending" — survey is the mode that
+  yields pending.
 
-So `RunMode` becomes an `ExecutionCondition`: the launcher reads the injected `RunMode` fact and selects
-the execution mode. It is *injected*, never read from `Deployment` inside a phase (E3 confirmed the mode
-is piloted from OUTSIDE the scenario — a context decision, never a scenario property).
+The mode is *injected*, never read from `Deployment` inside a phase (E3: piloted from OUTSIDE the
+scenario, a context decision). The scenario is MODE-BLIND: it resolves its collaborator, calls it, and
+tells its story; nothing in the story branches on the mode.
+
+=== The render — every step PENDING (E9, no reflection)
 
 *The trap the POC avoided — naive dry-run renders BLIND (E1 + E9).* jGiven couples rendering to
 execution: `doIntercept` returns early WITHOUT `proceed()` as soon as the invocation mode is SKIPPED or
 PENDING. So any mechanism that skips step bodies (the `jgiven.report.dry-run` property, a
 `disableMethodExecution()`, a `setDefaultInvocationMode(PENDING)`) also skips *building the tree* — a
-`@NestedSteps` whose body does not run never builds its sub-tree, the plan comes out EMPTY (and with the
-E8 `@Hidden` relays, entirely empty). Worse, E1: dry-run skips the step bodies, so a `guaranteed` state
-stays `null` → the DAG enforcement throws. *DAG enforcement XOR dry-run — not both.*
+`@NestedSteps` whose body does not run never builds its sub-tree, the plan comes out EMPTY. Worse, E1:
+dry-run skips the step bodies, so a `guaranteed` state stays `null` → the DAG enforcement throws. *DAG
+enforcement XOR dry-run — not both.*
 
-*The resolution, proven (E9):* a `PreviewExecutor` decorates the `ScenarioListener` the executor
-installs. The interceptor keeps its local mode NORMAL — so it `proceed()`s, the entire tree builds
-against inert (bouchonné) probes — but the mode that REACHES the model is rewritten `NORMAL → PENDING`.
-Result: the full plan (all phases, the nested G/W/T, every reservation), each step `(pending)`, zero
-traversal. Preview is not the weak point it seemed — a rich preview is reachable by rebranching the
-render without touching execution. Bonus seam `FailFastPreviewExecutor` (overrides
-`ScenarioExecutor.failed` to re-enable execution so a fail-fast-skipped downstream plan still renders)
-is loquacity polish, not on the critical path.
+*The resolution, proven (E9):* a `PendingMarkingScenarioExecutor` decorates the `ScenarioListener` the
+executor installs. The interceptor keeps its local mode NORMAL — so it `proceed()`s, the entire tree
+builds — but the mode that REACHES the model is rewritten `NORMAL → PENDING`. Result: the full plan,
+each step `(pending)`; and because the bodies still run, the tree is COMPLETE — every scenario the run
+plays is rendered, placed under its crossing (the runbook invariant). It decorates the listener via
+the public `setListener` seam — no reflection, no `@Pending`, no fork. Installed by the socle when the
+run surveys, off a `SurveySeed` the host seeds from `RunMode` and the sow relays to every scion.
+
+=== The touch — a live collaborator or a surveying one, chosen at the frontier
+
+Rendering PENDING does not stop a body that runs from touching the live world. The touch is the
+orthogonal concern, and it lives entirely at the FRONTIER — the point where a scenario resolves its
+collaborator (`@OsgiService`). One side is the mode-blind scenario; the other is a mode-PURE
+implementation; the frontier is the only place the mode is known.
+
+*The criterion — is there an HONEST plan to survey? (the no-fake law).* A survey must never fabricate a
+live observation (the gardening `l'abri`: the real tool, inert, never a false harvest). So the mode
+mechanism splits by the NATURE of the collaborator:
+
+* a MATERIALISER (bbox reconcile, incus image, the live-tree promote, manifests) HAS an honest plan —
+  "here is what I would do" (WOULD_CREATE, would-build, the diff). It is a PAIRED collaborator: a
+  `Cultivating…` impl (touches, applies) and a `Surveying…` impl (projects the plan from the real
+  desired input, touches nothing, claims nothing about live state). Both are real production code;
+  neither branches on the mode. The `RunGate` selects which one is injected — resolved once at the
+  frontier (the `@OsgiService` bridge filters by the mode the ambient gate carries), never in the
+  scenario. So the `dryRun` contract parameter and the per-step `if (!cultivating)` guard both
+  dissolve — the mode-branch is aspirated out of BOTH the scenario and the edge.
+* a PURE PROBE (systemd adapter, cluster readiness) has NO honest plan — its output IS the live state;
+  you cannot know "the cluster is ready" without checking. A surveying probe would be the forbidden
+  fake. So a pure probe does NOT run in survey: its scenario declares itself survey-inert and every
+  step renders PENDING (the render mechanism above), touching nothing.
+
+Manifests is neither — a pure FS synthesis, inert against the live system by nature; it runs in both
+modes (the staging IS wanted at survey), so it needs no pair. The host GROW is the one genuinely
+Pulumi-bound touch: `com.pulumi` resources register dry-run natively under `isDryRun`, so it stays at
+the pulumi-edge, outside this frontier.
 
 *The output/stack axis* (write the stack) is the genuinely Pulumi-only part — it vanishes detached. It
 stays at the host edge as a `PulumiOutputContributor` (SPI) + `PulumiOutputRegistry` (guaranteed
@@ -694,7 +732,7 @@ socle (increment 1, shipped), the ClusterSeed vertical (increment 2, one pipelin
 link:../osgi/seed-spec.adoc#migration[the seed spec § Migration], with the ownership/seam and
 detached-by-design architecture the migration realises.
 
-The three mechanisms not yet productionised (the `PreviewExecutor`, the `SCENARIO_STATE_DAG` gate, the
+The three mechanisms not yet productionised (the `PendingMarkingScenarioExecutor`, the `SCENARIO_STATE_DAG` gate, the
 cross-world `ScenarioModel` graft) have their reference sketch pinned at tag `spike/bdd-pipeline-poc`
 (`git show spike/bdd-pipeline-poc:<path>`): `PollUntilReadyExtension` (adaptive poll — though its live
 form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological gate), and
