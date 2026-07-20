@@ -98,7 +98,7 @@ domain that uses `doctor.records` already imports it); the flat realm carries th
 files + the two `-port` seams that import `doctor.records`).
 
 *New input the extension must acquire.* The flat realm includes the exec-module's OWN compiled
-classes (`ControlplanePolicy`, the host stages) — which live in the current project's
+classes (`BootstrapConfig`, the host stages) — which live in the current project's
 `target/classes`, NOT in any resolved dependency jar. The other gates only ever read resolved
 dependency jars; `REALM_BOUNDARY`'s flat scan additionally reads the current project's build output
 directory.

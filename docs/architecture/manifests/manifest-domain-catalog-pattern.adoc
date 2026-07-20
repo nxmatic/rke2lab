@@ -20,7 +20,7 @@ graph TD
     Catalog[ManifestDomainCatalog]
     Catalog -->|clusterApi| ClusterApiReg[ClusterApiDomainRegistrar]
     Catalog -->|clusterApi| HostManifest[HostSlotManifest]
-    Catalog -->|clusterApi| Policy[ManifestLinkPolicy]
+    Catalog -->|clusterApi| Policy[ManifestSynthesisScenario<br/>scion policy derivation]
 
     style Catalog fill:#4a90e2,color:#fff
     style ClusterApiReg fill:#7ed321
@@ -153,7 +153,7 @@ manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
 - `ManifestsDomainRegistrar` implementations (in the `domain/` package)
 - `ManifestDomainPolicy` queries (`isEnabled()` calls)
 - Policy serialization (`HostSlotManifest`, etc.)
-- Policy loading (`ControlplanePolicy.from()`)
+- Policy derivation in the manifests scion (`ManifestSynthesisScenario.the_policy_is_derived_from_the_facet`)
 
 **Exceptions**:
 - The catalog's own builder methods (`addDefaultDomains()` implementation)
@@ -232,11 +232,11 @@ public String myNewDomain() {
 return new ManifestsDomain(CATALOG.myNewDomain(), ...);
 ----
 
-5. Add to policy loading in `ControlplanePolicy.from()`:
+5. Map the facet key in the scion's policy derivation (`ManifestSynthesisScenario`), keyed by the catalog accessor:
 +
 [source,java]
 ----
-.myNewDomain(environment.bool("policy.link.myNewDomain.enabled", false))
+.myNewDomain(link.enabled(CATALOG.myNewDomain()))
 ----
 
 **That's it!** All existing consumers will automatically have access via the catalog.
@@ -245,7 +245,6 @@ return new ManifestsDomain(CATALOG.myNewDomain(), ...);
 
 * link:manifests-architecture.adoc[Manifests Architecture] - How domains become manifests; Chart-vs-Construct rule (all units MUST extend Construct)
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven domain enablement
-* link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies
 
 == Troubleshooting
 
@@ -263,7 +262,7 @@ Debugging steps:
 A: Check these locations:
 1. `ManifestDomainCatalog` - accessor method exists?
 2. `Builder.addDefaultDomains()` - ID in the list?
-3. `ControlplanePolicy.from()` - policy loading code added?
+3. `ManifestSynthesisScenario` (the scion) - policy derivation from the facet added?
 4. `ManifestDomainPolicy.Builder` - setter method exists?
 
 **Q: Can I use domain ID strings in tests?**

@@ -50,7 +50,7 @@ convergence unitrepo's verdict already named (a `ManifestsUnit` is the first con
 
 | conditional inclusion — policy-driven units
 | ✅ Shipped (blue)
-| Optional units/layers are included per `ControlplanePolicy` flag at synthesis time; ephemeral runs skip
+| Optional units/layers are included per the manifests domain policy (derived by the scion from its facet) at synthesis time; ephemeral runs skip
   synthesis via the `BootstrapIdentity.UNKNOWN` guard.
 
 | explode + apply — per-domain output, RKE2 auto-deploy
@@ -164,7 +164,7 @@ Colored by horizon; all but one are blue.
 
 | optional units are included by policy at synthesis
 | now (blue)
-| `ControlplanePolicy` plus the inclusion hook
+| the manifests domain policy (scion-derived) plus the inclusion hook
 
 | output explodes per-domain and applies with no kubectl
 | now (blue)
@@ -214,7 +214,7 @@ the richest playable surface after the runtime view), one green design target.
 
 . *Optional units are included by policy at synthesis* — `[playable]` blue +
 .. GIVEN a fixed set of units always synthesised
-.. WHEN `ControlplanePolicy` flags gate optional units/layers at synthesis time
+.. WHEN the manifests domain policy (derived by the scion from its facet) gates optional units/layers at synthesis time
 .. THEN optional units are included by policy — AND ephemeral runs skip synthesis via the
    `BootstrapIdentity.UNKNOWN` guard, nothing else rewired.
 

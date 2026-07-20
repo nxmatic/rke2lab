@@ -154,11 +154,11 @@ The shared model currently provides:
 * convenience helpers such as `usesDaemonsetDelivery()` and `materializesEncodedArchives()`
 * a concrete `floxContainerdShim()` factory for the current runtime workflow
 
-At the time of writing, the shared model is implemented but not yet threaded all the way through `ControlplanePolicy` as a first-class aggregated field.
+The shared model is implemented but not yet threaded through the manifests scion's policy facet as a first-class aggregated field.
 
 The purpose of the model would be to connect:
 
-* controlplane policy intent
+* manifests-scion policy intent (the sown debug/link facet)
 * workflow-specific host asset delivery
 * shared daemonset helper usage
 * host asset root lifecycle rules
@@ -168,9 +168,9 @@ The purpose of the model would be to connect:
 classDiagram
     direction LR
 
-    class ControlplanePolicy {
+    class ManifestsPolicyFacet {
       +DebugPolicy debug
-      +ManifestLinkPolicy manifestLink
+      +LinkFacet link
       +HostAssetDeliveryPolicy hostAssetDelivery
     }
 
@@ -179,7 +179,7 @@ classDiagram
       +containerdShimFloxV2WrapperEnabled : boolean
     }
 
-    class ManifestLinkPolicy {
+    class LinkFacet {
       +domains : ManifestDomainPolicy
       +highAvailabilityEnabled() boolean
       +networkingEnabled() boolean
@@ -240,13 +240,13 @@ classDiagram
       +prepareCleanHostAssetRoot(hostAssetRoot)
     }
 
-    ControlplanePolicy --> DebugPolicy : aggregates
-    ControlplanePolicy --> ManifestLinkPolicy : aggregates
-    ControlplanePolicy --> HostAssetDeliveryPolicy : would aggregate
+    ManifestsPolicyFacet --> DebugPolicy : aggregates
+    ManifestsPolicyFacet --> LinkFacet : aggregates
+    ManifestsPolicyFacet --> HostAssetDeliveryPolicy : would aggregate
 
-    ManifestLinkPolicy --> ManifestDomainPolicy : uses
+    LinkFacet --> ManifestDomainPolicy : uses
     HostAssetDeliveryPolicy --> ManifestDomainIds : ownerDomainId
-    ManifestLinkPolicy --> ManifestDomainIds : domain flags
+    LinkFacet --> ManifestDomainIds : domain flags
 
     FloxContainerdShimLayer --> WrapperGoArchiveAssets : packages payload
     FloxContainerdShimLayer --> ShimInstaller : delivers installer asset
@@ -265,7 +265,7 @@ classDiagram
 
 Reading this diagram from left to right:
 
-* `ControlplanePolicy` already owns `DebugPolicy` and `ManifestLinkPolicy`
+* the manifests scion's policy facet already carries `DebugPolicy` and the `LinkFacet`
 * `HostAssetDeliveryPolicy` is the implemented shared model for host-asset delivery rules
 * `FloxContainerdShimLayer` remains the current workflow-specific delivery layer for Flox shim assets
 * `RuntimeDaemonsetScriptPolicyLayer` remains the current shared helper delivery layer

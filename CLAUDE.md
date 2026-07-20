@@ -126,7 +126,7 @@ List<DiscoveredEnvironment> envs = FloxEnvironmentHelper.discover();
 **Common scenarios:**
 
 - **Discovered data** (like flox environments): The discovery is expensive and should happen once. Store in an instance field, expose via getter.
-- **Configuration**: Pass `BootstrapConfig` or `ControlplanePolicy` instances, don't make static accessors.
+- **Configuration**: Pass `BootstrapConfig` instances, don't make static accessors.
 - **Resource handles** (git repo, file trees): Wrap in an instance that manages lifecycle. Don't make static "open/close" helpers.
 
 **When static methods ARE appropriate:**

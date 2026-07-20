@@ -231,8 +231,8 @@ on/off, …). Their journey is the crux of the realm split:
 `mesh: false`) — naming no domain type — and the in-container manifests scion
 translates it into both the `ManifestDomainPolicy` (synth-time: which domains are
 built) and the `seedVariables` (link-time: the `RKE2LAB_POLICY_LINK_*` written into
-the overlay). The translation that used to live host-side (`ManifestLinkPolicy`,
-`ControlplanePolicy`) descends into the scion, which alone may name its own catalog.
+the overlay). The translation that used to live host-side (the former
+`ManifestLinkPolicy`/`ControlplanePolicy`, now dissolved) lives in the scion, which alone may name its own catalog.
 `writeControlplaneOverlay(root, layerContext, seedVariables)` — already published
 OSGi-side as `NodeEnvOverlayService` — is the sink; it awaits a caller in the scion.
 
@@ -285,10 +285,10 @@ the replacement scions existed. The result is seven open deltas:
 | in-container scion, sow-triggered
 
 | 6
-| `rke2lab-env` overlay — `writeControlplaneOverlay` survives OSGi-side but is
-  orphaned (no caller); `ManifestLinkPolicy`/`ControlplanePolicy` survive
-  host-side but are consumed only by tests, their env-maps read by no production
-  path.
+| `rke2lab-env` overlay — `writeControlplaneOverlay` (published OSGi-side as
+  `NodeEnvOverlayService`) is driven by the manifests scion, which derives the
+  `RKE2LAB_POLICY_LINK_*` link-time vars from its facet. The former host-side
+  `ManifestLinkPolicy`/`ControlplanePolicy` are dissolved.
 | in-container scion (sink already present)
 
 | 7

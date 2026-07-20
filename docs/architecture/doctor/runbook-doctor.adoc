@@ -586,8 +586,8 @@ Increment B.
 envelope `Map<String,Object>` already _is_ the captured snapshot, and it already flows to
 the sink → `SystemdAdapterResource`. Building a separate `Observation` at the catch site would
 revive the two-sources-of-truth anti-pattern. So `Observation` becomes the record the probe
-returns, exposing `toOutputMap()` (the established idiom — cf.
-`ControlplanePolicy.toOutputMap()`): one instance, two views — typed for the doctor, a map
+returns, exposing `toOutputMap()` (the established idiom — a typed record that also renders to a
+Pulumi output map): one instance, two views — typed for the doctor, a map
 for the Pulumi outputs and the YAML block in the runbook.
 
 The retype is *atomic, in Increment B* (no compat shim, per CLAUDE.md): the probe contract

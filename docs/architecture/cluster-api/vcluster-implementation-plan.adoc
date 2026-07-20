@@ -1305,7 +1305,6 @@ Throughout implementation, these decisions may require adjustment:
 * link:../bdd/bdd.adoc[BDD-as-engine] - the seeding expressed as jGiven scenarios on the JUnit launcher
 
 === Configuration & Policies
-* link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Single source of truth for domain IDs
 
 === System Architecture

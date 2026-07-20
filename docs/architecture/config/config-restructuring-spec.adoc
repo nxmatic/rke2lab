@@ -28,8 +28,8 @@ catalogs); this document fixes the architecture, not the syntax.
 | Issue | Detail
 
 | Multiple Config readers
-| Three classes (`BootstrapConfig.Builder`, `ControlplanePolicy`, `ConfigResolver`) each read
-  Pulumi `Config` independently, with divergent `EnvironmentValues` wrappers.
+| Several classes each read Pulumi `Config` independently, with divergent `EnvironmentValues`
+  wrappers, instead of one reader feeding an immutable DTO.
 
 | Mixed fallbacks
 | Values fall back to env vars (`RKE2LAB_ACCESS_HOST`, `SYSTEMD_ADAPTER_DBUS_*`,
@@ -56,7 +56,7 @@ catalogs); this document fixes the architecture, not the syntax.
 . *Domain-contributed* - each infra domain owns its config fragment (and, in the future, its
   doctor specialist), mirroring the manifest-domain registry.
 . *Nix-compatible* - works without git context or home directories.
-. *Incremental* - delivered in small, independently green increments.
+. *Incremental* - each capability lands green on its own.
 
 == C4 Level 1 - System context
 
@@ -74,13 +74,13 @@ graph TB
     subgraph "rke2lab control plane"
         CONFIG["Rke2labConfig<br/>single config reader"]
         BOOT["BootstrapConfig<br/>provisioning params"]
-        POLICY["ControlplanePolicy<br/>feature flags"]
+        POLICY["PolicyConfig<br/>raw policy facet (in the DTO)"]
         PIPE["ApplicationPipeline<br/>orchestration"]
     end
 
     YAML -->|"read once at startup"| CONFIG
-    CONFIG -->|"resolve"| BOOT
-    CONFIG -->|"resolve"| POLICY
+    CONFIG -->|"derive"| BOOT
+    CONFIG -->|"carries"| POLICY
     BOOT --> PIPE
     POLICY --> PIPE
     PIPE -->|"provisions"| INCUS
@@ -93,9 +93,9 @@ graph TB
 ----
 
 * *Rke2labConfig* (green = new) is the single point where Pulumi config is read.
-* *BootstrapConfig* and *ControlplanePolicy* are *derived* from the DTO and never touch Pulumi
-  `Config` again.
-* The pipeline consumes the derived configs to provision Incus and read repo assets.
+* *BootstrapConfig* is *derived* from the DTO and never touches Pulumi `Config` again; the raw
+  *PolicyConfig* is carried in the DTO and read by the manifests scion from its sown facet.
+* The pipeline consumes the derived config to provision Incus and read repo assets.
 
 == C4 Level 2 - Configuration components
 
@@ -125,7 +125,7 @@ graph TB
 
     DTO["Rke2labConfig<br/>immutable DTO"]
     BOOT["BootstrapConfig"]
-    POL["ControlplanePolicy"]
+    POL["PolicyConfig<br/>(raw, in the DTO)"]
 
     PULUMI --> LOADER
     LOADER -->|"missing mandatory key"| EXC
@@ -134,8 +134,8 @@ graph TB
     LOADER -->|"scalars"| XID
     REGISTRY --> DTO
     XID --> DTO
-    DTO -->|"resolve / BootstrapConfig.from"| BOOT
-    DTO -->|"resolve / ControlplanePolicy.from"| POL
+    DTO -->|"derive / BootstrapConfig.from"| BOOT
+    DTO -->|"carries (read by manifests scion)"| POL
 
     style LOADER fill:#90EE90,stroke:#2e7d32
     style REGISTRY fill:#90EE90,stroke:#2e7d32
@@ -168,8 +168,9 @@ graph TB
 | The assembled, immutable DTO. Infra fragments via the registry; cross-cutting identity
   loaded directly. No defaults, no logic beyond load-time mandatory validation.
 
-| `BootstrapConfig` / `ControlplanePolicy`
-| Optional-free views *derived* from the DTO. Defaults applied here.
+| `BootstrapConfig`
+| Optional-free view *derived* from the DTO. Defaults applied here. (The policy stays raw as
+  `PolicyConfig` in the DTO; the manifests scion derives its domain policy from the sown facet.)
 |===
 
 == Detailed design
@@ -348,46 +349,45 @@ graph LR
     style IDC fill:#90EE90,stroke:#2e7d32
 ----
 
-* `policy.link.*` flags *are* manifest-domain IDs, so `ControlplanePolicy.isLinkEnabled` MUST
+* `policy.link.*` flags *are* manifest-domain IDs, so the manifests scion's policy derivation MUST
   resolve them through `ManifestDomainCatalog` accessors (the `clusterApi`-vs-`cluster-api`
   discipline) - never a hardcoded switch.
 * Stage-A infra keys are tagged by `InfraDomainCatalog` for symptom routing.
 * Cross-cutting identity (`cluster.name`, `node.name`, `api.endpoint`, `kubeconfig.ref`,
   `readiness.*`) belongs to *neither* catalog - it has no domain and no specialist.
 
-=== Deriving the runtime configs
+=== Deriving the runtime config
 
 The DTO carries `Optional` and no defaults. Turning it into the Optional-free `BootstrapConfig`
-and `ControlplanePolicy` is a multi-stage workflow. This `resolve(...)` step is the single seam where
-`Optional` becomes concrete and where every default lives.
+is where `Optional` becomes concrete and where every default lives. The policy is NOT derived into
+a host type: the raw `PolicyConfig` stays in the DTO, and the manifests scion derives its domain
+policy from the sown facet.
 
 [mermaid]
 ----
 graph LR
     DTO["Rke2labConfig<br/>(Optionals, no defaults)"]
-    subgraph resolve["resolve(...) - fluent pipeline"]
-        S1["during bootstrap<br/>→ BootstrapConfig.from(dto)"]
-        S2["during policy<br/>→ ControlplanePolicy.from(dto)"]
-        S1 -->|"then"| S2
+    subgraph derive["BootstrapConfig.from(dto)"]
+        S1["apply defaults<br/>→ Optional-free"]
     end
     BOOT["BootstrapConfig<br/>(Optional-free)"]
-    POL["ControlplanePolicy<br/>(link keyed by catalog)"]
+    POL["PolicyConfig<br/>(raw, carried by the DTO)"]
 
-    DTO --> resolve
+    DTO --> derive
     S1 --> BOOT
-    S2 --> POL
+    DTO -->|"carries"| POL
 
     style DTO fill:#90EE90,stroke:#2e7d32
     style BOOT fill:#FFE4B5,stroke:#e65100
     style POL fill:#FFE4B5,stroke:#e65100
 ----
 
-* Each `during(label, …)` stage *delegates* to the matching factory; the pipeline supplies the
-  labels (entry/exit logs, `PipelineStageFailure(label, cause)`) and type-state ordering.
+* `BootstrapConfig.from(dto)` *delegates* to the matching factory; a failure surfaces as a
+  labelled `PipelineStageFailure(label, cause)`.
 * Defaults are literal `orElse(...)` at this single site - every default that used to hide in
   `BootstrapConfig.Defaults` (env vars, `user.home`, JGit) becomes a visible literal here.
-* `ControlplanePolicy` builds a `link-by-catalog-id` map by pairing each `ManifestDomainCatalog`
-  accessor with its policy getter, so a caller querying `CATALOG.clusterApi()` can never miss.
+* The manifests scion builds a `link-by-catalog-id` map by pairing each `ManifestDomainCatalog`
+  accessor with its facet getter, so a caller querying `CATALOG.clusterApi()` can never miss.
 
 === YAML configuration structure
 
@@ -537,199 +537,6 @@ NOTE: Until the doctor exists, `MissingRequiredConfiguration` works *standalone*
 and throws a single aggregated message listing all keys (with their domain tags). Routing to
 domain specialists for the *why* is the only part that waits for the doctor.
 
-== Evolution of the configuration system
-
-The diagrams above show the *target* architecture. This section figures how the system actually
-*looks at the end of each increment* - so each increment is a concrete, shippable shape, not an
-abstract label. Read top-to-bottom: each state is green and provisions successfully before the
-next begins.
-
-=== State 0 - today (the starting point)
-
-Three independent readers, each touching Pulumi `Config` directly, each with its own fallbacks.
-
-[mermaid]
-----
-graph LR
-    CFG["com.pulumi.Config"]
-    BB["BootstrapConfig.Builder<br/>+ Defaults (env/JGit/user.home)"]
-    CP["ControlplanePolicy<br/>+ EnvironmentValues"]
-    CR["ConfigResolver"]
-    ENV["env vars / GIT_WORKTREE / user.home"]
-
-    CFG --> BB
-    CFG --> CP
-    CFG --> CR
-    ENV -.->|"hidden fallbacks"| BB
-    ENV -.->|"hidden fallbacks"| CP
-
-    style BB fill:#ffe0e0,stroke:#cc0000
-    style CP fill:#ffe0e0,stroke:#cc0000
-    style CR fill:#ffe0e0,stroke:#cc0000
-    style ENV fill:#ffe0e0,stroke:#cc0000
-----
-
-Red = to be removed. Three reading patterns, scattered fallbacks, Nix-hostile.
-
-=== State A - DTO + loader in place (readers untouched yet)
-
-`ConfigLoader` + `Rke2labConfig` exist and are proven by tests; the YAML is nested. The three old
-readers still exist - nothing consumes the DTO yet. This state is green but transitional.
-
-[mermaid]
-----
-graph LR
-    CFG["com.pulumi.Config"]
-    LOADER["ConfigLoader (new)"]
-    DTO["Rke2labConfig (new)<br/>infra registry + cross-cutting"]
-    OLD["BootstrapConfig.Builder /<br/>ControlplanePolicy / ConfigResolver<br/>(still reading Config)"]
-
-    CFG --> LOADER --> DTO
-    CFG --> OLD
-
-    style LOADER fill:#90EE90,stroke:#2e7d32
-    style DTO fill:#90EE90,stroke:#2e7d32
-    style OLD fill:#ffe0e0,stroke:#cc0000
-----
-
-=== State B - BootstrapConfig derived from the DTO
-
-`BootstrapConfig` now derives from the DTO; its `Builder`/`Defaults`/env-git detection are gone.
-`ControlplanePolicy` + `ConfigResolver` still read `Config` (next increment).
-
-[mermaid]
-----
-graph LR
-    CFG["com.pulumi.Config"]
-    LOADER["ConfigLoader"]
-    DTO["Rke2labConfig"]
-    BOOT["BootstrapConfig<br/>(derived, Optional-free)"]
-    CP["ControlplanePolicy / ConfigResolver<br/>(still reading Config)"]
-
-    CFG --> LOADER --> DTO
-    DTO -->|"resolve"| BOOT
-    CFG --> CP
-
-    style LOADER fill:#90EE90,stroke:#2e7d32
-    style DTO fill:#90EE90,stroke:#2e7d32
-    style BOOT fill:#FFE4B5,stroke:#e65100
-    style CP fill:#ffe0e0,stroke:#cc0000
-----
-
-=== State C - single source of truth reached
-
-`ControlplanePolicy` derives from the DTO; `ConfigResolver` deleted. Now *one* component reads
-`Config`. The target architecture (C4 Level 2) is fully realized - minus the doctor.
-
-[mermaid]
-----
-graph LR
-    CFG["com.pulumi.Config"]
-    LOADER["ConfigLoader<br/>(only Config reader)"]
-    DTO["Rke2labConfig"]
-    BOOT["BootstrapConfig"]
-    POL["ControlplanePolicy<br/>(link keyed by catalog)"]
-
-    CFG --> LOADER --> DTO
-    DTO -->|"resolve"| BOOT
-    DTO -->|"resolve"| POL
-
-    style LOADER fill:#90EE90,stroke:#2e7d32
-    style DTO fill:#90EE90,stroke:#2e7d32
-    style BOOT fill:#FFE4B5,stroke:#e65100
-    style POL fill:#FFE4B5,stroke:#e65100
-----
-
-Mandatory-key absence still throws the standalone aggregated `MissingRequiredConfiguration` - no
-doctor yet.
-
-=== State D - doctor remediation (first use case)
-
-The loader's accumulated, domain-tagged symptoms now consult the (newly built) Generalist;
-infra domains contribute specialists. A missing key yields a prescription, not a stack trace.
-
-[mermaid]
-----
-graph LR
-    CFG["com.pulumi.Config"]
-    LOADER["ConfigLoader<br/>accumulates domain-tagged symptoms"]
-    DTO["Rke2labConfig"]
-    BOOT["BootstrapConfig"]
-    POL["ControlplanePolicy"]
-    GEN["Generalist (new core)"]
-    SPEC["infra-contributed specialists"]
-    PLAN["RemediationPlan → operator"]
-
-    CFG --> LOADER --> DTO
-    DTO -->|"resolve"| BOOT
-    DTO -->|"resolve"| POL
-    LOADER -.->|"missing keys"| GEN
-    GEN --> SPEC --> PLAN
-
-    style LOADER fill:#90EE90,stroke:#2e7d32
-    style DTO fill:#90EE90,stroke:#2e7d32
-    style GEN fill:#fff4e6,stroke:#ff9900
-    style SPEC fill:#fff4e6,stroke:#ff9900
-    style PLAN fill:#ccffcc,stroke:#00cc66
-----
-
-[cols="1,2,2",options="header"]
-|===
-| State | Readers of `com.pulumi.Config` | Doctor
-
-| 0 (today) | 3 (Builder, Policy, Resolver) | none
-| A | 3 old + ConfigLoader (DTO unused) | none
-| B | 2 old + ConfigLoader | none
-| C | *1* (ConfigLoader only) | none
-| D | 1 (ConfigLoader only) | *born here* (first use case)
-|===
-
-== Implementation increments
-
-Each increment ships green. A-C are doctor-free; D introduces the doctor.
-
-[cols="1,4,2",options="header"]
-|===
-| Increment | Scope | Green when
-
-| *A* +
-DTO + loader
-| Create `Rke2labConfig` (mandatory plain / optional `Optional`), `ConfigLoader`
-  (`require*`/`optional*` + accumulation), `MissingRequiredConfiguration`, `InfraDomainCatalog`,
-  the registrar/registry/sealed-fragment types + 6 registrars. Restructure `Pulumi.dev.yaml` to
-  nested. Clean dead/unprefixed keys.
-| DTO populated from nested YAML; missing mandatory key reported (accumulated) by name; omitted
-  optional → empty.
-
-| *B* +
-derive BootstrapConfig
-| `BootstrapConfig.from(dto)` factory. Delete `Builder`, `Defaults`, `applyConfig`, all env/git
-  detection. Document the github-clone fallback contract on `WorktreeConfig`.
-| `pulumi up` provisions with `worktree.dir` from config; zero `com.pulumi.Config` /
-  `System.getenv` / JGit references remain in bootstrap config.
-
-| *C* +
-derive ControlplanePolicy
-| `ControlplanePolicy.from(dto)`; `isLinkEnabled` keyed off `ManifestDomainCatalog`. Delete
-  `ConfigResolver` and the `EnvironmentValues` wrapper.
-| All policy comes from the DTO; `ConfigResolver` deleted; build green.
-
-| *D* +
-doctor remediation +
-(*first doctor use case*)
-| Build the minimal doctor core consumed first here (Generalist, specialist interface,
-  Prescription, RemediationPlan, domain routing). Infra registrars contribute their specialists;
-  the loader's accumulated, domain-tagged symptoms route to them.
-| Two missing keys → ONE consultation; a missing `incus.configDir` yields a prescription whose
-  why/example come from the Incus specialist; a domain without a specialist degrades to the bare
-  message.
-|===
-
-NOTE: Increment D builds the minimal doctor core *as its first use case* - it is the doctor's
-birthplace, not a passive consumer. runbook-doctor then reuses the same core and adds the runbook
-DAG + checkpoint machinery on top, becoming the *second* use case. *(Open for confirmation - see
-Review questions.)*
-
 == Testing strategy
 
 [cols="1,3",options="header"]
@@ -777,7 +584,7 @@ Review questions.)*
   (`policy.readiness.override` / `simulate`) - a shape Pulumi handles.
 
 | Breaking existing deployments
-| Each increment is independently testable; validate the new nested YAML before removing old code.
+| The new nested YAML is validated before it feeds the DTO; each capability is independently testable.
 
 | Nix deployment still won't work
 | Explicit config is a *prerequisite*, not the whole solution. Nix deploys must still ensure
@@ -811,7 +618,7 @@ registrar design in this spec is PRESERVED as that future direction.
 === GitHub clone fallback
 
 If `worktree.dir` is inaccessible (e.g. Nix) and `worktree.source = github`, clone the repo to a
-temp dir. Contract documented on `WorktreeConfig` in Increment B; implementation deferred.
+temp dir. Contract documented on `WorktreeConfig`; implementation deferred.
 
 === Secrets integration
 
@@ -832,13 +639,11 @@ variation axes.
 
 == Review questions (for the gate)
 
-. *Doctor core ownership* - confirm Increment D builds the minimal doctor core as the *first* use
-  case (runbook-doctor reuses it as the second), versus a shared neutral core either branch may
-  create first.
+. *Doctor core ownership* - confirm the config entry gate builds the minimal doctor core as the
+  *first* use case (runbook-doctor reuses it as the second), versus a shared neutral core either
+  branch may create first.
 . *`policy.readiness.simulate` scope* - keep this runbook-doctor key in this spec's DTO (loaded
   here, consumed there), or move it entirely to runbook-doctor?
-. *Increment D timing* - A-C ship doctor-free now; D lands when the doctor core is built. Confirm
-  that sequencing.
 
 == Related documentation
 
@@ -857,6 +662,7 @@ Under `seed-master/.../controlplane/config/`: `Rke2labConfig` (the immutable DTO
 — the polymorphic enum whose six values (`INCUS`, `IMAGE`, `NETWORK`, `WORKTREE`, `SYSTEMD`, `HOST`)
 each self-load their fragment via `contribute(ConfigLoader)`; the DTO is assembled by iterating
 `InfraDomain.values()`. (The open `InfraDomainRegistrar`/`InfraConfigRegistry` form this spec's
-diagrams draw is the future p2p evolution — see § <<open-registrar-p2p>>.) `BootstrapConfig` and
-`ControlplanePolicy` expose `from(Rke2labConfig)` (their old `Builder`/`Config`/`EnvironmentValues`
-readers gone); `ConfigResolver` is gone; `Pulumi.dev.yaml` is nested.
+diagrams draw is the future p2p evolution — see § <<open-registrar-p2p>>.) `BootstrapConfig`
+exposes `from(Rke2labConfig)` (its old `Builder`/`Config`/`EnvironmentValues`
+readers gone); the policy is carried raw as `PolicyConfig` in the DTO (the manifests scion derives
+its domain policy from the sown facet); `ConfigResolver` is gone; `Pulumi.dev.yaml` is nested.

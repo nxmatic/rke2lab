@@ -101,8 +101,8 @@ policy reachable through it.**
 | Path | Input → translation | Used by
 | system properties | `-Drke2lab.manifests.policy.enabledDomains=…` →
   `ManifestSynthesisRequest.fromSystemProperties()` | `manifests-cli`
-| host Pulumi config | `Rke2labConfig.policy().link()` → `ManifestLinkPolicy` →
-  `ManifestDomainPolicy` (+ `toEnvMap` for `RKE2LAB_POLICY_LINK_*`) | seed
+| host Pulumi config | `Rke2labConfig.policy().link()` → the `link` facet → the scion
+  derives `ManifestDomainPolicy` (+ `RKE2LAB_POLICY_LINK_*`) | seed
 |===
 * The host policies that WOULD target other scions (`ReadinessPolicy`,
   `PreviewPolicy` → cluster/systemd) are wired to NOTHING — neither the old nor the
@@ -173,18 +173,20 @@ flowchart LR
   `link`/`debug` concerns. A scion sees ONLY its facet, never another soil's config.
 
 **Consequences.** `fromSystemProperties()` dissolves — the CLI reads the same file
-as the seed, through the same reader. `ControlplanePolicy` does NOT go away — it is
-REACTIVATED as the host's sow pilot (§ the policy is live logic below): it keeps
-reading the yaml and now drives `sow(RunbookCoordinate("manifests"), facet)`, but
-carries only the RAW facets (`LinkPolicyConfig` + `DebugPolicyConfig` — neutral
-`Optional<Boolean>`, no manifests type). What dissolves is `ManifestLinkPolicy`,
-whose SOLE job was translating the raw booleans into `ManifestDomainPolicy` +
-`toEnvMap()`; that translation moves into the scion. So the host stops NAMING
-`manifests.contract` (the gate clears) while `ControlplanePolicy` stays in the flow.
-`ReadinessPolicy` / `PreviewPolicy` stay on `ControlplanePolicy` too — they are the
-`readiness` / `preview` concerns, sown into the cluster/systemd facets the day those
-scions grow a wire-record — no new channel. Every policy travels one way, from one
-file, for every caller and every domain.
+as the seed, through the same reader. Both host policy classes are GONE (deleted at
+`1f7c1ee54`): `ManifestLinkPolicy` (whose sole job was translating the raw booleans
+into `ManifestDomainPolicy` + `toEnvMap()`) AND `ControlplanePolicy` (the aggregate
+that held it) were orphaned live logic with no production caller, and the translation
+now lives OSGi-side in the scion. The scion derives BOTH `ManifestDomainPolicy`
+(synth-time filter) and the `RKE2LAB_POLICY_LINK_*` seed vars (link-time overlay)
+from its own `link`/`debug` facet — it owns `ManifestDomainCatalog` + the
+`RKE2LAB_POLICY_LINK_*` naming, so no host type names `manifests.contract` (the gate
+is clear, and LOCKED at ERROR). The scion's facet is defaulted today
+(`ManifestsRunbookInput.defaults()`); the host does not pilot it (a decision, not a
+gap — the policy is a manifests concern, not a host one). `readiness` / `preview`
+were always separate concerns (they lived on the now-deleted host policy); they stay
+raw in the config (`PolicyConfig`) and belong to a cluster/doctor scion the day it
+grows a wire-record, not to the host.
 
 *Design constraint this puts on piece 2 (the wire-record).* For the pluck to stay
 generic, the runbook-input wire-record's top-level component names MUST equal the
@@ -196,8 +198,7 @@ nesting exactly, rather than flattening into one bag.
 === The policy has TWO ends — the scion must cover both
 
 The activation choice does not stop at "which domains synthesize". It drives a path
-with two distinct ends, and today they live on opposite sides of the realm boundary
-— which is the whole bug. The scion must own BOTH:
+with two distinct ends, and the scion owns BOTH:
 
 [cols="1,2,2",options="header"]
 |===
@@ -212,75 +213,58 @@ with two distinct ends, and today they live on opposite sides of the realm bound
   env vars written into the `99-…env-config` overlay
   (`NodeEnvOverlayService.writeControlplaneOverlay(seedVariables)`), read by
   `rke2lab-manifests-install.sh` and the per-layer `*-ready.sh` gates on the master
-| **host-side** (`ManifestLinkPolicy.toEnvMap`) — the leak
+| **in-container** — the scion derives the vars from its facet and writes the overlay
 |===
 
-Both ends derive from the SAME operator choice. Today the host computes the
-link-time `seedVariables` and hands them to `writeControlplaneOverlay`; the constat's
-delta #6 is exactly that this host→overlay call is orphaned. The scion closes it:
+Both ends derive from the SAME operator choice, and the scion covers both:
 
 * from its facet (the `manifests` sub-map of the one policy, § the single path), the
   scion derives BOTH the `ManifestDomainPolicy` (synth-time filter) AND the
   `RKE2LAB_POLICY_LINK_*` seed variables (link-time overlay) — it owns the
   `RKE2LAB_POLICY_LINK_<X>_ENABLED` naming, so this is legitimate in-container;
 * the scenario's synthesis step drives `writeControlplaneOverlay` with those
-  seed variables (the call the host used to make), so the `99-…` overlay lands with
+  seed variables, so the `99-…` overlay lands with
   the right `RKE2LAB_POLICY_LINK_*` — the master's install/ready scripts see exactly
-  what they saw before (the founding rule: invisible at the master frontier).
+  what they need (the founding rule: invisible at the master frontier).
 
 This is why the scion is the natural home: it is the single point that already knows
 the catalog, and it can satisfy both ends from one payload without any host type
 naming a domain vocabulary.
 
-==== The policy is LIVE logic, orphaned — reactivating it is the point
+==== The scion owns both ends — the policy IS the synthesis input
 
-This is not a cleanup that happens to satisfy a gate; it is a REGRESSION to close.
-On `main`, both ends were computed by ONE consumer — `HostSlotManifest.Builder.policy(ControlplanePolicy)`
-(the `controlplane/incus/` subtree) — which projected the policy into the slot's
-`MANIFEST.yaml`:
+The activation choice drives synthesis structurally, not by promise:
+`ManifestSynthesisRequest` carries `manifestDomainPolicy` + `floxDebugPolicy` as
+FIELDS — synthesis does not run without them. The scion derives both from its facet
+(the `link`/`debug` concerns) and calls `synthesize(request)`, so the policy IS the
+synthesis input, not something computed beside it. It owns `ManifestDomainCatalog` +
+the `RKE2LAB_POLICY_LINK_*` naming, so no host type names `manifests.contract`.
 
-* synth-time: `manifestDomain{cluster, storage, gitops, runtime, networking, mesh,
-  highAvailability, cicd, clusterApi, platform}` — each `policy.manifestLink().domains().isEnabled(catalog.X())`;
-* debug: `{mesh, networking, nriPluginsFlox}` — each `policy.debug().X()`;
-* link-time: `ManifestLinkPolicy.toEnvMap()` → the `RKE2LAB_POLICY_LINK_*` overlay.
+Both ends are covered in one place:
 
-The incus-bootstrap demolition (commit `342b7c327`) removed `HostSlotManifest` — the
-policy's SOLE production consumer — but left `ControlplanePolicy` / `ManifestLinkPolicy`
-behind. So today they are **orphaned live logic**: still compiled, referenced only by
-tests and javadoc, computing nothing. Nobody derives `manifestDomain{}` or the
-`RKE2LAB_POLICY_LINK_*` anymore, so a freshly provisioned master no longer receives
-what the previous version wrote — a direct breach of the founding rule (invisible at
-the master frontier).
+* *synth-time* — `ManifestDomainPolicy` filters which domains synthesize;
+* *link-time* — the scion writes the `RKE2LAB_POLICY_LINK_*` overlay
+  (`writeControlplaneOverlay` → the `99-…env-config` ConfigMap). On the master those
+  vars are sourced into the systemd env, and `rke2lab-manifests-install.sh <layer>`
+  reads `RKE2LAB_POLICY_LINK_<LAYER>_ENABLED`: an enabled layer is STOWED (its
+  non-local-config manifests `ln -sfn`'d into rke2's server manifest dir, where rke2
+  auto-applies), a disabled one has its target removed. `rke2lab-layer-ready.sh` gates
+  readiness on the same flag. The operator's choice made live — invisible at the
+  master frontier (the founding rule).
 
-The deliverable is to put this policy back in the flow, NOT to delete it. The split:
-
-* `ControlplanePolicy` is **reactivated** as the host's sow pilot — it reads the yaml
-  and drives `sow(RunbookCoordinate("manifests"), facet)`, carrying the raw facets it
-  already reads (`LinkPolicyConfig` + `DebugPolicyConfig`). It stops naming
-  `manifests.contract` (so the realm-boundary gate clears) but stays in the flow.
-* the TRANSLATION — raw booleans → `ManifestDomainPolicy` + `FloxDebugPolicy` +
-  `RKE2LAB_POLICY_LINK_*`, today `HostSlotManifest.Builder.policy()` + `ManifestLinkPolicy`
-  — moves OSGi-side into the scion, where it belongs (it names the manifests catalog).
-  This is a LITERAL transposition of the projection, driven by the sown facet.
-
-The guarantee that the policy is genuinely played by synthesis is structural, not a
-promise: `ManifestSynthesisRequest` carries `manifestDomainPolicy` + `floxDebugPolicy`
-as FIELDS — synthesis does not run without them. The scion sets them from the facet
-and calls `synthesize(request)`, so `ControlplanePolicy`'s logic IS the synthesis
-input, not something computed beside it. Only `ManifestLinkPolicy` (the host
-translator) dissolves; `ControlplanePolicy` and the raw `PolicyConfig` reader live on.
+The former host-side projection of this (the deleted `ManifestLinkPolicy`/`ControlplanePolicy`)
+is gone; its logic is this scion's, driven by the sown facet.
 
 === Scope — which of the host policies this scion absorbs
 
-The host's `ControlplanePolicy` aggregates six sub-policies; they do not all route
-to manifests. This scion absorbs the two that are manifests' business; the rest go
-elsewhere or stay host:
+The operator's policy has several concerns; not all route to manifests. This scion
+owns the two that are manifests' business; the rest live elsewhere:
 
 [cols="1,2,1",options="header"]
 |===
-| Host sub-policy | Concern | Destination
+| Policy concern | What it decides | Destination
 
-| `ManifestLinkPolicy` | which domains synthesize + which layers link (the two-ended
+| *link* (the link concern) | which domains synthesize + which layers link (the two-ended
   path above) | *this scion* (activation payload)
 | `DebugPolicy` → `FloxDebugPolicy` | per-layer debug (flox NRI / mesh / networking
   image-command-env swap) — already a `manifests.contract` input of
@@ -295,7 +279,7 @@ elsewhere or stay host:
 |===
 
 So the manifests activation payload has TWO facets — *activation* (which domains,
-from `ManifestLinkPolicy`) and *debug* (per-layer, from `DebugPolicy`→`FloxDebugPolicy`).
+from the *link* facet) and *debug* (per-layer, from `DebugPolicy`→`FloxDebugPolicy`).
 Both are already `manifests.contract` concepts; the scion assembles them from the
 sown payload. `ReadinessPolicy`/`PreviewPolicy` are a separate transposition (a
 cluster/doctor scion), out of scope here — noted so their host records are not

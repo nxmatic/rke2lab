@@ -253,7 +253,7 @@ aval they meet on `Role`:
 ----
 @SeedContract("runbook")
 public record ManifestsRunbookInput(
-    @Amendment(Amendment.FACET) LinkFacet link,     // host fills FACET from ControlplanePolicy
+    @Amendment(Amendment.FACET) LinkFacet link,     // host fills FACET from Rke2labConfig.policy()
     @Amendment(Amendment.FACET) DebugFacet debug,
     @Amendment(Amendment.SOIL)  Path materializationRoot) {}  // host fills SOIL from BootstrapPaths
 

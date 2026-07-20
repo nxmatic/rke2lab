@@ -175,9 +175,9 @@ phases, calling the edge for the two kubectl ones and projecting the results int
 
 [IMPORTANT]
 ====
-*Contract shape decided (2026-06-26): the edge receives already-projected `ControllerRef`s — it never
-sees `ControlplanePolicy`.* The current `verifyRequiredControllers(kubeconfig, ControlplanePolicy,
-timeout)` mixes two concerns: deriving the required controllers from the host policy
+*Contract shape: the edge receives already-projected `ControllerRef`s — it never
+sees the host policy.* A `verifyRequiredControllers(kubeconfig, policy,
+timeout)` shape would mix two concerns: deriving the required controllers from the policy facet
 (`requiredControllers(policy)` reads HA/networking/storage/… enabled flags) AND shelling
 `kubectl wait`/`rollout`. Only the second is the contact. So the *host* keeps the policy→refs
 projection and passes the resulting `List<ControllerRef>` to the edge; the edge does pure kubectl over

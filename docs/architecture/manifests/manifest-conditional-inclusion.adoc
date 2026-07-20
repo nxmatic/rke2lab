@@ -47,7 +47,7 @@ graph TB
 
     subgraph "Seed Bootstrap - Pulumi"
         BC[BootstrapConfig]
-        CP[ControlplanePolicy]
+        CP[ManifestSynthesisScenario<br/>derives policy from facet]
         BI[BootstrapIdentity<br/>clusterName + incusRemoteName]
         MS[ManifestSynthesisRequest]
     end
@@ -112,7 +112,7 @@ graph TB
 1. **Operator** - Configures Pulumi stack (`cluster.name`, `incus.defaultRemote`, policy flags) and maintains infrastructure credentials (`~/.config/incus/config.yml`)
 2. **BootstrapConfig** - Loads operator's configuration into structured data
 3. **BootstrapIdentity** - Normalized identity context (cluster name, Incus remote name, node identity) derived from config
-4. **ControlplanePolicy** - Feature toggles and policy decisions derived from config
+4. **ManifestSynthesisScenario** - The manifests scion; derives the domain policy (feature toggles, policy decisions) from its sown facet
 5. **Manifest Units** - Access identity context via `bootstrapIdentity()` and check policy flags to synthesize resources
 6. **Operator Environment Files** - Units read from filesystem (`.secrets`, `~/.config/incus`) using identity as keys
 
@@ -123,7 +123,7 @@ graph TB
 graph TB
     subgraph "Policy Layer"
         MDP[ManifestDomainPolicy<br/>isEnabled: String → Boolean]
-        CP[ControlplanePolicy<br/>porch: Boolean<br/>mesh: Boolean<br/>clusterApi: Boolean]
+        CP[ManifestSynthesisScenario<br/>derives policy from<br/>the sown link facet]
     end
 
     subgraph "Registry Builder"
@@ -177,7 +177,7 @@ graph TB
 [mermaid]
 ----
 sequenceDiagram
-    participant CP as ControlplanePolicy
+    participant CP as ManifestSynthesisScenario
     participant DMS as DefaultManifestSynthesisService
     participant LDRB as ManifestsDomainRegistryBuilder
     participant GDR as GitopsDomainRegistrar
@@ -291,17 +291,16 @@ public String porch() {
 }
 ----
 
-**2. ControlplanePolicy** (Pulumi config to policy):
+**2. ManifestSynthesisScenario** (the scion derives the domain policy from its sown link facet):
 
 [source,java]
 ----
-ManifestLinkPolicy manifestLinkPolicy =
-    new ManifestLinkPolicy(
-        ManifestDomainPolicy.builder()
-            .gitops(environment.bool("policy.link.gitops.enabled", true))
-            .porch(environment.bool("policy.link.porch.enabled", false))  // <-- optional flag
-            .build()
-    );
+// ManifestSynthesisScenario.the_policy_is_derived_from_the_facet
+ManifestDomainPolicy domains =
+    ManifestDomainPolicy.builder()
+        .gitops(link.enabled(CATALOG.gitops()))
+        .porch(link.enabled(CATALOG.porch()))   // <-- optional flag, read from the facet by catalog id
+        .build();
 ----
 
 **3. Pulumi Stack Configuration**:
@@ -367,7 +366,7 @@ To add a new optional feature to an existing domain:
 1. **Add policy flag** to `ManifestDomainCatalog` and `ManifestDomainPolicy`
 2. **Override `domain(policy)`** in the domain registrar
 3. **Check policy flag** before adding the unit to the list
-4. **Add Pulumi config mapping** in `ControlplanePolicy`
+4. **Map the facet key** in the scion's policy derivation (`ManifestSynthesisScenario`)
 
 Example: Making mesh headplane optional:
 
@@ -512,7 +511,6 @@ This documentation is directly linked to the implementation. Navigate to these f
 **Orchestration**:
 
 * link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
-* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Pulumi config → policy mapping
 
 == Related Documentation
 
@@ -633,7 +631,6 @@ final String remoteName = bootstrapIdentity().incusRemoteName();
 
 == Related Documentation
 
-* link:policy-configuration-guide.adoc[Policy Configuration Guide] - Comprehensive guide to all policy types, configuration format, and decision trees
 * link:manifests-architecture.adoc[Manifests Architecture] - Overall CDK8s generation system and the domain-registry status this mechanism depends on
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context pattern for cluster identity access
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - How synthesized manifests reach live Kubernetes resources

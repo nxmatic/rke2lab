@@ -1236,7 +1236,6 @@ spec:
 
 === Cross-Cutting Concerns
 
-* link:policy-configuration-guide.adoc[Policy Configuration Guide] - Add `policy.link.vcluster.enabled` toggle for VCluster operator installation
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Use catalog accessor for vCluster domain ID (avoid hardcoded strings)
 * link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - VCluster CRs applied via manifest layer, not systemd units
 
