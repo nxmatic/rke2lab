@@ -322,6 +322,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                     manifestUnitId,
                     resolver,
                     DefaultManifestSynthesisService.this.contributorRegistry,
+                    state
+                        .request
+                        .manifestDomainPolicy()
+                        .orElseGet(() -> new ManifestDomainPolicy(java.util.Map.of())),
                     DefaultManifestSynthesisService.this.yaml));
           }
 

@@ -107,8 +107,10 @@ public record ManifestDomainCatalog(List<String> all, List<String> stageALinkabl
     }
 
     public Builder addDefaultStageALinkableDomains() {
+      // The publishable set = the operator's toggleable facet domains. Base infra (platform,
+      // cluster, runtime) is always-on, never a publish knob.
       return addStageALinkableDomains(
-          List.of(HIGH_AVAILABILITY, NETWORKING, STORAGE, MESH, CLUSTER_API, PLATFORM));
+          List.of(GITOPS, NETWORKING, CLUSTER_API, STORAGE, MESH, HIGH_AVAILABILITY, CICD));
     }
 
     public Builder addDomain(String domainId) {

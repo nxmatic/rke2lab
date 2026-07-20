@@ -12,6 +12,7 @@ import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -24,26 +25,8 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.RUNTIME + "/env-config";
 
-  private static final List<String> ENV_SECTIONS =
-      List.of(
-          "cilium",
-          "cluster",
-          "config",
-          "containerd",
-          "cri",
-          "daemonset-script-policy",
-          "etcdctl",
-          "helm",
-          "kpt",
-          "kubectl",
-          "network-cluster",
-          "network-lan-wan",
-          "network-node",
-          "network-vip",
-          "node",
-          "paths",
-          "rke2",
-          "user");
+  /** Sections that have no contributor — resolved by {@link #resolveBuiltInSection}. */
+  private static final List<String> BUILTIN_SECTIONS = List.of("kpt");
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "env-config");
@@ -54,10 +37,18 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext();
+    final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext(context.manifestDomainPolicy());
     final NodeEnvContributorRegistry envContributorRegistry = context.contributorRegistry();
 
-    for (String section : ENV_SECTIONS) {
+    // Sections are contributor-driven — every contributor's contributedSections() plus the built-in
+    // sections that have no contributor — so nothing drifts out of sync with a hardcoded list.
+    final LinkedHashSet<String> sections = new LinkedHashSet<>();
+    for (NodeEnvContributor contributor : envContributorRegistry.orderedContributors()) {
+      sections.addAll(contributor.contributedSections());
+    }
+    sections.addAll(BUILTIN_SECTIONS);
+
+    for (String section : sections) {
       createSectionConfigMap(scope, section, nodeEnvContext, envContributorRegistry);
     }
   }

@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.manifests.contract.node;
 
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import java.nio.file.Path;
@@ -77,6 +78,11 @@ public interface NodeEnvContext {
   String vipGatewayInetAddr(); // "10.80.7.1"
 
   String vipHostInetAddr(); // "10.80.7.10"
+
+  // Publish policy — the run's manifest-domain decision (which layers are enabled). Carried here so
+  // a node-env contributor can derive the RKE2LAB_MANIFESTS_PUBLISH_* vars from the same run-scoped
+  // policy that drives the synth-time domain filter.
+  ManifestDomainPolicy manifestDomainPolicy();
 
   // Incus Infrastructure Identity
   default String incusRemoteName() {

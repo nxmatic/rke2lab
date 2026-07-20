@@ -1,8 +1,10 @@
 package io.nxmatic.rke2lab.manifests.node;
 
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * Default synthesis-time {@link NodeEnvContext} backed by canonical netplan blueprint derivation.
@@ -21,6 +23,23 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
           .node(NODE_NAME)
           .deriveRecipeModel()
           .build();
+
+  private final ManifestDomainPolicy manifestDomainPolicy;
+
+  /** The run's policy carrier — a synth-time unit passes the policy from its unit context. */
+  public DefaultNodeEnvContext(ManifestDomainPolicy manifestDomainPolicy) {
+    this.manifestDomainPolicy = manifestDomainPolicy;
+  }
+
+  /** No policy in scope (units that emit no publish vars) — an empty, complete policy. */
+  public DefaultNodeEnvContext() {
+    this(new ManifestDomainPolicy(Map.of()));
+  }
+
+  @Override
+  public ManifestDomainPolicy manifestDomainPolicy() {
+    return manifestDomainPolicy;
+  }
 
   @Override
   public Path rootPath() {

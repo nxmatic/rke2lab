@@ -42,7 +42,7 @@ manifests_publish_var_name() {
 
 layer_is_publishable() {
 	case "${1:-}" in
-	high-availability | networking | replication | storage | mesh)
+	gitops | networking | cluster-api | storage | mesh | high-availability | cicd)
 		return 0
 		;;
 	*)

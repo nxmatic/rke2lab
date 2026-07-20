@@ -4,21 +4,8 @@ set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
 set -x
 
-bool_is_true() {
-	case "${1:-}" in
-	1 | true | TRUE | yes | YES | on | ON)
-		return 0
-		;;
-	*)
-		return 1
-		;;
-	esac
-}
-
-if [[ -n "${RKE2LAB_MANIFESTS_PUBLISH_REPLICATION_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_MANIFESTS_PUBLISH_REPLICATION_ENABLED}"; then
-	echo "[rke2-replicator-ready] publishing disabled for replication layer; skipping replicator readiness checks"
-	exit 0
-fi
+# The replicator is a unit of the always-on `platform` domain, not a publishable layer — no publish
+# gate. Readiness always runs.
 
 : "Waiting for kubernetes-replicator components..."
 
