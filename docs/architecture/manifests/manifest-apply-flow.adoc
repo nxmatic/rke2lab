@@ -242,7 +242,7 @@ Layers have explicit ordering via `After=/Requires=` to ensure dependencies are 
    - `RKE2_SERVER_MANIFESTS_DIR=/var/lib/rancher/rke2/server/manifests`
 
 2. Checks policy (for linkable layers):
-   - Reads `RKE2LAB_POLICY_LINK_NETWORKING_ENABLED` (etc.)
+   - Reads `RKE2LAB_MANIFESTS_PUBLISH_NETWORKING_ENABLED` (etc.)
    - If `false`, removes existing symlinks and exits
 
 3. Calls `link_manifest_tree()`:
@@ -278,7 +278,7 @@ metadata:
 Layers can be disabled via policy:
 
 ```bash
-RKE2LAB_POLICY_LINK_MESH_ENABLED=false
+RKE2LAB_MANIFESTS_PUBLISH_MESH_ENABLED=false
 ```
 
 If disabled, the script removes all symlinks for that layer, effectively uninstalling it from the cluster.
@@ -666,10 +666,10 @@ If policy disables a layer, the install script removes all symlinks:
 
 ```bash
 # Check policy
-incus exec master -- bash -c 'source /srv/host/rke2lab-environment.d/*.sh && env | grep POLICY_LINK'
+incus exec master -- bash -c 'source /srv/host/rke2lab-environment.d/*.sh && env | grep MANIFESTS_PUBLISH'
 
 # Example output
-RKE2LAB_POLICY_LINK_MESH_ENABLED=false
+RKE2LAB_MANIFESTS_PUBLISH_MESH_ENABLED=false
 ```
 
 If a layer is disabled, manifests remain in `/srv/host/rke2-manifests.d/` but symlinks are removed from `/var/lib/rancher/rke2/server/manifests/`, so RKE2 doesn't see them.

@@ -41,7 +41,7 @@ public record IncusRunbookInput(
    * mounts over an NFS automount. The scion feeds them to {@code
    * BootstrapPaths.fromLocalWorktree(root, cluster, node)} and (for the mount sources) {@code
    * asAutomountView(nfsAutomount, netPrefix)}. A sub-record filled blind by role, mirroring the
-   * {@code LinkFacet}/{@code DebugFacet} pattern — the host names no path vocabulary.
+   * {@code PublishFacet}/{@code DebugFacet} pattern — the host names no path vocabulary.
    */
   public record Worktree(
       String worktreeRoot, String clusterName, String nodeName, boolean nfsAutomount) {}

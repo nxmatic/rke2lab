@@ -68,7 +68,7 @@ top-down demolition removed ahead of its replacement, so the work-list is explic
 [mermaid]
 ----
 flowchart TB
-  op["operator's Pulumi config<br/>(policy.link.*, incus.*)"]
+  op["operator's Pulumi config<br/>(manifests.publish.*, incus.*)"]
 
   subgraph host["HOST realm — seed-master, inside Pulumi.run(...)"]
     decl["resource declarations<br/>Project·Network·Profile·Image·Instance"]
@@ -146,7 +146,7 @@ depend on.
 | `manifestsRoot/runtime/env-config/` — the per-section ConfigMaps + the
   aggregated `99-configmap-env-section-controlplane-layer-contributions.yml`
 | flox `profile-common.sh` sources the YAMLs and turns their `data:` keys into
-  shell environment variables (incl. `RKE2LAB_POLICY_LINK_*`, read by
+  shell environment variables (incl. `RKE2LAB_MANIFESTS_PUBLISH_*`, read by
   `rke2lab-manifests-install.sh` to decide which layers are symlinked live, and by
   the per-layer `*-ready.sh` gates)
 | DYNAMIC
@@ -216,21 +216,21 @@ per-target checksums cross from the scion to the host graph.
 
 == The activation payload — how "which layers" reaches the master
 
-The `RKE2LAB_POLICY_LINK_*` variables in the env-config overlay are the master's
+The `RKE2LAB_MANIFESTS_PUBLISH_*` variables in the env-config overlay are the master's
 copy of the operator's per-domain activation choice (mesh on/off, cluster-api
 on/off, …). Their journey is the crux of the realm split:
 
-. The operator's choice lives in the Pulumi config (`policy.link.*`).
+. The operator's choice lives in the Pulumi config (`manifests.publish.*`).
 . It must reach the `rke2lab-env` materialization as *seed variables* the
   synthesis folds into the overlay ConfigMap.
 . The synthesis (the manifests domain) knows the vocabulary — the
-  `ManifestDomainCatalog`, the `RKE2LAB_POLICY_LINK_<X>_ENABLED` naming, the
+  `ManifestDomainCatalog`, the `RKE2LAB_MANIFESTS_PUBLISH_<X>_ENABLED` naming, the
   `ManifestDomainPolicy` that filters which domains are synthesized at all.
 
 **Target shape:** the host `sow`s a host-neutral activation payload (raw booleans,
 `mesh: false`) — naming no domain type — and the in-container manifests scion
 translates it into both the `ManifestDomainPolicy` (synth-time: which domains are
-built) and the `seedVariables` (link-time: the `RKE2LAB_POLICY_LINK_*` written into
+built) and the `seedVariables` (publish-time: the `RKE2LAB_MANIFESTS_PUBLISH_*` written into
 the overlay). The translation that used to live host-side (the former
 `ManifestLinkPolicy`/`ControlplanePolicy`, now dissolved) lives in the scion, which alone may name its own catalog.
 `writeControlplaneOverlay(root, layerContext, seedVariables)` — already published
@@ -287,7 +287,7 @@ the replacement scions existed. The result is seven open deltas:
 | 6
 | `rke2lab-env` overlay — `writeControlplaneOverlay` (published OSGi-side as
   `NodeEnvOverlayService`) is driven by the manifests scion, which derives the
-  `RKE2LAB_POLICY_LINK_*` link-time vars from its facet. The former host-side
+  `RKE2LAB_MANIFESTS_PUBLISH_*` publish-time vars from its facet. The former host-side
   `ManifestLinkPolicy`/`ControlplanePolicy` are dissolved.
 | in-container scion (sink already present)
 
@@ -381,7 +381,7 @@ materialization targets are orphaned *of trigger*, not of mechanism — the
 synthesis machinery survives intact OSGi-side, waiting to be played as a scion.
 
 **Why this matters:** a master provisioned by the previous binary carries the
-materialized files (the `99-…` overlay, the `RKE2LAB_POLICY_LINK_*` vars) because
+materialized files (the `99-…` overlay, the `RKE2LAB_MANIFESTS_PUBLISH_*` vars) because
 that binary still ran the registry. The current `seed-master` reproduces neither
 the Pulumi graph nor the materialization — so a fresh seed would not stand up a
 master. Closing these deltas is the substance of the incus/materialization

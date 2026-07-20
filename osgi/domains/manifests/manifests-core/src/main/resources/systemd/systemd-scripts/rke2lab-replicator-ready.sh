@@ -15,8 +15,8 @@ bool_is_true() {
 	esac
 }
 
-if [[ -n "${RKE2LAB_POLICY_LINK_REPLICATION_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_POLICY_LINK_REPLICATION_ENABLED}"; then
-	echo "[rke2-replicator-ready] policy disables replication layer; skipping replicator readiness checks"
+if [[ -n "${RKE2LAB_MANIFESTS_PUBLISH_REPLICATION_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_MANIFESTS_PUBLISH_REPLICATION_ENABLED}"; then
+	echo "[rke2-replicator-ready] publishing disabled for replication layer; skipping replicator readiness checks"
 	exit 0
 fi
 

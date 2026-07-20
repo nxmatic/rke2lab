@@ -44,9 +44,9 @@ class ManifestsShapeReflectorTest {
     final var schema = CODEC.decode(reaped.payload());
     assertEquals("object", schema.path("type").asText());
     // The top-level properties ARE the yaml concern keys — the design constraint the generic pluck
-    // depends on (the sower plucks policy.<name> for each named property).
+    // depends on (the sower plucks manifests.<name> for each named property).
     final var properties = schema.path("properties");
-    assertTrue(properties.has("link"), "schema must name the 'link' concern");
+    assertTrue(properties.has("publish"), "schema must name the 'publish' concern");
     assertTrue(properties.has("debug"), "schema must name the 'debug' concern");
   }
 
@@ -63,7 +63,7 @@ class ManifestsShapeReflectorTest {
     // nesting
     // for debug. The codec (jackson) coerces it into the typed wire-record — the verbatim-pluck
     // invariant. The host copies this subtree blindly; all coercion is OSGi-side.
-    final Map<String, Object> link =
+    final Map<String, Object> publish =
         Map.of(
             "gitops", "true",
             "networking", "true",
@@ -79,10 +79,10 @@ class ManifestsShapeReflectorTest {
             "nriPlugins", Map.of("flox", Map.of("enabled", "true")));
 
     final ManifestsRunbookInput input =
-        CODEC.fromMap(Map.of("link", link, "debug", debug), ManifestsRunbookInput.class);
+        CODEC.fromMap(Map.of("publish", publish, "debug", debug), ManifestsRunbookInput.class);
 
-    assertTrue(input.link().clusterApi());
-    assertFalse(input.link().mesh());
+    assertTrue(input.publish().clusterApi());
+    assertFalse(input.publish().mesh());
     assertTrue(input.debug().mesh().enabled());
     assertFalse(input.debug().networking().enabled());
     assertTrue(input.debug().nriPlugins().flox().enabled());

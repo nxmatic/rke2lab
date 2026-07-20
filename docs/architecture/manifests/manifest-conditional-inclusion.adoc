@@ -41,7 +41,7 @@ optional unit when you implement it.
 graph TB
     subgraph "Operator Environment"
         OP[Operator<br/>configures stack]
-        PC[Pulumi Config<br/>cluster.name=bioskop<br/>incus.defaultRemote=bioskop-nixos<br/>policy.link.porch.enabled=false]
+        PC[Pulumi Config<br/>cluster.name=bioskop<br/>incus.defaultRemote=bioskop-nixos<br/>manifests.publish.gitops=true]
         IC[~/.config/incus/config.yml<br/>remotes: bioskop-nixos]
     end
 
@@ -123,7 +123,7 @@ graph TB
 graph TB
     subgraph "Policy Layer"
         MDP[ManifestDomainPolicy<br/>isEnabled: String → Boolean]
-        CP[ManifestSynthesisScenario<br/>derives policy from<br/>the sown link facet]
+        CP[ManifestSynthesisScenario<br/>derives policy from<br/>the sown publish facet]
     end
 
     subgraph "Registry Builder"
@@ -291,25 +291,32 @@ public String porch() {
 }
 ----
 
-**2. ManifestSynthesisScenario** (the scion derives the domain policy from its sown link facet):
+**2. ManifestSynthesisScenario** (the scion derives the domain policy from its sown publish facet):
 
 [source,java]
 ----
 // ManifestSynthesisScenario.the_policy_is_derived_from_the_facet
+final ManifestsRunbookInput.PublishFacet publish = facet.publish();
 ManifestDomainPolicy domains =
     ManifestDomainPolicy.builder()
-        .gitops(link.enabled(CATALOG.gitops()))
-        .porch(link.enabled(CATALOG.porch()))   // <-- optional flag, read from the facet by catalog id
+        .domainCatalog(CATALOG)
+        .stageADefaults()
+        .gitops(publish.gitops())            // <-- flat boolean read straight off the facet
+        .networking(publish.networking())    // <-- the remaining domain flags follow the facet
         .build();
 ----
+
+Porch is a UNIT *within* the gitops domain, not a domain flag of its own: its conditional
+inclusion is decided by the gitops registrar's `domain(policy)` hook (see below), not by a
+top-level publish toggle. There is no `publish.porch` key.
 
 **3. Pulumi Stack Configuration**:
 
 [source,yaml]
 ----
 config:
-  rke2lab:policy.link.gitops.enabled: "true"   # Enable gitops domain
-  rke2lab:policy.link.porch.enabled: "false"   # Exclude Porch units within gitops
+  rke2lab:manifests.publish.gitops: "true"   # Enable the gitops domain layer
+  # (no publish.porch key — porch inclusion is a unit-level filter within gitops)
 ----
 
 === Accessing Bootstrap Identity for Infrastructure Configuration
@@ -473,12 +480,12 @@ graph TB
     class SYNTH output
 ----
 
-**Example**: `policy.link.gitops.enabled=true` + `policy.link.porch.enabled=false`
+**Example**: `manifests.publish.gitops=true`, with the (illustrative) porch unit excluded within gitops
 
 * **Phase 1**: GitopsDomainRegistrar creates domain with [Flux, SOPS, FluxRoot] (Porch excluded)
 * **Phase 2**: gitops domain passes domain-level filter, units synthesized
 
-**Example**: `policy.link.gitops.enabled=false` + `policy.link.porch.enabled=true`
+**Example**: `manifests.publish.gitops=false`, with the porch unit included
 
 * **Phase 1**: GitopsDomainRegistrar creates domain with [Flux, SOPS, FluxRoot, Porch]
 * **Phase 2**: gitops domain filtered out entirely, nothing synthesized
@@ -534,8 +541,9 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 [source,bash]
 ----
-# Check Pulumi config
-pulumi config get rke2lab:policy.link.porch.enabled
+# Porch has no top-level publish flag — it is filtered within the gitops
+# registrar's domain(policy) hook. Verify the gitops layer is enabled:
+pulumi config get rke2lab:manifests.publish.gitops
 
 # Check synthesis logs
 grep "Applying manifest-domain policy" /tmp/rke2lab.log
@@ -560,7 +568,7 @@ grep -A 10 "domain(ManifestDomainPolicy" \
 [source,bash]
 ----
 # Check domain-level policy
-pulumi config get rke2lab:policy.link.gitops.enabled  # Must be true
+pulumi config get rke2lab:manifests.publish.gitops  # Must be true
 
 # Check policy flag matches catalog
 grep 'public String porch()' \

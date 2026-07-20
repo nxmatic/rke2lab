@@ -29,12 +29,12 @@ bool_is_true() {
 	esac
 }
 
-policy_link_var_name() {
+manifests_publish_var_name() {
 	local layer_key="${1:?layer key required}"
-	printf 'RKE2LAB_POLICY_LINK_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
+	printf 'RKE2LAB_MANIFESTS_PUBLISH_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
 }
 
-layer_is_policy_linkable() {
+layer_is_publishable() {
 	case "${1:-}" in
 	high-availability | networking | replication | storage | mesh)
 		return 0
@@ -49,14 +49,14 @@ layer_readiness_enabled() {
 	local layer_key="${1:?layer key required}"
 	local var_name value
 
-	if ! layer_is_policy_linkable "${layer_key}"; then
+	if ! layer_is_publishable "${layer_key}"; then
 		return 0
 	fi
 
-	var_name="$(policy_link_var_name "${layer_key}")"
+	var_name="$(manifests_publish_var_name "${layer_key}")"
 	value="${!var_name:-}"
 	if [[ -z "${value}" ]]; then
-		log "Missing required policy variable for layer ${layer_key}: ${var_name}"
+		log "Missing required publish variable for layer ${layer_key}: ${var_name}"
 		return 1
 	fi
 
@@ -288,9 +288,9 @@ fi
 
 layer="${layer%/}"
 
-policy_layer_key="${layer%%/*}"
-if ! layer_readiness_enabled "${policy_layer_key}"; then
-	log "Policy disables layer ${policy_layer_key}; skipping readiness checks"
+publish_layer_key="${layer%%/*}"
+if ! layer_readiness_enabled "${publish_layer_key}"; then
+	log "Publishing disabled for layer ${publish_layer_key}; skipping readiness checks"
 	exit 0
 fi
 

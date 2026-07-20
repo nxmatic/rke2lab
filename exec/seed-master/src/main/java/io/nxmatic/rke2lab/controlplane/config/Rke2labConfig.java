@@ -5,7 +5,6 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import org.osgi.service.log.LogLevel;
 
@@ -23,7 +22,6 @@ public record Rke2labConfig(
     ProfileConfig profile,
     ApiConfig api,
     KubeconfigConfig kubeconfig,
-    PolicyConfig policy,
     ProvisioningPolicyConfig provisioning,
     ReadinessConfig readiness,
     EntryGateConfig entryGate,
@@ -77,7 +75,6 @@ public record Rke2labConfig(
             new ProfileConfig(loader.optional("profile", "name")),
             new ApiConfig(loader.optionalUri("api", "endpoint")),
             new KubeconfigConfig(loader.optionalPath("kubeconfig", "ref")),
-            PolicyConfig.from(loader),
             new ProvisioningPolicyConfig(
                 loader.optionalBoolean("policy.network.lan.binding", "enabled"),
                 loader.optionalBoolean("policy.gitDirtyCheck", "enabled")),
@@ -156,42 +153,6 @@ public record Rke2labConfig(
   public record ApiConfig(Optional<URI> endpoint) {}
 
   public record KubeconfigConfig(Optional<Path> ref) {}
-
-  public record PolicyConfig(
-      LinkPolicyConfig link,
-      DebugPolicyConfig debug,
-      Map<String, String> readinessOverride,
-      Map<String, String> previewSimulate) {
-    static PolicyConfig from(ConfigLoader loader) {
-      return new PolicyConfig(
-          new LinkPolicyConfig(
-              loader.optionalBoolean("policy.link", "gitops"),
-              loader.optionalBoolean("policy.link", "networking"),
-              loader.optionalBoolean("policy.link", "clusterApi"),
-              loader.optionalBoolean("policy.link", "storage"),
-              loader.optionalBoolean("policy.link", "mesh"),
-              loader.optionalBoolean("policy.link", "highAvailability"),
-              loader.optionalBoolean("policy.link", "cicd")),
-          new DebugPolicyConfig(
-              loader.optionalBoolean("policy.debug.mesh", "enabled"),
-              loader.optionalBoolean("policy.debug.networking", "enabled"),
-              loader.optionalBoolean("policy.debug.nriPlugins.flox", "enabled")),
-          loader.stringMap("policy.readiness", "override"),
-          loader.stringMap("policy.preview", "simulate"));
-    }
-  }
-
-  public record LinkPolicyConfig(
-      Optional<Boolean> gitops,
-      Optional<Boolean> networking,
-      Optional<Boolean> clusterApi,
-      Optional<Boolean> storage,
-      Optional<Boolean> mesh,
-      Optional<Boolean> highAvailability,
-      Optional<Boolean> cicd) {}
-
-  public record DebugPolicyConfig(
-      Optional<Boolean> mesh, Optional<Boolean> networking, Optional<Boolean> nriPluginsFlox) {}
 
   public record ProvisioningPolicyConfig(
       Optional<Boolean> lanBinding, Optional<Boolean> gitDirtyCheck) {}

@@ -36,22 +36,22 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The manifests synthesis scenario, a production jGiven scenario told in the MANIFESTS DOMAIN's own
- * vocabulary — the operator's activation facet ({@link ManifestsRunbookInput}: which layers link,
- * which debug) translated into the synthesis input and materialised, no host/Pulumi type. Played
- * IN-CONTAINER by the engine so the runbook shows a real node of the OSGi world; it is the fifth
- * scion, on the trio pattern the four contact scions share, with the differences its nature forces
- * (see docs/architecture/osgi/manifests-bdd-spec.adoc § what makes it different): it synthesises +
- * materialises rather than probing a live system, it READS its trigger (the others ignore theirs),
- * and it consults no doctor (a synthesis failure is a build defect, not a symptom).
+ * vocabulary — the operator's activation facet ({@link ManifestsRunbookInput}: which layers
+ * publish, which debug) translated into the synthesis input and materialised, no host/Pulumi type.
+ * Played IN-CONTAINER by the engine so the runbook shows a real node of the OSGi world; it is the
+ * fifth scion, on the trio pattern the four contact scions share, with the differences its nature
+ * forces (see docs/architecture/osgi/manifests-bdd-spec.adoc § what makes it different): it
+ * synthesises + materialises rather than probing a live system, it READS its trigger (the others
+ * ignore theirs), and it consults no doctor (a synthesis failure is a build defect, not a symptom).
  *
  * <p>The WHEN stage is the transposition of {@code HostSlotManifest.Builder.policy()} — the
  * projection the incus-bootstrap demolition orphaned — now OSGi-side: from the facet it derives
- * BOTH the {@link ManifestDomainPolicy} (synth-time filter) AND the {@code RKE2LAB_POLICY_LINK_*}
- * seed variables (link-time overlay), owning the {@link ManifestDomainCatalog} + the {@code
- * RKE2LAB_POLICY_LINK_*} naming. So the control-plane policy is reactivated INSIDE synthesis: the
- * {@link ManifestSynthesisRequest} carries the derived policy as a field, and {@code
- * writeControlplaneOverlay} lands the {@code 99-…} overlay the master's install/ready scripts read
- * — invisible at the master frontier (the founding rule).
+ * BOTH the {@link ManifestDomainPolicy} (synth-time filter) AND the {@code
+ * RKE2LAB_MANIFESTS_PUBLISH_*} seed variables (publish-time overlay), owning the {@link
+ * ManifestDomainCatalog} + the {@code RKE2LAB_MANIFESTS_PUBLISH_*} naming. So the control-plane
+ * policy is reactivated INSIDE synthesis: the {@link ManifestSynthesisRequest} carries the derived
+ * policy as a field, and {@code writeControlplaneOverlay} lands the {@code 99-…} overlay the
+ * master's install/ready scripts read — invisible at the master frontier (the founding rule).
  *
  * <p>Its collaborators are INJECTED from its OWN bundle's registry by the {@link OsgiService}
  * bridge: the {@link ManifestSynthesisService} + {@link NodeEnvOverlayService} (the SCR-published
@@ -90,7 +90,7 @@ public class ManifestSynthesisScenario
   private final Scenario<Given, When, Then> scenario = createScenario();
 
   // The activation facet the front-door seeds before the body (InputReceiver) — the operator's
-  // choice (which layers link, which debug) the WHEN translates. @MonotonicNonNull: null until
+  // choice (which layers publish, which debug) the WHEN translates. @MonotonicNonNull: null until
   // receiveInput sets it (before the body), then read.
   @MonotonicNonNull private ManifestsRunbookInput input;
 
@@ -123,13 +123,13 @@ public class ManifestSynthesisScenario
         .and()
         .the_manifests_are_synthesized()
         .and()
-        .the_manifests_links_env_is_written();
+        .the_manifests_publish_env_is_written();
     then()
         .every_enabled_domain_produced_its_units()
         .and()
         .the_manifests_file_is_written()
         .and()
-        .the_overlay_carries_the_link_time_policy();
+        .the_overlay_carries_the_publish_time_policy();
   }
 
   /** Given: the activation facet and the synthesis collaborators. */
@@ -156,10 +156,10 @@ public class ManifestSynthesisScenario
 
   /**
    * When: the transposition of {@code HostSlotManifest.Builder.policy()}. Derives the {@link
-   * ManifestDomainPolicy} + {@link FloxDebugPolicy} + the {@code RKE2LAB_POLICY_LINK_*} seed vars
-   * from the facet, synthesises, then writes the controlplane overlay — the two policy ends from
-   * one payload. Mode-blind: the materialisation target follows the SOIL amendment alone (the live
-   * target is Family-2/checksum-glue territory, still a temp dir here), never a run gate.
+   * ManifestDomainPolicy} + {@link FloxDebugPolicy} + the {@code RKE2LAB_MANIFESTS_PUBLISH_*} seed
+   * vars from the facet, synthesises, then writes the controlplane overlay — the two policy ends
+   * from one payload. Mode-blind: the materialisation target follows the SOIL amendment alone (the
+   * live target is Family-2/checksum-glue territory, still a temp dir here), never a run gate.
    */
   public static class When extends Stage<When> {
 
@@ -168,7 +168,7 @@ public class ManifestSynthesisScenario
     @ExpectedScenarioState NodeEnvOverlayService overlay;
 
     @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
-    @ProvidedScenarioState Map<String, String> linkSeedVariables;
+    @ProvidedScenarioState Map<String, String> publishSeedVariables;
     @ProvidedScenarioState ManifestSynthesisResult result;
 
     // Two Paths in one stage: jGiven shares state BY TYPE by default, so name-resolve both to avoid
@@ -186,7 +186,7 @@ public class ManifestSynthesisScenario
     @MonotonicNonNull private Path outdir;
 
     public When the_policy_is_derived_from_the_facet() {
-      final ManifestsRunbookInput.LinkFacet link = facet.link();
+      final ManifestsRunbookInput.PublishFacet publish = facet.publish();
       // Synth-time: the 10-domain filter HostSlotManifest projected. cluster/runtime/platform are
       // always on (namespace, RKE2 config + Flox runtime, cert-manager/replicator); the rest follow
       // the facet.
@@ -197,24 +197,27 @@ public class ManifestSynthesisScenario
               .cluster(true)
               .runtime(true)
               .platform(true)
-              .gitops(link.gitops())
-              .networking(link.networking())
-              .storage(link.storage())
-              .mesh(link.mesh())
-              .highAvailability(link.highAvailability())
-              .cicd(link.cicd())
-              .clusterApi(link.clusterApi())
+              .gitops(publish.gitops())
+              .networking(publish.networking())
+              .storage(publish.storage())
+              .mesh(publish.mesh())
+              .highAvailability(publish.highAvailability())
+              .cicd(publish.cicd())
+              .clusterApi(publish.clusterApi())
               .build();
-      // Link-time: the 6 RKE2LAB_POLICY_LINK_* vars the master's install/ready scripts read — owned
-      // by this domain (the host no longer projects them; the pre-migration host copy is gone).
+      // Publish-time: the 6 RKE2LAB_MANIFESTS_PUBLISH_* vars the master's install/ready scripts
+      // read
+      // — owned by this domain (the host no longer projects them; the pre-migration host copy is
+      // gone).
       final Map<String, String> vars = new LinkedHashMap<>();
-      vars.put("RKE2LAB_POLICY_LINK_HIGH_AVAILABILITY_ENABLED", bool(link.highAvailability()));
-      vars.put("RKE2LAB_POLICY_LINK_NETWORKING_ENABLED", bool(link.networking()));
-      vars.put("RKE2LAB_POLICY_LINK_STORAGE_ENABLED", bool(link.storage()));
-      vars.put("RKE2LAB_POLICY_LINK_MESH_ENABLED", bool(link.mesh()));
-      vars.put("RKE2LAB_POLICY_LINK_CLUSTER_API_ENABLED", bool(link.clusterApi()));
-      vars.put("RKE2LAB_POLICY_LINK_PLATFORM_ENABLED", bool(Boolean.TRUE));
-      this.linkSeedVariables = Map.copyOf(vars);
+      vars.put(
+          "RKE2LAB_MANIFESTS_PUBLISH_HIGH_AVAILABILITY_ENABLED", bool(publish.highAvailability()));
+      vars.put("RKE2LAB_MANIFESTS_PUBLISH_NETWORKING_ENABLED", bool(publish.networking()));
+      vars.put("RKE2LAB_MANIFESTS_PUBLISH_STORAGE_ENABLED", bool(publish.storage()));
+      vars.put("RKE2LAB_MANIFESTS_PUBLISH_MESH_ENABLED", bool(publish.mesh()));
+      vars.put("RKE2LAB_MANIFESTS_PUBLISH_CLUSTER_API_ENABLED", bool(publish.clusterApi()));
+      vars.put("RKE2LAB_MANIFESTS_PUBLISH_PLATFORM_ENABLED", bool(Boolean.TRUE));
+      this.publishSeedVariables = Map.copyOf(vars);
       return self();
     }
 
@@ -245,11 +248,11 @@ public class ManifestSynthesisScenario
       return self();
     }
 
-    public When the_manifests_links_env_is_written() {
+    public When the_manifests_publish_env_is_written() {
       final NodeEnvContext layerContext = new DefaultNodeEnvContext();
       final Path overlayRoot = outdir().resolve("rke2lab-environment.d");
       try {
-        overlay.writeControlplaneOverlay(overlayRoot, layerContext, linkSeedVariables);
+        overlay.writeControlplaneOverlay(overlayRoot, layerContext, publishSeedVariables);
       } catch (IOException ex) {
         throw new UncheckedIOException("controlplane overlay write failed", ex);
       }
@@ -291,13 +294,13 @@ public class ManifestSynthesisScenario
   /**
    * Then: the two policy ends landed. Every enabled domain produced units (the synth-time filter);
    * the materialised tree is complete (manifest file + systemd units dir exist, hit count &gt; 0);
-   * and the overlay carries the link-time {@code RKE2LAB_POLICY_LINK_*} — what the master's scripts
-   * read.
+   * and the overlay carries the publish-time {@code RKE2LAB_MANIFESTS_PUBLISH_*} — what the
+   * master's scripts read.
    */
   public static class Then extends Stage<Then> {
 
     @ExpectedScenarioState ManifestDomainPolicy domainPolicy;
-    @ExpectedScenarioState Map<String, String> linkSeedVariables;
+    @ExpectedScenarioState Map<String, String> publishSeedVariables;
     @ExpectedScenarioState ManifestSynthesisResult result;
 
     // Two Paths in this stage too: name-resolve both to match the When's field names (overlayFile,
@@ -327,7 +330,7 @@ public class ManifestSynthesisScenario
       return self();
     }
 
-    public Then the_overlay_carries_the_link_time_policy() {
+    public Then the_overlay_carries_the_publish_time_policy() {
       if (!Files.exists(overlayFile)) {
         throw new AssertionError("controlplane overlay was not written: " + overlayFile);
       }
@@ -337,12 +340,14 @@ public class ManifestSynthesisScenario
       } catch (IOException ex) {
         throw new UncheckedIOException("cannot read the controlplane overlay " + overlayFile, ex);
       }
-      // The 99-… ConfigMap's data carries each RKE2LAB_POLICY_LINK_* the master's install/ready
-      // scripts read. Assert the rendered YAML names every link var — the link-time end landed.
-      for (String key : linkSeedVariables.keySet()) {
+      // The 99-… ConfigMap's data carries each RKE2LAB_MANIFESTS_PUBLISH_* the master's
+      // install/ready
+      // scripts read. Assert the rendered YAML names every publish var — the publish-time end
+      // landed.
+      for (String key : publishSeedVariables.keySet()) {
         if (!rendered.contains(key)) {
           throw new AssertionError(
-              "overlay does not carry the link-time policy var " + key + "\n" + rendered);
+              "overlay does not carry the publish-time policy var " + key + "\n" + rendered);
         }
       }
       return self();

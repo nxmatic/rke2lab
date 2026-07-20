@@ -41,7 +41,7 @@ flowchart TB
   broker -->|routes| handler
   handler --> front --> scen
   scen -->|synth-time| svc
-  scen -->|link-time| overlay
+  scen -->|publish-time| overlay
   scen -.->|RunbookEnvelope JSON| handler
   handler -.->|reaped SeedEnvelope| broker
   broker -.->|runbook JSON| caller
@@ -101,8 +101,8 @@ policy reachable through it.**
 | Path | Input → translation | Used by
 | system properties | `-Drke2lab.manifests.policy.enabledDomains=…` →
   `ManifestSynthesisRequest.fromSystemProperties()` | `manifests-cli`
-| host Pulumi config | `Rke2labConfig.policy().link()` → the `link` facet → the scion
-  derives `ManifestDomainPolicy` (+ `RKE2LAB_POLICY_LINK_*`) | seed
+| host Pulumi config | `manifests.publish` sub-map → the `publish` facet → the scion
+  derives `ManifestDomainPolicy` (+ `RKE2LAB_MANIFESTS_PUBLISH_*`) | seed
 |===
 * The host policies that WOULD target other scions (`ReadinessPolicy`,
   `PreviewPolicy` → cluster/systemd) are wired to NOTHING — neither the old nor the
@@ -121,25 +121,26 @@ seam — the seed reads it live (`ConfigLoader.of(com.pulumi.Config)`, inside
 in-memory policy threaded through `SeedRun`; it is the file both realms' callers
 already point at, through the one reader.
 
-The `rke2lab:policy:` section is organised **by concern**, not by soil — `link`,
-`debug`, `network`, `readiness`, `preview`. This stays as-is (no migration): the
-concern grouping is the operator's natural vocabulary, and the seed's raw
-`PolicyConfig` DTO reads it verbatim (plain `Optional<Boolean>` keyed by camelCase —
-NO manifests type named). The soil→facet mapping does NOT live in the file; it is
-carried by the *shape* (below), so the file never needs a by-soil reshuffle.
+The config is organised **by concern**, not by soil. The manifests concerns live under
+`rke2lab:manifests` — `publish`, `debug`; the remaining policy concerns (`network`,
+`readiness`, `preview`) stay under `rke2lab:policy`. The concern grouping is the operator's
+natural vocabulary, and the seed reads each verbatim into typed DTO records (plain
+`Optional<Boolean>` keyed by camelCase — NO manifests type named). The soil→facet mapping
+does NOT live in the file; it is carried by the *shape* (below), so the file never needs a
+by-soil reshuffle.
 
 .Figure 2 — one file (by concern), the shape carves each soil's facet, one channel
 [mermaid]
 ----
 flowchart LR
-  yaml["Pulumi.dev.yaml<br/>rke2lab:policy: BY CONCERN<br/>link · debug · readiness · preview"]
+  yaml["Pulumi.dev.yaml<br/>rke2lab:manifests: publish · debug<br/>rke2lab:policy: network · readiness · preview"]
   loader["ConfigLoader — one reader, source-abstracted<br/>seed: of(Config) · CLI: ofNestedRoot(yaml)"]
   yaml --> loader
   loader --> sower["a sower toward soil S<br/>(seed WHEN or manifests-cli)"]
 
   sower -->|"sow(ShapeCoordinate(S), {})"| shape["S's shape<br/>schema top-level = the concern names S owns"]
-  shape -.->|"e.g. manifests → {link, debug}"| sower
-  sower -->|"pluck those concerns from the yaml"| trig["sow(RunbookCoordinate(S), {link:{…}, debug:{…}})"]
+  shape -.->|"e.g. manifests → {publish, debug}"| sower
+  sower -->|"pluck those concerns from the yaml"| trig["sow(RunbookCoordinate(S), {publish:{…}, debug:{…}})"]
   trig --> scion["S's scion — reads its facet, translates in its OWN vocabulary"]
 
   classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
@@ -155,8 +156,8 @@ flowchart LR
 . **The shape carves the facet — no host names a domain vocabulary.** A soil's facet
   is NOT a sub-map the caller knows a priori; it is DISCOVERED:
   `sow(ShapeCoordinate(S), {})` reaps S's runbook-input schema, whose top-level
-  properties ARE the concern keys S owns (`manifests` → `link`, `debug`). The caller
-  plucks exactly those concern sub-maps from the yaml `policy` section and assembles
+  properties ARE the concern keys S owns (`manifests` → `publish`, `debug`). The caller
+  plucks exactly those concern sub-maps from the yaml `manifests` section and assembles
   the trigger. Generic — the sower names NO domain vocabulary; the schema dictates
   which concerns to pluck. This is why the concern grouping needs no by-soil sealing
   in the file: the sealing lives in each soil's wire-record (which concerns it
@@ -168,9 +169,9 @@ flowchart LR
   `SowAndGraftStage` stop sending empty), not manifests-only.
 . **One translator per domain — the scion.** Each scion reads its own facet in
   `handle(trigger)` and translates it in its OWN vocabulary. The manifests scion
-  owns `ManifestDomainCatalog` + the `RKE2LAB_POLICY_LINK_*` naming, so it derives
-  `ManifestDomainPolicy` + `FloxDebugPolicy` + the link-time seed vars from the
-  `link`/`debug` concerns. A scion sees ONLY its facet, never another soil's config.
+  owns `ManifestDomainCatalog` + the `RKE2LAB_MANIFESTS_PUBLISH_*` naming, so it derives
+  `ManifestDomainPolicy` + `FloxDebugPolicy` + the publish-time seed vars from the
+  `publish`/`debug` concerns. A scion sees ONLY its facet, never another soil's config.
 
 **Consequences.** `fromSystemProperties()` dissolves — the CLI reads the same file
 as the seed, through the same reader. Both host policy classes are GONE (deleted at
@@ -178,21 +179,21 @@ as the seed, through the same reader. Both host policy classes are GONE (deleted
 into `ManifestDomainPolicy` + `toEnvMap()`) AND `ControlplanePolicy` (the aggregate
 that held it) were orphaned live logic with no production caller, and the translation
 now lives OSGi-side in the scion. The scion derives BOTH `ManifestDomainPolicy`
-(synth-time filter) and the `RKE2LAB_POLICY_LINK_*` seed vars (link-time overlay)
-from its own `link`/`debug` facet — it owns `ManifestDomainCatalog` + the
-`RKE2LAB_POLICY_LINK_*` naming, so no host type names `manifests.contract` (the gate
+(synth-time filter) and the `RKE2LAB_MANIFESTS_PUBLISH_*` seed vars (publish-time overlay)
+from its own `publish`/`debug` facet — it owns `ManifestDomainCatalog` + the
+`RKE2LAB_MANIFESTS_PUBLISH_*` naming, so no host type names `manifests.contract` (the gate
 is clear, and LOCKED at ERROR). The scion's facet is defaulted today
 (`ManifestsRunbookInput.defaults()`); the host does not pilot it (a decision, not a
 gap — the policy is a manifests concern, not a host one). `readiness` / `preview`
 were always separate concerns (they lived on the now-deleted host policy); they stay
-raw in the config (`PolicyConfig`) and belong to a cluster/doctor scion the day it
-grows a wire-record, not to the host.
+raw in the config (the residual `rke2lab:policy` section / `ReadinessConfig`) and belong
+to a cluster/doctor scion the day it grows a wire-record, not to the host.
 
 *Design constraint this puts on piece 2 (the wire-record).* For the pluck to stay
 generic, the runbook-input wire-record's top-level component names MUST equal the
-yaml concern keys (`link`, `debug`) — the schema's top-level properties ARE those
-component names, and the caller plucks `policy.<name>` for each. So the wire-record
-nests (`record …(LinkFacet link, DebugFacet debug)`), mirroring the yaml's concern
+yaml concern keys (`publish`, `debug`) — the schema's top-level properties ARE those
+component names, and the caller plucks `manifests.<name>` for each. So the wire-record
+nests (`record …(PublishFacet publish, DebugFacet debug)`), mirroring the yaml's concern
 nesting exactly, rather than flattening into one bag.
 
 === The policy has TWO ends — the scion must cover both
@@ -209,7 +210,7 @@ with two distinct ends, and the scion owns BOTH:
   rejects an all-disabled set
 | in-container (manifests-core) — correct already
 
-| *link-time* | which layers the master *links live* — the `RKE2LAB_POLICY_LINK_*`
+| *publish-time* | which layers the master *publishes live* — the `RKE2LAB_MANIFESTS_PUBLISH_*`
   env vars written into the `99-…env-config` overlay
   (`NodeEnvOverlayService.writeControlplaneOverlay(seedVariables)`), read by
   `rke2lab-manifests-install.sh` and the per-layer `*-ready.sh` gates on the master
@@ -220,11 +221,11 @@ Both ends derive from the SAME operator choice, and the scion covers both:
 
 * from its facet (the `manifests` sub-map of the one policy, § the single path), the
   scion derives BOTH the `ManifestDomainPolicy` (synth-time filter) AND the
-  `RKE2LAB_POLICY_LINK_*` seed variables (link-time overlay) — it owns the
-  `RKE2LAB_POLICY_LINK_<X>_ENABLED` naming, so this is legitimate in-container;
+  `RKE2LAB_MANIFESTS_PUBLISH_*` seed variables (publish-time overlay) — it owns the
+  `RKE2LAB_MANIFESTS_PUBLISH_<X>_ENABLED` naming, so this is legitimate in-container;
 * the scenario's synthesis step drives `writeControlplaneOverlay` with those
   seed variables, so the `99-…` overlay lands with
-  the right `RKE2LAB_POLICY_LINK_*` — the master's install/ready scripts see exactly
+  the right `RKE2LAB_MANIFESTS_PUBLISH_*` — the master's install/ready scripts see exactly
   what they need (the founding rule: invisible at the master frontier).
 
 This is why the scion is the natural home: it is the single point that already knows
@@ -236,17 +237,17 @@ naming a domain vocabulary.
 The activation choice drives synthesis structurally, not by promise:
 `ManifestSynthesisRequest` carries `manifestDomainPolicy` + `floxDebugPolicy` as
 FIELDS — synthesis does not run without them. The scion derives both from its facet
-(the `link`/`debug` concerns) and calls `synthesize(request)`, so the policy IS the
+(the `publish`/`debug` concerns) and calls `synthesize(request)`, so the policy IS the
 synthesis input, not something computed beside it. It owns `ManifestDomainCatalog` +
-the `RKE2LAB_POLICY_LINK_*` naming, so no host type names `manifests.contract`.
+the `RKE2LAB_MANIFESTS_PUBLISH_*` naming, so no host type names `manifests.contract`.
 
 Both ends are covered in one place:
 
 * *synth-time* — `ManifestDomainPolicy` filters which domains synthesize;
-* *link-time* — the scion writes the `RKE2LAB_POLICY_LINK_*` overlay
+* *publish-time* — the scion writes the `RKE2LAB_MANIFESTS_PUBLISH_*` overlay
   (`writeControlplaneOverlay` → the `99-…env-config` ConfigMap). On the master those
   vars are sourced into the systemd env, and `rke2lab-manifests-install.sh <layer>`
-  reads `RKE2LAB_POLICY_LINK_<LAYER>_ENABLED`: an enabled layer is STOWED (its
+  reads `RKE2LAB_MANIFESTS_PUBLISH_<LAYER>_ENABLED`: an enabled layer is STOWED (its
   non-local-config manifests `ln -sfn`'d into rke2's server manifest dir, where rke2
   auto-applies), a disabled one has its target removed. `rke2lab-layer-ready.sh` gates
   readiness on the same flag. The operator's choice made live — invisible at the
@@ -264,7 +265,7 @@ owns the two that are manifests' business; the rest live elsewhere:
 |===
 | Policy concern | What it decides | Destination
 
-| *link* (the link concern) | which domains synthesize + which layers link (the two-ended
+| *publish* (the publish concern) | which domains synthesize + which layers publish live (the two-ended
   path above) | *this scion* (activation payload)
 | `DebugPolicy` → `FloxDebugPolicy` | per-layer debug (flox NRI / mesh / networking
   image-command-env swap) — already a `manifests.contract` input of
@@ -279,7 +280,7 @@ owns the two that are manifests' business; the rest live elsewhere:
 |===
 
 So the manifests activation payload has TWO facets — *activation* (which domains,
-from the *link* facet) and *debug* (per-layer, from `DebugPolicy`→`FloxDebugPolicy`).
+from the *publish* facet) and *debug* (per-layer, from `DebugPolicy`→`FloxDebugPolicy`).
 Both are already `manifests.contract` concepts; the scion assembles them from the
 sown payload. `ReadinessPolicy`/`PreviewPolicy` are a separate transposition (a
 cluster/doctor scion), out of scope here — noted so their host records are not
@@ -305,12 +306,12 @@ the scenario's — the preview inertness the map requires, lifted out of the sce
 ----
 GIVEN the activation payload (which domains the operator enabled)
   AND the synthesis service, resolved from this bundle's registry
-WHEN the policy is derived from the payload          [the scion builds BOTH ends: ManifestDomainPolicy + the RKE2LAB_POLICY_LINK_* seed vars]
+WHEN the policy is derived from the payload          [the scion builds BOTH ends: ManifestDomainPolicy + the RKE2LAB_MANIFESTS_PUBLISH_* seed vars]
   AND the manifests are synthesized                  [service.synthesize(request) → the K8s/systemd/rke2-config tree, filtered synth-time]
-  AND the controlplane overlay is written             [writeControlplaneOverlay(seedVars) → the 99-… env-config with RKE2LAB_POLICY_LINK_*]
+  AND the controlplane overlay is written             [writeControlplaneOverlay(seedVars) → the 99-… env-config with RKE2LAB_MANIFESTS_PUBLISH_*]
 THEN every enabled domain produced its units         [domainCount matches the enabled set]
   AND the materialized tree is complete               [manifestFile + systemdUnitsDir exist, hit count > 0]
-  AND the overlay carries the link-time policy         [RKE2LAB_POLICY_LINK_* match the enabled set — what the master's scripts read]
+  AND the overlay carries the publish-time policy      [RKE2LAB_MANIFESTS_PUBLISH_* match the enabled set — what the master's scripts read]
 ----
 
 No doctor consult. A synthesis `IOException` or an empty domain set fails the step —
@@ -365,12 +366,12 @@ sequenceDiagram
   participant SH as ManifestsShapeReflector
   participant RH as ManifestsRunbookHandler
   CLI->>Y: ConfigLoader.ofNestedRoot(parse)
-  Y-->>CLI: policy section (by concern)
+  Y-->>CLI: config sections (by concern)
   CLI->>B: sow(ShapeCoordinate("manifests"), {})
   B->>SH: route
   SH-->>CLI: JSON Schema of the runbook input (opaque String)
-  Note over CLI: schema top-level = {link, debug} → pluck those concerns from the yaml
-  CLI->>B: sow(RunbookCoordinate("manifests"), {link:{…}, debug:{…}})
+  Note over CLI: schema top-level = {publish, debug} → pluck those concerns from the yaml
+  CLI->>B: sow(RunbookCoordinate("manifests"), {publish:{…}, debug:{…}})
   B->>RH: route
   RH-->>CLI: runbook JSON
 ----
@@ -381,8 +382,8 @@ its OWN vocabulary (system properties) is coupled to a second source of truth. T
 shape closes both: the CLI reads the operator's `Pulumi.dev.yaml` (one file, § the
 single path) and asks the broker "what config do you want for the manifests runbook?"
 (`sow(ShapeCoordinate("manifests"), {})`). The reaped schema's top-level properties
-name the concerns to pluck (`link`, `debug`); the CLI plucks exactly those from the
-yaml `policy` section and sows the runbook — naming no manifests vocabulary, holding
+name the concerns to pluck (`publish`, `debug`); the CLI plucks exactly those from the
+yaml `manifests` section and sows the runbook — naming no manifests vocabulary, holding
 no contract class.
 
 For this the `shape` meta-coordinate must be realized (foundation piece 1 — SHIPPED,

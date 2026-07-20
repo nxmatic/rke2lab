@@ -14,9 +14,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Fluent, section-aware reader over Pulumi config; the only class that touches {@link
  * com.pulumi.Config}. Reads each top-level section once as a {@code Map} (nested YAML), pulling
- * keys from it. Dotted section names ({@code "policy.link"}) walk into sub-maps. {@code optional*}
- * returns {@link Optional}; {@code require*} records a domain-tagged symptom on absence and returns
- * a placeholder, so the caller throws once via {@link #diagnoseIfIncomplete()}.
+ * keys from it. Dotted section names ({@code "manifests.publish"}) walk into sub-maps. {@code
+ * optional*} returns {@link Optional}; {@code require*} records a domain-tagged symptom on absence
+ * and returns a placeholder, so the caller throws once via {@link #diagnoseIfIncomplete()}.
  */
 public final class ConfigLoader {
 

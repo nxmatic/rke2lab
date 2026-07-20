@@ -14,11 +14,14 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
  * the schema alone cannot express (see seed-broker-spec § @Amendment):
  *
  * <ul>
- *   <li>{@link Amendment#FACET} — {@link #link} and {@link #debug} ARE the {@code rke2lab:policy:}
- *       concern keys of {@code Pulumi.dev.yaml}, each nested record mirroring that concern's yaml
- *       sub-map EXACTLY. The host (seed AND CLI) plucks {@code policy.link} / {@code policy.debug}
- *       VERBATIM — a blind subtree copy guided by the schema's names, naming no manifests
- *       vocabulary. The schema matching the yaml is what makes the copy blind.
+ *   <li>{@link Amendment#FACET} — {@link #publish} and {@link #debug} ARE the {@code
+ *       rke2lab:manifests:} concern keys of {@code Pulumi.dev.yaml}, each nested record mirroring
+ *       that concern's yaml sub-map EXACTLY. The host fills a FACET by a blind subtree copy guided
+ *       by the schema's names ({@code manifests.publish} / {@code manifests.debug}), naming no
+ *       manifests vocabulary — the schema matching the yaml is what makes the copy blind. NOTE: the
+ *       seed path (the incus graft) currently amends only {@code SOIL}, so the FACETs fall to
+ *       {@link #defaults()}; wiring the config subtree onto them lands when the exec sowers migrate
+ *       to the runbook model.
  *   <li>{@link Amendment#SOIL} — {@link #materializationRoot} is NOT in the yaml: it is the plot
  *       the scion materialises into, which only the host knows (it holds {@code BootstrapPaths}).
  *       The host fills it by role — the SOIL amendment — from its provisioning state (the
@@ -30,12 +33,12 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
  * lives in the scion (OSGi-side): it decodes this record (jackson coerces the yaml's string {@code
  * "true"} to {@code boolean}), flattens the nesting, and translates into its own vocabulary —
  * {@link ManifestDomainPolicy} (synth-time filter) + {@code FloxDebugPolicy} (per-layer debug) +
- * the {@code RKE2LAB_POLICY_LINK_*} link-time env contributions. The host names no {@code
+ * the {@code RKE2LAB_MANIFESTS_PUBLISH_*} publish-time env contributions. The host names no {@code
  * manifests.contract} translation type.
  */
 @SeedContract("runbook")
 public record ManifestsRunbookInput(
-    @Amendment(Amendment.FACET) LinkFacet link,
+    @Amendment(Amendment.FACET) PublishFacet publish,
     @Amendment(Amendment.FACET) DebugFacet debug,
     @Amendment(Amendment.SOIL) String materializationRoot) {
 
@@ -46,17 +49,17 @@ public record ManifestsRunbookInput(
    * complete sub-facet, so no incomplete state ever exists.
    */
   public static ManifestsRunbookInput defaults() {
-    return new ManifestsRunbookInput(LinkFacet.defaults(), DebugFacet.disabled(), "");
+    return new ManifestsRunbookInput(PublishFacet.defaults(), DebugFacet.disabled(), "");
   }
 
   /**
-   * The {@code policy.link} concern: which manifest layers the master links live. Flat booleans,
-   * mirroring the yaml sub-map exactly; the scion feeds them to {@link
-   * ManifestDomainPolicy.Builder} and the {@code RKE2LAB_POLICY_LINK_*} overlay. An absent key
-   * defaults to the operator's usual posture (everything on except {@code mesh}) so a partial yaml
-   * still yields a complete facet.
+   * The {@code manifests.publish} concern: which domain manifest layers the master publishes into
+   * RKE2's server-manifests directory (a symlink/stow it auto-applies). Flat booleans, mirroring
+   * the yaml sub-map exactly; the scion feeds them to {@link ManifestDomainPolicy.Builder} and the
+   * {@code RKE2LAB_MANIFESTS_PUBLISH_*} overlay. An absent key defaults to the operator's usual
+   * posture (everything on except {@code mesh}) so a partial yaml still yields a complete facet.
    */
-  public record LinkFacet(
+  public record PublishFacet(
       boolean gitops,
       boolean networking,
       boolean clusterApi,
@@ -65,14 +68,14 @@ public record ManifestsRunbookInput(
       boolean highAvailability,
       boolean cicd) {
 
-    public static LinkFacet defaults() {
-      return new LinkFacet(true, true, true, true, false, true, true);
+    public static PublishFacet defaults() {
+      return new PublishFacet(true, true, true, true, false, true, true);
     }
   }
 
   /**
-   * The {@code policy.debug} concern, mirroring the yaml's {@code enabled}-wrapper nesting exactly
-   * ({@code debug.mesh.enabled}, {@code debug.networking.enabled}, {@code
+   * The {@code manifests.debug} concern, mirroring the yaml's {@code enabled}-wrapper nesting
+   * exactly ({@code debug.mesh.enabled}, {@code debug.networking.enabled}, {@code
    * debug.nriPlugins.flox.enabled}). The scion flattens it into the three booleans {@code
    * FloxDebugPolicy} carries. An absent toggle defaults to off.
    */

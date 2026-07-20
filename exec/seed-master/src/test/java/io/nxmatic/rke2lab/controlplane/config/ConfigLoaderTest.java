@@ -56,7 +56,7 @@ class ConfigLoaderTest {
   @Test
   void dotted_section_walks_into_submap() {
     final ConfigLoader loader =
-        ConfigLoader.ofNestedRoot(Map.of("policy", Map.of("link", Map.of("gitops", "true"))));
-    assertEquals(Optional.of(true), loader.optionalBoolean("policy.link", "gitops"));
+        ConfigLoader.ofNestedRoot(Map.of("manifests", Map.of("publish", Map.of("gitops", "true"))));
+    assertEquals(Optional.of(true), loader.optionalBoolean("manifests.publish", "gitops"));
   }
 }

@@ -158,7 +158,7 @@ The shared model is implemented but not yet threaded through the manifests scion
 
 The purpose of the model would be to connect:
 
-* manifests-scion policy intent (the sown debug/link facet)
+* manifests-scion policy intent (the sown debug/publish facet)
 * workflow-specific host asset delivery
 * shared daemonset helper usage
 * host asset root lifecycle rules
@@ -170,7 +170,7 @@ classDiagram
 
     class ManifestsPolicyFacet {
       +DebugPolicy debug
-      +LinkFacet link
+      +PublishFacet publish
       +HostAssetDeliveryPolicy hostAssetDelivery
     }
 
@@ -179,7 +179,7 @@ classDiagram
       +containerdShimFloxV2WrapperEnabled : boolean
     }
 
-    class LinkFacet {
+    class PublishFacet {
       +domains : ManifestDomainPolicy
       +highAvailabilityEnabled() boolean
       +networkingEnabled() boolean
@@ -241,12 +241,12 @@ classDiagram
     }
 
     ManifestsPolicyFacet --> DebugPolicy : aggregates
-    ManifestsPolicyFacet --> LinkFacet : aggregates
+    ManifestsPolicyFacet --> PublishFacet : aggregates
     ManifestsPolicyFacet --> HostAssetDeliveryPolicy : would aggregate
 
-    LinkFacet --> ManifestDomainPolicy : uses
+    PublishFacet --> ManifestDomainPolicy : uses
     HostAssetDeliveryPolicy --> ManifestDomainIds : ownerDomainId
-    LinkFacet --> ManifestDomainIds : domain flags
+    PublishFacet --> ManifestDomainIds : domain flags
 
     FloxContainerdShimLayer --> WrapperGoArchiveAssets : packages payload
     FloxContainerdShimLayer --> ShimInstaller : delivers installer asset
@@ -265,7 +265,7 @@ classDiagram
 
 Reading this diagram from left to right:
 
-* the manifests scion's policy facet already carries `DebugPolicy` and the `LinkFacet`
+* the manifests scion's policy facet already carries `DebugPolicy` and the `PublishFacet`
 * `HostAssetDeliveryPolicy` is the implemented shared model for host-asset delivery rules
 * `FloxContainerdShimLayer` remains the current workflow-specific delivery layer for Flox shim assets
 * `RuntimeDaemonsetScriptPolicyLayer` remains the current shared helper delivery layer

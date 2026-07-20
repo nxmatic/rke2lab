@@ -35,12 +35,12 @@ bool_is_true() {
 	esac
 }
 
-policy_link_var_name() {
+manifests_publish_var_name() {
 	local layer_key="${1:?layer key required}"
-	printf 'RKE2LAB_POLICY_LINK_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
+	printf 'RKE2LAB_MANIFESTS_PUBLISH_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
 }
 
-layer_is_policy_linkable() {
+layer_is_publishable() {
 	case "${1:-}" in
 	high-availability | networking | replication | storage | mesh)
 		return 0
@@ -55,14 +55,14 @@ layer_install_enabled() {
 	local layer_key="${1:?layer key required}"
 	local var_name value
 
-	if ! layer_is_policy_linkable "${layer_key}"; then
+	if ! layer_is_publishable "${layer_key}"; then
 		return 0
 	fi
 
-	var_name="$(policy_link_var_name "${layer_key}")"
+	var_name="$(manifests_publish_var_name "${layer_key}")"
 	value="${!var_name:-}"
 	if [[ -z "${value}" ]]; then
-		echo "[rke2-manifests-install] missing required policy variable for layer ${layer_key}: ${var_name}" >&2
+		echo "[rke2-manifests-install] missing required publish variable for layer ${layer_key}: ${var_name}" >&2
 		return 1
 	fi
 
@@ -124,9 +124,9 @@ fi
 if [[ -z "${pkg_name}" ]]; then
 	: "Install all manifests for layer ${layer_dir}"
 	target_dir="${DST_DIR}/${layer_dir}"
-	policy_layer_key="${layer_dir}"
-	if ! layer_install_enabled "${policy_layer_key}"; then
-		echo "[rke2-manifests-install] policy disables layer ${policy_layer_key}; removing ${target_dir}" >&2
+	publish_layer_key="${layer_dir}"
+	if ! layer_install_enabled "${publish_layer_key}"; then
+		echo "[rke2-manifests-install] publish disabled for layer ${publish_layer_key}; removing ${target_dir}" >&2
 		rm -rf "${target_dir}"
 		exit 0
 	fi
@@ -134,9 +134,9 @@ if [[ -z "${pkg_name}" ]]; then
 else
 	: "Install package ${pkg_name} for layer ${layer_dir}"
 	target_dir="${DST_DIR}/${layer_dir}/${pkg_name}"
-	policy_layer_key="${layer_dir}"
-	if ! layer_install_enabled "${policy_layer_key}"; then
-		echo "[rke2-manifests-install] policy disables layer ${policy_layer_key}; removing ${target_dir}" >&2
+	publish_layer_key="${layer_dir}"
+	if ! layer_install_enabled "${publish_layer_key}"; then
+		echo "[rke2-manifests-install] publish disabled for layer ${publish_layer_key}; removing ${target_dir}" >&2
 		rm -rf "${target_dir}"
 		exit 0
 	fi

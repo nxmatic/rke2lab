@@ -37,8 +37,8 @@ bool_is_true() {
 	esac
 }
 
-if [[ -n "${RKE2LAB_POLICY_LINK_STORAGE_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_POLICY_LINK_STORAGE_ENABLED}"; then
-	log "Policy disables storage layer; skipping OpenEBS readiness checks"
+if [[ -n "${RKE2LAB_MANIFESTS_PUBLISH_STORAGE_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_MANIFESTS_PUBLISH_STORAGE_ENABLED}"; then
+	log "Publishing disabled for storage layer; skipping OpenEBS readiness checks"
 	exit 0
 fi
 

@@ -502,10 +502,10 @@ flowchart TB
     I["incus (∅)"]
     S["systemd (∅ today)"]
     C["cluster (∅ today)"]
-    M["manifests (NEW)<br/>facet → ManifestDomainPolicy (synth)<br/>+ RKE2LAB_POLICY_LINK_* overlay (link)"]
+    M["manifests (NEW)<br/>facet → ManifestDomainPolicy (synth)<br/>+ RKE2LAB_MANIFESTS_PUBLISH_* overlay (publish)"]
   end
   M -->|synth-time| tree["K8s + systemd + rke2-config tree"]
-  M -->|link-time| ov["99-… controlplane overlay<br/>read by master install/ready scripts"]
+  M -->|publish-time| ov["99-… controlplane overlay<br/>read by master install/ready scripts"]
 
   classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef new fill:#ffd,stroke:#aa2,stroke-width:2px;
@@ -513,7 +513,7 @@ flowchart TB
   class M new;
 ....
 
-The two ends of the manifests policy (synth-time filter, link-time overlay) both
+The two ends of the manifests policy (synth-time filter, publish-time overlay) both
 derive from its facet, in-container — dissolving the former host-side policy leak.
 `fromSystemProperties()` (CLI) and `toEnvMap()` (seed) collapse into this one
 facet-translation. `Readiness`/`Preview` become the cluster/systemd facets of the

@@ -14,8 +14,8 @@ bool_is_true() {
 	esac
 }
 
-if [[ -n "${RKE2LAB_POLICY_LINK_NETWORKING_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_POLICY_LINK_NETWORKING_ENABLED}"; then
-	echo "[rke2-cilium-ready] policy disables networking layer; skipping cilium readiness checks"
+if [[ -n "${RKE2LAB_MANIFESTS_PUBLISH_NETWORKING_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_MANIFESTS_PUBLISH_NETWORKING_ENABLED}"; then
+	echo "[rke2-cilium-ready] publishing disabled for networking layer; skipping cilium readiness checks"
 	exit 0
 fi
 

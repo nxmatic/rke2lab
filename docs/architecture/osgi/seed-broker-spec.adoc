@@ -235,7 +235,7 @@ remain (piece 2, with the manifests scion).
 === `@Amendment` — the schema says the SHAPE, the role says WHICH state fills it
 
 Shape answers "what is the FORM of the payload" (a JSON Schema: an `outdir` string, a
-`link` object). It does NOT answer "which of the host's states goes into `outdir`" —
+`publish` object). It does NOT answer "which of the host's states goes into `outdir`" —
 and it cannot: the schema describes the wire-record, it knows nothing of
 `BootstrapPaths` and its seventeen roots. That second half is the missing piece a
 sower hits the instant it tries to fill a payload from real state.
@@ -253,14 +253,15 @@ aval they meet on `Role`:
 ----
 @SeedContract("runbook")
 public record ManifestsRunbookInput(
-    @Amendment(Amendment.FACET) LinkFacet link,     // host fills FACET from Rke2labConfig.policy()
+    @Amendment(Amendment.FACET) PublishFacet publish,  // host is to fill FACET by blind subtree copy from manifests.publish (not yet wired: seed path amends only SOIL → defaults)
     @Amendment(Amendment.FACET) DebugFacet debug,
-    @Amendment(Amendment.SOIL)  Path materializationRoot) {}  // host fills SOIL from BootstrapPaths
+    @Amendment(Amendment.SOIL)  String materializationRoot) {}  // host fills SOIL from BootstrapPaths
 
 // host, amending the soil before it sows (the WHICH is an explicit host affixation,
 // exactly as materializeToStaging chose stagingManifestsRoot on main):
-//   amendment SOIL  <- paths.asStagingView(slot).manifestsRoot()
-//   amendment FACET <- controlplanePolicy's link/debug facet
+//   amendment SOIL  <- paths.asStagingView(slot).manifestsRoot()   (wired)
+//   amendment FACET <- blind subtree copy from manifests.publish / manifests.debug
+//                      (designed, NOT yet wired: the FACETs fall to defaults())
 ----
 
 `Amendment` is a neutral vocabulary of String constants (the twin of `Role`): `SOIL`
@@ -366,7 +367,7 @@ stays in `seed-broker-shape` with its victools weight) is the broker-generic rol
 JSON: given a record's
 `defaults` and a `{role → value}` map, it binds each offered role onto the `@Amendment` component that role
 names (loud on absent/ambiguous; a role borne by several components — `ManifestsRunbookInput` marks both
-`link` and `debug` FACET — is fine unless offered). A domain contributes a `@Component` amend reflector
+`publish` and `debug` FACET — is fine unless offered). A domain contributes a `@Component` amend reflector
 (`ManifestsAmendReflector` serves `AmendCoordinate("manifests")`, binding onto `ManifestsRunbookInput`).
 
 This is where the broker earns its role as the door that RECONCILES two points of view: incus (the first

@@ -74,7 +74,7 @@ graph TB
     subgraph "rke2lab control plane"
         CONFIG["Rke2labConfig<br/>single config reader"]
         BOOT["BootstrapConfig<br/>provisioning params"]
-        POLICY["PolicyConfig<br/>raw policy facet (in the DTO)"]
+        POLICY["ProvisioningPolicyConfig<br/>lan-binding + git-dirty-check (in the DTO)"]
         PIPE["ApplicationPipeline<br/>orchestration"]
     end
 
@@ -93,8 +93,10 @@ graph TB
 ----
 
 * *Rke2labConfig* (green = new) is the single point where Pulumi config is read.
-* *BootstrapConfig* is *derived* from the DTO and never touches Pulumi `Config` again; the raw
-  *PolicyConfig* is carried in the DTO and read by the manifests scion from its sown facet.
+* *BootstrapConfig* is *derived* from the DTO and never touches Pulumi `Config` again; the DTO also
+  carries the raw *ProvisioningPolicyConfig* (lan-binding, git-dirty-check). The manifests
+  publish/debug concern is NOT a DTO field — it is the `rke2lab:manifests` runbook facet sown to the
+  manifests scion.
 * The pipeline consumes the derived config to provision Incus and read repo assets.
 
 == C4 Level 2 - Configuration components
@@ -125,7 +127,7 @@ graph TB
 
     DTO["Rke2labConfig<br/>immutable DTO"]
     BOOT["BootstrapConfig"]
-    POL["PolicyConfig<br/>(raw, in the DTO)"]
+    POL["ProvisioningPolicyConfig<br/>(raw, in the DTO)"]
 
     PULUMI --> LOADER
     LOADER -->|"missing mandatory key"| EXC
@@ -135,7 +137,7 @@ graph TB
     REGISTRY --> DTO
     XID --> DTO
     DTO -->|"derive / BootstrapConfig.from"| BOOT
-    DTO -->|"carries (read by manifests scion)"| POL
+    DTO -->|"carries"| POL
 
     style LOADER fill:#90EE90,stroke:#2e7d32
     style REGISTRY fill:#90EE90,stroke:#2e7d32
@@ -169,8 +171,9 @@ graph TB
   loaded directly. No defaults, no logic beyond load-time mandatory validation.
 
 | `BootstrapConfig`
-| Optional-free view *derived* from the DTO. Defaults applied here. (The policy stays raw as
-  `PolicyConfig` in the DTO; the manifests scion derives its domain policy from the sown facet.)
+| Optional-free view *derived* from the DTO. Defaults applied here. (The `ProvisioningPolicyConfig`
+  stays raw in the DTO; the manifests publish/debug concern is a separate `rke2lab:manifests` runbook
+  facet sown to the manifests scion, not a DTO field.)
 |===
 
 == Detailed design
@@ -190,7 +193,7 @@ classDiagram
         +NodeConfig node
         +ApiConfig api
         +KubeconfigConfig kubeconfig
-        +PolicyConfig policy
+        +ProvisioningPolicyConfig provisioning
         +ReadinessConfig readiness
         +incus() IncusConfig
         +image() ImageConfig
@@ -231,13 +234,13 @@ classDiagram
         +Optional~Integer~ rotationRetentionCount
     }
 
-    class PolicyConfig {
-        +LinkPolicyConfig link
-        +ReadinessPolicyConfig readiness
+    class ProvisioningPolicyConfig {
+        +Optional~Boolean~ lanBinding
+        +Optional~Boolean~ gitDirtyCheck
     }
 
     Rke2labConfig *-- InfraConfigRegistry
-    Rke2labConfig *-- PolicyConfig
+    Rke2labConfig *-- ProvisioningPolicyConfig
     InfraConfigRegistry o-- InfraConfigFragment
     InfraConfigFragment <|.. IncusConfig
     InfraConfigFragment <|.. ImageConfig
@@ -342,15 +345,15 @@ graph LR
         ID["incus, image, network,<br/>worktree, systemd, host"]
         IDC --- ID
     end
-    LINK["policy.link.* flags"] -->|"key off"| MDC
+    PUB["manifests.publish.* flags"] -->|"key off"| MDC
     XID["incus.*, image.*, worktree.*"] -->|"tagged by"| IDC
 
     style MDC fill:#B0C4DE,stroke:#1565c0
     style IDC fill:#90EE90,stroke:#2e7d32
 ----
 
-* `policy.link.*` flags *are* manifest-domain IDs, so the manifests scion's policy derivation MUST
-  resolve them through `ManifestDomainCatalog` accessors (the `clusterApi`-vs-`cluster-api`
+* `manifests.publish.*` flags *are* manifest-domain IDs, so the manifests scion's policy derivation
+  MUST resolve them through `ManifestDomainCatalog` accessors (the `clusterApi`-vs-`cluster-api`
   discipline) - never a hardcoded switch.
 * Stage-A infra keys are tagged by `InfraDomainCatalog` for symptom routing.
 * Cross-cutting identity (`cluster.name`, `node.name`, `api.endpoint`, `kubeconfig.ref`,
@@ -359,9 +362,10 @@ graph LR
 === Deriving the runtime config
 
 The DTO carries `Optional` and no defaults. Turning it into the Optional-free `BootstrapConfig`
-is where `Optional` becomes concrete and where every default lives. The policy is NOT derived into
-a host type: the raw `PolicyConfig` stays in the DTO, and the manifests scion derives its domain
-policy from the sown facet.
+is where `Optional` becomes concrete and where every default lives. The manifests publish/debug
+concern is NOT derived into a host type: it is the `rke2lab:manifests` runbook facet sown to the
+manifests scion, which derives its own domain policy from it. The DTO carries only the raw
+`ProvisioningPolicyConfig` (lan-binding, git-dirty-check).
 
 [mermaid]
 ----
@@ -371,7 +375,7 @@ graph LR
         S1["apply defaults<br/>→ Optional-free"]
     end
     BOOT["BootstrapConfig<br/>(Optional-free)"]
-    POL["PolicyConfig<br/>(raw, carried by the DTO)"]
+    POL["ProvisioningPolicyConfig<br/>(raw, carried by the DTO)"]
 
     DTO --> derive
     S1 --> BOOT
@@ -386,7 +390,7 @@ graph LR
   labelled `PipelineStageFailure(label, cause)`.
 * Defaults are literal `orElse(...)` at this single site - every default that used to hide in
   `BootstrapConfig.Defaults` (env vars, `user.home`, JGit) becomes a visible literal here.
-* The manifests scion builds a `link-by-catalog-id` map by pairing each `ManifestDomainCatalog`
+* The manifests scion builds a `publish-by-catalog-id` map by pairing each `ManifestDomainCatalog`
   accessor with its facet getter, so a caller querying `CATALOG.clusterApi()` can never miss.
 
 === YAML configuration structure
@@ -422,9 +426,16 @@ config:
   rke2lab:systemd:
     dbusHost: bioskop-master
     dbusPort: 12434
+  rke2lab:manifests:
+    publish: { gitops: true, networking: true, clusterApi: true, storage: true,
+               mesh: false, highAvailability: true, cicd: true }
+    debug:
+      mesh: { enabled: false }
+      networking: { enabled: false }
+      nriPlugins: { flox: { enabled: false } }
   rke2lab:policy:
-    link: { gitops: true, networking: true, clusterApi: true, storage: true,
-            mesh: false, highAvailability: false, cicd: false, platform: false, runtime: true }
+    network: { lan: { binding: { enabled: true } } }
+    gitDirtyCheck: { enabled: true }
     readiness:
       override: { systemd-adapter: warning }
       simulate: {}
@@ -561,8 +572,8 @@ domain specialists for the *why* is the only part that waits for the doctor.
 | Each `orElse` default applied; result Optional-free.
 
 | Policy catalog-keying
-| `isLinkEnabled(CATALOG.clusterApi())` returns the value set under `policy.link.clusterApi` -
-  guards the kebab/camel mismatch.
+| `policy.isEnabled(CATALOG.clusterApi())` returns the value set under `manifests.publish.clusterApi`
+  - guards the kebab/camel mismatch.
 
 | Doctor remediation (D)
 | Accumulated keys route by domain to the right specialist; one `RemediationPlan`; missing
@@ -664,5 +675,6 @@ each self-load their fragment via `contribute(ConfigLoader)`; the DTO is assembl
 `InfraDomain.values()`. (The open `InfraDomainRegistrar`/`InfraConfigRegistry` form this spec's
 diagrams draw is the future p2p evolution — see § <<open-registrar-p2p>>.) `BootstrapConfig`
 exposes `from(Rke2labConfig)` (its old `Builder`/`Config`/`EnvironmentValues`
-readers gone); the policy is carried raw as `PolicyConfig` in the DTO (the manifests scion derives
-its domain policy from the sown facet); `ConfigResolver` is gone; `Pulumi.dev.yaml` is nested.
+readers gone); the DTO carries the raw `ProvisioningPolicyConfig` (lan-binding, git-dirty-check),
+while the manifests publish/debug concern is the `rke2lab:manifests` runbook facet sown to the
+manifests scion (not a DTO field); `ConfigResolver` is gone; `Pulumi.dev.yaml` is nested.

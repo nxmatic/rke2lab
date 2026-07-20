@@ -27,9 +27,9 @@ bool_is_true() {
 	esac
 }
 
-policy_link_var_name() {
+manifests_publish_var_name() {
 	local layer_key="${1:?layer key required}"
-	printf 'RKE2LAB_POLICY_LINK_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
+	printf 'RKE2LAB_MANIFESTS_PUBLISH_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
 }
 
 link_layer_if_enabled() {
@@ -39,7 +39,7 @@ link_layer_if_enabled() {
 	local default_enabled="${4:?default required}"
 	local var_name enabled_value source_path target_path
 
-	var_name="$(policy_link_var_name "${layer_key}")"
+	var_name="$(manifests_publish_var_name "${layer_key}")"
 	enabled_value="${!var_name:-${default_enabled}}"
 	source_path="${RKE2LAB_MANIFESTS_DIR}/${source_rel}"
 	target_path="${MANIFESTS_DIR}/${target_rel}"
