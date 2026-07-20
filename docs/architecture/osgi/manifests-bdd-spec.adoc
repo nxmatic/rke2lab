@@ -33,15 +33,13 @@ flowchart TB
     handler["ManifestsRunbookHandler<br/>serves RunbookCoordinate('manifests')"]
     front["ManifestsBddScenarios.run(trigger)<br/>in-container JUnit launcher"]
     scen["ManifestSynthesisScenario<br/>resolves synthesis service from registry (mode-blind)"]
-    svc["ManifestSynthesisService (SCR)"]
-    overlay["NodeEnvOverlayService.writeControlplaneOverlay"]
+    svc["ManifestSynthesisService (SCR)<br/>synthesises manifests + env-config ConfigMaps"]
   end
 
   caller -->|"sow(RunbookCoordinate('manifests'), policyJSON)"| broker
   broker -->|routes| handler
   handler --> front --> scen
   scen -->|synth-time| svc
-  scen -->|publish-time| overlay
   scen -.->|RunbookEnvelope JSON| handler
   handler -.->|reaped SeedEnvelope| broker
   broker -.->|runbook JSON| caller
@@ -211,22 +209,23 @@ with two distinct ends, and the scion owns BOTH:
 | in-container (manifests-core) — correct already
 
 | *publish-time* | which layers the master *publishes live* — the `RKE2LAB_MANIFESTS_PUBLISH_*`
-  env vars written into the `99-…env-config` overlay
-  (`NodeEnvOverlayService.writeControlplaneOverlay(seedVariables)`), read by
-  `rke2lab-manifests-install.sh` and the per-layer `*-ready.sh` gates on the master
-| **in-container** — the scion derives the vars from its facet and writes the overlay
+  env vars emitted as an env-config section by `PublishNodeEnvContributor` (one variable per
+  publishable domain, read from the `ManifestDomainPolicy`), read by `rke2lab-manifests-install.sh`
+  and the per-layer `*-ready.sh` gates on the master
+| **in-container** — the scion derives the policy from its facet; the contributor emits the vars
 |===
 
 Both ends derive from the SAME operator choice, and the scion covers both:
 
 * from its facet (the `manifests` sub-map of the one policy, § the single path), the
-  scion derives BOTH the `ManifestDomainPolicy` (synth-time filter) AND the
-  `RKE2LAB_MANIFESTS_PUBLISH_*` seed variables (publish-time overlay) — it owns the
-  `RKE2LAB_MANIFESTS_PUBLISH_<X>_ENABLED` naming, so this is legitimate in-container;
-* the scenario's synthesis step drives `writeControlplaneOverlay` with those
-  seed variables, so the `99-…` overlay lands with
-  the right `RKE2LAB_MANIFESTS_PUBLISH_*` — the master's install/ready scripts see exactly
-  what they need (the founding rule: invisible at the master frontier).
+  scion derives the `ManifestDomainPolicy` — synth-time it filters the domain registry, and at
+  synthesis the `PublishNodeEnvContributor` reads it off the `NodeEnvContext` to emit the
+  `RKE2LAB_MANIFESTS_PUBLISH_<X>_ENABLED` variables (it owns that naming, so this is legitimate
+  in-container);
+* the synthesis service runs the contributor as a normal env-config section, so the publish
+  variables land in the env-config ConfigMaps with the right `RKE2LAB_MANIFESTS_PUBLISH_*` — the
+  master's install/ready scripts see exactly what they need (the founding rule: invisible at the
+  master frontier).
 
 This is why the scion is the natural home: it is the single point that already knows
 the catalog, and it can satisfy both ends from one payload without any host type
@@ -244,8 +243,8 @@ the `RKE2LAB_MANIFESTS_PUBLISH_*` naming, so no host type names `manifests.contr
 Both ends are covered in one place:
 
 * *synth-time* — `ManifestDomainPolicy` filters which domains synthesize;
-* *publish-time* — the scion writes the `RKE2LAB_MANIFESTS_PUBLISH_*` overlay
-  (`writeControlplaneOverlay` → the `99-…env-config` ConfigMap). On the master those
+* *publish-time* — `PublishNodeEnvContributor` emits the `RKE2LAB_MANIFESTS_PUBLISH_*`
+  variables as an env-config section (from the same `ManifestDomainPolicy`). On the master those
   vars are sourced into the systemd env, and `rke2lab-manifests-install.sh <layer>`
   reads `RKE2LAB_MANIFESTS_PUBLISH_<LAYER>_ENABLED`: an enabled layer is STOWED (its
   non-local-config manifests `ln -sfn`'d into rke2's server manifest dir, where rke2
@@ -304,14 +303,13 @@ the scenario's — the preview inertness the map requires, lifted out of the sce
 
 [listing]
 ----
-GIVEN the activation payload (which domains the operator enabled)
+GIVEN the activation facet (which domains the operator enabled)
   AND the synthesis service, resolved from this bundle's registry
-WHEN the policy is derived from the payload          [the scion builds BOTH ends: ManifestDomainPolicy + the RKE2LAB_MANIFESTS_PUBLISH_* seed vars]
-  AND the manifests are synthesized                  [service.synthesize(request) → the K8s/systemd/rke2-config tree, filtered synth-time]
-  AND the controlplane overlay is written             [writeControlplaneOverlay(seedVars) → the 99-… env-config with RKE2LAB_MANIFESTS_PUBLISH_*]
+WHEN the policy is derived from the facet            [the scion builds the ManifestDomainPolicy — synth-time filter AND the source the publish contributor reads]
+  AND the manifests are synthesized                  [service.synthesize(request) → the K8s/systemd/rke2-config tree + env-config ConfigMaps, filtered synth-time]
 THEN every enabled domain produced its units         [domainCount matches the enabled set]
-  AND the materialized tree is complete               [manifestFile + systemdUnitsDir exist, hit count > 0]
-  AND the overlay carries the publish-time policy      [RKE2LAB_MANIFESTS_PUBLISH_* match the enabled set — what the master's scripts read]
+  AND the manifests file is written                   [the consolidated manifestFile exists, hit count > 0]
+  AND the publish env section is synthesized          [PublishNodeEnvContributor's RKE2LAB_MANIFESTS_PUBLISH_* match the enabled set — what the master's scripts read]
 ----
 
 No doctor consult. A synthesis `IOException` or an empty domain set fails the step —

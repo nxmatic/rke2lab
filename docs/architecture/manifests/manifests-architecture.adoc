@@ -373,7 +373,6 @@ graph LR
       EXPL["ManifestExplodeService<br/>explode(request) → result"]
       DOC["ManifestDocumentService<br/>deterministic YAML read"]
       FLOX["FloxRuntimeAssetService<br/>materialise installer assets"]
-      NEO["NodeEnvOverlayService<br/>render env-config ConfigMaps"]
       REQ["ManifestExplodeRequest / …Result<br/>value records"]
       ANN["ManifestAnnotations<br/>domain/package/order stamps"]
       PAW["ManifestDomainPolicyAware<br/>marker"]
@@ -384,13 +383,11 @@ graph LR
     H -->|calls| EXPL
     H -->|calls| DOC
     H -->|calls| FLOX
-    H -->|calls| NEO
     EXPL -.->|in/out| REQ
     EXPL -.->|reads stamps| ANN
     C -.->|implements| EXPL
     C -.->|implements| DOC
     C -.->|implements| FLOX
-    C -.->|implements| NEO
     style port fill:#e1f5ff,stroke:#0066cc
     style core fill:#e1ffe1,stroke:#00cc00
 ----
@@ -426,12 +423,6 @@ graph LR
   per-environment `.flox` trees, NRI plugin sources, debug tooling. The host asks for the tree to be
   written and reads which environments were discovered; laying out the assets is description, so it
   lives here.
-
-| `NodeEnvOverlayService`
-| SPI synthesising the controlplane runtime env-config overlay — each domain's per-section ConfigMap
-  plus the aggregated `99-configmap` — and returning a snapshot of what the contributor registry
-  produced. The host supplies only its resolved seed variables and consumes the files; it never
-  serialises YAML nor reaches into the contributor registry.
 
 | `ManifestDomainPolicyAware`
 | Marker contract for models that explicitly carry manifest-domain policy.
@@ -650,7 +641,6 @@ graph TB
     subgraph svc["Default* SPI impls (@Component)"]
       DDOC["DefaultManifestDocumentService"]
       DEXP["DefaultManifestExplodeService"]
-      DNEO["DefaultNodeEnvOverlayService"]
       DFLOX["DefaultFloxRuntimeAssetService"]
     end
     subgraph regs["domain registrars (ManifestsDomainRegistrar)"]
@@ -662,6 +652,7 @@ graph TB
     end
     subgraph node["node environment"]
       NIC["NodeEnvIdentityContributor"]
+      PNEC["PublishNodeEnvContributor"]
       DNEC["DefaultNodeEnvContext"]
     end
     subgraph prof["pod + sidecar profiles"]
@@ -695,10 +686,6 @@ the seam.
 | `DefaultManifestExplodeService`
 | Implements `ManifestExplodeService`: splits a multi-document synthesis into per-resource files by
   domain/package with order-prefixed names (CRDs, cluster-scoped, namespace-scoped).
-
-| `DefaultNodeEnvOverlayService`
-| Implements `NodeEnvOverlayService`: aggregates registered contributors and writes the ConfigMap
-  overlay (seed variables + per-layer sections).
 
 | `DefaultFloxRuntimeAssetService`
 | Implements `FloxRuntimeAssetService`: materialises the flox installer assets and reports the
@@ -752,6 +739,13 @@ cross-domain ordering.
 | `NodeEnvIdentityContributor`
 | A `NodeEnvContributor` contributing node-identity variables (ID, name, kind) and canonical path
   references for the node domain.
+
+| `PublishNodeEnvContributor`
+| A `NodeEnvContributor` emitting the `RKE2LAB_MANIFESTS_PUBLISH_<domain>_ENABLED` variables — one
+  per publishable domain (`ManifestDomainCatalog.stageALinkableDomains()`), read from the
+  `ManifestDomainPolicy` on the `NodeEnvContext`. This is the publish activation the systemd
+  stow/readiness scripts gate on, contributed as a normal env-config section (design (ii)) rather
+  than an out-of-band overlay.
 
 | `DefaultNodeEnvContext`
 | The `NodeEnvContext` implementation: synthesis-time node/cluster paths, network addresses and

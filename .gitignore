@@ -1,8 +1,9 @@
 # @codebase
 # Build outputs
 target/
-# Alternate build directory used by the `nxmatic` Maven profile (parallel builds)
+# Alternate build directories used by the `nxmatic` / `claude` Maven profiles (parallel builds)
 target~nxmatic/
+target~claude/
 # jGiven report JSON emitted by scenario runs (regenerable)
 jgiven-reports/
 # Claude scratch working area (never committed)

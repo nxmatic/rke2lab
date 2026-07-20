@@ -844,6 +844,15 @@
         <directory>target~nxmatic</directory>
       </build>
     </profile>
+    <!-- The twin of nxmatic for the agent's builds: a separate target~claude so agent runs never
+         race the IDE's continuous build over the shared target/ (a stale IDE-compiled class would
+         otherwise be loaded at test time). -->
+    <profile>
+      <id>claude</id>
+      <build>
+        <directory>target~claude</directory>
+      </build>
+    </profile>
     <!-- Test selection by tag. The default build excludes 'live | spike'
          (see the surefire.excludedGroups property). These profiles re-include
          or narrow by tag; -Dgroups=… / -DexcludedGroups=… still work for ad hoc

@@ -19,18 +19,23 @@ import org.osgi.service.log.LogLevel;
  * The bare-JVM proxy (VSCode-clickable) that runs the manifests scion's in-container proof. It
  * boots a Felix carrying BOTH worlds — the JUnit bundles (via the runner) and the jGiven boot
  * closure (via {@link ScenarioTestkit#felix()}, since the scenario is a jGiven ScenarioTest) —
- * installs the manifests-bdd host bundle and this {@code -test} fragment PLUS manifests-bdd's whole
- * runtime graph (its own import closure pulls manifests-core, the cdk8s carrier + systemd fragment,
- * the sibling ports, the pipeline engine, unitrepo-core, and the third-party OSGi bundles),
- * resolves the host (attaching the fragment, OSGi Core §3.14), then drives {@code
- * ManifestsBddTests} FROM INSIDE the framework. Resolving the host IS the live proof that the
- * scion's graph wires in-container.
+ * installs the manifests-bdd host bundle and this {@code -test} fragment PLUS manifests-core (the
+ * real synthesis impl) and BOTH their import closures (the cdk8s carrier + systemd fragment, the
+ * sibling ports, the pipeline engine, unitrepo-core, and the third-party OSGi bundles), resolves
+ * the host (attaching the fragment, OSGi Core §3.14), then drives {@code ManifestsBddTests} FROM
+ * INSIDE the framework. Resolving the host IS the live proof that the scion's graph wires
+ * in-container.
  *
- * <p>Unlike the bbox proof, the scenario resolves the REAL synthesis (manifests-core's DS
- * {@code @Component}s), so {@code .withScr()} must run for them to activate. The one collaborator
- * not SCR-published is the {@link io.nxmatic.rke2lab.seed.broker.port.RunGate} — the passenger
- * registers a mock in-container, on the shared fragment loader, so nothing crosses to the host JVM
- * and only {@code seed.broker.port} (the one true host↔OSGi membrane) is system-exported.
+ * <p>manifests-core is installed EXPLICITLY (not left to the host's import closure): the scenario
+ * reaches the synthesis through its {@code ManifestSynthesisService} interface, which lives in
+ * manifests-contract, so the closure wires that package to manifests-contract and never pulls the
+ * impl bundle — the {@code @Component}s would then be absent and the {@code @OsgiService} would
+ * find nothing. Unlike the bbox proof, this scion resolves the REAL synthesis (manifests-core's DS
+ * {@code @Component}s), so {@code .withScr()} must run for them to activate. Its one non-SCR
+ * collaborator is the {@link io.nxmatic.rke2lab.manifests.contract.SshToAgeConverter} edge (a pure
+ * external-tool seam) — the passenger registers a stub in-container, on the shared fragment loader,
+ * so nothing crosses to the host JVM and only {@code seed.broker.port} (the one true host↔OSGi
+ * membrane) is system-exported.
  */
 @OsgiWorld
 // Flip to LogLevel.DEBUG to troubleshoot a failed in-container resolve/activation
@@ -47,33 +52,43 @@ class ManifestsBddInContainerTest {
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
       ScenarioTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
-          // manifests-core carries @Components (the synthesis + overlay services), so its bundle
-          // Requires the DS extender (osgi.extender=osgi.component); felix.scr must run for them to
-          // resolve and activate — the scenario resolves the REAL services, not mocks.
+          // manifests-core carries the synthesis @Components, so its bundle Requires the DS
+          // extender
+          // (osgi.extender=osgi.component); felix.scr must run for them to resolve and activate —
+          // the scenario resolves the REAL synthesis, not mocks.
           .withScr()
           // The ONE package still system-exported is seed.broker.port (RunGate + SeedEnvelope — the
           // one true host↔OSGi membrane, published by the host in prod). Everything else
-          // (manifests-contract, manifests-core, the cdk8s carrier, seed-broker-codec, jackson,
-          // jGiven) is derived from the host bundle's manifest in the test body via
-          // installImportClosureOf.
+          // (manifests-contract, the cdk8s carrier, seed-broker-codec, jackson, jGiven) is derived
+          // from the import closures in the test body; manifests-core itself is installed
+          // explicitly
+          // (its service package resolves to manifests-contract, so the closure never pulls it).
           .systemPackages("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
           // The JUnit-Platform runner world (launcher + engine) the front-door drives in-container.
           .withJUnitRunner()
           .build();
 
+  // The bundle carrying the REAL synthesis @Components (DefaultManifestSynthesisService and its
+  // collaborators). Its service interfaces live in manifests-contract, so the host's import closure
+  // wires the contract package to manifests-contract and NEVER pulls the impl bundle — this scion
+  // must install it explicitly (unlike bbox/incus/cluster, which mock their collaborators and need
+  // no impl bundle in-container).
+  private static final String CORE_BSN = "io.nxmatic.rke2lab.manifests.core";
+
   @TestFactory
   Stream<DynamicTest> scionTests() throws Exception {
     // The shared driver installs the fixture + its host (found through the fragment's
-    // Fragment-Host),
-    // pulls the host's own import closure, resolves+starts it, and runs the front-door
-    // in-container.
+    // Fragment-Host)
+    // AND manifests-core (the real synthesis impl), pulls both import closures, resolves+starts the
+    // graph, and runs the front-door in-container.
     return InContainerScenarios.drive(
         felix,
         RUNNER_FQN,
         f -> {
           final Bundle host = f.installFixtureWithHost(BDD_FIXTURE).host();
-          final List<Bundle> toResolve = new ArrayList<>(List.of(host));
-          toResolve.addAll(f.installImportClosureOf(host));
+          final Bundle core = f.install(CORE_BSN);
+          final List<Bundle> toResolve = new ArrayList<>(List.of(host, core));
+          toResolve.addAll(f.installImportClosureOf(host, core));
           return new Provisioning(host, toResolve, true);
         });
   }
