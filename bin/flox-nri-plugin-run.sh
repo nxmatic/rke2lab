@@ -12,10 +12,10 @@ echo "Checking for GC root..."
 GC_ROOT_PATH="/nix/var/nix/gcroots/flox-runtime/flox-nri-plugin"
 
 if [ ! -L "${GC_ROOT_PATH}" ]; then
-	echo "ERROR: NRI plugin GC root not found: ${GC_ROOT_PATH}" >&2
-	echo "Listing /nix/var/nix/gcroots/flox-runtime/:" >&2
-	ls -la /nix/var/nix/gcroots/flox-runtime/ || echo "Directory does not exist" >&2
-	exit 1
+    echo "ERROR: NRI plugin GC root not found: ${GC_ROOT_PATH}" >&2
+    echo "Listing /nix/var/nix/gcroots/flox-runtime/:" >&2
+    ls -la /nix/var/nix/gcroots/flox-runtime/ || echo "Directory does not exist" >&2
+    exit 1
 fi
 
 # Resolve the symlink to get the actual Nix store path
@@ -26,22 +26,22 @@ echo "Symlink points to: ${PLUGIN_PKG_PATH}"
 # If relative, make it absolute
 case "${PLUGIN_PKG_PATH}" in
 /*)
-	# Already absolute
-	;;
+    # Already absolute
+    ;;
 *)
-	# Relative, make absolute
-	PLUGIN_PKG_PATH="$(cd "$(dirname "${GC_ROOT_PATH}")" && cd "${PLUGIN_PKG_PATH}" && pwd)"
-	;;
+    # Relative, make absolute
+    PLUGIN_PKG_PATH="$(cd "$(dirname "${GC_ROOT_PATH}")" && cd "${PLUGIN_PKG_PATH}" && pwd)"
+    ;;
 esac
 
 echo "Resolved to: ${PLUGIN_PKG_PATH}"
 PLUGIN_BIN="${PLUGIN_PKG_PATH}/bin/flox-nri-plugin"
 
 if [ ! -x "${PLUGIN_BIN}" ]; then
-	echo "ERROR: NRI plugin binary not found or not executable: ${PLUGIN_BIN}" >&2
-	echo "Listing ${PLUGIN_PKG_PATH}/bin/:" >&2
-	ls -la "${PLUGIN_PKG_PATH}/bin/" || echo "Directory does not exist" >&2
-	exit 1
+    echo "ERROR: NRI plugin binary not found or not executable: ${PLUGIN_BIN}" >&2
+    echo "Listing ${PLUGIN_PKG_PATH}/bin/:" >&2
+    ls -la "${PLUGIN_PKG_PATH}/bin/" || echo "Directory does not exist" >&2
+    exit 1
 fi
 
 echo "Found NRI plugin binary: ${PLUGIN_BIN}"

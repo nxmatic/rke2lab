@@ -46,14 +46,14 @@ container_id="$(printf '%s' "$state" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*
 echo "hook invoked container=${container_id} bundle=${bundle} name=${overlay_name} lower=${lower_source} target=${target_rel}"
 
 if [ -z "$bundle" ]; then
-	echo "ERROR: could not parse bundle path from OCI state" >&2
-	exit 1
+    echo "ERROR: could not parse bundle path from OCI state" >&2
+    exit 1
 fi
 
 rootfs="${bundle%/}/rootfs"
 if [ ! -d "$rootfs" ]; then
-	echo "ERROR: rootfs does not exist: ${rootfs}" >&2
-	exit 1
+    echo "ERROR: rootfs does not exist: ${rootfs}" >&2
+    exit 1
 fi
 
 target="${rootfs}${target_rel}"
@@ -82,7 +82,7 @@ container_upper="/.overlays.d/${overlay_name}/rw/upper"
 container_work="/.overlays.d/${overlay_name}/rw/work"
 
 chroot "$rootfs" mount -t overlay overlay \
-	-o "lowerdir=${container_lower},upperdir=${container_upper},workdir=${container_work}" \
-	"${target_rel}"
+    -o "lowerdir=${container_lower},upperdir=${container_upper},workdir=${container_work}" \
+    "${target_rel}"
 
 exit 0

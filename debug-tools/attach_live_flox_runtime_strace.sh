@@ -7,7 +7,7 @@ source "${SCRIPT_DIR}/.sh.d/rke2lab-debug-tooling.sh"
 rke2lab::debug:logging:setup "${BASH_SOURCE[0]}"
 
 usage() {
-	cat <<'EOF'
+    cat <<'EOF'
 Usage:
   attach_live_flox_runtime_strace.sh --plugin-id <sandbox-id> [--log-root <dir>] [--output-dir <dir>]
   attach_live_flox_runtime_strace.sh --pid <plugin-pid> [--log-root <dir>] [--output-dir <dir>]
@@ -31,61 +31,61 @@ TARGET_PID=""
 TARGET_PLUGIN_ID=""
 
 while [[ $# -gt 0 ]]; do
-	case "$1" in
-	--pid)
-		TARGET_PID="${2:-}"
-		shift 2
-		;;
-	--plugin-id | --id)
-		TARGET_PLUGIN_ID="${2:-}"
-		shift 2
-		;;
-	--log-root)
-		LOG_ROOT="${2:-}"
-		shift 2
-		;;
-	--output-dir)
-		OUTPUT_DIR="${2:-}"
-		shift 2
-		;;
-	-h | --help)
-		usage
-		exit 0
-		;;
-	*)
-		echo "unknown argument: $1" >&2
-		usage >&2
-		exit 2
-		;;
-	esac
+    case "$1" in
+    --pid)
+        TARGET_PID="${2:-}"
+        shift 2
+        ;;
+    --plugin-id | --id)
+        TARGET_PLUGIN_ID="${2:-}"
+        shift 2
+        ;;
+    --log-root)
+        LOG_ROOT="${2:-}"
+        shift 2
+        ;;
+    --output-dir)
+        OUTPUT_DIR="${2:-}"
+        shift 2
+        ;;
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    *)
+        echo "unknown argument: $1" >&2
+        usage >&2
+        exit 2
+        ;;
+    esac
 done
 
 if [[ -z "${TARGET_PID}" && -z "${TARGET_PLUGIN_ID}" ]]; then
-	echo "either --pid or --plugin-id is required" >&2
-	usage >&2
-	exit 2
+    echo "either --pid or --plugin-id is required" >&2
+    usage >&2
+    exit 2
 fi
 
 find_strace() {
-	local candidate
-	for candidate in "$(command -v strace 2>/dev/null || true)" /usr/bin/strace /bin/strace; do
-		if [[ -n "${candidate}" && -x "${candidate}" ]]; then
-			printf '%s\n' "${candidate}"
-			return 0
-		fi
-	done
-	return 1
+    local candidate
+    for candidate in "$(command -v strace 2>/dev/null || true)" /usr/bin/strace /bin/strace; do
+        if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 STRACE_BIN="$(find_strace || true)"
 if [[ -z "${STRACE_BIN}" ]]; then
-	echo "strace not found" >&2
-	exit 1
+    echo "strace not found" >&2
+    exit 1
 fi
 
 if [[ -z "${TARGET_PID}" ]]; then
-	TARGET_PID="$(
-		python3 - "${TARGET_PLUGIN_ID}" <<'PY'
+    TARGET_PID="$(
+        python3 - "${TARGET_PLUGIN_ID}" <<'PY'
 import os
 import sys
 
@@ -126,20 +126,20 @@ if not matches:
 matches.sort()
 print(matches[-1][0])
 PY
-	)" || {
-		echo "could not find a live flox-nri-plugin daemon for sandbox id ${TARGET_PLUGIN_ID}" >&2
-		exit 1
-	}
+    )" || {
+        echo "could not find a live flox-nri-plugin daemon for sandbox id ${TARGET_PLUGIN_ID}" >&2
+        exit 1
+    }
 fi
 
 if [[ ! -d "/proc/${TARGET_PID}" ]]; then
-	echo "pid ${TARGET_PID} is not running" >&2
-	exit 1
+    echo "pid ${TARGET_PID} is not running" >&2
+    exit 1
 fi
 
 read_proc_value() {
-	local path="$1"
-	python3 - "$path" <<'PY'
+    local path="$1"
+    python3 - "$path" <<'PY'
 import os
 import sys
 path = sys.argv[1]
@@ -163,23 +163,23 @@ TASK_DIR="/proc/${TARGET_PID}/task"
 
 mapfile -t CMDLINE < <(read_proc_value "${CMDLINE_FILE}")
 if [[ ${#CMDLINE[@]} -eq 0 ]]; then
-	echo "failed to read cmdline for pid ${TARGET_PID}" >&2
-	exit 1
+    echo "failed to read cmdline for pid ${TARGET_PID}" >&2
+    exit 1
 fi
 
 if [[ -z "${TARGET_PLUGIN_ID}" ]]; then
-	prev=""
-	for arg in "${CMDLINE[@]}"; do
-		if [[ "${prev}" == "-id" ]]; then
-			TARGET_PLUGIN_ID="${arg}"
-			break
-		fi
-		prev="${arg}"
-	done
+    prev=""
+    for arg in "${CMDLINE[@]}"; do
+        if [[ "${prev}" == "-id" ]]; then
+            TARGET_PLUGIN_ID="${arg}"
+            break
+        fi
+        prev="${arg}"
+    done
 fi
 
 CWD="$(
-	python3 - "${TARGET_PID}" <<'PY'
+    python3 - "${TARGET_PID}" <<'PY'
 import os
 import sys
 pid = sys.argv[1]
@@ -188,11 +188,11 @@ try:
 except OSError:
     sys.exit(1)
 PY
-	2>/dev/null || true
+    2>/dev/null || true
 )"
 
 PATH_VALUE="$(
-	python3 - "${ENVIRON_FILE}" <<'PY'
+    python3 - "${ENVIRON_FILE}" <<'PY'
 import sys
 path = sys.argv[1]
 try:
@@ -207,7 +207,7 @@ PY
 )"
 
 WRAPPER_RUN_DIR="$(
-	python3 - "${LOG_ROOT}" "${PATH_VALUE}" <<'PY'
+    python3 - "${LOG_ROOT}" "${PATH_VALUE}" <<'PY'
 import os
 import sys
 log_root = os.path.realpath(sys.argv[1])
@@ -223,12 +223,12 @@ PY
 )"
 
 if [[ -z "${OUTPUT_DIR}" ]]; then
-	STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-	if [[ -n "${WRAPPER_RUN_DIR}" ]]; then
-		OUTPUT_DIR="${WRAPPER_RUN_DIR}/attach-${STAMP}-${TARGET_PID}"
-	else
-		OUTPUT_DIR="${LOG_ROOT}/attach-${STAMP}-${TARGET_PID}"
-	fi
+    STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+    if [[ -n "${WRAPPER_RUN_DIR}" ]]; then
+        OUTPUT_DIR="${WRAPPER_RUN_DIR}/attach-${STAMP}-${TARGET_PID}"
+    else
+        OUTPUT_DIR="${LOG_ROOT}/attach-${STAMP}-${TARGET_PID}"
+    fi
 fi
 
 mkdir -p "${OUTPUT_DIR}"
@@ -236,32 +236,32 @@ META_FILE="${OUTPUT_DIR}/metadata.txt"
 PREFIX="${OUTPUT_DIR}/strace"
 COMMAND_TRACE_HINT=""
 if [[ -n "${WRAPPER_RUN_DIR}" && -f "${WRAPPER_RUN_DIR}/command-trace.log" ]]; then
-	COMMAND_TRACE_HINT="${WRAPPER_RUN_DIR}/command-trace.log"
+    COMMAND_TRACE_HINT="${WRAPPER_RUN_DIR}/command-trace.log"
 fi
 
 mapfile -t THREAD_IDS < <(find "${TASK_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | LC_ALL=C sort -n)
 if [[ ${#THREAD_IDS[@]} -eq 0 ]]; then
-	echo "no threads found for pid ${TARGET_PID}" >&2
-	exit 1
+    echo "no threads found for pid ${TARGET_PID}" >&2
+    exit 1
 fi
 
 {
-	echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	echo "plugin_pid=${TARGET_PID}"
-	echo "plugin_id=${TARGET_PLUGIN_ID:-<unknown>}"
-	echo "cwd=${CWD:-<unknown>}"
-	echo "log_root=${LOG_ROOT}"
-	echo "wrapper_run_dir=${WRAPPER_RUN_DIR:-<none>}"
-	echo "command_trace_hint=${COMMAND_TRACE_HINT:-<none>}"
-	echo "output_dir=${OUTPUT_DIR}"
-	echo "strace_prefix=${PREFIX}"
-	echo "strace_bin=${STRACE_BIN}"
-	echo "cmdline=$(printf '%q ' "${CMDLINE[@]}")"
-	echo "threads=${THREAD_IDS[*]}"
-	echo "--- status ---"
-	cat "${STATUS_FILE}" 2>/dev/null || true
-	echo "--- environ (selected) ---"
-	read_proc_value "${ENVIRON_FILE}" | grep -E '^(PATH|FLOX|NIX|RUST_LOG|RUST_BACKTRACE|_FLOX)' || true
+    echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "plugin_pid=${TARGET_PID}"
+    echo "plugin_id=${TARGET_PLUGIN_ID:-<unknown>}"
+    echo "cwd=${CWD:-<unknown>}"
+    echo "log_root=${LOG_ROOT}"
+    echo "wrapper_run_dir=${WRAPPER_RUN_DIR:-<none>}"
+    echo "command_trace_hint=${COMMAND_TRACE_HINT:-<none>}"
+    echo "output_dir=${OUTPUT_DIR}"
+    echo "strace_prefix=${PREFIX}"
+    echo "strace_bin=${STRACE_BIN}"
+    echo "cmdline=$(printf '%q ' "${CMDLINE[@]}")"
+    echo "threads=${THREAD_IDS[*]}"
+    echo "--- status ---"
+    cat "${STATUS_FILE}" 2>/dev/null || true
+    echo "--- environ (selected) ---"
+    read_proc_value "${ENVIRON_FILE}" | grep -E '^(PATH|FLOX|NIX|RUST_LOG|RUST_BACKTRACE|_FLOX)' || true
 } >"${META_FILE}"
 
 printf 'Attaching to live flox-nri-plugin daemon\n'
@@ -270,14 +270,14 @@ printf '  shim id: %s\n' "${TARGET_PLUGIN_ID:-<unknown>}"
 printf '  output dir: %s\n' "${OUTPUT_DIR}"
 printf '  strace prefix: %s\n' "${PREFIX}"
 if [[ -n "${COMMAND_TRACE_HINT}" ]]; then
-	printf '  wrapper command trace: %s\n' "${COMMAND_TRACE_HINT}"
+    printf '  wrapper command trace: %s\n' "${COMMAND_TRACE_HINT}"
 fi
 printf '  threads: %s\n' "${THREAD_IDS[*]}"
 printf '\nNow reproduce the failing pod create, then stop this command with Ctrl-C.\n\n'
 
 ATTACH_ARGS=()
 for tid in "${THREAD_IDS[@]}"; do
-	ATTACH_ARGS+=(-p "${tid}")
+    ATTACH_ARGS+=(-p "${tid}")
 done
 
 exec "${STRACE_BIN}" -f -ff -s 65535 -yy -o "${PREFIX}" "${ATTACH_ARGS[@]}"

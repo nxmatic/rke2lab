@@ -44,14 +44,14 @@ container_id="$(printf '%s' "$state" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*
 echo "hook invoked container=${container_id} bundle=${bundle} env=${env_store_path} target=${target_flox_rel}"
 
 if [ -z "$bundle" ]; then
-	echo "ERROR: could not parse bundle path from OCI state" >&2
-	exit 1
+    echo "ERROR: could not parse bundle path from OCI state" >&2
+    exit 1
 fi
 
 rootfs="${bundle%/}/rootfs"
 if [ ! -d "$rootfs" ]; then
-	echo "ERROR: rootfs does not exist: ${rootfs}" >&2
-	exit 1
+    echo "ERROR: rootfs does not exist: ${rootfs}" >&2
+    exit 1
 fi
 
 # The store path is addressed identically inside and outside the container: the
@@ -59,8 +59,8 @@ fi
 # /nix/store/<hash>-<env> resolves on both sides. We record it verbatim as the
 # env/ symlink target — valid after pivot_root.
 if [ ! -d "${env_store_path}/env" ]; then
-	echo "ERROR: env store path missing env/ subdir: ${env_store_path}/env" >&2
-	exit 1
+    echo "ERROR: env store path missing env/ subdir: ${env_store_path}/env" >&2
+    exit 1
 fi
 
 target_flox="${rootfs}${target_flox_rel}"
@@ -72,7 +72,7 @@ mkdir -p "${target_flox}" "${target_flox}/run" "${target_flox}/cache" "${target_
 ln -sfn "${env_store_path}/env" "${target_flox}/env"
 
 if [ ! -e "${target_flox}/env.json" ]; then
-	printf '%s' '{"name": "default", "version": 1}' >"${target_flox}/env.json"
+    printf '%s' '{"name": "default", "version": 1}' >"${target_flox}/env.json"
 fi
 
 echo "materialized flox env farm at ${target_flox_rel} (env -> ${env_store_path}/env)"
