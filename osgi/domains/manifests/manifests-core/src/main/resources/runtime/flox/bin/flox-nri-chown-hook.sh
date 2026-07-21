@@ -20,8 +20,8 @@ state="$(cat)"
 bundle="$(printf '%s' "$state" | sed -n 's/.*"bundle"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
 
 if [ -z "$bundle" ]; then
-	echo "ERROR: could not parse bundle path from OCI state" >&2
-	exit 0
+    echo "ERROR: could not parse bundle path from OCI state" >&2
+    exit 0
 fi
 
 rootfs="${bundle%/}/rootfs"

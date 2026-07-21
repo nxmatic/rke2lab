@@ -36,7 +36,15 @@ class BootstrapHostAssetMaterializerTest {
   }
 
   private static String configMap(String name, String dataYaml) {
-    return "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: " + name + "\ndata:\n" + dataYaml;
+    return """
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: %s
+        data:
+        """
+            .formatted(name)
+        + dataYaml;
   }
 
   @Test
@@ -45,7 +53,13 @@ class BootstrapHostAssetMaterializerTest {
     final HostAssetEntry entry =
         HostAssetEntry.file(
             ".configmap-systemd-scripts.yml",
-            configMap("rke2lab-systemd-scripts", "  foo.sh: |\n    #!/bin/sh\n    echo hi\n"));
+            configMap(
+                "rke2lab-systemd-scripts",
+                """
+                  foo.sh: |
+                    #!/bin/sh
+                    echo hi
+                """));
     new BootstrapHostAssetMaterializer()
         .materialize(
             paths,
@@ -71,7 +85,12 @@ class BootstrapHostAssetMaterializerTest {
         HostAssetEntry.file(
             ".configmap-systemd-units.yml",
             configMap(
-                "rke2lab-systemd-units", "  bar.service: |\n    [Unit]\n    Description=bar\n"));
+                "rke2lab-systemd-units",
+                """
+                  bar.service: |
+                    [Unit]
+                    Description=bar
+                """));
     new BootstrapHostAssetMaterializer()
         .materialize(
             paths,
@@ -98,7 +117,12 @@ class BootstrapHostAssetMaterializerTest {
             ".configmap-cloud-config.yml",
             configMap(
                 "rke2lab-cloud-config",
-                "  userData: |\n    #cloud-config\n  metaData: hi\n  networkData: net\n"));
+                """
+                  userData: |
+                    #cloud-config
+                  metaData: hi
+                  networkData: net
+                """));
     new BootstrapHostAssetMaterializer()
         .materialize(
             paths,
@@ -119,7 +143,13 @@ class BootstrapHostAssetMaterializerTest {
     final BootstrapPaths paths = pathsUnder(tempDir);
     final HostAssetEntry entry =
         HostAssetEntry.file(
-            ".configmap-env-section.yml", configMap("rke2lab-env", "  FOO: bar\n  BAZ: qux\n"));
+            ".configmap-env-section.yml",
+            configMap(
+                "rke2lab-env",
+                """
+                  FOO: bar
+                  BAZ: qux
+                """));
     new BootstrapHostAssetMaterializer()
         .materialize(
             paths,

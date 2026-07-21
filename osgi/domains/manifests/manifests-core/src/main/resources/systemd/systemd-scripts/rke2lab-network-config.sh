@@ -17,11 +17,11 @@ lan_binding_enabled="${RKE2LAB_POLICY_NETWORK_LAN_BINDING_ENABLED:-true}"
 : "Apply policy override when LAN binding is disabled"
 case "${lan_binding_enabled,,}" in
 1 | true | yes | on)
-	# Canonical default: LAN binding remains enabled.
-	rm -f /etc/netplan/90-rke2lab-lan-disable.yaml
-	;;
+    # Canonical default: LAN binding remains enabled.
+    rm -f /etc/netplan/90-rke2lab-lan-disable.yaml
+    ;;
 0 | false | no | off)
-	cat >/etc/netplan/90-rke2lab-lan-disable.yaml <<'EOF'
+    cat >/etc/netplan/90-rke2lab-lan-disable.yaml <<'EOF'
 network:
   version: 2
   ethernets:
@@ -31,11 +31,11 @@ network:
       optional: true
       link-local: []
 EOF
-	;;
+    ;;
 *)
-	echo "[!] Invalid RKE2LAB_POLICY_NETWORK_LAN_BINDING_ENABLED='${lan_binding_enabled}', expected boolean" >&2
-	exit 1
-	;;
+    echo "[!] Invalid RKE2LAB_POLICY_NETWORK_LAN_BINDING_ENABLED='${lan_binding_enabled}', expected boolean" >&2
+    exit 1
+    ;;
 esac
 
 : "=== Stopping dhcpcd for vmnet0 (systemd-networkd will manage it) ==="
@@ -44,12 +44,12 @@ pkill -f 'dhcpcd.*vmnet0' || true
 
 : "=== Applying netplan configuration ==="
 if systemd-detect-virt --container >/dev/null 2>&1 || [[ -f /run/systemd/container ]]; then
-	: "[i] Container environment detected; applying netplan via generate + networkd reload"
-	netplan generate
-	networkctl reload
-	networkctl reconfigure lan0 vmnet0
+    : "[i] Container environment detected; applying netplan via generate + networkd reload"
+    netplan generate
+    networkctl reload
+    networkctl reconfigure lan0 vmnet0
 else
-	netplan apply
+    netplan apply
 fi
 
 : "=== Reloading systemd-networkd non-disruptively ==="
@@ -59,10 +59,10 @@ sleep 2
 
 : "=== Verifying dhcpcd is not managing vmnet0 ==="
 if ps aux | grep -v grep | grep 'dhcpcd.*vmnet0'; then
-	echo "[!] Warning: dhcpcd still managing vmnet0, killing again..."
-	pkill -f 'dhcpcd.*vmnet0' || true
+    echo "[!] Warning: dhcpcd still managing vmnet0, killing again..."
+    pkill -f 'dhcpcd.*vmnet0' || true
 else
-	echo "[i] dhcpcd not managing vmnet0 (correct)"
+    echo "[i] dhcpcd not managing vmnet0 (correct)"
 fi
 
 : "=== Final Network Status ==="

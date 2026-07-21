@@ -21,8 +21,8 @@ FLOX_NRI_PLUGIN_DYN_DIR="${FLOX_RUNTIME_ROOT}/nri-plugin.dyn"
 FLOX_NRI_PLUGIN_BINARY="${FLOX_NRI_PLUGIN_DYN_DIR}/bin/flox-nri-plugin"
 
 [[ -x "${FLOX_NRI_PLUGIN_BINARY}" ]] || {
-	echo "flox-nri-plugin-reload: dynamic plugin binary not found or not executable: ${FLOX_NRI_PLUGIN_BINARY}" >&2
-	exit 1
+    echo "flox-nri-plugin-reload: dynamic plugin binary not found or not executable: ${FLOX_NRI_PLUGIN_BINARY}" >&2
+    exit 1
 }
 
 echo "flox-nri-plugin-reload: dynamic plugin binary found at ${FLOX_NRI_PLUGIN_BINARY}"
@@ -46,11 +46,11 @@ echo "flox-nri-plugin-reload: installed dynamic plugin to ${NRI_PLUGIN_RUNTIME_B
 # automatically by Kubernetes.
 
 if pgrep -f "flox-nri-plugin" >/dev/null; then
-	echo "flox-nri-plugin-reload: sending SIGTERM to running flox-nri-plugin process(es)..."
-	pkill -TERM -f "flox-nri-plugin" || true
-	echo "flox-nri-plugin-reload: signal sent; plugin will restart via DaemonSet restartPolicy"
+    echo "flox-nri-plugin-reload: sending SIGTERM to running flox-nri-plugin process(es)..."
+    pkill -TERM -f "flox-nri-plugin" || true
+    echo "flox-nri-plugin-reload: signal sent; plugin will restart via DaemonSet restartPolicy"
 else
-	echo "flox-nri-plugin-reload: no running flox-nri-plugin process found; plugin will start on next container create"
+    echo "flox-nri-plugin-reload: no running flox-nri-plugin process found; plugin will start on next container create"
 fi
 
 echo "flox-nri-plugin-reload: reload complete"

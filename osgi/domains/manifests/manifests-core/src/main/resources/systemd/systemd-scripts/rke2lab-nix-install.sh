@@ -11,80 +11,80 @@ RKE2LAB_NIX_INSTALL_URL=${RKE2LAB_NIX_INSTALL_URL:-https://nixos.org/nix/install
 RKE2LAB_CURL_IP_FAMILY=()
 
 pick_working_ip_family() {
-	if curl --proto '=https' --tlsv1.2 --silent --show-error --location --head --max-time 10 "${RKE2LAB_NIX_INSTALL_URL}" >/dev/null 2>&1; then
-		RKE2LAB_CURL_IP_FAMILY=()
-		return 0
-	fi
+    if curl --proto '=https' --tlsv1.2 --silent --show-error --location --head --max-time 10 "${RKE2LAB_NIX_INSTALL_URL}" >/dev/null 2>&1; then
+        RKE2LAB_CURL_IP_FAMILY=()
+        return 0
+    fi
 
-	if curl --proto '=https' --tlsv1.2 --silent --show-error --location --head --max-time 10 --ipv4 "${RKE2LAB_NIX_INSTALL_URL}" >/dev/null 2>&1; then
-		RKE2LAB_CURL_IP_FAMILY=(--ipv4)
-		return 0
-	fi
+    if curl --proto '=https' --tlsv1.2 --silent --show-error --location --head --max-time 10 --ipv4 "${RKE2LAB_NIX_INSTALL_URL}" >/dev/null 2>&1; then
+        RKE2LAB_CURL_IP_FAMILY=(--ipv4)
+        return 0
+    fi
 
-	if curl --proto '=https' --tlsv1.2 --silent --show-error --location --head --max-time 10 --ipv6 "${RKE2LAB_NIX_INSTALL_URL}" >/dev/null 2>&1; then
-		RKE2LAB_CURL_IP_FAMILY=(--ipv6)
-		return 0
-	fi
+    if curl --proto '=https' --tlsv1.2 --silent --show-error --location --head --max-time 10 --ipv6 "${RKE2LAB_NIX_INSTALL_URL}" >/dev/null 2>&1; then
+        RKE2LAB_CURL_IP_FAMILY=(--ipv6)
+        return 0
+    fi
 
-	return 1
+    return 1
 }
 
 if [[ -d /etc/nix ]]; then
-	: "Nix already installed; continue with idempotent configuration"
+    : "Nix already installed; continue with idempotent configuration"
 else
-	: "Wait for basic network readiness (route + HTTPS reachability)"
-	attempt=1
-	while [[ "${attempt}" -le "${RKE2LAB_NIX_NETWORK_RETRIES}" ]]; do
-		if ip route show default >/dev/null 2>&1 && pick_working_ip_family; then
-			: "Network is ready for Nix installer download"
-			break
-		fi
+    : "Wait for basic network readiness (route + HTTPS reachability)"
+    attempt=1
+    while [[ "${attempt}" -le "${RKE2LAB_NIX_NETWORK_RETRIES}" ]]; do
+        if ip route show default >/dev/null 2>&1 && pick_working_ip_family; then
+            : "Network is ready for Nix installer download"
+            break
+        fi
 
-		if [[ "${attempt}" -eq "${RKE2LAB_NIX_NETWORK_RETRIES}" ]]; then
-			echo "ERROR: network not ready for Nix install after ${RKE2LAB_NIX_NETWORK_RETRIES} attempts" >&2
-			exit 1
-		fi
+        if [[ "${attempt}" -eq "${RKE2LAB_NIX_NETWORK_RETRIES}" ]]; then
+            echo "ERROR: network not ready for Nix install after ${RKE2LAB_NIX_NETWORK_RETRIES} attempts" >&2
+            exit 1
+        fi
 
-		: "Network not ready yet (attempt ${attempt}/${RKE2LAB_NIX_NETWORK_RETRIES}); retrying"
-		sleep "${RKE2LAB_NIX_RETRY_SLEEP}"
-		attempt=$((attempt + 1))
-	done
+        : "Network not ready yet (attempt ${attempt}/${RKE2LAB_NIX_NETWORK_RETRIES}); retrying"
+        sleep "${RKE2LAB_NIX_RETRY_SLEEP}"
+        attempt=$((attempt + 1))
+    done
 
-	: "Install Nix using official installer with retries"
-	install_attempt=1
-	while [[ "${install_attempt}" -le "${RKE2LAB_NIX_INSTALL_RETRIES}" ]]; do
-		if bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 --show-error -L "${RKE2LAB_CURL_IP_FAMILY[@]}" "${RKE2LAB_NIX_INSTALL_URL}") --daemon --yes; then
-			break
-		fi
+    : "Install Nix using official installer with retries"
+    install_attempt=1
+    while [[ "${install_attempt}" -le "${RKE2LAB_NIX_INSTALL_RETRIES}" ]]; do
+        if bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 --show-error -L "${RKE2LAB_CURL_IP_FAMILY[@]}" "${RKE2LAB_NIX_INSTALL_URL}") --daemon --yes; then
+            break
+        fi
 
-		if [[ "${install_attempt}" -eq "${RKE2LAB_NIX_INSTALL_RETRIES}" ]]; then
-			echo "ERROR: Nix installer failed after ${RKE2LAB_NIX_INSTALL_RETRIES} attempts" >&2
-			exit 1
-		fi
+        if [[ "${install_attempt}" -eq "${RKE2LAB_NIX_INSTALL_RETRIES}" ]]; then
+            echo "ERROR: Nix installer failed after ${RKE2LAB_NIX_INSTALL_RETRIES} attempts" >&2
+            exit 1
+        fi
 
-		: "Nix installer failed (attempt ${install_attempt}/${RKE2LAB_NIX_INSTALL_RETRIES}); retrying"
-		sleep "${RKE2LAB_NIX_RETRY_SLEEP}"
-		install_attempt=$((install_attempt + 1))
-	done
+        : "Nix installer failed (attempt ${install_attempt}/${RKE2LAB_NIX_INSTALL_RETRIES}); retrying"
+        sleep "${RKE2LAB_NIX_RETRY_SLEEP}"
+        install_attempt=$((install_attempt + 1))
+    done
 fi
 
 : "Verify Nix installation created /etc/nix directory"
 if [ ! -d /etc/nix ]; then
-	echo "ERROR: Nix installer did not create /etc/nix directory" >&2
-	exit 1
+    echo "ERROR: Nix installer did not create /etc/nix directory" >&2
+    exit 1
 fi
 
 source ${NIX_DEFAULT_PROFILE:=/nix/var/nix/profiles/default}/etc/profile.d/nix-daemon.sh
 nix --extra-experimental-features "nix-command flakes ca-derivations" \
-	profile add --profile "${NIX_DEFAULT_PROFILE}" nixpkgs#yq-go nixpkgs#dasel ||
-	{
-		echo "ERROR: Failed to install yq-go via Nix" >&2
-		exit 1
-	}
+    profile add --profile "${NIX_DEFAULT_PROFILE}" nixpkgs#yq-go nixpkgs#dasel ||
+    {
+        echo "ERROR: Failed to install yq-go via Nix" >&2
+        exit 1
+    }
 
 : "Configure Nix after installation (idempotent - only if not already configured by rke2lab)"
 if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
-	cat >>/etc/nix/nix.conf <<EOF
+    cat >>/etc/nix/nix.conf <<EOF
 # BEGIN rke2lab-nix: Custom configuration for rke2lab environment
 allowed-users = *
 auto-optimise-store = false
@@ -116,10 +116,10 @@ fi
 : "Configure systemd to prepend Nix profile to PATH"
 mkdir -p /etc/systemd/system.conf.d
 if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
-	cat >/etc/systemd/system.conf.d/10-rke2lab-nix.conf <<EOF
+    cat >/etc/systemd/system.conf.d/10-rke2lab-nix.conf <<EOF
 [Manager]
 DefaultEnvironment="PATH=/nix/var/nix/profiles/default/bin:$PATH"
 EOF
-	: "Reload systemd configuration to apply new environment"
-	systemctl daemon-reload
+    : "Reload systemd configuration to apply new environment"
+    systemctl daemon-reload
 fi

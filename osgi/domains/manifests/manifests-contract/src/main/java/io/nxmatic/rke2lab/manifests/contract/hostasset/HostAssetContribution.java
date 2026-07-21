@@ -9,8 +9,8 @@ import java.util.Objects;
  * provider may yield several (the systemd bundle contributes one per slot — units and scripts).
  *
  * <p>{@code targetFile} names the ONE output artifact a fan-in kind writes ({@link
- * HostAssetDeliveryKind#SHELL_ENV_FILE}); the fan-out kinds ({@code SEED_DIR}, {@code DIRECT_COPY})
- * derive their outputs from the entries and leave it blank.
+ * HostAssetDeliveryKind#SHELL_ENV_FILE}); the fan-out kinds ({@code SEED_DIR}, {@code
+ * CONFIGMAP_FILES}) derive their outputs from the entries and leave it blank.
  */
 public record HostAssetContribution(
     HostAssetSlot slot,
@@ -32,7 +32,7 @@ public record HostAssetContribution(
     }
   }
 
-  /** A fan-out contribution (SEED_DIR / DIRECT_COPY): the entries drive the outputs. */
+  /** A fan-out contribution (SEED_DIR / CONFIGMAP_FILES): the entries drive the outputs. */
   public static HostAssetContribution fanOut(
       HostAssetSlot slot, HostAssetDeliveryKind deliveryKind, List<HostAssetEntry> entries) {
     return new HostAssetContribution(slot, deliveryKind, entries, "");

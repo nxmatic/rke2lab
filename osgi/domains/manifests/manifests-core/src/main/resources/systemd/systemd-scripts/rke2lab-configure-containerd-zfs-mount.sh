@@ -28,7 +28,7 @@ EOF
 
 : "Remove obsolete drop-in override if present"
 if [[ -d "${MOUNT_UNIT_DROPIN_DIR}" ]]; then
-	rm -rf "${MOUNT_UNIT_DROPIN_DIR}"
+    rm -rf "${MOUNT_UNIT_DROPIN_DIR}"
 fi
 
 : "Reload systemd to recognize drop-in configuration"

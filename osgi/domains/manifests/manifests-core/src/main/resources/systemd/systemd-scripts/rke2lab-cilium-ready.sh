@@ -4,19 +4,19 @@ source <(flox activate --dir /var/lib/rancher/rke2)
 set -x
 
 bool_is_true() {
-	case "${1:-}" in
-	1 | true | TRUE | yes | YES | on | ON)
-		return 0
-		;;
-	*)
-		return 1
-		;;
-	esac
+    case "${1:-}" in
+    1 | true | TRUE | yes | YES | on | ON)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
 }
 
 if [[ -n "${RKE2LAB_MANIFESTS_PUBLISH_NETWORKING_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_MANIFESTS_PUBLISH_NETWORKING_ENABLED}"; then
-	echo "[rke2-cilium-ready] publishing disabled for networking layer; skipping cilium readiness checks"
-	exit 0
+    echo "[rke2-cilium-ready] publishing disabled for networking layer; skipping cilium readiness checks"
+    exit 0
 fi
 
 kubectl wait --for=condition=Ready nodes --all --timeout=300s || true

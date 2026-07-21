@@ -8,14 +8,14 @@ export RKE2LAB_ROOT RKE2LAB_SCRIPTS_DIR HOME
 
 : "Source nix-daemon directly; flox is on PATH thanks to rke2lab-flox-install.service"
 if [[ ! -r /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
-	echo "[rke2lab-bootstrap-env] ERROR: nix-daemon profile missing; rke2lab-flox-install.service must run first" >&2
-	exit 1
+    echo "[rke2lab-bootstrap-env] ERROR: nix-daemon profile missing; rke2lab-flox-install.service must run first" >&2
+    exit 1
 fi
 source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
 if ! command -v flox >/dev/null 2>&1; then
-	echo "[rke2lab-bootstrap-env] ERROR: flox not on PATH after sourcing nix-daemon" >&2
-	exit 1
+    echo "[rke2lab-bootstrap-env] ERROR: flox not on PATH after sourcing nix-daemon" >&2
+    exit 1
 fi
 
 : "Set flox target system for this host"
@@ -24,11 +24,11 @@ export RKE2_FLOX_SYSTEM
 
 : "Configure direnv to use flox"
 direnv:config:generate() {
-	mkdir -p "/root/.config/direnv/lib"
-	curl -o \
-		"/root/.config/direnv/lib/flox.sh" \
-		"https://raw.githubusercontent.com/flox/flox-direnv/v1.1.0/direnv.rc"
-	cat <<EoConfig | cut -c 3- >"/root/.config/direnv/direnv.toml"
+    mkdir -p "/root/.config/direnv/lib"
+    curl -o \
+        "/root/.config/direnv/lib/flox.sh" \
+        "https://raw.githubusercontent.com/flox/flox-direnv/v1.1.0/direnv.rc"
+    cat <<EoConfig | cut -c 3- >"/root/.config/direnv/direnv.toml"
   [whitelist]
   prefix= [ "/home", "/root", "/var/lib/cloud", "/var/lib/rancher/rke2", "${RKE2LAB_ROOT}" ]
 EoConfig
@@ -37,15 +37,15 @@ direnv:config:generate
 
 : "Initialize nocloud flox environment under /var/lib/cloud"
 nocloud:env:bootstrap() {
-	local FLOX_ENV_DIR="/var/lib/cloud"
+    local FLOX_ENV_DIR="/var/lib/cloud"
 
-	if [[ ! -d "${FLOX_ENV_DIR}/.flox" ]]; then
-		mkdir -p "${FLOX_ENV_DIR}"
-		flox init --dir="${FLOX_ENV_DIR}"
-		flox install --dir="${FLOX_ENV_DIR}" dasel yq-go
-	fi
+    if [[ ! -d "${FLOX_ENV_DIR}/.flox" ]]; then
+        mkdir -p "${FLOX_ENV_DIR}"
+        flox init --dir="${FLOX_ENV_DIR}"
+        flox install --dir="${FLOX_ENV_DIR}" dasel yq-go
+    fi
 
-	cat <<'EoFloxCommonProfile' | cut -c 3- | tee "${FLOX_ENV_DIR}/.flox/env/profile-common.sh"
+    cat <<'EoFloxCommonProfile' | cut -c 3- | tee "${FLOX_ENV_DIR}/.flox/env/profile-common.sh"
   rke2lab::shell:indirect() {
     local var="$1" value=""
 
@@ -144,30 +144,30 @@ nocloud:env:bootstrap() {
   set +a
 EoFloxCommonProfile
 
-	: "Activate first so dasel/yq from the freshly-installed env are on PATH for the manifest rewrite"
-	set +x # Silence flox activation noise
-	source <(flox activate --dir="${FLOX_ENV_DIR}")
-	set -x
-	dasel -i toml -o yaml <"${FLOX_ENV_DIR}/.flox/env/manifest.toml" |
-		yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
-		yq eval '.profile = { "common": "source ${FLOX_ENV_PROJECT}/.flox/env/profile-common.sh" }' - |
-		dasel -i yaml -o toml | tee /tmp/manifest.toml.$$ &&
-		mv /tmp/manifest.toml.$$ "${FLOX_ENV_DIR}/.flox/env/manifest.toml"
+    : "Activate first so dasel/yq from the freshly-installed env are on PATH for the manifest rewrite"
+    set +x # Silence flox activation noise
+    source <(flox activate --dir="${FLOX_ENV_DIR}")
+    set -x
+    dasel -i toml -o yaml <"${FLOX_ENV_DIR}/.flox/env/manifest.toml" |
+        yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
+        yq eval '.profile = { "common": "source ${FLOX_ENV_PROJECT}/.flox/env/profile-common.sh" }' - |
+        dasel -i yaml -o toml | tee /tmp/manifest.toml.$$ &&
+        mv /tmp/manifest.toml.$$ "${FLOX_ENV_DIR}/.flox/env/manifest.toml"
 
-	: "Re-activate so the updated profile.common is baked into the activation hook for downstream scripts"
-	set +x # Silence flox activation noise
-	source <(flox activate --dir="${FLOX_ENV_DIR}")
-	set -x
+    : "Re-activate so the updated profile.common is baked into the activation hook for downstream scripts"
+    set +x # Silence flox activation noise
+    source <(flox activate --dir="${FLOX_ENV_DIR}")
+    set -x
 
-	: "Generate nocloud envrc to load environment variables"
-	cat >/var/lib/cloud/.envrc <<'EoEnvrc'
+    : "Generate nocloud envrc to load environment variables"
+    cat >/var/lib/cloud/.envrc <<'EoEnvrc'
   log_status "Loading nocloud environment variables"
 
   [[ "$FLOX_ENV_PROJECT" != "$PWD" ]] &&
     use flox
 EoEnvrc
-	mkdir -p /var/lib/cloud/seed/nocloud
-	ln -sf /var/lib/cloud/.envrc /var/lib/cloud/seed/nocloud/.envrc
+    mkdir -p /var/lib/cloud/seed/nocloud
+    ln -sf /var/lib/cloud/.envrc /var/lib/cloud/seed/nocloud/.envrc
 }
 
 nocloud:env:bootstrap

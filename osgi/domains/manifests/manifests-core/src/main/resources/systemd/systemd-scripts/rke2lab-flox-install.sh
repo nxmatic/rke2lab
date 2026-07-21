@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bash -exuo pipefail
 
 [[ -n "${HOME:-}" ]] ||
-	export HOME=/root
+    export HOME=/root
 
 NIX_PROFILE=/nix/var/nix/profiles/default
 NIX_CONF_DIR=/etc/nix
@@ -13,10 +13,10 @@ SECRETS_FILE=/srv/host/rke2lab-worktree.d/.secrets
 source "${NIX_PROFILE}/etc/profile.d/nix-daemon.sh"
 
 ensure_flox_nix_include() {
-	mkdir -p "${NIX_CONF_DIR}"
+    mkdir -p "${NIX_CONF_DIR}"
 
-	if [[ ! -f "${FLOX_CONF_FILE}" ]]; then
-		cat >"${FLOX_CONF_FILE}" <<'EOF'
+    if [[ ! -f "${FLOX_CONF_FILE}" ]]; then
+        cat >"${FLOX_CONF_FILE}" <<'EOF'
 # Default to use the upstream cache as well as the flox public store.
 extra-trusted-substituters = https://cache.flox.dev
 extra-trusted-public-keys = flox-cache-public-1:7F4OyH7ZCnFhcze3fJdfyXYLQw/aV7GEed86nQ7IsOs= floxhub-1:0QOAlcobcEvq1mqEf4qAYCaWnTTOXpyoRv/PmqfSixM=
@@ -32,15 +32,15 @@ stalled-download-timeout = 30
 min-free = 128000000
 max-free = 1000000000
 EOF
-	fi
+    fi
 
-	if ! grep -Fqx 'include /etc/nix/flox.conf' "${NIX_CONF_FILE}"; then
-		cat >>"${NIX_CONF_FILE}" <<'EOF'
+    if ! grep -Fqx 'include /etc/nix/flox.conf' "${NIX_CONF_FILE}"; then
+        cat >>"${NIX_CONF_FILE}" <<'EOF'
 
 # Managed by rke2lab flox installer.
 include /etc/nix/flox.conf
 EOF
-	fi
+    fi
 }
 
 : "Ensure nix.conf includes flox.conf for Flox-specific Nix settings"

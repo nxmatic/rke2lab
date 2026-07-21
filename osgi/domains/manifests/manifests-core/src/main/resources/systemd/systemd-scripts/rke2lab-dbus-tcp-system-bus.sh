@@ -8,8 +8,8 @@
 source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
 
 if [[ "${RKE2LAB_NODE_NAME:-}" != "master" ]]; then
-	echo "[rke2lab-dbus-tcp] skipping non-master node (${RKE2LAB_NODE_NAME:-unknown})"
-	exit 0
+    echo "[rke2lab-dbus-tcp] skipping non-master node (${RKE2LAB_NODE_NAME:-unknown})"
+    exit 0
 fi
 
 dbus_port="${RKE2LAB_DBUS_TCP_PORT:-12434}"

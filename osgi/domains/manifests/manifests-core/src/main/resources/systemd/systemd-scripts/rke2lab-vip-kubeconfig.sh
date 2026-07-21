@@ -18,7 +18,7 @@ chmod 644 "$KUBECONFIG"
 
 : "Apply modifications to working copy"
 yq --inplace --from-file=<(
-	cat <<EoE
+    cat <<EoE
 .clusters[0].cluster.name = "${RKE2LAB_CLUSTER_NAME}" |
 .clusters[0].cluster.server = "https://${RKE2LAB_NETWORK_LAN_HOST_INETADDR}:6443" |
 .clusters[0].name = "${RKE2LAB_CLUSTER_NAME}" |

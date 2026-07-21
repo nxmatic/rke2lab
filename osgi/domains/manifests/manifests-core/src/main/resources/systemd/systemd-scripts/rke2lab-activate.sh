@@ -42,11 +42,11 @@ set -x
 : "Expose bind-mounted helper scripts on PATH (strip .sh suffix)"
 scripts_dir=${RKE2LAB_SCRIPTS_DIR}
 if [ -d "$scripts_dir" ]; then
-	for src in "$scripts_dir"/*.sh; do
-		[ -f "$src" ] || continue
-		base=$(basename "${src%.sh}")
-		ln -sf "$src" "/usr/local/sbin/$base"
-	done
+    for src in "$scripts_dir"/*.sh; do
+        [ -f "$src" ] || continue
+        base=$(basename "${src%.sh}")
+        ln -sf "$src" "/usr/local/sbin/$base"
+    done
 fi
 
 : "Enable RKE2 service to start with multi-user.target"
