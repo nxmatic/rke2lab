@@ -59,13 +59,24 @@ public final class BootstrapHostAssetMaterializer {
    * root is the synthesis root each provider resolves its own slice against.
    */
   public void materialize(BootstrapPaths paths) throws IOException {
+    materialize(paths, providers);
+  }
+
+  /**
+   * Package-private seam: materialise a given provider set (production uses the @Reference set).
+   */
+  void materialize(BootstrapPaths paths, List<HostAssetProvider> providers) throws IOException {
     final Path synthesizedRoot = paths.manifestsRoot();
     for (HostAssetProvider provider : providers) {
       for (HostAssetContribution contribution : provider.contribute(synthesizedRoot)) {
         final Path root = rootFor(paths, contribution.slot());
         switch (contribution.deliveryKind()) {
           case SEED_DIR -> seedDir(contribution.entries(), root);
-          case DIRECT_COPY -> directCopy(contribution.entries(), root);
+          case CONFIGMAP_FILES ->
+              configMapFiles(
+                  contribution.entries(),
+                  root,
+                  contribution.slot() == HostAssetSlot.SYSTEMD_SCRIPTS);
           case SHELL_ENV_FILE ->
               shellEnvFile(contribution.entries(), root, contribution.targetFile());
         }
@@ -136,15 +147,22 @@ public final class BootstrapHostAssetMaterializer {
     return "'" + value.replace("'", "'\\''") + "'";
   }
 
-  /** Write each entry verbatim under the root, honouring the executable bit. */
-  private void directCopy(List<HostAssetEntry> entries, Path root) throws IOException {
+  /**
+   * Extract each entry's ConfigMap {@code data} and write every key as its own file under the root
+   * (the key is the file's slot-relative path). Files land executable when the slot is a scripts
+   * slot (systemd scripts must be runnable; unit files must not).
+   */
+  private void configMapFiles(List<HostAssetEntry> entries, Path root, boolean executable)
+      throws IOException {
     Files.createDirectories(root);
     for (HostAssetEntry entry : entries) {
-      final Path target = root.resolve(entry.relativePath());
-      Files.createDirectories(target.getParent());
-      Files.writeString(target, entry.content(), StandardCharsets.UTF_8);
-      if (entry.executable()) {
-        makeExecutable(target);
+      for (Map.Entry<String, String> file : extractPayload(parse(entry.content())).entrySet()) {
+        final Path target = root.resolve(file.getKey());
+        Files.createDirectories(target.getParent());
+        Files.writeString(target, file.getValue(), StandardCharsets.UTF_8);
+        if (executable) {
+          makeExecutable(target);
+        }
       }
     }
   }

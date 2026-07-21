@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.systemd.cdk8s;
 
 import java.io.IOException;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +62,56 @@ public class SystemdChart extends Construct {
         .filter(SystemdDropIn.class::isInstance)
         .map(SystemdDropIn.class::cast)
         .toList();
+  }
+
+  /** All {@link SystemdScript} constructs anywhere under this chart, in construct-tree order. */
+  private List<SystemdScript> scripts() {
+    return getNode().findAll(ConstructOrder.PREORDER).stream()
+        .filter(SystemdScript.class::isInstance)
+        .map(SystemdScript.class::cast)
+        .toList();
+  }
+
+  /**
+   * The rendered unit + drop-in files as {@code relativePath -> content} — the unit bundle for a
+   * consumer that carries them AS DATA (e.g. a ConfigMap the host materialises), rather than
+   * writing them to a directory via {@link #synthesize(Path)}.
+   */
+  public Map<String, String> renderUnitFiles() {
+    final Map<String, String> rendered = new LinkedHashMap<>();
+    for (SystemdUnit unit : units()) {
+      rendered.put(unit.getUnitFileName(), render(unit::writeUnitFile));
+    }
+    for (SystemdDropIn dropIn : dropIns()) {
+      rendered.put(
+          dropIn.getDropInDirectory() + "/" + dropIn.getDropInFileName(),
+          render(dropIn::writeDropInFile));
+    }
+    return rendered;
+  }
+
+  /** The registered scripts as {@code fileName -> content} — the script bundle. */
+  public Map<String, String> renderScriptFiles() {
+    final Map<String, String> rendered = new LinkedHashMap<>();
+    for (SystemdScript script : scripts()) {
+      rendered.put(script.getScriptFileName(), script.getContent());
+    }
+    return rendered;
+  }
+
+  private static String render(SystemdFileWriter writer) {
+    final StringWriter buffer = new StringWriter();
+    try {
+      writer.writeTo(buffer);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("failed to render systemd file", ex);
+    }
+    return buffer.toString();
+  }
+
+  @FunctionalInterface
+  private interface SystemdFileWriter {
+    void writeTo(Writer writer) throws IOException;
   }
 
   /**

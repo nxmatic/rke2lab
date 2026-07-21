@@ -3,12 +3,12 @@ package io.nxmatic.rke2lab.manifests.contract.hostasset;
 import java.util.Objects;
 
 /**
- * One file a provider contributes: a slot-relative path plus its text content (raw slice content —
+ * One entry a provider contributes: a slot-relative path plus its text content (raw slice content —
  * incus's {@link HostAssetDeliveryKind} strategy transforms it). All bootstrap host assets are text
- * (shell, yaml, env), so content is a {@code String}; the executable bit is honoured only by {@link
- * HostAssetDeliveryKind#DIRECT_COPY}.
+ * (shell, yaml, env), so content is a {@code String}. Executability is decided by the delivery
+ * strategy from the slot (e.g. a scripts slot), not per-entry.
  */
-public record HostAssetEntry(String relativePath, String content, boolean executable) {
+public record HostAssetEntry(String relativePath, String content) {
 
   public HostAssetEntry {
     relativePath = requireSlotRelative(relativePath);
@@ -16,11 +16,7 @@ public record HostAssetEntry(String relativePath, String content, boolean execut
   }
 
   public static HostAssetEntry file(String relativePath, String content) {
-    return new HostAssetEntry(relativePath, content, false);
-  }
-
-  public static HostAssetEntry executable(String relativePath, String content) {
-    return new HostAssetEntry(relativePath, content, true);
+    return new HostAssetEntry(relativePath, content);
   }
 
   private static String requireSlotRelative(String relativePath) {

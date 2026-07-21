@@ -8,8 +8,12 @@ package io.nxmatic.rke2lab.manifests.contract.hostasset;
 public enum HostAssetDeliveryKind {
   /** Strip the ConfigMap/Secret envelope and write each keyed value as a seed file (NoCloud). */
   SEED_DIR,
-  /** Copy each entry verbatim under the slot root, honouring the executable bit. */
-  DIRECT_COPY,
+  /**
+   * Extract each entry's ConfigMap {@code data} and write every key as its own file under the slot
+   * root (the key is the file's slot-relative path). Files land executable when the slot is a
+   * scripts slot. Used for the systemd bundle (units, drop-ins, scripts).
+   */
+  CONFIGMAP_FILES,
   /**
    * Extract the env vars from each entry's ConfigMap/Secret and emit ONE shell env file (wrapped
    * {@code set -a}…{@code set +a}) the boot sources — the contribution's {@code targetFile} names

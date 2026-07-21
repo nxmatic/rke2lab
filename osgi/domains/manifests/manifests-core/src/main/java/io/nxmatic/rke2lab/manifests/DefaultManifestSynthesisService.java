@@ -25,6 +25,7 @@ import io.nxmatic.rke2lab.manifests.internal.synthesis.OnFailure;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.PhaseRunner;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
+import io.nxmatic.rke2lab.manifests.systemd.SystemdBundleConfigMaps;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdDropIn;
@@ -659,10 +660,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                 "Calling app.synth() to synthesize K8s manifests to: {}", scaffold.synthOutdir());
             scaffold.app().synth();
             LOG.info(
-                "app.synth() completed, now synthesizing systemd units to: {}",
+                "app.synth() completed, now carrying the systemd bundle as ConfigMaps to: {}",
                 scaffold.systemdOutdir());
-            scaffold.systemdChart().synthesize(scaffold.systemdOutdir());
-            LOG.info("systemdChart.synthesize() completed");
+            // (X) the chart owns the scripts too: register the bundled host scripts, then carry the
+            // whole systemd bundle (units + drop-ins + scripts) as local-config ConfigMap dotfiles
+            // the incus host materializer extracts — manifests.d/systemd holds ONLY manifests.
+            SystemdBundleConfigMaps.synthesize(scaffold.systemdChart(), scaffold.systemdOutdir());
+            LOG.info("systemd bundle carried as ConfigMaps");
 
             final Path synthesizedFile = getSynthesizedFile();
 

@@ -577,6 +577,19 @@ prepare (promote) and grow (bind).
 
 == The host-asset materialization service (settled design)
 
+[NOTE]
+====
+*Terminology — "host" is overloaded (a known naming debt).* It carries three senses in this
+codebase: (1) the *host world* — the machine running Pulumi, the realm OUTSIDE Felix (the
+host↔OSGi membrane, `InstanceGrow`'s "pure-host GROW"); (2) the *control node* — the RKE2
+node being provisioned; (3) `/srv/host` — that node's base filesystem (vs its containers),
+whence `HostPathCatalog`, `host-tree`, `BootstrapPaths`. The `HostAsset*` types here mean
+sense (3): assets materialised into the node's `/srv/host` tree — aligned with the existing
+`HostPathCatalog` convention. The collision is chiefly (1) vs (3): the materializer RUNS in the
+host world yet WRITES to the node's `/srv/host`. A codebase-wide disambiguation is a separate
+pass; the name `HostAsset*` is kept to stay consistent with `HostPathCatalog`/`host-tree`.
+====
+
 Family 2's materializations share ONE dropped mechanism: main's
 `IncusResourceBootstrap.materializeAssets()` populated the staging roots BEFORE the
 mounts; the migration to `InstanceGrow` (mounts-only) re-added only nocloud's writer.
@@ -601,20 +614,27 @@ to incus). Split by realm:
   RAW content + executable bit). A provider may yield several — the systemd bundle
   contributes one per slot.
 
-`HostAssetDeliveryKind` names the transform incus applies: `SEED_DIR` strips the
+`HostAssetDeliveryKind` names the transform incus applies (every host asset is a synthesised
+ConfigMap the materializer extracts — no raw files in the tree): `SEED_DIR` strips the
 ConfigMap/Secret envelope and writes the NoCloud files (absorbing the former
-`NocloudSeedWriter`); `DIRECT_COPY` writes each entry verbatim, honouring the executable
-bit; `SHELL_ENV_FILE` extracts the env vars from each entry's ConfigMap and emits ONE
-`set -a`…`set +a` shell file the boot sources — closing the env read-gap (the sections
-synthesise as hidden dotfiles the loader's visible-`*.yml` glob missed).
+`NocloudSeedWriter`); `SHELL_ENV_FILE` extracts the env vars and emits ONE `set -a`…`set +a`
+shell file the boot sources — closing the env read-gap (the sections synthesise as hidden
+dotfiles the loader's visible-`*.yml` glob missed); `CONFIGMAP_FILES` extracts each ConfigMap
+`data` key back to its own file under the slot root (executable when the slot is a scripts
+slot) — the systemd bundle.
 
 Three bootstrap providers (manifests-core): *CloudConfig* (`CloudConfigHostAssetProvider`
 → `CLOUD_SEED` / `SEED_DIR` → cloud.d), *EnvConfig* (`EnvConfigHostAssetProvider` →
 `ENV_CONFIG` / `SHELL_ENV_FILE` → one `rke2lab-environment.sh` in the scripts root, sourced
-by `rke2lab-env-load.sh`), *Systemd bundle* (units synth + scripts classpath as ONE
-provider — the units' `ExecStart` depends on the scripts → `SYSTEMD_UNITS` +
-`SYSTEMD_SCRIPTS`, `DIRECT_COPY`). Scripts stay a transverse provider in manifests-core (no
-per-domain split — incus no longer knows domains). The DAEMONSET path
+by `rke2lab-env-load.sh`), *Systemd bundle* (`SystemdBundleHostAssetProvider`). For systemd,
+`SystemdChart` OWNS both the units AND the scripts (a `SystemdScript` construct; the content
+is injected from manifests-core's classpath, the chart owns the collection) — the synthesis
+carries the whole bundle as TWO local-config ConfigMap dotfiles (units + drop-ins, and
+scripts) so `manifests.d/systemd` holds ONLY manifests, never raw `.service`/`.sh`; the
+provider reads them and yields two `CONFIGMAP_FILES` contributions → `SYSTEMD_UNITS`
+(systemd-units.d) + `SYSTEMD_SCRIPTS` (systemd-scripts.d, executable). No archive/base64: the
+daemonset needs those only to beat the 1MiB limit of a REAL k8s ConfigMap; these are
+local-config, never applied, materialised disk-to-disk in-JVM. The DAEMONSET path
 (link:../patterns/daemonset-host-assets-architecture.adoc[daemonset-host-assets],
 `daemonset-host-asset-materializer.sh`, flox) brings its resources to the host VIA THE
 CLUSTER — an entirely separate channel with its OWN `HostAssetDeliveryPolicy`, NOT a
@@ -673,7 +693,7 @@ flowchart TB
   subgraph "manifests-core providers"
     PC["CloudConfigHostAssetProvider SEED_DIR"]
     PE["EnvConfigHostAssetProvider"]
-    PS["SystemdBundleHostAssetProvider DIRECT_COPY two contributions"]
+    PS["SystemdBundleHostAssetProvider CONFIGMAP_FILES two contributions"]
   end
   PC -.->|"implements"| SPI
   PE -.->|"implements"| SPI

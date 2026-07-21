@@ -450,6 +450,31 @@ public SystemdDropIn after(String... units)
 public SystemdDropIn requires(String... units)
 ----
 
+=== SystemdScript
+
+**Purpose**: A host script the units invoke (an `ExecStart` target). A construct in the chart tree so
+`SystemdChart` OWNS the COUPLED bundle — the units and the scripts they call — as one thing. The chart
+owns only the COLLECTION; the content is injected by the domain that owns the resources (rke2lab
+manifests), keeping this generic systemd library free of rke2lab specifics.
+
+**Example**:
+
+[source,java]
+----
+new SystemdScript(systemdChart, "rke2lab-env-load.sh", "rke2lab-env-load.sh", scriptContent);
+----
+
+**Key methods**:
+
+[source,java]
+----
+public String getScriptFileName()   // e.g. "rke2lab-env-load.sh"
+public String getContent()          // the verbatim script body
+----
+
+Rendered by `SystemdChart.renderScriptFiles()` into the systemd bundle the manifests synthesis carries
+as a local-config ConfigMap, which the incus host materializer extracts into `systemd-scripts.d`.
+
 === SystemdChart
 
 **Purpose**: Container for all systemd constructs, handles synthesis.
