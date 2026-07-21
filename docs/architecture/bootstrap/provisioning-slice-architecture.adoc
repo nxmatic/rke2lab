@@ -431,12 +431,14 @@ with a dependency order.
 resources return, host-side, as the provisioning body of the "the instance is
 provisioned" WHEN. Code that exists in `342b7c327~1` and should not have left.
 
-**Family 2 — the five materializations (deltas #2–6), metier → scion.** They share
-one missing piece: there is no `manifests-bdd`. The synthesis machinery
-(`ManifestSynthesisService`, `NodeEnvOverlayService`, explode) is intact OSGi-side
-but nothing plays it as a scion. Standing up `manifests-bdd` — a scion that
-synthesizes + materializes, fed a host-neutral activation payload sown by the host
-— unblocks all five at once, on the same pattern as bbox/incus/systemd/cluster.
+**Family 2 — the five materializations (deltas #2–6), metier → scion.** The synthesis
+machinery (`ManifestSynthesisService`, the env-config contributors, explode) is intact
+OSGi-side, but two things were dropped: nothing plays it as a scion, and main's
+`materializeAssets()` step that wrote the synthesised content INTO the staging roots
+(before the mounts) is gone — only nocloud's writer was re-added. The settled
+replacement is an IoC service (§ _The host-asset materialization service_ below): the
+providers, in manifests, own the content; a driver in incus writes them where the
+instance needs them. One pattern covers env, systemd-bundle and cloud-config at once.
 
 **Family 3 — the checksum→reload glue (delta #7), straddling.** The cloud-init
 checksum is COMPUTED in-container (the scion already carries it: `host.live.d =
@@ -573,8 +575,123 @@ grow), its material promoted into `host.live.d` so the grow mounts a current tre
 Family 1 (the Pulumi graph) is the GROW beat; Family 4 (promotion + mounts) straddles
 prepare (promote) and grow (bind).
 
+== The host-asset materialization service (settled design)
+
+Family 2's materializations share ONE dropped mechanism: main's
+`IncusResourceBootstrap.materializeAssets()` populated the staging roots BEFORE the
+mounts; the migration to `InstanceGrow` (mounts-only) re-added only nocloud's writer.
+The settled replacement makes the formerly IMPLICIT incus↔manifests coupling — manifests
+wrote files by convention, incus read them back blind through a generic YAML parse — an
+EXPLICIT, typed, enumerable *contribution*: a missing asset is now a missing provider, not
+a silent gap. It is a contribution, NOT a manifests _policy_ (a policy activates a common
+logic across units, e.g. `ManifestDomainPolicy`; this is manifests contributing resources
+to incus). Split by realm:
+
+* *incus DRIVES* — `BootstrapHostAssetMaterializer` (an SCR `@Component` in `incus-core`)
+  realises a requirement of provisioning the instance: it `@Reference(MULTIPLE)` the
+  providers, maps each `HostAssetSlot` to the `BootstrapPaths` root it owns, and applies
+  the transform-and-place strategy. The instance's boot format (the NoCloud seed
+  filenames) lives HERE — incus knows the instance's need. This is the FIRST explicit
+  incus→`manifests-contract` type coupling (the content still crosses as raw bytes; no
+  manifests IMPL coupling).
+* *manifests PROVIDES* — `HostAssetProvider` (SPI in `manifests-contract`) reads its own
+  synthesised slice under the manifests root (`manifests` owns the `runtime/…` sub-layout,
+  incus owns the mount-root name) and returns a list of `HostAssetContribution`: each a
+  `HostAssetSlot` + a `HostAssetDeliveryKind` + a list of `HostAssetEntry` (relativePath +
+  RAW content + executable bit). A provider may yield several — the systemd bundle
+  contributes one per slot.
+
+`HostAssetDeliveryKind` names the transform incus applies: `SEED_DIR` strips the
+ConfigMap/Secret envelope and writes the NoCloud files (absorbing the former
+`NocloudSeedWriter`); `DIRECT_COPY` writes each entry verbatim, honouring the executable
+bit; `SHELL_ENV_FILE` extracts the env vars from each entry's ConfigMap and emits ONE
+`set -a`…`set +a` shell file the boot sources — closing the env read-gap (the sections
+synthesise as hidden dotfiles the loader's visible-`*.yml` glob missed).
+
+Three bootstrap providers (manifests-core): *CloudConfig* (`CloudConfigHostAssetProvider`
+→ `CLOUD_SEED` / `SEED_DIR` → cloud.d), *EnvConfig* (`EnvConfigHostAssetProvider` →
+`ENV_CONFIG` / `SHELL_ENV_FILE` → one `rke2lab-environment.sh` in the scripts root, sourced
+by `rke2lab-env-load.sh`), *Systemd bundle* (units synth + scripts classpath as ONE
+provider — the units' `ExecStart` depends on the scripts → `SYSTEMD_UNITS` +
+`SYSTEMD_SCRIPTS`, `DIRECT_COPY`). Scripts stay a transverse provider in manifests-core (no
+per-domain split — incus no longer knows domains). The DAEMONSET path
+(link:../patterns/daemonset-host-assets-architecture.adoc[daemonset-host-assets],
+`daemonset-host-asset-materializer.sh`, flox) brings its resources to the host VIA THE
+CLUSTER — an entirely separate channel with its OWN `HostAssetDeliveryPolicy`, NOT a
+`HostAssetProvider`, out of scope here.
+
+=== Figure — C1 system context
+
+[mermaid]
+----
+flowchart LR
+  OP["Operator activation facet"]
+  RUN["seed-master PREPARE"]
+  SYS["Bootstrap host-asset materialization"]
+  INST["master srv host"]
+  OP --> RUN --> SYS --> INST
+----
+
+=== Figure — C2 container
+
+[mermaid]
+----
+flowchart TB
+  subgraph "incus-core"
+    BM["BootstrapHostAssetMaterializer Component"]
+  end
+  subgraph "manifests-contract"
+    SPI["HostAssetProvider SPI"]
+    K["HostAssetContribution slot plus kind plus entries"]
+    E["HostAssetEntry"]
+  end
+  subgraph "manifests-core"
+    PROV["providers cloudconfig env systemd"]
+  end
+  subgraph "instance"
+    FS["srv host roots via mounts"]
+  end
+  BM -->|"Reference MULTIPLE"| SPI
+  PROV -.->|"implements"| SPI
+  SPI -->|"yields"| K
+  K -->|"holds"| E
+  BM -->|"writes then mount"| FS
+----
+
+=== Figure — C3 component
+
+[mermaid]
+----
+flowchart TB
+  subgraph "manifests-contract hostasset SPI"
+    SPI["HostAssetProvider contribute returns list"]
+    K["HostAssetContribution slot plus deliveryKind plus entries"]
+    E["HostAssetEntry relativePath plus content plus executable"]
+    SPI -->|"yields"| K
+    K -->|"holds"| E
+  end
+  subgraph "manifests-core providers"
+    PC["CloudConfigHostAssetProvider SEED_DIR"]
+    PE["EnvConfigHostAssetProvider"]
+    PS["SystemdBundleHostAssetProvider DIRECT_COPY two contributions"]
+  end
+  PC -.->|"implements"| SPI
+  PE -.->|"implements"| SPI
+  PS -.->|"implements"| SPI
+  subgraph "incus-core driver"
+    BM["BootstrapHostAssetMaterializer Component"]
+    STG["reads synthesized manifests root"]
+    MAP["slot maps to BootstrapPaths root"]
+    BM --> STG
+    BM --> MAP
+  end
+  BM -->|"Reference MULTIPLE"| SPI
+  BM -->|"writes then mount"| FS["srv host staging roots"]
+----
+
 == Related Documentation
 
+* link:../patterns/daemonset-host-assets-architecture.adoc[Daemonset host-assets] — the SEPARATE in-cluster delivery channel (flox), the counterpart backend to the bootstrap service above
 * link:../bdd/bdd.adoc#clusterseed-scenario-map[BDD-as-engine — the ClusterSeed scenario map] — the target host runbook these gestures compose into
 * link:../atlas/seed.adoc[Atlas — Seed orchestration] — Diagram R (the host realisation) states the graph stays host, the metier becomes scions
 * link:../osgi/seed-broker-spec.adoc[Seed broker spec] — `broker.sow` and the runbook handler, the channel the activation payload travels

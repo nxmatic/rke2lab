@@ -30,13 +30,13 @@ import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
 import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
+import io.nxmatic.rke2lab.incus.core.BootstrapHostAssetMaterializer;
 import io.nxmatic.rke2lab.incus.core.GitProvenanceReader;
 import io.nxmatic.rke2lab.incus.core.GrowNetworkResolver;
 import io.nxmatic.rke2lab.incus.core.GrowPlanAssembler;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
 import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
 import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
-import io.nxmatic.rke2lab.incus.core.NocloudSeedWriter;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
@@ -56,6 +56,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -146,6 +147,9 @@ public class IncusProvisionScenario
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
   @OsgiService private Optional<NetplanSynthesisService> netplan = Optional.empty();
 
+  @OsgiService
+  private Optional<BootstrapHostAssetMaterializer> hostAssetMaterializer = Optional.empty();
+
   @OsgiService(await = false)
   private Optional<AuthTokenContact> authToken = Optional.empty();
 
@@ -178,7 +182,7 @@ public class IncusProvisionScenario
   }
 
   @Test
-  void the_instance_is_prepared() {
+  void the_instance_is_prepared() throws IOException {
     final ImageBuilder imageBuilder = this.imageBuilder.orElseThrow();
     final Parcel parcel = this.parcel.orElseThrow();
     final IncusRunbookInput input =
@@ -211,7 +215,7 @@ public class IncusProvisionScenario
         .and()
         .the_manifests_are_cultivated(hostScenario, hostTree)
         .and()
-        .the_nocloud_seed_is_unwrapped(resolved)
+        .the_host_assets_are_materialized(resolved, hostAssetMaterializer.orElseThrow())
         .and()
         .the_secrets_are_written(resolved, authToken)
         .and()
@@ -292,14 +296,13 @@ public class IncusProvisionScenario
       String soil,
       String liveRoot,
       Path worktreeRoot,
-      Path runtimeCloudConfigRoot,
       Path cloudSeedRoot,
       Path secretsFile,
       String clusterName,
       String nodeName) {
 
     static final Resolved UNAMENDED =
-        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), Path.of(""), "", "");
+        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), "", "");
 
     static Resolved from(Optional<Worktree> maybeWorktree, Cellar cellar, Parcel parcel) {
       if (maybeWorktree.isEmpty()) {
@@ -316,7 +319,6 @@ public class IncusProvisionScenario
           staging.manifestsRoot().toString(),
           local.liveRoot().toString(),
           root,
-          staging.runtimeCloudConfigRoot(),
           staging.cloudSeedRoot(),
           staging.secretsFile(),
           worktree.clusterName(),
@@ -457,21 +459,28 @@ public class IncusProvisionScenario
     }
 
     /**
-     * Unwrap the synthesised {@code cloud-config} ConfigMap into the NoCloud seed the instance
-     * reads at first boot (§ provisioning-slice delta #2) — a WHEN because it FABRICATES material,
-     * like the manifests synthesis it follows. The manifests sub-sow materialised the ConfigMap
-     * under the staging slot's {@code runtime/cloud-config}; {@link NocloudSeedWriter} strips the
-     * envelope and writes {@code user-data}/{@code meta-data}/{@code network-config} into the
-     * slot's {@code cloud.d}, so it lands BEFORE {@code the_staging_is_published} checksums the
-     * tree. NOT gated: a pure FS materialisation into the staging slot, inert against the live
-     * instance (like the manifests synthesis) — only the promotion into {@code host.live.d} is
-     * gated. Skipped for an unamended survey (no slot materialised).
+     * Materialise every host asset the manifests providers contribute into their staging slot roots
+     * (§ provisioning-slice delta #2) — a WHEN because it FABRICATES material, like the manifests
+     * synthesis it follows. The manifests sub-sow wrote its tree under the staging slot; {@link
+     * BootstrapHostAssetMaterializer} collects each {@code HostAssetProvider}'s contributions and
+     * places them (the cloud-config unwrapped into {@code cloud.d} as the NoCloud seed, and so on),
+     * so they land BEFORE {@code the_staging_is_published} checksums the tree. The staging {@link
+     * BootstrapPaths} is rebuilt deterministically from the resolved slot (never re-selecting N).
+     * NOT gated: a pure FS materialisation into the staging slot, inert against the live instance
+     * (like the manifests synthesis) — only the promotion into {@code host.live.d} is gated.
+     * Skipped for an unamended survey (no slot materialised).
      */
-    public When the_nocloud_seed_is_unwrapped(@Hidden Resolved resolved) {
+    public When the_host_assets_are_materialized(
+        @Hidden Resolved resolved, @Hidden BootstrapHostAssetMaterializer materializer)
+        throws IOException {
       if (!resolved.isAmended()) {
         return self();
       }
-      new NocloudSeedWriter().unwrap(resolved.runtimeCloudConfigRoot(), resolved.cloudSeedRoot());
+      final BootstrapPaths staging =
+          BootstrapPaths.fromLocalWorktree(
+                  resolved.worktreeRoot(), resolved.clusterName(), resolved.nodeName())
+              .asStagingView(Path.of(resolved.stagingRoot()));
+      materializer.materialize(staging);
       return self();
     }
 

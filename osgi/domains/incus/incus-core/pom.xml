@@ -54,7 +54,14 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
     </dependency>
-    <!-- Generic YAML parse for NocloudSeedWriter — unwrap the cloud-config ConfigMap into the
+    <!-- The FIRST explicit incus->manifests seam: the HostAssetProvider SPI incus @Reference(MULTIPLE)s
+         to collect the host-asset contributions manifests offers. Only the contract face — the content
+         still crosses as raw bytes (no manifests IMPL coupling); incus owns the transform strategy. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-contract</artifactId>
+    </dependency>
+    <!-- Generic YAML parse for the SEED_DIR strategy — unwrap the cloud-config ConfigMap into the
          NoCloud seed (§ provisioning-slice #2). No manifests coupling: a bare read into a Map. -->
     <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>

@@ -103,46 +103,18 @@ rke2lab::flox:ensure_manifest_tools
 rke2lab::flox:configure_auth_from_secrets
 
 rke2lab::env:load() {
-	local root env_dir files_count yq_cmd
+	# The env-config sections are materialised into ONE shell file in the scripts dir by incus's
+	# BootstrapHostAssetMaterializer (SHELL_FILE strategy) — already wrapped set -a … set +a, so
+	# sourcing it auto-exports every rke2lab variable. Filename is the convention shared with
+	# EnvConfigHostAssetProvider.ENV_FILE; keep the two in sync.
+	local env_file="${RKE2LAB_SCRIPTS_DIR}/rke2lab-environment.sh"
 
-	root=${RKE2LAB_ROOT:-/srv/host}
-	env_dir=${RKE2LAB_ENV_DIR:-${root}/rke2lab-environment.d}
-
-	if [[ ! -d "${env_dir}" ]]; then
-		echo "[rke2lab-env] missing environment directory: ${env_dir}" >&2
+	if [[ ! -r "${env_file}" ]]; then
+		echo "[rke2lab-env] missing environment file: ${env_file}" >&2
 		return 1
 	fi
 
-	shopt -s nullglob
-	local files=("${env_dir}"/*.yml "${env_dir}"/*.yaml)
-	shopt -u nullglob
-
-	files_count=${#files[@]}
-	if [[ "${files_count}" -eq 0 ]]; then
-		echo "[rke2lab-env] no manifest YAML files found in: ${env_dir}" >&2
-		return 1
-	fi
-
-	local file kind
-	for file in "${files[@]}"; do
-		kind="$(yq eval -r '.kind // ""' "${file}")"
-
-		case "${kind}" in
-		ConfigMap)
-			set -a
-			source <(yq eval -o=shell '.data // {}' "${file}")
-			set +a
-			;;
-		Secret)
-			set -a
-			source <(yq eval -o=shell '((.stringData // {}) * ((.data // {}) | with_entries(.value |= @base64d)))' "${file}")
-			set +a
-			;;
-		*)
-			continue
-			;;
-		esac
-	done
+	source "${env_file}"
 }
 
 rke2lab::env:load

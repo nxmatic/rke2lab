@@ -1,6 +1,7 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.contract
 Export-Package: \
     io.nxmatic.rke2lab.manifests.contract,\
+    io.nxmatic.rke2lab.manifests.contract.hostasset,\
     io.nxmatic.rke2lab.manifests.contract.node,\
     io.nxmatic.rke2lab.manifests.contract.profiles
 # type=contract — the manifests domain's vocabulary (the synthesis/explode/document service verbs,
