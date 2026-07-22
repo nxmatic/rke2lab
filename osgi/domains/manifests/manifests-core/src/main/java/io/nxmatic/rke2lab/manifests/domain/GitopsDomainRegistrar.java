@@ -8,7 +8,9 @@ import io.nxmatic.rke2lab.manifests.units.gitops.FluxOperatorManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.gitops.FluxRootManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.gitops.SopsAgeSecretManifestsUnit;
 import java.util.List;
+import org.osgi.service.component.annotations.Component;
 
+@Component(service = ManifestsDomainRegistrar.class)
 public final class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
 
   @Override

@@ -10,7 +10,9 @@ import io.nxmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.libexec.RuntimeSystemdLibexecPlaceholderManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.rke2.RuntimeRke2ConfigManifestsUnit;
 import java.util.List;
+import org.osgi.service.component.annotations.Component;
 
+@Component(service = ManifestsDomainRegistrar.class)
 public final class RuntimeDomainRegistrar implements ManifestsDomainRegistrar {
 
   @Override

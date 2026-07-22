@@ -8,7 +8,9 @@ import io.nxmatic.rke2lab.manifests.units.networking.CiliumConfigManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.networking.EnvoyGatewayManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.networking.KdnsManifestsUnit;
 import java.util.List;
+import org.osgi.service.component.annotations.Component;
 
+@Component(service = ManifestsDomainRegistrar.class)
 public final class NetworkingDomainRegistrar implements ManifestsDomainRegistrar {
 
   @Override

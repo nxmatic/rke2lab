@@ -4,65 +4,32 @@ package io.nxmatic.rke2lab.manifests;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 
 /**
- * Registers a manifest domain with its manifest units. Implementations can conditionally include
- * units based on {@link ManifestDomainPolicy}.
+ * A domain's contribution of manifest units to the synthesis — the unit channel of the three
+ * contribution channels (units here, node-env via {@code NodeEnvContributor}, host-assets via
+ * {@code HostAssetProvider}); see {@code
+ * docs/architecture/manifests/manifests-contribution-channels.adoc}. Each implementation is an SCR
+ * {@code @Component(service = ManifestsDomainRegistrar.class)} discovered through the OSGi registry
+ * and collected by {@code DefaultManifestSynthesisService} (a {@code @Reference(MULTIPLE)}), which
+ * calls {@link #domain(ManifestDomainPolicy)} on each at synthesis time and builds the {@link
+ * ManifestsDomainRegistry} from the results — no static registration.
  *
- * <h2>Component Diagram: Policy-Aware Registration</h2>
- *
- * <pre>{@code
- * graph LR
- *     LDRB[ManifestsDomainRegistryBuilder]
- *     LDR[ManifestsDomainRegistrar]
- *     MDP[ManifestDomainPolicy]
- *     LD[ManifestsDomain]
- *     MU[ManifestsUnit List]
- *
- *     LDRB -->|register registrar, policy| LDR
- *     LDR -->|queries| MDP
- *     MDP -->|isEnabled flag| LDR
- *     LDR -->|creates| LD
- *     LD -->|contains| MU
- *
- *     style MDP fill:#e1f5ff,stroke:#01579b
- *     style LDR fill:#f3e5f5,stroke:#4a148c
- *     style MU fill:#e8f5e9,stroke:#1b5e20
- * }</pre>
- *
- * <h3>Usage Patterns</h3>
- *
- * <p><b>Backwards compatible (no policy awareness):</b>
+ * <p>Because the run policy arrives as the {@link #domain(ManifestDomainPolicy)} argument (not as
+ * construction state), a registrar is a stateless singleton. Most contribute a fixed set of units
+ * by overriding {@link #domain()}; a policy-aware registrar overrides {@link
+ * #domain(ManifestDomainPolicy)} to include optional units conditionally.
  *
  * <pre>{@code
- * public class SimpleDomainRegistrar implements ManifestsDomainRegistrar {
+ * @Component(service = ManifestsDomainRegistrar.class)
+ * public final class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
  *   @Override
  *   public ManifestsDomain domain() {
- *     return new ManifestsDomain("simple", List.of(new SomeManifestsUnit()));
- *   }
- * }
- * }</pre>
- *
- * <p><b>Policy-aware (conditional units):</b>
- *
- * <pre>{@code
- * public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
- *   private static final ManifestDomainCatalog CATALOG =
- *       ManifestDomainCatalog.builder().addDefaultDomains().build();
- *
- *   @Override
- *   public ManifestsDomain domain(ManifestDomainPolicy policy) {
- *     List<ManifestsUnit> units = new ArrayList<>();
- *     units.add(new FluxInstanceManifestsUnit());
- *     if (policy.isEnabled(CATALOG.clusterApi())) {
- *       units.add(new ClusterApiManifestsUnit());
- *     }
- *     return new ManifestsDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units);
+ *     return new ManifestsDomain(ManifestDomainCatalog.GITOPS, List.of(...), units);
  *   }
  * }
  * }</pre>
  *
  * @see ManifestDomainPolicy
  * @see ManifestsDomain
- * @see ManifestsDomainRegistryBuilder
  */
 public interface ManifestsDomainRegistrar {
 

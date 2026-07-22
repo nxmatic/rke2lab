@@ -8,7 +8,9 @@ import io.nxmatic.rke2lab.manifests.units.mesh.HeadscaleManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.mesh.MeshSystemNamespaceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.mesh.TailscaleManifestsUnit;
 import java.util.List;
+import org.osgi.service.component.annotations.Component;
 
+@Component(service = ManifestsDomainRegistrar.class)
 public final class MeshDomainRegistrar implements ManifestsDomainRegistrar {
 
   @Override

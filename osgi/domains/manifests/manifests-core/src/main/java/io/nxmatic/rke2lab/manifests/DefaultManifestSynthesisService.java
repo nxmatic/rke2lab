@@ -11,16 +11,6 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.contract.SshToAgeConverter;
 import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
-import io.nxmatic.rke2lab.manifests.domain.CicdDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.ClusterApiDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.ClusterDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.GitopsDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.HighAvailabilityDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.MeshDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.NetworkingDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.PlatformDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.domain.StorageDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.OnFailure;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.PhaseRunner;
@@ -35,6 +25,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,6 +42,7 @@ import org.cdk8s.Chart;
 import org.jspecify.annotations.Nullable;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.resolver.Resolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +62,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
   /** SCR-injected registry of node-env contributors, threaded into each unit's context. */
   @Reference private NodeEnvContributorRegistry contributorRegistry;
+
+  /**
+   * The domain registrars, SCR-collected — the unit contribution channel, aligned on the node-env
+   * channel's shape (cardinality MULTIPLE). Each registrar contributes one manifest domain with its
+   * units; {@link #buildDomainRegistry} iterates them as {@code domain(policy)} at build time, so a
+   * registrar stays a stateless singleton and the run policy is a call-time argument. This replaces
+   * the former static {@code register(new XxxRegistrar())} chain.
+   */
+  @Reference(cardinality = ReferenceCardinality.MULTIPLE)
+  private List<ManifestsDomainRegistrar> domainRegistrars;
 
   /**
    * The deterministic YAML service, threaded into each unit's context (units are not components).
@@ -758,18 +760,12 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final ManifestDomainPolicy effectivePolicy =
         policy.orElseGet(() -> ManifestDomainPolicy.builder().build());
 
-    return new ManifestsDomainRegistryBuilder()
-        .register(new ClusterDomainRegistrar(), effectivePolicy)
-        .register(new StorageDomainRegistrar(), effectivePolicy)
-        .register(new GitopsDomainRegistrar(), effectivePolicy)
-        .register(new RuntimeDomainRegistrar(), effectivePolicy)
-        .register(new NetworkingDomainRegistrar(), effectivePolicy)
-        .register(new MeshDomainRegistrar(), effectivePolicy)
-        .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
-        .register(new CicdDomainRegistrar(), effectivePolicy)
-        .register(new ClusterApiDomainRegistrar(), effectivePolicy)
-        .register(new PlatformDomainRegistrar(), effectivePolicy)
-        .build();
+    final List<ManifestsDomain> domains =
+        domainRegistrars.stream()
+            .map(registrar -> registrar.domain(effectivePolicy))
+            .sorted(Comparator.comparing(ManifestsDomain::domainId))
+            .toList();
+    return new ManifestsDomainRegistry(domains);
   }
 
   ManifestsDomainRegistry applyManifestDomainPolicy(
