@@ -6,7 +6,9 @@ import com.tngtech.jgiven.impl.DefaultStageCreator;
 import com.tngtech.jgiven.impl.StageCreator;
 import com.tngtech.jgiven.impl.intercept.StepInterceptor;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 import org.osgi.framework.FrameworkUtil;
 
@@ -44,7 +46,11 @@ import org.osgi.framework.FrameworkUtil;
  * RunGate} ONCE when built, so the run mode is consulted in one place and every scenario and stage
  * stays mode-blind.
  */
-public final class OsgiServiceExtension implements TestInstancePostProcessor {
+public final class OsgiServiceExtension
+    implements TestInstancePostProcessor, AfterTestExecutionCallback {
+
+  private static final Namespace NAMESPACE = Namespace.create(OsgiServiceExtension.class);
+  private static final String REGISTRY = "scenario-registry";
 
   @Override
   public void postProcessTestInstance(Object testInstance, ExtensionContext context) {
@@ -53,8 +59,14 @@ public final class OsgiServiceExtension implements TestInstancePostProcessor {
     if (FrameworkUtil.getBundle(testInstance.getClass()) == null) {
       return;
     }
-    final OsgiServiceInjector injector =
-        OsgiServiceInjector.forRegistry(ScenarioRegistry.of(testInstance));
+    // ONE registry per scenario, stashed for the boundary close: it HOLDS every service it resolves
+    // (a delayed SCR component stays active, its @References bound) until afterTestExecution
+    // releases
+    // them — the deferral that stops a resolved component being torn down under the injected field
+    // before the body calls it (the materializer's "0 providers" defect).
+    final ScenarioRegistry registry = ScenarioRegistry.of(testInstance);
+    context.getStore(NAMESPACE).put(REGISTRY, registry);
+    final OsgiServiceInjector injector = OsgiServiceInjector.forRegistry(registry);
 
     // The scenario test instance (its seeds, plus any collaborator it still declares itself).
     injector.inject(testInstance);
@@ -64,6 +76,21 @@ public final class OsgiServiceExtension implements TestInstancePostProcessor {
     // StageCreator holding the same injector. The scenario's collaborators live on the stages now.
     if (testInstance instanceof ScenarioTestBase<?, ?, ?> scenarioTest) {
       scenarioTest.getScenario().setStageCreator(new InjectingStageCreator(injector));
+    }
+  }
+
+  /**
+   * The scenario boundary: release the services the registry held, now the body that used the
+   * injected collaborators has run. Fires per scenario ({@code @Test} method), so a nested scion —
+   * played on its own launcher — brackets its own registry, and every delayed component stayed
+   * active for exactly its scenario's duration.
+   */
+  @Override
+  public void afterTestExecution(ExtensionContext context) {
+    final ScenarioRegistry registry =
+        context.getStore(NAMESPACE).get(REGISTRY, ScenarioRegistry.class);
+    if (registry != null) {
+      registry.close();
     }
   }
 

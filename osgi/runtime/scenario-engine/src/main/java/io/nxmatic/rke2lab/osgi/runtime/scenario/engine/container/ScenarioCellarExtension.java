@@ -145,8 +145,14 @@ public final class ScenarioCellarExtension
       }
       return service;
     }
-    // No world connection ⇒ an in-container scion: resolve through its own bundle registry.
-    return ScenarioRegistry.of(context.getRequiredTestInstance())
-        .require(type, "no " + type.getSimpleName() + " in the scion's registry");
+    // No world connection ⇒ an in-container scion: resolve through its own bundle registry. The
+    // durable cellar is host-registered (not a delayed SCR component), so releasing the registry at
+    // once — try-with-resources — hands back a still-valid service without holding the get open;
+    // the
+    // scenario-lifetime hold belongs to the @OsgiService injection path (OsgiServiceExtension), not
+    // this one-shot durable lookup.
+    try (ScenarioRegistry registry = ScenarioRegistry.of(context.getRequiredTestInstance())) {
+      return registry.require(type, "no " + type.getSimpleName() + " in the scion's registry");
+    }
   }
 }

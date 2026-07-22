@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.osgi.framework.Bundle;
@@ -29,12 +31,21 @@ import org.osgi.util.tracker.ServiceTracker;
  * without it), so awaiting would block the full timeout every doctor-less run for nothing — it
  * takes a snapshot, empty when none is published.
  */
-public final class ScenarioRegistry {
+public final class ScenarioRegistry implements AutoCloseable {
 
   /** How long {@link #require} waits for SCR to publish a delayed component's service. */
   private static final long AWAIT_MILLIS = 5_000;
 
   private final BundleContext context;
+
+  // The services this registry got and MUST keep gotten until {@link #close}. A delayed SCR
+  // component is activated by getService and DEACTIVATED when its use-count falls to zero — which
+  // UNBINDS its dynamic @References. If a resolve released the service at once (the old
+  // tracker-close-in-finally), the caller would hold a deconfigured instance whose injected state
+  // was already torn down (the "0 providers" defect). So a resolve HOLDS the get, and close()
+  // releases them together at the scenario boundary — the component stays active for the whole run.
+  private final List<ServiceTracker<?, ?>> heldTrackers = new ArrayList<>();
+  private final List<ServiceReference<?>> gottenReferences = new ArrayList<>();
 
   private ScenarioRegistry(BundleContext context) {
     this.context = context;
@@ -60,16 +71,7 @@ public final class ScenarioRegistry {
    * one), not a runtime condition to guess a default for.
    */
   public <T> T require(Class<T> type, String absenceMessage) {
-    final ServiceTracker<T, T> tracker = new ServiceTracker<>(context, type, null);
-    tracker.open();
-    try {
-      return Objects.requireNonNull(tracker.waitForService(AWAIT_MILLIS), absenceMessage);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("interrupted awaiting service " + type.getName(), ex);
-    } finally {
-      tracker.close();
-    }
+    return awaitAndHold(new ServiceTracker<>(context, type, null), type, absenceMessage);
   }
 
   /**
@@ -79,16 +81,30 @@ public final class ScenarioRegistry {
    * an unpaired service matches it too. Combined with {@code objectClass} into the tracker filter.
    */
   public <T> T require(Class<T> type, String gardeningFilter, String absenceMessage) {
-    final ServiceTracker<T, T> tracker =
-        new ServiceTracker<>(context, filter(type, gardeningFilter), null);
+    return awaitAndHold(
+        new ServiceTracker<>(context, filter(type, gardeningFilter), null), type, absenceMessage);
+  }
+
+  /**
+   * Await the service on {@code tracker}, then KEEP the tracker open (its get held) so the resolved
+   * service — a delayed SCR component — stays active with its {@code @References} bound until
+   * {@link #close}. A missing service is a wiring bug: close the throwaway tracker and fail with
+   * {@code absenceMessage}.
+   */
+  private <T> T awaitAndHold(ServiceTracker<T, T> tracker, Class<T> type, String absenceMessage) {
     tracker.open();
     try {
-      return Objects.requireNonNull(tracker.waitForService(AWAIT_MILLIS), absenceMessage);
+      final T service = tracker.waitForService(AWAIT_MILLIS);
+      if (service == null) {
+        tracker.close();
+        throw new NullPointerException(absenceMessage);
+      }
+      heldTrackers.add(tracker);
+      return service;
     } catch (InterruptedException ex) {
+      tracker.close();
       Thread.currentThread().interrupt();
       throw new IllegalStateException("interrupted awaiting service " + type.getName(), ex);
-    } finally {
-      tracker.close();
     }
   }
 
@@ -127,6 +143,22 @@ public final class ScenarioRegistry {
   }
 
   private <T> T service(ServiceReference<T> ref) {
+    gottenReferences.add(ref);
     return context.getService(ref);
+  }
+
+  /**
+   * Release every service this registry held — close the held trackers and unget the gotten
+   * references, dropping each resolved component's use-count so SCR can finally deactivate it. The
+   * scenario bracket ({@code OsgiServiceExtension}) calls this at the test boundary, AFTER the body
+   * that used the injected collaborators — the deferral that keeps a delayed component (and its
+   * bound {@code @References}) alive for the whole scenario.
+   */
+  @Override
+  public void close() {
+    heldTrackers.forEach(ServiceTracker::close);
+    heldTrackers.clear();
+    gottenReferences.forEach(context::ungetService);
+    gottenReferences.clear();
   }
 }

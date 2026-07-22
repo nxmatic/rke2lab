@@ -164,9 +164,9 @@ public final class FrameworkLauncher {
    * hard-coded HERE, not a checked-in {@code logback.xml}, so there is one source and nothing to
    * misplace. The file and root level come from {@link LaunchConfig} FIELDS ({@link
    * LaunchConfig#logFile} and {@link LaunchConfig#frameworkLogLevel} — the same knob that drives
-   * {@code felix.log.level}, Plane A), baked straight in: no system property, and the launcher stays
-   * ignorant of the host/Pulumi. This is the ONE logback in the process: it drains the JDK JUL bus
-   * (host + Felix) via pax's JdkHandler AND the OSGi LogService.
+   * {@code felix.log.level}, Plane A), baked straight in: no system property, and the launcher
+   * stays ignorant of the host/Pulumi. This is the ONE logback in the process: it drains the JDK
+   * JUL bus (host + Felix) via pax's JdkHandler AND the OSGi LogService.
    */
   private Path writePaxLogbackConfig() throws IOException {
     final Path file = Files.createTempFile("rke2lab-osgi-logback-", ".xml");
