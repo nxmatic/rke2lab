@@ -19,8 +19,10 @@ import org.osgi.service.component.annotations.Component;
  * synthesis carried the units and scripts as two ConfigMap dotfiles (decision X — {@code
  * SystemdChart} owns the coupled unit+script bundle), and yields them raw. Incus's {@link
  * HostAssetDeliveryKind#CONFIGMAP_FILES} strategy extracts each ConfigMap {@code data} key back to
- * a file: the units into {@code systemd-units.d}, the scripts into {@code systemd-scripts.d}
- * (executable). Two contributions because the two bundles land in different slot roots.
+ * a file: the units into {@code systemd-units.d}, the scripts into {@code systemd-scripts.d}. This
+ * provider MARKS the scripts contribution executable (a systemd script must run) via {@link
+ * HostAssetContribution#executableFiles} — incus applies that flag rather than inferring it from
+ * the slot. Two contributions because the two bundles land in different slot roots.
  */
 @Component(service = HostAssetProvider.class)
 public final class SystemdBundleHostAssetProvider implements HostAssetProvider {
@@ -37,23 +39,31 @@ public final class SystemdBundleHostAssetProvider implements HostAssetProvider {
     addBundle(
         contributions,
         slice.resolve(SystemdBundleConfigMaps.UNITS_DOTFILE),
-        HostAssetSlot.SYSTEMD_UNITS);
+        HostAssetSlot.SYSTEMD_UNITS,
+        false);
     addBundle(
         contributions,
         slice.resolve(SystemdBundleConfigMaps.SCRIPTS_DOTFILE),
-        HostAssetSlot.SYSTEMD_SCRIPTS);
+        HostAssetSlot.SYSTEMD_SCRIPTS,
+        true);
     return contributions;
   }
 
   private static void addBundle(
-      List<HostAssetContribution> contributions, Path configMap, HostAssetSlot slot) {
+      List<HostAssetContribution> contributions,
+      Path configMap,
+      HostAssetSlot slot,
+      boolean executable) {
     if (!Files.isRegularFile(configMap)) {
       return;
     }
     final HostAssetEntry entry =
         HostAssetEntry.file(configMap.getFileName().toString(), readString(configMap));
     contributions.add(
-        HostAssetContribution.fanOut(slot, HostAssetDeliveryKind.CONFIGMAP_FILES, List.of(entry)));
+        executable
+            ? HostAssetContribution.executableFiles(slot, List.of(entry))
+            : HostAssetContribution.fanOut(
+                slot, HostAssetDeliveryKind.CONFIGMAP_FILES, List.of(entry)));
   }
 
   private static String readString(Path file) {

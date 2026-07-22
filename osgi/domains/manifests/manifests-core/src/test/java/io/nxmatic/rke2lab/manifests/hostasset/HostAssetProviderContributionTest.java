@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.manifests.hostasset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.manifests.contract.hostasset.HostAssetContribution;
@@ -142,6 +143,10 @@ class HostAssetProviderContributionTest {
         List.of(HostAssetSlot.SYSTEMD_UNITS, HostAssetSlot.SYSTEMD_SCRIPTS),
         contributions.stream().map(HostAssetContribution::slot).toList(),
         "units first, then scripts (the provider's add order)");
+    assertFalse(contributions.get(0).executable(), "unit files are not executable");
+    assertTrue(
+        contributions.get(1).executable(),
+        "the provider marks its scripts contribution executable — incus does not infer it");
   }
 
   @Test

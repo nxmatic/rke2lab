@@ -20,9 +20,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The strategies the materializer applies to each contribution — SEED_DIR (NoCloud unwrap),
- * CONFIGMAP_FILES (systemd bundle: each data key to a file, executable by slot), SHELL_ENV_FILE
- * (env concat). Driven through the package-private {@code materialize(paths, providers)} seam with
- * stub providers, since the in-container scion runs unamended (materialiser is a no-op there).
+ * CONFIGMAP_FILES (systemd bundle: each data key to a file, executable when the contribution
+ * declares it), SHELL_ENV_FILE (env concat). Driven through the package-private {@code
+ * materialize(paths, providers)} seam with stub providers, since the in-container scion runs
+ * unamended (materialiser is a no-op there).
  */
 class BootstrapHostAssetMaterializerTest {
 
@@ -65,10 +66,8 @@ class BootstrapHostAssetMaterializerTest {
             paths,
             List.of(
                 yielding(
-                    HostAssetContribution.fanOut(
-                        HostAssetSlot.SYSTEMD_SCRIPTS,
-                        HostAssetDeliveryKind.CONFIGMAP_FILES,
-                        List.of(entry)))));
+                    HostAssetContribution.executableFiles(
+                        HostAssetSlot.SYSTEMD_SCRIPTS, List.of(entry)))));
 
     final Path script = paths.scriptsRoot().resolve("foo.sh");
     assertTrue(Files.isRegularFile(script), "the script was extracted from the ConfigMap");

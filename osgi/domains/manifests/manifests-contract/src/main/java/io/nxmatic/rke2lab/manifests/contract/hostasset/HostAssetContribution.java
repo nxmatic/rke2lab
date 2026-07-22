@@ -5,18 +5,25 @@ import java.util.Objects;
 
 /**
  * A provider's offer of host assets: the entries, the logical slot they target, the delivery kind
- * incus applies to place them, and — for a fan-in kind — the single output file it produces. A
- * provider may yield several (the systemd bundle contributes one per slot — units and scripts).
+ * incus applies to place them, whether the placed files are executable, and — for a fan-in kind —
+ * the single output file it produces. A provider may yield several (the systemd bundle contributes
+ * one per slot — units and scripts).
  *
  * <p>{@code targetFile} names the ONE output artifact a fan-in kind writes ({@link
  * HostAssetDeliveryKind#SHELL_ENV_FILE}); the fan-out kinds ({@code SEED_DIR}, {@code
  * CONFIGMAP_FILES}) derive their outputs from the entries and leave it blank.
+ *
+ * <p>{@code executable} is declared BY THE CONTRIBUTION (the domain knows a systemd script must be
+ * runnable, a unit file must not), not inferred by incus from the slot — so incus stays agnostic of
+ * its clients. Only a {@link HostAssetDeliveryKind#CONFIGMAP_FILES} contribution may be executable;
+ * use {@link #executableFiles} for it.
  */
 public record HostAssetContribution(
     HostAssetSlot slot,
     HostAssetDeliveryKind deliveryKind,
     List<HostAssetEntry> entries,
-    String targetFile) {
+    String targetFile,
+    boolean executable) {
 
   public HostAssetContribution {
     slot = Objects.requireNonNull(slot, "slot");
@@ -30,18 +37,32 @@ public record HostAssetContribution(
       throw new IllegalArgumentException(
           deliveryKind + " does not use a targetFile: " + targetFile);
     }
+    if (executable && deliveryKind != HostAssetDeliveryKind.CONFIGMAP_FILES) {
+      throw new IllegalArgumentException(
+          deliveryKind + " cannot be executable — only CONFIGMAP_FILES");
+    }
   }
 
-  /** A fan-out contribution (SEED_DIR / CONFIGMAP_FILES): the entries drive the outputs. */
+  /** A fan-out contribution (SEED_DIR / CONFIGMAP_FILES) whose files are NOT executable. */
   public static HostAssetContribution fanOut(
       HostAssetSlot slot, HostAssetDeliveryKind deliveryKind, List<HostAssetEntry> entries) {
-    return new HostAssetContribution(slot, deliveryKind, entries, "");
+    return new HostAssetContribution(slot, deliveryKind, entries, "", false);
+  }
+
+  /**
+   * A CONFIGMAP_FILES contribution whose extracted files land executable — the domain declares it
+   * (a systemd script must be runnable), incus does not infer it from the slot.
+   */
+  public static HostAssetContribution executableFiles(
+      HostAssetSlot slot, List<HostAssetEntry> entries) {
+    return new HostAssetContribution(
+        slot, HostAssetDeliveryKind.CONFIGMAP_FILES, entries, "", true);
   }
 
   /** A SHELL_ENV_FILE contribution: the entries fan into the single {@code targetFile}. */
   public static HostAssetContribution shellEnvFile(
       HostAssetSlot slot, List<HostAssetEntry> entries, String targetFile) {
     return new HostAssetContribution(
-        slot, HostAssetDeliveryKind.SHELL_ENV_FILE, entries, targetFile);
+        slot, HostAssetDeliveryKind.SHELL_ENV_FILE, entries, targetFile, false);
   }
 }

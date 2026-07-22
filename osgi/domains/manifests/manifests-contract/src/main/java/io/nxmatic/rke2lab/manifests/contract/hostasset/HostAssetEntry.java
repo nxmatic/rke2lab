@@ -5,8 +5,8 @@ import java.util.Objects;
 /**
  * One entry a provider contributes: a slot-relative path plus its text content (raw slice content —
  * incus's {@link HostAssetDeliveryKind} strategy transforms it). All bootstrap host assets are text
- * (shell, yaml, env), so content is a {@code String}. Executability is decided by the delivery
- * strategy from the slot (e.g. a scripts slot), not per-entry.
+ * (shell, yaml, env), so content is a {@code String}. Executability is declared by the {@link
+ * HostAssetContribution} the entry rides in — not derived from the slot, and not per-entry.
  */
 public record HostAssetEntry(String relativePath, String content) {
 

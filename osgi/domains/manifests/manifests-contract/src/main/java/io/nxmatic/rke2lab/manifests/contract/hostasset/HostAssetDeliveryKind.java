@@ -10,8 +10,9 @@ public enum HostAssetDeliveryKind {
   SEED_DIR,
   /**
    * Extract each entry's ConfigMap {@code data} and write every key as its own file under the slot
-   * root (the key is the file's slot-relative path). Files land executable when the slot is a
-   * scripts slot. Used for the systemd bundle (units, drop-ins, scripts).
+   * root (the key is the file's slot-relative path). Files land executable when the {@link
+   * HostAssetContribution} declares it ({@link HostAssetContribution#executableFiles}), not by
+   * slot. Used for the systemd bundle (units, drop-ins, scripts).
    */
   CONFIGMAP_FILES,
   /**

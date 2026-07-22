@@ -73,10 +73,7 @@ public final class BootstrapHostAssetMaterializer {
         switch (contribution.deliveryKind()) {
           case SEED_DIR -> seedDir(contribution.entries(), root);
           case CONFIGMAP_FILES ->
-              configMapFiles(
-                  contribution.entries(),
-                  root,
-                  contribution.slot() == HostAssetSlot.SYSTEMD_SCRIPTS);
+              configMapFiles(contribution.entries(), root, contribution.executable());
           case SHELL_ENV_FILE ->
               shellEnvFile(contribution.entries(), root, contribution.targetFile());
         }
@@ -149,8 +146,9 @@ public final class BootstrapHostAssetMaterializer {
 
   /**
    * Extract each entry's ConfigMap {@code data} and write every key as its own file under the root
-   * (the key is the file's slot-relative path). Files land executable when the slot is a scripts
-   * slot (systemd scripts must be runnable; unit files must not).
+   * (the key is the file's slot-relative path). Files land executable when the CONTRIBUTION
+   * declares it (a systemd scripts bundle does, unit files do not) — incus applies the flag, it
+   * does not infer executability from the slot.
    */
   private void configMapFiles(List<HostAssetEntry> entries, Path root, boolean executable)
       throws IOException {

@@ -86,7 +86,12 @@ should follow:
 * the aggregator collects every contributor with one `@Reference(MULTIPLE)`.
 
 The host-asset channel follows the same shape (`contribute(Path)` collected by
-incus). The manifest-unit channel already has the method-parameter half --
+incus). Responsibility split on the host-asset seam: the domain names a *logical
+slot* + content and DECLARES whether the placed files are executable (a systemd
+script must run, a unit file must not -- `HostAssetContribution.executableFiles`);
+incus, which owns the instance, maps the slot to a `/srv/host/...` root and APPLIES
+the declared mode -- it never infers executability from the slot, so it stays
+agnostic of its clients. The manifest-unit channel already has the method-parameter half --
 `ManifestsDomainRegistrar.domain(ManifestDomainPolicy)` takes the policy as an
 argument -- but is still collected statically.
 
