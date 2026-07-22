@@ -6,6 +6,8 @@ config:
     name: master
   rke2lab:profile:
     name: rke2lab
+  rke2lab:logging:
+    level: warn
   rke2lab:incus:
     project: rke2lab
     defaultRemote: bioskop-nixos
@@ -21,11 +23,23 @@ config:
   rke2lab:api:
     endpoint: https://10.66.106.10:6443
   rke2lab:worktree:
-    dir: /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-seed-scenario/
+    dir: /private/var/lib/git/nxmatic/rke2lab.d/main
   rke2lab:systemd:
     dbusHost: bioskop-master
     dbusPort: "12434"
-  rke2lab:policy:
+  rke2lab:manifests:
+    # Which domain manifest layers the master publishes (stows via symlink) into RKE2's
+    # server-manifests directory, and per-layer synthesis debug. NOTE: not yet wired — the seed
+    # path amends only SOIL, so the scion falls to its defaults; the config→FACET pluck lands when
+    # the exec sowers migrate to the runbook model.
+    publish:
+      gitops: "true"
+      networking: "true"
+      clusterApi: "true"
+      storage: "true"
+      mesh: "false"
+      highAvailability: "true"
+      cicd: "true"
     debug:
       mesh:
         enabled: "true"
@@ -34,20 +48,13 @@ config:
       nriPlugins:
         flox:
           enabled: "true"
+  rke2lab:policy:
     network:
       lan:
         binding:
           enabled: "true"
     gitDirtyCheck:
       enabled: "false"
-    link:
-      gitops: "true"
-      networking: "true"
-      clusterApi: "true"
-      storage: "true"
-      mesh: "false"
-      highAvailability: "true"
-      cicd: "true"
     readiness:
       override:
         systemd-adapter: warning
