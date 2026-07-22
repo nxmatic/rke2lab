@@ -250,12 +250,13 @@ Five decisions, taken together (2026-07-04), fix the model:
   of the seed scenario* — "when the framework is launched" — a plain effect step (bouchonné-probe
   pattern E2, no runbook value folded), already how `OsgiConnection.embedded()` opens the world. There
   is no amorce paradox: the JUnit launcher runs on the HOST flat classpath, OUTSIDE Felix
-  (`SeedLauncherMain` — `main()` creates it), so launching Felix is a narrated step the launcher plays,
-  not a pre-amorce that must precede it. The fluent grammar had no surviving OSGi user once the boot
-  was de-grammatised, so `pipeline-port` was dissolved: its engine relocated INTO `manifests-core` as
-  un-exported internal synthesis (`Phase`/`PhaseRunner`), leaving the specs the moment the code stopped
-  exporting it (the `SPEC_COVERAGE` code-first ratchet). The seed host's own `during/then` chains
-  (`ClusterSeedTopic.seedCluster()`) are the last to migrate, on the deferred scenario-rewrite arc.
+  (`Main` — `main()`, inside `Pulumi.run`, creates it), so launching Felix is a narrated step the
+  launcher plays, not a pre-amorce that must precede it. The fluent grammar had no surviving OSGi user
+  once the boot was de-grammatised, so `pipeline-port` was dissolved: its engine relocated INTO
+  `manifests-core` as un-exported internal synthesis (`Phase`/`PhaseRunner`), leaving the specs the
+  moment the code stopped exporting it (the `SPEC_COVERAGE` code-first ratchet). The seed host's own
+  `during/then` chains have migrated too: `ClusterSeedScenario` is the live root runbook, no fluent
+  chain survives — `Topic`/`State<I,B>` are deleted from the codebase.
 . *The value-DAG is carried by the jGiven state annotations*, not lost:
 +
 --
@@ -292,7 +293,7 @@ bench:
 flowchart TB
   operator(["Operator<br/>reads the runbook AND acts through it"])
   subgraph host["host — the JUnit launcher runs HERE (flat classpath, OUTSIDE Felix)"]
-    launch["JUnit Platform launcher<br/>(SeedLauncherMain: main() creates it)<br/>plays the seed scenario — engine-agnostic"]
+    launch["JUnit Platform launcher<br/>(Main: main() inside Pulumi.run creates it)<br/>plays the seed scenario — engine-agnostic"]
     edge["pulumi-edge<br/>RunMode source · stack sink · output registry"]
   end
   subgraph scn["the seed scenario — jGiven Stages, @NestedSteps compose ONE tree"]

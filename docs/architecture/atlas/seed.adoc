@@ -231,14 +231,18 @@ connected scenario, green) rather than on the disposable bench.
 | `DUPLICATE_REALM_CLASS` == 0 | ✓ | the rule fires only if a class transpires *through a port* — jGiven is never in a `type=seam`/`system.packages.extra`, so each world loading its own copy is legal by construction (the LOCAL claim in `jgiven-wrap`'s bnd).
 |===
 
-*Conclusion.* The seeding rests on the launcher-substrate, the disciplines, and the value-DAG (with the
-`PendingMarkingScenarioExecutor` still to design). The fluent grammar, `Topic`/`Sink`/`State<I,B>`, `PipelineContext`,
-`LiveGate`, `FluentTopicRunner` and the host-side boot are gone — the grammar engine dissolved into
-manifests-core's internal synthesis, the boot into `FrameworkLaunch`; the `SCENARIO_STATE_DAG` gate is
-the value-DAG's build-time safety. It rests on four invariants (above). The orchestration substrate
-SHIPPED (increment 1, `osgi/runtime/scenario-engine`, green). What remains is wiring seed-master's own
-live pipeline onto it: the *ClusterSeed-vertical-first* increment; the six other pipelines stay on the
-former Topic/State model meanwhile (assumed coexistence, not a legacy variant to hide).
+*Conclusion.* The seeding rests on the launcher-substrate, the disciplines, and the value-DAG. The
+fluent grammar, `Topic`/`Sink`/`State<I,B>`, `PipelineContext`, `LiveGate`, `FluentTopicRunner` and the
+host-side boot are gone — the grammar engine dissolved into manifests-core's internal synthesis, the
+boot into `FrameworkLaunch`; the `SCENARIO_STATE_DAG` gate (still to build) is the value-DAG's
+build-time safety. It rests on four invariants (above). The orchestration substrate SHIPPED (increment
+1, `osgi/runtime/scenario-engine`, green) and the ClusterSeed vertical is wired onto it:
+`ClusterSeedScenario` is the live seed runbook (GIVEN + seven WHENs), `PendingMarkingScenarioExecutor`
+renders preview, and every domain has its scenario (bbox, incus, systemd, cluster, manifests). No
+pipeline remains on the former Topic/State model — it is deleted from the codebase, not coexisting. The
+one orphaned leftover is `netplan-cli` (still referencing the deleted `FrameworkLaunchPipeline` +
+stale `netplan.api`/`netplan.port` packages), a compile-broken exec module to realign onto
+`FrameworkLaunch`, not a live pipeline.
 
 === The go/no-go gate — closed; the socle shipped
 
@@ -250,11 +254,10 @@ graved; increment 1 (the engine-lifecycle socle) then SHIPPED the load-bearing o
 CONSUMED: the proof is no longer "a bench shows it viable" but "the socle realizes it." The detailed
 seven-mechanism registry lived here to decide the GO; that decision is made, so it collapses to a
 pointer — see link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec] for the shipped socle and
-its increment boundary, and the migration plan for the vertical sequence. Three mechanisms are NOT yet
-productionised and belong to the vertical (increment 2) or its close: the `PendingMarkingScenarioExecutor`
-(preview-as-`ExecutionCondition`, Q3, not yet designed), the `SCENARIO_STATE_DAG` gate (the closing
-task — a sixth `StagingGate` on the existing ASM+`@GovernedBy` mould), and the cross-world
-`ScenarioModel` graft (only when an OSGi-world scenario is grafted). The bench code survives at tag
+its increment boundary. The vertical shipped: `PendingMarkingScenarioExecutor` (preview-as-render, E9)
+and the cross-world `ScenarioModel` graft (`ScenarioGraft`, driving every `ClusterSeedScenario`
+crossing) are both productionised. One mechanism remains: the `SCENARIO_STATE_DAG` gate (the closing
+task — a sixth `StagingGate` on the existing ASM+`@GovernedBy` mould). The bench code survives at tag
 `spike/bdd-pipeline-poc`; the module is out of the default build.
 
 [NOTE]

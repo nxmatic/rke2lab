@@ -104,9 +104,10 @@ broker crosses and the graft narrates (Figure 2).
 The launcher does not change this — it is one more consumer of the R4 boot seam (Felix in `Pulumi.run`).
 `InContainerJUnitRunner` already drives a JUnit launcher *inside* Felix; `JGivenTestkit.felix()` proves
 the jGiven runtime (byte-buddy proxy, `ScenarioExecutor`, `ValueInjector`) boots in-container — the
-coupling that gives the state-DAG + the execution nesting. The live boot seam already exists:
-`ClusterSeedTopic.seedCluster()` boots embedded Felix synchronously on the `Pulumi.run` lambda thread
-today.
+coupling that gives the state-DAG + the execution nesting. The live boot seam is in production:
+`Main` (inside the `Pulumi.run` lambda) drives `JUnitLauncherCore` on the host flat classpath, playing
+`ClusterSeedScenario`, whose first jGiven step launches embedded Felix (`FrameworkLaunch` via
+`OsgiConnection.embedded()`).
 
 *Which use case is which* (two real seed use cases, not a theoretical symmetry):
 
