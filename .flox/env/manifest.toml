@@ -44,6 +44,7 @@ jdk25.priority = 1
 maven.flake = "github:nxmatic/rke2lab#maven"
 shfmt.flake = "github:nxmatic/rke2lab#shfmt"
 shellcheck.flake = "github:nxmatic/rke2lab#shellcheck"
+claude-code.pkg-path = "claude-code"
 
 
 ## Environment Variables ---------------------------------------------

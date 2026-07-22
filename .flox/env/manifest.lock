@@ -24,6 +24,9 @@
         "pkg-group": "k8s-kubectl-tools",
         "outputs": "all"
       },
+      "claude-code": {
+        "pkg-path": "claude-code"
+      },
       "dasel": {
         "pkg-path": "dasel",
         "version": "3.3.0"
@@ -2277,6 +2280,64 @@
       "priority": 5
     },
     {
+      "attr_path": "claude-code",
+      "broken": false,
+      "derivation": "/nix/store/wcxn8b1xy0j7vvdbcjjvx95wk34m48kj-claude-code-2.1.76.drv",
+      "description": "Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster",
+      "install_id": "claude-code",
+      "license": "Unfree",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "claude-code-2.1.76",
+      "pname": "claude-code",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:03.600432Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": true,
+      "version": "2.1.76",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/p5d5c57p5874b3p57h9v4m7kzab5s2c8-claude-code-2.1.76"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "claude-code",
+      "broken": false,
+      "derivation": "/nix/store/jk9cg84z4wbi84hl22fbg1lig4d02l3a-claude-code-2.1.76.drv",
+      "description": "Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster",
+      "install_id": "claude-code",
+      "license": "Unfree",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "claude-code-2.1.76",
+      "pname": "claude-code",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:14:38.706055Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": true,
+      "version": "2.1.76",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/dl9yl8lv9x2fvmhmdfna5i4whngsf7l6-claude-code-2.1.76"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "dasel",
       "broken": false,
       "derivation": "/nix/store/np07g2vxsvjchvckv8j7asjh4m2baqsh-dasel-3.3.0.drv",
@@ -3204,6 +3265,9 @@
       "install": {
         "cdk8s-cli": {
           "pkg-path": "cdk8s-cli"
+        },
+        "claude-code": {
+          "pkg-path": "claude-code"
         },
         "dasel": {
           "pkg-path": "dasel",
