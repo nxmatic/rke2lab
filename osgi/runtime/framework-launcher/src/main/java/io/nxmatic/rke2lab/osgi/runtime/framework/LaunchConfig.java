@@ -29,7 +29,17 @@ import org.osgi.service.log.LogLevel;
  *       has no AUDIT/TRACE — they pin to the nearest step), used by both boot paths.
  * </ul>
  */
-public record LaunchConfig(List<String> bootDelegation, Optional<LogLevel> frameworkLogLevel) {
+public record LaunchConfig(
+    List<String> bootDelegation, Optional<LogLevel> frameworkLogLevel, String logFile) {
+
+  /**
+   * Default log file for the generated pax logback config — seed-master's established path ({@code
+   * .local.d/seed-master.log}, relative to the launch CWD, the {@code BootstrapPaths.STATE_DIR}
+   * ".local.d" convention). An executor booting for another purpose overrides it via {@link
+   * #withLogFile}. A field, not a system property: {@code FrameworkLauncher} bakes it straight into
+   * the config it generates, knowing nothing of the host/Pulumi.
+   */
+  public static final String DEFAULT_LOG_FILE = ".local.d/seed-master.log";
 
   /**
    * The boot-delegation every jGiven-PLAYING boot needs — the single source both executors derive
@@ -66,9 +76,9 @@ public record LaunchConfig(List<String> bootDelegation, Optional<LogLevel> frame
     bootDelegation = List.copyOf(bootDelegation);
   }
 
-  /** The prod default: no boot-delegation, Felix's default log level. */
+  /** The prod default: no boot-delegation, Felix's default log level, seed-master's log file. */
   public static LaunchConfig defaults() {
-    return new LaunchConfig(List.of(), Optional.empty());
+    return new LaunchConfig(List.of(), Optional.empty(), DEFAULT_LOG_FILE);
   }
 
   public LaunchConfig withBootDelegation(String... packages) {
@@ -76,11 +86,16 @@ public record LaunchConfig(List<String> bootDelegation, Optional<LogLevel> frame
   }
 
   public LaunchConfig withBootDelegation(List<String> packages) {
-    return new LaunchConfig(packages, frameworkLogLevel);
+    return new LaunchConfig(packages, frameworkLogLevel, logFile);
   }
 
   public LaunchConfig withFrameworkLogLevel(LogLevel level) {
-    return new LaunchConfig(bootDelegation, Optional.of(level));
+    return new LaunchConfig(bootDelegation, Optional.of(level), logFile);
+  }
+
+  /** The file the generated pax logback config writes to (an executor-specific knob). */
+  public LaunchConfig withLogFile(String logFile) {
+    return new LaunchConfig(bootDelegation, frameworkLogLevel, logFile);
   }
 
   /**
@@ -96,6 +111,21 @@ public record LaunchConfig(List<String> bootDelegation, Optional<LogLevel> frame
       case WARN -> 2;
       case INFO -> 3;
       case DEBUG, TRACE -> 4;
+    };
+  }
+
+  /**
+   * Collapse the OSGi {@link LogLevel} to a logback level NAME (a String) for the generated pax
+   * logback root — the Plane-B twin of {@link #felixLevelOf} (Plane A). Both read the SAME {@link
+   * #frameworkLogLevel} knob; logback has no AUDIT (pins to ERROR), the rest map by name.
+   */
+  public static String logbackLevelOf(LogLevel level) {
+    return switch (level) {
+      case AUDIT, ERROR -> "ERROR";
+      case WARN -> "WARN";
+      case INFO -> "INFO";
+      case DEBUG -> "DEBUG";
+      case TRACE -> "TRACE";
     };
   }
 }

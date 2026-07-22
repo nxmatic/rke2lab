@@ -95,9 +95,10 @@ public record BootstrapConfig(
             .rotationRetentionCount()
             .orElse(DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT),
         config.readiness().timeout().orElse(DEFAULT_READINESS_TIMEOUT),
-        // No default: absent ⇒ no override — the boot keeps the Felix default and the host logback
-        // keeps its logback.xml root level. A present value drives BOTH planes (felix.log.level at
-        // construction + the host logback root).
+        // No default: absent ⇒ no override — the boot keeps the Felix default and the generated pax
+        // logback keeps its ${seed.log.level} default. A present value drives BOTH planes:
+        // felix.log.level (Plane A) + the pax logback root via the seed.log.level property (Plane
+        // B).
         config.logging().level());
   }
 

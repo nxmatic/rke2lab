@@ -97,6 +97,26 @@
       <artifactId>org.apache.felix.log</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The OSGi logging stack the inverted-flow probe boots out-of-container: pax-logging-api
+         installs a JdkHandler that captures the JDK java.util.logging bus, and pax-logging-logback
+         is the single sink. The probe configures pax-logging-logback FILE-only via configadmin (no
+         console) and proves a java.util.logging record reaches that sink, never a ConsoleAppender.
+         Located on the test classpath by Bundle-SymbolicName, installed in the test body. -->
+    <dependency>
+      <groupId>org.ops4j.pax.logging</groupId>
+      <artifactId>pax-logging-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.ops4j.pax.logging</groupId>
+      <artifactId>pax-logging-logback</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.configadmin</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.service.metatype</artifactId>

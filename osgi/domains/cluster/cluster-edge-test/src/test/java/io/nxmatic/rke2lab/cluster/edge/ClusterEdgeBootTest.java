@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.cluster.edge;
 
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.FrameworkLog;
-import org.osgi.service.log.LogLevel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.InContainerScenarios.Provisioning;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OutOfContainerFrameworkExtension;
@@ -13,6 +12,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.osgi.framework.Bundle;
+import org.osgi.service.log.LogLevel;
 
 /**
  * The bare-JVM proxy (VSCode-clickable) that runs the cluster edge's in-container proof. It boots a

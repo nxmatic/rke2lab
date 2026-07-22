@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.controlplane;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.LoggerContext;
 import com.pulumi.Pulumi;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -24,14 +22,16 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
-import org.osgi.service.log.LogLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The Pulumi entry point — Layer 1 of the amorce (see
@@ -52,38 +52,21 @@ public final class Main {
   private Main() {}
 
   public static void main(String[] args) {
-    // Point logback's FILE appender at the project state dir BEFORE the first log line (logback
-    // initialises lazily on first use, so this must precede any logging). One source for the
-    // ".local.d" convention — BootstrapPaths.STATE_DIR — not a literal duplicated into logback.xml.
-    // The XML reads ${seed.log.dir} with a safe default if this is ever absent.
-    System.setProperty("seed.log.dir", BootstrapPaths.STATE_DIR);
-
-    // Silence the process's raw console. pax-logging (in-container, its own default config, NOT our
-    // host logback.xml) and any stray printStackTrace write straight to System.out/err — and under
-    // a remote debugger that console is not drained, so the native FileOutputStream.write BLOCKS
-    // the
-    // FelixStartLevel thread and the whole boot deadlocks (proven by jstack). Every real log
-    // already
-    // goes to .local.d/seed-master.log via the logback FILE appender, so the raw streams carry
-    // nothing we need; routing them to a sink makes the JVM debuggable. Pulumi reads the engine
-    // gRPC
-    // channel, not stdout, so it is unaffected.
-    final java.io.PrintStream sink =
-        new java.io.PrintStream(java.io.OutputStream.nullOutputStream(), true);
-    System.setOut(sink);
-    System.setErr(sink);
+    // Route the process's raw console to the boot file, NEVER the real console: under a remote
+    // debugger the console is not drained, so a native write to System.out/err blocks the
+    // FelixStartLevel thread and the boot deadlocks (proven by jstack). This catches stray direct
+    // writes (printStackTrace) AND the early host logs before pax boots (JUL's default
+    // ConsoleHandler
+    // writes to System.err, now this file). Once pax is up its logback drains everything to
+    // .local.d/seed-master.log. seed-master is headless (Pulumi reads the engine gRPC channel, not
+    // stdout), so nothing consumes the console and there is nothing to restore — but unlike the
+    // former /dev/null sink, sending it to a file PRESERVES the early diagnostics.
+    redirectRawConsoleToBootFile();
     Pulumi.run(
         context -> {
           final RunMode runMode = RunMode.detect(true);
           final Rke2labConfig config = Rke2labConfig.from(ConfigLoader.of(context.config()));
           final BootstrapConfig bootstrap = BootstrapConfig.from(config);
-          // Plane B of the one log-level knob: the host's own logback root. Set programmatically
-          // (not via a sysprop the XML reads) because the config is only knowable HERE, after
-          // logback has already initialised on the first log line — a late sysprop would not be
-          // re-read, but setting the level on the live LoggerContext takes effect immediately. The
-          // named loggers (io.netty, …) keep their explicit levels; only the root moves. Plane A
-          // (Felix's own felix.log.level) is threaded separately, via LogLevelSeed below.
-          bootstrap.logLevel().ifPresent(Main::applyHostLogLevel);
           final Parcel parcel = new Parcel(context.projectName(), context.stackName());
           final SeedRun run =
               new SeedRun(
@@ -158,25 +141,23 @@ public final class Main {
         });
   }
 
-  /** Set the host logback root level from the knob — plane B of the one log-level knob. */
-  private static void applyHostLogLevel(LogLevel level) {
-    final LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
-    context.getLogger(Logger.ROOT_LOGGER_NAME).setLevel(logbackLevelOf(level));
-  }
-
   /**
-   * Collapse the OSGi {@link LogLevel} to a logback {@link Level} for the host root. logback has no
-   * AUDIT (pins to ERROR, the least-verbose threshold); the rest map by name. The host-realm twin
-   * of {@code LaunchConfig.felixLevelOf} (plane A) — the two planes read the SAME knob, each
-   * translating to its own backend's vocabulary.
+   * Redirect {@code System.out}/{@code err} to a dedicated boot file (truncated at startup). A file
+   * on disk never blocks on a full console pipe, so raw-stream writes during boot cannot deadlock
+   * the FelixStartLevel thread under a remote debugger. Not restored: seed-master is headless (see
+   * the call site), so nothing reads the console; and unlike the former {@code nullOutputStream}
+   * sink, a file preserves the early diagnostics until pax's logback takes over.
    */
-  private static Level logbackLevelOf(LogLevel level) {
-    return switch (level) {
-      case AUDIT, ERROR -> Level.ERROR;
-      case WARN -> Level.WARN;
-      case INFO -> Level.INFO;
-      case DEBUG -> Level.DEBUG;
-      case TRACE -> Level.TRACE;
-    };
+  private static void redirectRawConsoleToBootFile() {
+    try {
+      final Path bootLog = Path.of(BootstrapPaths.STATE_DIR, "rke2lab-boot-early.log");
+      Files.createDirectories(bootLog.getParent());
+      final PrintStream bootFile =
+          new PrintStream(Files.newOutputStream(bootLog), true, StandardCharsets.UTF_8);
+      System.setOut(bootFile);
+      System.setErr(bootFile);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("failed to redirect the raw console to the boot file", ex);
+    }
   }
 }

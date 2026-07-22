@@ -5,7 +5,6 @@ import io.nxmatic.rke2lab.osgi.boot.discovery.BootPlan;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleInstaller;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.logging.FelixJulLogger;
-import io.nxmatic.rke2lab.osgi.boot.logging.HostLoggingBridge;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,19 +31,14 @@ import org.slf4j.LoggerFactory;
  * test harness so both provision the framework identically (same start-level activation, same
  * logging setup) — a test cannot pass for a boot prod would fail.
  *
- * <p>This is where the host LOGGING substrate is set up, because the launch is what owns it:
- *
- * <ul>
- *   <li>the {@link SLF4JBridgeHandler jul→slf4j bridge} routes host {@code java.util.logging}
- *       emitters (io.grpc, the JDK, SeedLog) onto slf4j/logback;
- *   <li>a {@link FelixJulLogger} hands Felix's OWN internal output into JUL too (via {@code
- *       felix.log.logger}), so even the framework trace joins that one path — no {@code System.out}
- *       remainder;
- *   <li>{@code pax-logging-logback} (when the plan carries pax) reuses the host's logback context
- *       ({@code StaticLogbackContext=true}) for the OSGi LogService side.
- * </ul>
- *
- * Every application, framework-event and bundle log thus converges on the one logback context.
+ * <p>The logging convergence is INVERTED onto the OSGi side: every host source rides the JDK {@code
+ * java.util.logging} bus — host slf4j binds to {@code slf4j-jdk14}, native emitters (io.grpc, the
+ * JDK) already speak JUL, and a {@link FelixJulLogger} hands Felix's OWN internal output into JUL
+ * (via {@code felix.log.logger}) so even the framework trace joins the bus. pax-logging-api's
+ * {@code JdkHandler} then drains that JUL bus into {@code pax-logging-logback}, the single sink
+ * (configured console-free). JUL is the only channel that crosses the OSGi classloader boundary —
+ * pax embeds its own private logback — so this is how the host and OSGi worlds converge on one
+ * logback context.
  */
 public final class FrameworkLauncher {
 
@@ -58,8 +52,6 @@ public final class FrameworkLauncher {
 
   /** Launch the framework, install+start what the plan decided, and assert SCR if it carries it. */
   public BootedFramework launch(BootPlan plan, boolean assertScr) throws IOException {
-    HostLoggingBridge.install();
-
     final FrameworkFactory factory =
         ServiceLoader.load(FrameworkFactory.class)
             .findFirst()
@@ -121,7 +113,8 @@ public final class FrameworkLauncher {
     // so the live and test boots can never diverge on them (§
     // LaunchConfig.applyFrameworkInvariants).
     LaunchConfig.applyFrameworkInvariants(config);
-    // Felix's own internal logger routes into JUL (→ the bridge → logback) instead of System.out.
+    // Felix's own internal logger routes into JUL (→ pax's JdkHandler → pax logback) not
+    // System.out.
     config.put("felix.log.logger", new FelixJulLogger());
     if (config.get("felix.log.level") == null) {
       this.config
@@ -141,10 +134,15 @@ public final class FrameworkLauncher {
       config.put(Constants.FRAMEWORK_BOOTDELEGATION, String.join(",", config().bootDelegation()));
     }
     if (plan.paxPresent()) {
-      // pax-logging-logback reuses the host's logback LoggerContext (one context, host-owned)
-      // rather
-      // than a private one; and drains framework/bundle/service events at WARN into the LogService.
-      config.put("org.ops4j.pax.logging.StaticLogbackContext", "true");
+      // pax-logging-logback is the single sink (it drains the JDK JUL bus via its JdkHandler).
+      // Point
+      // it at a console-free FILE-only logback config — GENERATED here, not a checked-in resource —
+      // via StaticLogbackFile, so pax configures from it instead of its BasicConfigurator default
+      // (a
+      // ConsoleAppender whose native stdout write wedges the boot under a remote debugger). And
+      // drain
+      // framework/bundle/service events at WARN into the LogService.
+      config.put("org.ops4j.pax.logging.StaticLogbackFile", writePaxLogbackConfig().toString());
       config.put("org.ops4j.pax.logging.service.frameworkEventsLogLevel", "WARN");
     }
     // Felix accepts a Map<String,Object> (the logger is an instance); the launch API is
@@ -157,6 +155,48 @@ public final class FrameworkLauncher {
 
   private LaunchConfig config() {
     return config;
+  }
+
+  /**
+   * Generate the console-free, FILE-only logback config pax-logging-logback loads via {@code
+   * StaticLogbackFile}, and write it to a temp file (pax's only external-config channel is {@code
+   * JoranConfigurator.doConfigure(File)} — it takes a file, not an object). The config is
+   * hard-coded HERE, not a checked-in {@code logback.xml}, so there is one source and nothing to
+   * misplace. The file and root level come from {@link LaunchConfig} FIELDS ({@link
+   * LaunchConfig#logFile} and {@link LaunchConfig#frameworkLogLevel} — the same knob that drives
+   * {@code felix.log.level}, Plane A), baked straight in: no system property, and the launcher stays
+   * ignorant of the host/Pulumi. This is the ONE logback in the process: it drains the JDK JUL bus
+   * (host + Felix) via pax's JdkHandler AND the OSGi LogService.
+   */
+  private Path writePaxLogbackConfig() throws IOException {
+    final Path file = Files.createTempFile("rke2lab-osgi-logback-", ".xml");
+    final String rootLevel =
+        config().frameworkLogLevel().map(LaunchConfig::logbackLevelOf).orElse("INFO");
+    Files.writeString(
+        file,
+        """
+        <configuration>
+          <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+            <file>__LOG_FILE__</file>
+            <append>false</append>
+            <encoder>
+              <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+          </appender>
+          <logger name="io.netty" level="ERROR"/>
+          <logger name="io.grpc.netty" level="ERROR"/>
+          <logger name="io.netty.util.internal" level="ERROR"/>
+          <logger name="io.netty.buffer" level="ERROR"/>
+          <logger name="org.apache.http" level="WARN"/>
+          <logger name="org.apache.http.wire" level="ERROR"/>
+          <root level="__ROOT_LEVEL__">
+            <appender-ref ref="FILE"/>
+          </root>
+        </configuration>
+        """
+            .replace("__LOG_FILE__", config().logFile())
+            .replace("__ROOT_LEVEL__", rootLevel));
+    return file;
   }
 
   /**

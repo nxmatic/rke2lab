@@ -63,11 +63,11 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
-    <!-- The host LoggerContext pax-logging-logback reuses (StaticLogbackContext=true), as in
-         seed-master: stays flat, it is not a bundle. -->
+    <!-- Host slf4j binds to java.util.logging (slf4j-jdk14): host logs ride the JDK JUL bus, drained
+         by pax-logging-api's JdkHandler into pax-logging-logback. No host logback backend. -->
     <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-jdk14</artifactId>
     </dependency>
     <!-- The embedded-Felix CLI-scope test boots the same topology as the deployed jar. -->
     <dependency>

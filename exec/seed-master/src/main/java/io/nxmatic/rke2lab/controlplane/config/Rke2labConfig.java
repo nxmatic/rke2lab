@@ -165,7 +165,7 @@ public record Rke2labConfig(
 
   /**
    * The framework log-level knob ({@code logging:level}). Empty ⇒ no override: the boot keeps the
-   * Felix default and the host logback keeps its {@code logback.xml} root level.
+   * Felix default and the generated pax logback keeps its {@code ${seed.log.level}} default.
    */
   public record LoggingConfig(Optional<LogLevel> level) {}
 }

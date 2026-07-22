@@ -35,7 +35,6 @@ import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
 import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
-import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
@@ -278,6 +277,13 @@ public class ClusterSeedScenario
 
     @ScenarioState Gardening gardening;
     @ScenarioState PulumiCellar cellarRealisation;
+    // The run's transactional working cellar (the seam type Cellar — the ScenarioCellar the root
+    // GIVEN published). The GROW reads the InstanceGrowPlan through THIS, not the durable
+    // cellarRealisation: the incus scion's store is a within-run tag (grafted up into the host
+    // trunk at the provision crossing), drained to the durable backend only at the run boundary —
+    // so mid-run only the transactional overlay carries it (read-your-writes). Resolved by TYPE:
+    // Cellar and PulumiCellar are disjoint interfaces, no clash with cellarRealisation.
+    @ScenarioState Cellar workingCellar;
     @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
 
@@ -290,10 +296,6 @@ public class ClusterSeedScenario
     JsonNode imageScalars;
 
     @ScenarioState BootstrapConfig config;
-
-    // Decodes the InstanceGrowPlan envelope the GROW fetches — the host's flat copy of the codec
-    // (dual-realm), the same the cellar drains through.
-    private final SeedCodec codec = new SeedCodec();
 
     @NestedSteps
     @As("the entry gates are enforced")
@@ -367,9 +369,14 @@ public class ClusterSeedScenario
       if (!PulumiDeploymentSeed.isDeploymentPresent()) {
         return self();
       }
-      cellarRealisation
-          .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN)
-          .map(envelope -> codec.decode(envelope, InstanceGrowPlan.class))
+      // Read the plan through the TRANSACTIONAL cellar, not the durable cellarRealisation: the
+      // incus scion published it within THIS run (a tag grafted into the host trunk at the
+      // provision crossing), and the drain to the durable backend happens only at the run
+      // boundary — after this step. So mid-run only the transactional overlay carries the plan
+      // (read-your-writes). Reading the durable backend here saw an empty case and grew nothing,
+      // so a preview (which never drains) declared no instance and no mounts.
+      workingCellar
+          .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
           .ifPresent(plan -> new InstanceGrow(config, line -> {}).grow(plan));
       return self();
     }

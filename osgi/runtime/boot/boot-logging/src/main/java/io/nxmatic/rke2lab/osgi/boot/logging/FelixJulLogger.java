@@ -5,20 +5,22 @@ import org.apache.felix.framework.Logger;
 
 /**
  * Routes Felix's OWN internal log output ({@code felix.log.level} trace, the resolver diagnostics)
- * into {@code java.util.logging} instead of {@code System.out}, so it joins the single host log
- * path {@link HostLoggingBridge} sets up:
+ * onto the JDK {@code java.util.logging} bus instead of {@code System.out}, so it joins the boot's
+ * INVERTED logging flow:
  *
  * <pre>
- *   Felix internal Logger ─► JUL ─┐
- *   io.grpc / JDK / SeedLog ─► JUL ─┼─► SLF4JBridgeHandler ─► slf4j ─► logback
+ *   Felix internal Logger ────► JUL ─┐
+ *   host slf4j (slf4j-jdk14) ──► JUL ─┼─► pax-logging-api JdkHandler ─► pax-logging-logback
+ *   io.grpc / JDK / SeedLog ───► JUL ─┘
  * </pre>
  *
- * Felix takes a Logger INSTANCE through the {@code felix.log.logger} framework property; the
- * default writes to {@code System.out}/{@code err} in {@code doLogOut}. Overriding that one method
- * is all it takes — the level filtering, message assembly and {@code log(...)} fan-in stay Felix's.
- * With this in place there is NO {@code System.out} remainder: every framework + bundle + host
- * source converges on the one logback context (pax-logging carries the OSGi LogService side, this
- * carries Felix's own).
+ * There is NO slf4j bridge on the JUL bus (a {@code SLF4JBridgeHandler} would loop against the host
+ * {@code slf4j-jdk14} binding); pax's own {@code JdkHandler} drains JUL into its logback, the
+ * single sink. Felix takes a Logger INSTANCE through the {@code felix.log.logger} framework
+ * property; the default writes to {@code System.out}/{@code err} in {@code doLogOut}. Overriding
+ * that one method is all it takes — level filtering, message assembly and {@code log(...)} fan-in
+ * stay Felix's — so Felix's trace rides the JUL bus like every other host source instead of leaking
+ * to the console.
  */
 public final class FelixJulLogger extends Logger {
 

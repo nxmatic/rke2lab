@@ -318,6 +318,20 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
             log ->
                 config.put(
                     "felix.log.level", Integer.toString(LaunchConfig.felixLevelOf(log.value()))));
+    // Extra launch properties a proof mirrors from the prod FrameworkLauncher — the pax-logging
+    // knobs a bundle reads from the framework properties at activation — declared per test class
+    // via
+    // @FrameworkProperty (repeatable), read here like @FrameworkLog above: an annotation, not a
+    // builder verb, so it rides the test class even when the extension comes from a shared factory.
+    context
+        .getElement()
+        .ifPresent(
+            element -> {
+              for (FrameworkProperty property :
+                  element.getAnnotationsByType(FrameworkProperty.class)) {
+                config.put(property.name(), property.value());
+              }
+            });
     systemPackagesExtra.ifPresent(
         value -> config.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, value));
     bootDelegation.ifPresent(value -> config.put(Constants.FRAMEWORK_BOOTDELEGATION, value));

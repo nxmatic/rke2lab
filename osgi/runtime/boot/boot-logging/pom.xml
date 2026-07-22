@@ -11,47 +11,22 @@
 
   <artifactId>boot-logging</artifactId>
   <name>osgi/runtime/boot/boot-logging</name>
-  <description>The embedded-OSGi boot's HOST-side logging convergence, shared by both boot executors
-    (the prod FrameworkLauncher in osgi/runtime AND the test-world OutOfContainerFrameworkExtension in
-    osgi/junit-testkit) so they converge logs the SAME way instead of each re-implementing it. Two
-    host-world (JCL) pieces, both pax-free by design — pax-logging is the OSGi-side (BCL) LogService
-    and lives in osgi/runtime only, never here, so depending on boot-logging never drags a second
-    org.slf4j provider onto a test classpath (the scar that broke jGiven in-container resolution):
-    HostLoggingBridge.install() routes host java.util.logging (io.grpc, the JDK, SeedLog) onto
-    slf4j/logback, and FelixJulLogger hands Felix's own internal logger into JUL too (via
-    felix.log.logger) so even the framework trace converges — no System.out remainder. A plain jar,
-    not a bundle: it is touched JVM-side before/around the framework, never installed into it.</description>
+  <description>FelixJulLogger: reroutes Felix's OWN internal logger onto the JDK java.util.logging
+    bus (via felix.log.logger), the host half of the boot's INVERTED logging convergence. Host logs
+    ride JUL — host slf4j binds to slf4j-jdk14, native emitters (io.grpc, the JDK) already speak JUL,
+    and this carries Felix's trace onto it too — and pax-logging-api's JdkHandler drains that bus into
+    pax-logging-logback, the single sink. Pax-free by design (no org.slf4j provider here), so
+    depending on boot-logging never drags a second provider onto a test classpath (the scar that
+    broke jGiven in-container resolution). A plain jar, touched JVM-side, never installed as a
+    bundle.</description>
 
   <dependencies>
-    <!-- The jul→slf4j bridge (SLF4JBridgeHandler). Host-side only; carries NO second slf4j binding
-         (it routes JUL onto whatever slf4j binding the consumer already has — logback). -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>jul-to-slf4j</artifactId>
-    </dependency>
     <!-- FelixJulLogger extends org.apache.felix.framework.Logger to reroute Felix's own output into
-         JUL. Compile scope: we subclass a framework type. felix.framework carries no slf4j provider. -->
+         JUL (the inverted flow's host bus). Compile scope: we subclass a framework type.
+         felix.framework carries no slf4j provider. -->
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.apache.felix.framework</artifactId>
-    </dependency>
-    <!-- junit-jupiter (test) is inherited from build-parent. -->
-    <!-- The log-flow test emits through an org.slf4j Logger (LoggerFactory) to prove host JUL reaches
-         the slf4j/logback side; the main bridge touches only SLF4JBridgeHandler (jul-to-slf4j). So
-         slf4j-api is a TEST-scope direct dependency here, not compile — declared, not leaned on. -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- The real backend for the log-flow test: HostLoggingBridge must deliver host JUL (and Felix's
-         own logger) INTO logback, so the test keeps logback as the backend and captures on the
-         logback side (a ListAppender on the root context — downstream of the bridge, so it proves the
-         wiring, not a JUL-side short-circuit). Version managed by the BOM. -->
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -68,18 +43,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <!-- This module has NO pax (it is the pax-free host-side half), so logback is the only
-               slf4j binding and the test sees it directly. Pin it explicitly all the same, so a
-               future transitive provider cannot silently win over logback. -->
-          <systemPropertyVariables>
-            <slf4j.provider>ch.qos.logback.classic.spi.LogbackServiceProvider</slf4j.provider>
-          </systemPropertyVariables>
-        </configuration>
       </plugin>
     </plugins>
   </build>
