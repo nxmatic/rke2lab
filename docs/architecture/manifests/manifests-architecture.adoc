@@ -885,6 +885,9 @@ back to this doc — read them next to the code in your IDE. Start points:
   units within a domain
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] — single source of truth
   for domain IDs
+* link:manifests-contribution-channels.adoc[Manifests Contribution Channels] — how a domain hands
+  work to the synthesis: the three typed channels (units, node-env, host-assets), their aggregators,
+  and the SCR shape they share
 * link:systemd-architecture.adoc[Systemd Architecture] — target hierarchy, ordering directives,
   rke2-server drop-in
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] — how units read cluster /

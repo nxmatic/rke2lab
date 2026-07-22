@@ -64,7 +64,7 @@ services from the SCR registry. The pieces:
 * *felix.scr + embedded Felix* — `@Component` publishes, `@Reference` binds; the anti-cheat is a
   consumer left unsatisfied when its provider is absent.
 * *The 5 SPIs as `@Component`s, consumed intra-bundle via `@Reference`* — e.g.
-  `NodeEnvContributorRegistry` aggregates its 6 contributors through SCR.
+  `NodeEnvContributorRegistry` aggregates its 7 contributors through SCR.
 * *API-extraction* — the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the
   DOMAIN, not the adapter); the host compiles against the port and fails fast at build; each port
   carries its own `@Version`, imported versioned.
