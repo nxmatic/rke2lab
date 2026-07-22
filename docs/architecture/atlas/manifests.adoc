@@ -244,3 +244,51 @@ the richest playable surface after the runtime view), one green design target.
 
 *Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. Eight
 playable-and-blue (the shipped synthesis layer), one narrated-green (the lifecycle cleanup target).
+
+=== Diagram N — the contribution seam: how a domain feeds the synthesis
+
+The nine capabilities above are what the synthesis DOES. This is what feeds it: a domain never writes
+into the synthesis directly — it publishes a CONTRIBUTION and the synthesis aggregates. There is not
+one contribution but THREE typed channels, because a domain produces three payloads consumed at three
+points. Two channels ship as SCR-discovered contributions keyed by `domainId`; the unit channel is the
+static laggard the design aligns. Full detail:
+link:../manifests/manifests-contribution-channels.adoc[the contribution channels spec].
+
+[mermaid]
+....
+flowchart TB
+  subgraph dom ["a domain, e.g. networking"]
+    D["produces units, env sections, host assets"]
+  end
+  U["ManifestsDomainRegistrar<br/>units<br/>DESIGN: still static"]
+  E["NodeEnvContributor<br/>env sections<br/>shipped SCR"]
+  H["HostAssetProvider<br/>host files<br/>shipped SCR"]
+  RB["ManifestsDomainRegistryBuilder<br/>static register"]
+  NR["NodeEnvContributorRegistry<br/>Reference MULTIPLE"]
+  IM["incus materializer<br/>Reference MULTIPLE"]
+  D -->|units| U
+  D -->|env| E
+  D -->|assets| H
+  U -->|register static| RB
+  E -->|discovered| NR
+  H -->|discovered| IM
+  classDef shipped fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class E,H,NR,IM shipped;
+  class U,RB neu;
+....
+
+*The design target (green boxes).* Align the unit channel on the shape the other two already have:
+`ManifestsDomainRegistrar` becomes an SCR `@Component` keyed by `domainId`, collected by a registry via
+`@Reference(MULTIPLE)`, and the static `register(new XxxRegistrar())` chain in the synthesis is erased.
+The three channels then share ONE shape (SCR, `domainId`), while staying three distinct contracts —
+the payloads and consumers differ, folding them into one interface would leak all three concerns into
+one signature.
+
+*Two orthogonal axes.* Aligning the mechanism (static → SCR) is independent of WHERE a contributor
+lives (the home). Today every contributor — even the SCR ones — lives inside `manifests-core`; no
+contribution is yet distributed to a domain's own module. The home policy is hybrid: a contributor
+moves to a domain module only when that domain has a real runtime reason to live there (systemd owns
+its runtime units); the pure-k8s-workload contributors (gitops, mesh, cicd, storage, ...) stay grouped
+rather than exploded into empty bundles, because the OSGi domains and the manifest domains are
+orthogonal taxonomies — only `cluster` overlaps.
