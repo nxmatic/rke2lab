@@ -8,7 +8,7 @@
             "type": "java",
             "name": "Attach to Pulumi RKE2Lab Program",
             "request": "attach",
-            "projectName": "rke2lab",
+            "projectName": "seed-master",
             "hostName": "localhost",
             "port": "8000"
         },
