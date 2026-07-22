@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.unitrepo;
+package io.nxmatic.rke2lab.manifests.unitrepo;
 
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.ArrayDeque;

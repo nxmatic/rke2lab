@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.unitrepo;
+package io.nxmatic.rke2lab.manifests.unitrepo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

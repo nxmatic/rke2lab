@@ -1,9 +1,9 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.unitrepo.CrossDomainRule;
-import io.nxmatic.rke2lab.unitrepo.ManifestsUniverse;
-import io.nxmatic.rke2lab.unitrepo.ManifestsVisitOrder;
+import io.nxmatic.rke2lab.manifests.unitrepo.CrossDomainRule;
+import io.nxmatic.rke2lab.manifests.unitrepo.ManifestsUniverse;
+import io.nxmatic.rke2lab.manifests.unitrepo.ManifestsVisitOrder;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.ArrayList;
