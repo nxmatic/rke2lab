@@ -89,11 +89,6 @@ public class ManifestSynthesisScenario
   // receiveInput sets it (before the body), then read.
   @MonotonicNonNull private ManifestsRunbookInput input;
 
-  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
-  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
-  // bridge owns presence): all three required, awaited from SCR, so their orElseThrow never fires.
-  @OsgiService private Optional<ManifestSynthesisService> synthesis = Optional.empty();
-
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -108,7 +103,7 @@ public class ManifestSynthesisScenario
   void the_manifests_are_synthesized_from_the_activation_facet() {
     final ManifestsRunbookInput facet =
         Objects.requireNonNull(input, "the activation facet was not seeded before the body");
-    given().the_activation_facet(facet).and().the_synthesis_service(synthesis.orElseThrow());
+    given().the_activation_facet(facet);
     when().the_policy_is_derived_from_the_facet().and().the_manifests_are_synthesized();
     then()
         .every_enabled_domain_produced_its_units()
@@ -122,17 +117,10 @@ public class ManifestSynthesisScenario
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState ManifestsRunbookInput facet;
-    @ProvidedScenarioState ManifestSynthesisService synthesis;
 
     @Hidden
     public Given the_activation_facet(ManifestsRunbookInput facet) {
       this.facet = facet;
-      return self();
-    }
-
-    @Hidden
-    public Given the_synthesis_service(ManifestSynthesisService synthesis) {
-      this.synthesis = synthesis;
       return self();
     }
   }
@@ -148,7 +136,10 @@ public class ManifestSynthesisScenario
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState ManifestsRunbookInput facet;
-    @ExpectedScenarioState ManifestSynthesisService synthesis;
+
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario through the Given as a step param.
+    @OsgiService private Optional<ManifestSynthesisService> synthesis = Optional.empty();
 
     @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
     @ProvidedScenarioState ManifestSynthesisResult result;
@@ -206,7 +197,7 @@ public class ManifestSynthesisScenario
               .floxDebugPolicy(floxDebug)
               .build();
       try {
-        this.result = synthesis.synthesize(request);
+        this.result = synthesis.orElseThrow().synthesize(request);
       } catch (IOException ex) {
         throw new UncheckedIOException("manifests synthesis failed", ex);
       }

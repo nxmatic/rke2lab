@@ -68,10 +68,9 @@ public class IncusReconcileScenario
   // until receiveCellar sets it (before the body), then read.
   @MonotonicNonNull private ScenarioCellar cellar;
 
-  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
-  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
-  // bridge owns presence): both required, awaited from SCR, so their orElseThrow never fires.
-  @OsgiService private Optional<HostTreePromoter> promoter = Optional.empty();
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The promoter
+  // (the edge collaborator) moved to the When stage (@OsgiService there, filled by the stage
+  // creator); parcelService stays here — the body folds the reconciliation from it (not threaded).
   @OsgiService private Optional<Parcel> parcelService = Optional.empty();
 
   @Override
@@ -86,7 +85,6 @@ public class IncusReconcileScenario
 
   @Test
   void the_live_tree_is_reconciled() {
-    final HostTreePromoter promoter = this.promoter.orElseThrow();
     final Parcel parcel = parcelService.orElseThrow();
     final Reconciliation reconciliation = Reconciliation.foldFrom(cellar, parcel);
     // The @Test-owned sink the When fills with the promoter's factual outcome — read below for the
@@ -97,7 +95,7 @@ public class IncusReconcileScenario
     given()
         .the_host_tree(NODE)
         .and()
-        .reconciling_through(promoter, cellar, parcel, reconciliation, promotion);
+        .reconciling_through(cellar, parcel, reconciliation, promotion);
     when().the_change_is_decided().and().the_live_is_promoted();
     then().the_live_tree_is_reconciled();
     // Narrate a real promotion on the model — the PROMOTED tag projects the committed HostLiveEntry
@@ -175,7 +173,6 @@ public class IncusReconcileScenario
    */
   public static class Given extends Stage<Given> {
 
-    @ProvidedScenarioState HostTreePromoter promoter;
     @ProvidedScenarioState Cellar cellar;
     @ProvidedScenarioState Parcel parcel;
     @ProvidedScenarioState Reconciliation reconciliation;
@@ -187,12 +184,10 @@ public class IncusReconcileScenario
 
     @Hidden
     public Given reconciling_through(
-        HostTreePromoter promoter,
         Cellar cellar,
         Parcel parcel,
         Reconciliation reconciliation,
         AtomicReference<Promotion> promotionSink) {
-      this.promoter = promoter;
       this.cellar = cellar;
       this.parcel = parcel;
       this.reconciliation = reconciliation;
@@ -211,11 +206,14 @@ public class IncusReconcileScenario
    */
   public static class When extends Stage<When> {
 
-    @ExpectedScenarioState HostTreePromoter promoter;
     @ExpectedScenarioState Reconciliation reconciliation;
     @ExpectedScenarioState AtomicReference<Promotion> promotionSink;
 
     @ProvidedScenarioState Promotion promotion;
+
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario through the Given as a step param.
+    @OsgiService private Optional<HostTreePromoter> promoter = Optional.empty();
 
     public When the_change_is_decided() {
       // A checksum-map compare, no FS touch: empty change ⇒ the live already mirrors this staging,
@@ -236,11 +234,13 @@ public class IncusReconcileScenario
       // Mode-blind: the cultivating impl observes the drift + syncs; the surveying impl touches
       // nothing and reports notPromoted. The step renders PENDING under a survey via E9.
       final HostStagingEntry source = reconciliation.source().orElseThrow();
-      return promoter.promote(
-          Path.of(source.stagingRoot()),
-          reconciliation.liveRoot(),
-          reconciliation.pivotRoot(),
-          reconciliation.driftBase());
+      return promoter
+          .orElseThrow()
+          .promote(
+              Path.of(source.stagingRoot()),
+              reconciliation.liveRoot(),
+              reconciliation.pivotRoot(),
+              reconciliation.driftBase());
     }
   }
 

@@ -1,115 +1,92 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
+import com.tngtech.jgiven.base.ScenarioTestBase;
+import com.tngtech.jgiven.impl.ByteBuddyStageClassCreator;
+import com.tngtech.jgiven.impl.DefaultStageCreator;
+import com.tngtech.jgiven.impl.StageCreator;
+import com.tngtech.jgiven.impl.intercept.StepInterceptor;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
+import org.osgi.framework.FrameworkUtil;
 
 /**
  * The push bridge between jGiven and the OSGi registry: before the body runs, it INJECTS every
- * {@link OsgiService}-annotated field of the scenario from its bundle's registry ({@link
- * ScenarioRegistry}) — the DS {@code @Reference} a scenario cannot have (it is instantiated by the
- * JUnit engine, not by SCR). It replaces the byte-identical {@code
- * ScenarioRegistry.of(this).require(...)} / {@code .optional(...)} pull triad every scion carried
- * by hand: the scenario now DECLARES its collaborators as {@code Optional} fields and this fills
+ * {@link OsgiService}-annotated {@code Optional<T>} field from the scenario bundle's registry
+ * ({@link ScenarioRegistry}) — the DS {@code @Reference} a scenario/stage cannot have (both are
+ * instantiated outside SCR). It replaces the byte-identical {@code
+ * ScenarioRegistry.of(this).require} / {@code .optional} pull triad every scion carried by hand: a
+ * scenario (or a stage) now DECLARES its collaborators as {@code Optional} fields and this fills
  * them.
  *
- * <p>Every {@link OsgiService} field is an {@code Optional<T>} — so the bridge OWNS the presence
- * concern (the scenario never touches a null): {@link OsgiService#await()} decides how it resolves,
- * an awaited {@link ScenarioRegistry#require} (wrapped in a present {@code Optional}) for a
- * required collaborator racing the SCR extender, or a non-awaited {@link ScenarioRegistry#optional}
- * snapshot for an optional one. The body unwraps a required field with {@code orElseThrow} and an
- * optional one with {@code map}/{@code ifPresent}. Runs as a {@link TestInstancePostProcessor},
- * before jGiven's own post-processing, so the fields are set before the GIVEN — the same slot the
- * inbound seeds ({@link ScenarioInputSeed}, {@code SessionSeed}) fill their fields in.
+ * <p>Two injection sites, one {@link OsgiServiceInjector} (consulting the run-mode frontier once)
+ * shared between them:
  *
- * <p>Opt-in: a scenario with no annotated field is a no-op (the host-flat root declares none — it
+ * <ul>
+ *   <li>the SCENARIO test instance — filled here, as a {@link TestInstancePostProcessor}, in the
+ *       same slot the inbound seeds ({@link ScenarioInputSeed}, {@code SessionSeed}) fill theirs;
+ *   <li>every jGiven STAGE — filled as it is created, because a stage is instantiated by jGiven
+ *       (not the JUnit engine), so a {@code TestInstancePostProcessor} never sees it. A custom
+ *       {@link StageCreator} wrapping jGiven's default injects each stage the body builds, holding
+ *       the SAME injector. Installing it in post-processing is safe: jGiven's per-test {@code
+ *       startScenario} reuses the executor (it does not reset the stage creator), and stages are
+ *       created lazily at {@code given()}/{@code when()}/{@code then()} — after this ran. This is
+ *       what lets a scenario stop THREADING collaborators to its stages as step parameters: the
+ *       stage declares them.
+ * </ul>
+ *
+ * <p>Opt-in: a scenario whose class is not bundle-loaded is a no-op (the host-flat root — it
  * receives its world through {@code ConnectionReceiver}, and has no bundle registry to resolve
- * against anyway).
+ * against). A bundle scenario with no annotated field on the instance nor on any stage still
+ * installs the stage creator, but injection is then a per-stage no-op — harmless.
  *
- * <p>It is also the mode FRONTIER: before injecting, it reads the ambient {@link RunGate} ONCE and
- * builds a {@link GardeningSelection}, whose LDAP filter picks the cultivating or surveying half of
- * a mode-sensitive collaborator pair (an unpaired service matches regardless). So the run mode is
- * consulted HERE, in one place, and every scenario stays mode-blind — it declares its collaborators
- * and this decides which impl fills them.
+ * <p>The mode FRONTIER lives in the {@link OsgiServiceInjector}: it reads the ambient {@link
+ * RunGate} ONCE when built, so the run mode is consulted in one place and every scenario and stage
+ * stays mode-blind.
  */
 public final class OsgiServiceExtension implements TestInstancePostProcessor {
 
   @Override
-  public void postProcessTestInstance(Object testInstance, ExtensionContext context)
-      throws Exception {
-    final List<Field> fields = new ArrayList<>();
-    for (Field field : testInstance.getClass().getDeclaredFields()) {
-      if (field.getAnnotation(OsgiService.class) != null) {
-        fields.add(field);
-      }
+  public void postProcessTestInstance(Object testInstance, ExtensionContext context) {
+    // Host-flat root: not bundle-loaded, so there is no bundle registry to resolve against — and it
+    // receives its world through ConnectionReceiver, not @OsgiService. Nothing to inject.
+    if (FrameworkUtil.getBundle(testInstance.getClass()) == null) {
+      return;
     }
-    if (fields.isEmpty()) {
-      return; // host-flat root: no @OsgiService field, no bundle registry to resolve against
-    }
-    final ScenarioRegistry registry = ScenarioRegistry.of(testInstance);
-    // Read the ambient gate ONCE at the frontier: it selects which half of a Cultivating/Surveying
-    // pair each field resolves to (an unpaired service matches regardless of mode). This is the
-    // ONE place the run mode is consulted — every scenario downstream stays mode-blind.
-    final GardeningSelection selection = GardeningSelection.from(registry.optional(RunGate.class));
-    for (Field field : fields) {
-      if (field.getType() != Optional.class) {
-        throw new IllegalStateException(
-            "@OsgiService field '"
-                + field.getName()
-                + "' must be an Optional<ServiceType> (the bridge owns presence), not "
-                + field.getType().getSimpleName());
-      }
-      field.setAccessible(true);
-      field.set(
-          testInstance,
-          resolve(registry, field, field.getAnnotation(OsgiService.class).await(), selection));
+    final OsgiServiceInjector injector =
+        OsgiServiceInjector.forRegistry(ScenarioRegistry.of(testInstance));
+
+    // The scenario test instance (its seeds, plus any collaborator it still declares itself).
+    injector.inject(testInstance);
+
+    // Every stage the body creates: jGiven instantiates stages, so they are reached through a
+    // custom
+    // StageCreator holding the same injector. The scenario's collaborators live on the stages now.
+    if (testInstance instanceof ScenarioTestBase<?, ?, ?> scenarioTest) {
+      scenarioTest.getScenario().setStageCreator(new InjectingStageCreator(injector));
     }
   }
 
   /**
-   * Resolve one {@code Optional<T>} field through the frontier filter: an {@code await} field gets
-   * the required service (awaited from SCR) wrapped in a present {@code Optional}; a non-await
-   * field gets the snapshot {@code Optional}. The {@code selection} filter picks the impl matching
-   * the run mode (or any unpaired service). The absence message names the field so a wiring bug
-   * points straight at the unsatisfied declaration.
+   * jGiven's default stage creator, wrapped to {@code @OsgiService}-inject each stage it builds. It
+   * reconstructs the identical default jGiven would use ({@link DefaultStageCreator} over a {@link
+   * ByteBuddyStageClassCreator}) and delegates to it, so stage bytecode is created exactly as
+   * before — then hands the new stage to the shared {@link OsgiServiceInjector}.
    */
-  private static Optional<?> resolve(
-      ScenarioRegistry registry, Field field, boolean await, GardeningSelection selection) {
-    final Class<?> type = optionalElementType(field);
-    final String filter = selection.filter();
-    if (await) {
-      return Optional.of(
-          registry.require(
-              type,
-              filter,
-              "no "
-                  + type.getSimpleName()
-                  + " in the registry for @OsgiService field '"
-                  + field.getName()
-                  + "' (the live edge or a test mock must publish one)"));
-    }
-    return registry.optional(type, filter);
-  }
+  private static final class InjectingStageCreator implements StageCreator {
 
-  /** The {@code T} of an {@code Optional<T>} field — the service type to resolve. */
-  private static Class<?> optionalElementType(Field field) {
-    final Type generic = field.getGenericType();
-    if (generic instanceof ParameterizedType parameterized) {
-      final Type[] args = parameterized.getActualTypeArguments();
-      if (args.length == 1 && args[0] instanceof Class<?> element) {
-        return element;
-      }
+    private final StageCreator delegate = new DefaultStageCreator(new ByteBuddyStageClassCreator());
+    private final OsgiServiceInjector injector;
+
+    InjectingStageCreator(OsgiServiceInjector injector) {
+      this.injector = injector;
     }
-    throw new IllegalStateException(
-        "@OsgiService field '"
-            + field.getName()
-            + "' must be a parameterised Optional<ServiceType>, not "
-            + generic);
+
+    @Override
+    public <T> T createStage(Class<T> stageClass, StepInterceptor interceptor) {
+      final T stage = delegate.createStage(stageClass, interceptor);
+      injector.inject(stage);
+      return stage;
+    }
   }
 }

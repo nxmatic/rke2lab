@@ -57,12 +57,9 @@ public class SystemdAdapterScenario
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
-  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
-  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
-  // bridge owns presence): the probe awaits SCR (orElseThrow never fires — the bridge throws first
-  // if absent); the doctor is await=false, a snapshot, empty when a world booted without it.
-  @OsgiService private Optional<SystemdRuntimeProbe> probe = Optional.empty();
-
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The probe
+  // moved to the When stage (@OsgiService there, filled by the stage creator); the doctor stays
+  // here — await=false, a snapshot the consult reads, empty when a world booted without it.
   @OsgiService(await = false)
   private Optional<ConsultingService> doctor = Optional.empty();
 
@@ -84,7 +81,7 @@ public class SystemdAdapterScenario
   @Test
   void the_systemd_adapter_becomes_reachable() {
     final List<ObservationWire> observations = new ArrayList<>();
-    given().the_seed_node("seed").and().probed_through(probe.orElseThrow(), observations);
+    given().the_seed_node("seed").and().probed_through(observations);
     when()
         .the_systemd_endpoint_is_probed()
         .and()
@@ -141,8 +138,6 @@ public class SystemdAdapterScenario
   /** Given: the seed node to reach, the probe, and the shared observation buffer the When fills. */
   public static class Given extends Stage<Given> {
 
-    @ProvidedScenarioState SystemdRuntimeProbe probe;
-
     /** The snapshot the probe returned, read across the When's facet assertions. */
     @ProvidedScenarioState SystemdStatusSnapshot snapshot;
 
@@ -156,8 +151,7 @@ public class SystemdAdapterScenario
     }
 
     @Hidden
-    public Given probed_through(SystemdRuntimeProbe probe, List<ObservationWire> observations) {
-      this.probe = probe;
+    public Given probed_through(List<ObservationWire> observations) {
       this.observations = observations;
       return self();
     }
@@ -173,14 +167,17 @@ public class SystemdAdapterScenario
    */
   public static class When extends Stage<When> {
 
-    @ExpectedScenarioState SystemdRuntimeProbe probe;
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario through the Given as a step param.
+    @OsgiService private Optional<SystemdRuntimeProbe> probe = Optional.empty();
+
     @ExpectedScenarioState List<ObservationWire> observations;
 
     @ProvidedScenarioState SystemdStatusSnapshot snapshot;
 
     public When the_systemd_endpoint_is_probed() {
       try {
-        this.snapshot = probe.probe(endpoint());
+        this.snapshot = probe.orElseThrow().probe(endpoint());
       } catch (RuntimeException unreachable) {
         record("systemd endpoint", false, SymptomKind.CONNECTION_REFUSED);
         throw new AssertionError("systemd endpoint: " + unreachable.getMessage(), unreachable);

@@ -81,7 +81,8 @@ public class BboxReconciliationScenario
   // bridge owns presence): the required ones await SCR and the bridge throws if absent, so their
   // orElseThrow never fires; the doctor is await=false — a snapshot, empty when a world booted
   // without it.
-  @OsgiService private Optional<BboxReconciler> contact = Optional.empty();
+  // contact (the reconciler) moved to the When stage (@OsgiService there, filled by the stage
+  // creator); parcel stays here — an ambient identity seed threaded to the Then, not a domain edge.
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
 
   @OsgiService(await = false)
@@ -114,10 +115,7 @@ public class BboxReconciliationScenario
     // When fills it, and the consult below reads THIS reference — independent of jGiven's stage
     // state after a fail-fast step, so a refused row still reaches the consult.
     final List<BboxRowOutcome> outcomes = new ArrayList<>();
-    given()
-        .the_desired_reservations(desired.size())
-        .and()
-        .reconciled_through(contact.orElseThrow(), outcomes);
+    given().the_desired_reservations(desired.size()).and().reconciled_through(outcomes);
     when().the_reservations_are_reconciled_against_the_router();
     then()
         .every_row_has_an_outcome()
@@ -178,7 +176,6 @@ public class BboxReconciliationScenario
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState int desiredCount;
-    @ProvidedScenarioState BboxReconciler contact;
     @ProvidedScenarioState List<BboxRowOutcome> outcomes;
 
     public Given the_desired_reservations(@Quoted int count) {
@@ -187,8 +184,7 @@ public class BboxReconciliationScenario
     }
 
     @Hidden
-    public Given reconciled_through(BboxReconciler contact, List<BboxRowOutcome> outcomes) {
-      this.contact = contact;
+    public Given reconciled_through(List<BboxRowOutcome> outcomes) {
       this.outcomes = outcomes;
       return self();
     }
@@ -202,14 +198,19 @@ public class BboxReconciliationScenario
    */
   public static class When extends Stage<When> {
 
-    @ExpectedScenarioState BboxReconciler contact;
     @ExpectedScenarioState List<BboxRowOutcome> outcomes;
+
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario through the Given as a step param.
+    @OsgiService private Optional<BboxReconciler> contact = Optional.empty();
 
     public When the_reservations_are_reconciled_against_the_router() {
       // Fill the @Test-owned sink (not a fresh field) so the consult reads the outcomes even after
       // the Then's fail-fast on a refused row.
       outcomes.addAll(
-          contact.reconcile(ROUTER, ADMIN_PASSWORD, new BlueprintRowEnumerator().rows()));
+          contact
+              .orElseThrow()
+              .reconcile(ROUTER, ADMIN_PASSWORD, new BlueprintRowEnumerator().rows()));
       return self();
     }
   }

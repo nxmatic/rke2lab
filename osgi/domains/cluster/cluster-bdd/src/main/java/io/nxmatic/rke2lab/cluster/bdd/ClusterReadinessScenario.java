@@ -54,12 +54,9 @@ public class ClusterReadinessScenario
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
-  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body (the
-  // @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null — the
-  // bridge owns presence): the contact awaits SCR (orElseThrow never fires — the bridge throws
-  // first if absent); the doctor is await=false, a snapshot, empty when a world booted without it.
-  @OsgiService private Optional<ClusterReadinessContact> contact = Optional.empty();
-
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The contact
+  // moved to the When stage (@OsgiService there, filled by the stage creator); the doctor stays
+  // here — await=false, a snapshot the consult reads, empty when a world booted without it.
   @OsgiService(await = false)
   private Optional<ConsultingService> doctor = Optional.empty();
 
@@ -82,10 +79,7 @@ public class ClusterReadinessScenario
   void the_cluster_becomes_ready() {
     final Map<ClusterReadinessPhase, ObservationWire> observations =
         new EnumMap<>(ClusterReadinessPhase.class);
-    given()
-        .the_cluster("seed", kubeconfig())
-        .and()
-        .probed_through(contact.orElseThrow(), observations);
+    given().the_cluster("seed", kubeconfig()).and().probed_through(observations);
     when()
         .the_kubeconfig_is_published()
         .and()
@@ -148,7 +142,6 @@ public class ClusterReadinessScenario
 
     @ProvidedScenarioState Path kubeconfig;
     @ProvidedScenarioState List<ControllerRef> controllers = List.of();
-    @ProvidedScenarioState ClusterReadinessContact contact;
 
     /**
      * The per-phase observations the When records — the material the domain's own consult reads.
@@ -161,9 +154,7 @@ public class ClusterReadinessScenario
     }
 
     @Hidden
-    public Given probed_through(
-        ClusterReadinessContact contact, Map<ClusterReadinessPhase, ObservationWire> observations) {
-      this.contact = contact;
+    public Given probed_through(Map<ClusterReadinessPhase, ObservationWire> observations) {
       this.observations = observations;
       return self();
     }
@@ -180,8 +171,11 @@ public class ClusterReadinessScenario
 
     @ExpectedScenarioState Path kubeconfig;
     @ExpectedScenarioState List<ControllerRef> controllers;
-    @ExpectedScenarioState ClusterReadinessContact contact;
     @ExpectedScenarioState Map<ClusterReadinessPhase, ObservationWire> observations;
+
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario through the Given as a step param.
+    @OsgiService private Optional<ClusterReadinessContact> contact = Optional.empty();
 
     public When the_kubeconfig_is_published() {
       return check(
@@ -193,14 +187,14 @@ public class ClusterReadinessScenario
     public When the_api_is_ready() {
       return check(
           ClusterReadinessPhase.API_READY,
-          contact.isApiReady(kubeconfig),
+          contact.orElseThrow().isApiReady(kubeconfig),
           SymptomKind.API_NOT_READY);
     }
 
     public When the_required_controllers_are_effective() {
       return check(
           ClusterReadinessPhase.CONTROLLERS_EFFECTIVE,
-          contact.areControllersEffective(kubeconfig, controllers),
+          contact.orElseThrow().areControllersEffective(kubeconfig, controllers),
           SymptomKind.CONTROLLER_NOT_READY);
     }
 

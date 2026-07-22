@@ -135,23 +135,12 @@ public class IncusProvisionScenario
   // null until receiveInput sets it (before the body), then read.
   @MonotonicNonNull private IncusRunbookInput input;
 
-  // The collaborators the OsgiServiceExtension injects from THIS bundle's registry before the body
-  // (the @Reference a Jupiter-instantiated scenario cannot have). Uniform Optional (never null —
-  // the
-  // bridge owns presence): the five required ones await SCR and the bridge throws if absent, so
-  // their orElseThrow never fires; authToken + doctor are await=false snapshots (a world may boot
-  // without either — secrets fall back to the environment, a failure without a doctor degrades to
-  // unconsulted).
-  @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
-  @OsgiService private Optional<SeedBroker> broker = Optional.empty();
+  // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The edge
+  // collaborators (imageBuilder, broker, netplan, authToken) + the materializer moved to the stages
+  // that drive them (@OsgiService there, filled by the stage creator). What stays on the scenario:
+  // parcel — an ambient identity the body reads (Resolved.from) and threads to the Then; doctor —
+  // await=false, the consult the body raises on a failure (empty when a world booted without it).
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
-  @OsgiService private Optional<NetplanSynthesisService> netplan = Optional.empty();
-
-  @OsgiService
-  private Optional<BootstrapHostAssetMaterializer> hostAssetMaterializer = Optional.empty();
-
-  @OsgiService(await = false)
-  private Optional<AuthTokenContact> authToken = Optional.empty();
 
   @OsgiService(await = false)
   private Optional<ConsultingService> doctor = Optional.empty();
@@ -183,7 +172,6 @@ public class IncusProvisionScenario
 
   @Test
   void the_instance_is_prepared() throws IOException {
-    final ImageBuilder imageBuilder = this.imageBuilder.orElseThrow();
     final Parcel parcel = this.parcel.orElseThrow();
     final IncusRunbookInput input =
         Objects.requireNonNull(this.input, "the IncusRunbookInput was not seeded before the body");
@@ -207,32 +195,28 @@ public class IncusProvisionScenario
     given()
         .the_seed_node(NODE)
         .and()
-        .prepared_through(imageBuilder, observations, netplan.orElseThrow())
+        .prepared_through(observations)
         .and()
-        .consulting_manifests_through(broker.orElseThrow(), resolved.soil(), cellar);
+        .consulting_manifests_through(resolved.soil(), cellar);
     when()
         .the_image_is_built()
         .and()
         .the_manifests_are_cultivated(hostScenario, hostTree)
         .and()
-        .the_host_assets_are_materialized(resolved, hostAssetMaterializer.orElseThrow())
+        .the_host_assets_are_materialized(resolved)
         .and()
-        .the_secrets_are_written(resolved, authToken)
+        .the_secrets_are_written(resolved)
         .and()
         .the_network_is_resolved(resolved);
     then()
         .the_instance_is_prepared()
         .and()
-        .the_prep_is_stored(imageBuilder, resolved.soil(), cellar, parcel)
+        .the_prep_is_stored(resolved.soil(), cellar, parcel)
         .and()
         .the_staging_is_published(resolved, cellar, parcel)
         .and()
         .the_instance_grow_plan_is_published(
-            resolved,
-            input.image().orElse(new Image("", "", "", "")),
-            imageBuilder.recipeDigest(),
-            cellar,
-            parcel);
+            resolved, input.image().orElse(new Image("", "", "", "")), cellar, parcel);
     // Pose the live root the host renders the runbook into — a within-run fact whose layout
     // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
     // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
@@ -333,14 +317,8 @@ public class IncusProvisionScenario
   /** Given: the seed node, the image builder, the observation sink, and the door. */
   public static class Given extends Stage<Given> {
 
-    @ProvidedScenarioState ImageBuilder imageBuilder;
     @ProvidedScenarioState List<ObservationWire> observations;
-    @ProvidedScenarioState SeedBroker broker;
     @ProvidedScenarioState String soil;
-    // The netplan synthesis service the scion reads to derive the network blueprint it projects
-    // into
-    // the grow plan (the_network_is_resolved). A resolved collaborator like the image builder.
-    @ProvidedScenarioState NetplanSynthesisService netplan;
     // This scion's working cellar (the seam type Cellar here), carried on to the manifests sub-sow
     // so it inherits the same tx (txId + in-flight entries). Resolved by TYPE — the only Cellar in
     // stage state.
@@ -351,19 +329,13 @@ public class IncusProvisionScenario
     }
 
     @Hidden
-    public Given prepared_through(
-        ImageBuilder imageBuilder,
-        List<ObservationWire> observations,
-        NetplanSynthesisService netplan) {
-      this.imageBuilder = imageBuilder;
+    public Given prepared_through(List<ObservationWire> observations) {
       this.observations = observations;
-      this.netplan = netplan;
       return self();
     }
 
     @Hidden
-    public Given consulting_manifests_through(SeedBroker broker, String soil, Cellar cellar) {
-      this.broker = broker;
+    public Given consulting_manifests_through(String soil, Cellar cellar) {
       this.soil = soil;
       this.cellar = cellar;
       return self();
@@ -388,13 +360,19 @@ public class IncusProvisionScenario
    */
   public static class When extends Stage<When> {
 
-    @ExpectedScenarioState ImageBuilder imageBuilder;
     @ExpectedScenarioState List<ObservationWire> observations;
-    @ExpectedScenarioState SeedBroker broker;
     @ExpectedScenarioState String soil;
-    @ExpectedScenarioState NetplanSynthesisService netplan;
-
     @ExpectedScenarioState Cellar cellar;
+
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario as step params. The edge collaborators the WHEN drives.
+    @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
+    @OsgiService private Optional<SeedBroker> broker = Optional.empty();
+    @OsgiService private Optional<NetplanSynthesisService> netplan = Optional.empty();
+    @OsgiService private Optional<BootstrapHostAssetMaterializer> materializer = Optional.empty();
+
+    @OsgiService(await = false)
+    private Optional<AuthTokenContact> authToken = Optional.empty();
 
     // The flat network view the scion projects for the host GROW — assembled here (WHEN
     // fabricates),
@@ -408,7 +386,7 @@ public class IncusProvisionScenario
       // Mode-blind: the frontier already chose the builder — CultivatingDistrobuilderImageBuilder
       // (shells distrobuilder/ssh) or SurveyingImageBuilder (plans, shells nothing). The scion just
       // drives it; a surveying run touches nothing and the step renders PENDING.
-      final Optional<String> failure = imageBuilder.build(imageRequest());
+      final Optional<String> failure = imageBuilder.orElseThrow().build(imageRequest());
       if (failure.isPresent()) {
         record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failure.get());
         throw new AssertionError("incus image build failed: " + failure.get());
@@ -436,10 +414,12 @@ public class IncusProvisionScenario
       final ObjectNode roleValues = JsonNodeFactory.instance.objectNode();
       roleValues.put(Amendment.SOIL, soil);
       final SeedEnvelope amended =
-          broker.sow(
-              new AmendCoordinate("manifests"),
-              cellar,
-              new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)));
+          broker
+              .orElseThrow()
+              .sow(
+                  new AmendCoordinate("manifests"),
+                  cellar,
+                  new SeedEnvelope("manifests", "runbook", codec.encode(roleValues)));
       // RUNBOOK: play the manifests synthesis with the reconciled input; the fresh tree is the
       // graft
       // the instance will mount (consumed at once, never cellared — cultivated fresh). The reaped
@@ -451,7 +431,8 @@ public class IncusProvisionScenario
       // a scion GRAFTING a sub-scion in-world, the same mechanism the root uses host-side. A
       // manifests failure rides IN the model: graftUnder marks this step FAILED and fail-fasts the
       // steps after it, so a broken synthesis is no longer silently green.
-      final SeedEnvelope reaped = broker.sow(new RunbookCoordinate("manifests"), cellar, amended);
+      final SeedEnvelope reaped =
+          broker.orElseThrow().sow(new RunbookCoordinate("manifests"), cellar, amended);
       final String runbookJson = codec.decode(reaped.payload()).path("runbook").asText();
       graft.graftUnder(
           hostScenario, hostTree, "the manifests are cultivated", graft.rebuild(runbookJson));
@@ -470,9 +451,7 @@ public class IncusProvisionScenario
      * (like the manifests synthesis) — only the promotion into {@code host.live.d} is gated.
      * Skipped for an unamended survey (no slot materialised).
      */
-    public When the_host_assets_are_materialized(
-        @Hidden Resolved resolved, @Hidden BootstrapHostAssetMaterializer materializer)
-        throws IOException {
+    public When the_host_assets_are_materialized(@Hidden Resolved resolved) throws IOException {
       if (!resolved.isAmended()) {
         return self();
       }
@@ -480,7 +459,7 @@ public class IncusProvisionScenario
           BootstrapPaths.fromLocalWorktree(
                   resolved.worktreeRoot(), resolved.clusterName(), resolved.nodeName())
               .asStagingView(Path.of(resolved.stagingRoot()));
-      materializer.materialize(staging);
+      materializer.orElseThrow().materialize(staging);
       return self();
     }
 
@@ -494,8 +473,7 @@ public class IncusProvisionScenario
      * the writer falls back to the environment; the step renders PENDING via E9. Skipped only for
      * an unamended survey (no worktree {@code .secrets} to upsert).
      */
-    public When the_secrets_are_written(
-        @Hidden Resolved resolved, @Hidden Optional<AuthTokenContact> authToken) {
+    public When the_secrets_are_written(@Hidden Resolved resolved) {
       if (!resolved.isAmended()) {
         return self();
       }
@@ -516,7 +494,8 @@ public class IncusProvisionScenario
         return self();
       }
       this.networkView =
-          new GrowNetworkResolver(netplan).resolve(resolved.clusterName(), resolved.nodeName());
+          new GrowNetworkResolver(netplan.orElseThrow())
+              .resolve(resolved.clusterName(), resolved.nodeName());
       return self();
     }
 
@@ -546,6 +525,10 @@ public class IncusProvisionScenario
     // unamended survey (the_network_is_resolved skipped).
     @ExpectedScenarioState GrowNetworkView networkView;
 
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // the Then reads its recipe digest, no longer threaded from the scenario.
+    @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
+
     public Then the_instance_is_prepared() {
       return self();
     }
@@ -563,11 +546,9 @@ public class IncusProvisionScenario
      * picks the mode.
      */
     public Then the_prep_is_stored(
-        @Hidden ImageBuilder imageBuilder,
-        @Hidden String soil,
-        @Hidden Cellar cellar,
-        @Hidden Parcel parcel) {
-      final IncusHarvest harvest = new IncusHarvest(imageBuilder.recipeDigest(), soil);
+        @Hidden String soil, @Hidden Cellar cellar, @Hidden Parcel parcel) {
+      final IncusHarvest harvest =
+          new IncusHarvest(imageBuilder.orElseThrow().recipeDigest(), soil);
       cellar.store(parcel, IncusCoordinate.INCUS_PREP, harvest);
       return self();
     }
@@ -613,7 +594,6 @@ public class IncusProvisionScenario
     public Then the_instance_grow_plan_is_published(
         @Hidden Resolved resolved,
         @Hidden Image image,
-        @Hidden String recipeDigest,
         @Hidden Cellar cellar,
         @Hidden Parcel parcel) {
       if (!resolved.isAmended() || networkView == null) {
@@ -624,7 +604,7 @@ public class IncusProvisionScenario
                   image.alias(),
                   image.builderBinary(),
                   image.builderHost(),
-                  recipeDigest,
+                  imageBuilder.orElseThrow().recipeDigest(),
                   Path.of(image.sharedFolder()),
                   resolved.cloudSeedRoot())
               .assemble(networkView);
