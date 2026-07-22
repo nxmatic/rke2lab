@@ -114,8 +114,15 @@ security level — and the local Kroki is served over *http*. So the rendered im
 Fix it once per workspace via the VSCode command palette:
 
 . *AsciiDoc: Manage Preview Security Settings*
-. choose *Allow insecure content* (its setting key is `security.insecureContent.title`)
+. choose *Allow insecure content*
 . reload the window
+
+CAUTION: On some builds (seen on VSCode Insiders) the quick-pick shows the raw l10n
+*identifiers* instead of resolved labels. The entry to pick is then literally
+`security.insecureContent.title` — it maps to security level `1`
+(`AllowInsecureContent`). Do *not* pick `security.insecureLocalContent.title` (level `3`):
+"local" means `localhost`, and the Kroki host here is a *LAN* name
+(`bioskop-nixos.local`), which that level does not cover.
 
 *Why "insecure content" relates to https:* in CSP terms, "insecure content" means *content loaded
 over http* (non-TLS). The default policy permits `img-src https:` but not `http:`; our local Kroki is
@@ -123,8 +130,32 @@ served over http, so its image is refused. "Allow insecure content" simply adds 
 allowed sources. The two ways out are therefore the same coin: *allow http* (this option), or *serve
 Kroki over https* (a TLS reverse-proxy), which the default CSP already accepts without any change.
 
-This setting is stored by VSCode *per workspace* (not in a repo file), so it must be re-done when the
-repo is opened on another machine.
+*Where the setting lives (and why it must be re-done per worktree).* It is *not* in any
+`settings.json` (user, workspace, or folder). The extension stores it in its own *globalState*
+Memento — on macOS:
+
+[source]
+----
+~/Library/Application Support/Code - Insiders/User/globalStorage/state.vscdb
+  -> ItemTable, key "asciidoctor.asciidoctor-vscode"
+     { "preview_security_level:file://<workspace-root>": 1, ... }
+----
+
+The map is keyed by the *workspace-root URI*. So the choice is bound to the exact root path, not to
+the repo: it survives a reboot and a re-open of the same path, but a *fresh path* starts back at
+Strict (`0`) and the figures go blank again. Under the external-worktree model — where every branch
+is checked out at its own `<repo>.d/<namespace>/<branch>` path — this means *each new worktree needs
+its own "Allow insecure content" toggle* the first time its preview is opened. Same reason it must be
+re-done on another machine (a different globalState DB).
+
+Inspect the current state directly:
+
+[source,console]
+----
+$ sqlite3 "$HOME/Library/Application Support/Code - Insiders/User/globalStorage/state.vscdb" \
+    'SELECT value FROM ItemTable WHERE key = "asciidoctor.asciidoctor-vscode";'
+{"preview_security_level:file:///private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-seed-scenario":1}
+----
 
 NOTE: How we proved this was the cause: enable Kroki DEBUG logging
 (`JAVA_OPTS: "-Dlog.level=DEBUG"` on the `kroki` service) and watch its logs while reloading the
