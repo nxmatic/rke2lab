@@ -20,8 +20,7 @@ public interface ImageBuilder {
    * Build the artifacts described by {@code request}, blocking until they land in the artifact
    * directory. Returns {@link Optional#empty()} on success; otherwise a short human summary of why
    * the build failed (binary missing with no remote host configured, a non-zero build exit, an ssh
-   * failure). Never throws for a build failure — the twin of {@link
-   * IncusInstanceContact#isReachable}: the host reads the reason and decides.
+   * failure). Never throws for a build failure.
    */
   Optional<String> build(ImageBuildRequest request);
 
