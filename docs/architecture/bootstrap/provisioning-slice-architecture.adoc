@@ -611,8 +611,10 @@ to incus). Split by realm:
   synthesised slice under the manifests root (`manifests` owns the `runtime/…` sub-layout,
   incus owns the mount-root name) and returns a list of `HostAssetContribution`: each a
   `HostAssetSlot` + a `HostAssetDeliveryKind` + a list of `HostAssetEntry` (relativePath +
-  RAW content + executable bit). A provider may yield several — the systemd bundle
-  contributes one per slot.
+  RAW content) + a per-contribution `executable` flag the DOMAIN declares (a systemd script
+  must run, a unit file must not — incus never infers it from the slot) + a `targetFile`
+  naming the single output of the fan-in kind. A provider may yield several — the systemd
+  bundle contributes one per slot.
 
 `HostAssetDeliveryKind` names the transform incus applies (every host asset is a synthesised
 ConfigMap the materializer extracts — no raw files in the tree): `SEED_DIR` strips the
@@ -620,8 +622,8 @@ ConfigMap/Secret envelope and writes the NoCloud files (absorbing the former
 `NocloudSeedWriter`); `SHELL_ENV_FILE` extracts the env vars and emits ONE `set -a`…`set +a`
 shell file the boot sources — closing the env read-gap (the sections synthesise as hidden
 dotfiles the loader's visible-`*.yml` glob missed); `CONFIGMAP_FILES` extracts each ConfigMap
-`data` key back to its own file under the slot root (executable when the slot is a scripts
-slot) — the systemd bundle.
+`data` key back to its own file under the slot root (executable when the contribution
+declares it) — the systemd bundle.
 
 Three bootstrap providers (manifests-core): *CloudConfig* (`CloudConfigHostAssetProvider`
 → `CLOUD_SEED` / `SEED_DIR` → cloud.d), *EnvConfig* (`EnvConfigHostAssetProvider` →
@@ -686,7 +688,7 @@ flowchart TB
   subgraph "manifests-contract hostasset SPI"
     SPI["HostAssetProvider contribute returns list"]
     K["HostAssetContribution slot plus deliveryKind plus entries"]
-    E["HostAssetEntry relativePath plus content plus executable"]
+    E["HostAssetEntry relativePath plus content"]
     SPI -->|"yields"| K
     K -->|"holds"| E
   end
