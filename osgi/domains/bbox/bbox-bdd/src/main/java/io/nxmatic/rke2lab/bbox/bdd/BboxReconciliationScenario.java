@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 
@@ -233,9 +234,24 @@ public class BboxReconciliationScenario
     }
 
     public Then no_failed_row_is_silently_dropped() {
-      final long failed = outcomes.stream().filter(o -> o.action() == BboxAction.FAILED).count();
-      if (failed > 0) {
-        throw new AssertionError(failed + " reservation row(s) refused by the router");
+      final List<BboxRowOutcome> refused =
+          outcomes.stream().filter(o -> o.action() == BboxAction.FAILED).toList();
+      if (!refused.isEmpty()) {
+        // Surface each row's own reason — the step's whole point is that a refusal is never
+        // dropped,
+        // so its failureMessage must reach the narration, not just a count.
+        final String reasons =
+            refused.stream()
+                .map(
+                    o ->
+                        o.node()
+                            + " ("
+                            + o.mac()
+                            + "): "
+                            + o.failureMessage().orElse("no reason reported"))
+                .collect(Collectors.joining("; "));
+        throw new AssertionError(
+            refused.size() + " reservation row(s) refused by the router — " + reasons);
       }
       return self();
     }
