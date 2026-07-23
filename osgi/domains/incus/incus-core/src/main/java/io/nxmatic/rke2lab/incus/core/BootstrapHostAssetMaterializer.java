@@ -79,6 +79,23 @@ public final class BootstrapHostAssetMaterializer {
         }
       }
     }
+    ensureContentlessMountPoints(paths);
+  }
+
+  /**
+   * Mount points the instance binds unconditionally but that carry NO seed-time content: the
+   * daemonset root (filled by the in-cluster daemonset at runtime), the systemd-libexec root (a
+   * placeholder whose delivery is disabled), and the shared root (a cross-run scratch). incus
+   * rejects a disk whose source is absent, so each is materialised as an empty directory pinned by
+   * a {@code .keep} marker — the marker also carries a host-tree root through the file-copying
+   * promotion rsync (the shared root is a fixed path, created in place).
+   */
+  private void ensureContentlessMountPoints(BootstrapPaths paths) throws IOException {
+    for (Path root :
+        List.of(paths.daemonsetRoot(), paths.systemdLibexecRoot(), paths.shareRoot())) {
+      Files.createDirectories(root);
+      Files.writeString(root.resolve(".keep"), "");
+    }
   }
 
   private static Path rootFor(BootstrapPaths paths, HostAssetSlot slot) {
@@ -134,7 +151,11 @@ public final class BootstrapHostAssetMaterializer {
     }
     final StringBuilder body = new StringBuilder("set -a\n");
     vars.forEach(
-        (key, value) -> body.append(key).append('=').append(shellQuote(value)).append('\n'));
+        // Strip a trailing newline the ConfigMap serialization may have introduced (a YAML block
+        // scalar renders even a plain path as a literal carrying a trailing '\n'). An env var value
+        // is a single line; a stray newline breaks consumers like ${RKE2LAB_SCRIPTS_DIR}/env.sh.
+        (key, value) ->
+            body.append(key).append('=').append(shellQuote(value.stripTrailing())).append('\n'));
     body.append("set +a\n");
     Files.createDirectories(root);
     Files.writeString(root.resolve(targetFile), body.toString(), StandardCharsets.UTF_8);

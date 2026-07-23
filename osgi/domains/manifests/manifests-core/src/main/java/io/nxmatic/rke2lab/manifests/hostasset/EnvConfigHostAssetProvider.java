@@ -30,6 +30,13 @@ public final class EnvConfigHostAssetProvider implements HostAssetProvider {
   /** The single env file the boot loader ({@code rke2lab-env-load.sh}) sources. */
   static final String ENV_FILE = "rke2lab-environment.sh";
 
+  /**
+   * The env sections are exactly the {@code .configmap-env-section-*.yml} dotfiles. Whitelisting
+   * the prefix excludes the sibling {@code .configmap-*.group.yml} inventory marker (its {@code
+   * data.members} would otherwise serialise into the env file as a bogus {@code members} variable).
+   */
+  private static final String SECTION_PREFIX = ".configmap-env-section-";
+
   @Override
   public List<HostAssetContribution> contribute(Path synthesizedRoot) throws IOException {
     final Path slice = synthesizedRoot.resolve(ENV_CONFIG_SLICE);
@@ -40,7 +47,7 @@ public final class EnvConfigHostAssetProvider implements HostAssetProvider {
     try (Stream<Path> files = Files.list(slice)) {
       files
           .filter(Files::isRegularFile)
-          .filter(EnvConfigHostAssetProvider::isYaml)
+          .filter(EnvConfigHostAssetProvider::isEnvSection)
           .sorted()
           .forEach(file -> entries.add(readEntry(file)));
     }
@@ -50,9 +57,9 @@ public final class EnvConfigHostAssetProvider implements HostAssetProvider {
     return List.of(HostAssetContribution.shellEnvFile(HostAssetSlot.ENV_CONFIG, entries, ENV_FILE));
   }
 
-  private static boolean isYaml(Path path) {
+  private static boolean isEnvSection(Path path) {
     final String name = path.getFileName().toString();
-    return name.endsWith(".yml") || name.endsWith(".yaml");
+    return name.startsWith(SECTION_PREFIX) && (name.endsWith(".yml") || name.endsWith(".yaml"));
   }
 
   private static HostAssetEntry readEntry(Path file) {
