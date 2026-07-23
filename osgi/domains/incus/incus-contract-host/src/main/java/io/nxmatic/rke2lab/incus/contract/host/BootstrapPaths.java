@@ -163,6 +163,16 @@ public record BootstrapPaths(
   }
 
   /**
+   * Every materialisation root rebased under {@link #liveRoot()} — the deployed {@code host.live.d}
+   * tree the instance actually mounts (the promotion rsync's target), as opposed to the bare {@code
+   * host} base {@link #fromLocalWorktree} lays out (never materialised) or a rotation {@link
+   * #asStagingView} slot. Same rebasing as a staging view, pinned to the fixed live root.
+   */
+  public BootstrapPaths asLiveView() {
+    return asStagingView(liveRoot());
+  }
+
+  /**
    * The deployed tree the instance mounts — the fixed {@code host.live.d} the promotion rsyncs a
    * chosen staging slot into (singular, not a rotation slot). The host writes the run's narration
    * (the runbook) here DIRECTLY, post-run: the runbook is rendered from the complete played model,

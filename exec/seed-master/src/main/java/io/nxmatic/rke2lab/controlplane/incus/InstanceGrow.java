@@ -135,6 +135,18 @@ public final class InstanceGrow {
   }
 
   private Output<String> ensureProfile(Resource projectDependency) {
+    // A profile the host pre-created is ADOPTED BY OMISSION — referenced by name, never re-declared
+    // (its devices/config are host-owned), mirroring the vmnet bridge. Importing it instead churns:
+    // incus reads a profile's project back as null, and project is ForceNew, so an imported profile
+    // is perpetually flagged for a replacement the import declaration then forbids. Only a virgin
+    // host (no such profile) gets a fresh Pulumi-managed one.
+    final String existingProfileId =
+        importLookup.normalizeImportId(
+            importLookup.existingProfileId(config.profileName(), config.incusProject()));
+    if (!existingProfileId.isBlank()) {
+      return Output.of(config.profileName());
+    }
+
     final CustomResourceOptions options =
         CustomResourceOptions.builder()
             .provider(providerContext.provider())
@@ -238,6 +250,7 @@ public final class InstanceGrow {
     final BootstrapPaths paths =
         BootstrapPaths.fromLocalWorktree(
                 config.localWorktreePath(), config.clusterName(), config.nodeName())
+            .asLiveView()
             .asAutomountView(config.nfsAutomount(), config.netPrefix());
 
     final List<InstanceDeviceArgs> devices = new ArrayList<>();

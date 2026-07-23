@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.incus;
 import com.pulumi.deployment.Deployment;
 import com.pulumi.incus.IncusFunctions;
 import com.pulumi.incus.inputs.GetNetworkPlainArgs;
+import com.pulumi.incus.inputs.GetProfilePlainArgs;
 import com.pulumi.incus.inputs.GetProjectPlainArgs;
 import java.util.Locale;
 import java.util.Optional;
@@ -73,6 +74,27 @@ public final class IncusImportLookup {
       return providerId.isBlank() ? normalizeImportId(project.name()) : providerId;
     } catch (Exception ex) {
       log.accept("incus lookup getProject: failed (" + summarizeLookupFailure(ex) + ")");
+      return "";
+    }
+  }
+
+  /** The import id to adopt an existing (project-scoped) profile, or {@code ""} when none found. */
+  public String existingProfileId(String profileName, String incusProject) {
+    log.accept("incus lookup getProfile: start name=" + profileName + " project=" + incusProject);
+    try {
+      final var profile =
+          IncusFunctions.getProfilePlain(
+                  GetProfilePlainArgs.builder().name(profileName).project(incusProject).build(),
+                  context.invokeOptions())
+              .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
+              .join();
+      if (profile == null) {
+        return "";
+      }
+      final String providerId = normalizeImportId(profile.id());
+      return providerId.isBlank() ? normalizeImportId(profile.name()) : providerId;
+    } catch (Exception ex) {
+      log.accept("incus lookup getProfile: failed (" + summarizeLookupFailure(ex) + ")");
       return "";
     }
   }
