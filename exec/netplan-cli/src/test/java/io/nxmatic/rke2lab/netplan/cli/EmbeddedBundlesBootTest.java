@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.nxmatic.rke2lab.junit.testkit.OsgiWorld;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.framework.BootedFramework;
-import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunchPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FrameworkLaunch;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -28,9 +28,9 @@ class EmbeddedBundlesBootTest {
   @BeforeAll
   static void bootFromEmbeddedBundles() {
     assertTrue(
-        FrameworkLaunchPipeline.hasEmbeddedBundles(),
+        FrameworkLaunch.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    framework = FrameworkLaunchPipeline.embedded().launch();
+    framework = FrameworkLaunch.embedded().launch();
   }
 
   @AfterAll

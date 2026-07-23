@@ -27,11 +27,18 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
+    <!-- The seam contract the CLI compiles against, kept flat on the host classpath as the SINGLE
+         exporter of io.nxmatic.rke2lab.netplan.contract (netplan-core imports but does not export it);
+         OsgiRuntime mirrors it onto the system bundle so the embedded netplan-core resolves against
+         this one copy — typed access across the seam. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-contract</artifactId>
+    </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
-         installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade) so it
-         stays the single exporter of its own io.nxmatic.rke2lab.netplan package. runtime scope
-         MACHINE-ENFORCES path 2: the CLI compiles only against -port + OsgiRuntime, never against a
-         netplan-core impl type — the compiler now forbids the host→impl leak. -->
+         installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade). runtime
+         scope MACHINE-ENFORCES path 2: the CLI compiles only against -contract + OsgiRuntime, never
+         against a netplan-core impl type — the compiler now forbids the host→impl leak. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-core</artifactId>
