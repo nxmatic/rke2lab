@@ -73,7 +73,7 @@ services from the SCR registry. The pieces:
   intact (the model core + felix.scr/resolver + pax-logging). Proven by `pulumi preview` (full pipeline
   under Felix, no live deploy). Generalised across all three entrypoints — the two CLIs
   (`manifests-cli`, `netplan-cli`) boot Felix the same way, and all three demote the model `-core` to
-  `runtime` scope. `netplan.api` moved into `netplan-port` so the consumed contract is single-exported.
+  `runtime` scope. `netplan.api` moved into `netplan-contract` so the consumed contract is single-exported.
 * *The synthesis grammar + the boot decomposition* — the fluent-pipeline engine was once duplicated as
   seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, briefly unified into a shared
   `pipeline-port` seam, then DISSOLVED: with the boot de-grammatised and the seed's own chains the last
@@ -151,7 +151,7 @@ flowchart TB
 ....
 flowchart TB
   subgraph OSGI["OSGi space — pure models"]
-    bapi["the ports: manifests-port / netplan-port / systemd-port (osgi/, versioned)"]:::neu
+    bapi["the ports: manifests-port / netplan-contract / systemd-port (osgi/, versioned)"]:::neu
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component (R2)"]:::neu
     reg2["NodeEnvContributorRegistry @Component+@Reference (R3)"]:::neu
@@ -213,14 +213,6 @@ flowchart TB
 Conclusion: the runtime migration is additive through R4, with R5 the one named, deferred erasure. The
 static `ServiceLoader` surface and the live registry coexist until every caller boots under Felix.
 
-[NOTE]
-====
-*Confirmed in code.* R1–R3 shipped to
-`design/target-module-layout`, each proven on embedded Felix (`@OsgiSpike`, `-Posgi`). R4 +
-API-extraction are cartographied in `.claude/memory/` (`osgi-runtime-r4-boot-seam-state`,
-`api-extraction-tri-carto-state`) and remain GREEN here until they ship. Flip them blue at merge.
-====
-
 === Diagram K — AFTER (CLI alignment + pipeline unification + boot decomposition): the static surface erased, the grammar deduped, the boot decomposed
 
 Builds on Diagram J. The pre-named R5 erasure (CLI half) realised, the two runner copies unified, and
@@ -231,7 +223,7 @@ is DELETED (the named R5 erasure); the `cli` box is rewired, not erased.
 ....
 flowchart TB
   subgraph OSGI["OSGi space — pure models"]
-    bapi["the ports + netplan.api now in netplan-port"]:::osgi
+    bapi["the ports + netplan.api now in netplan-contract"]:::osgi
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component"]:::osgi
     reg2["NodeEnvContributorRegistry @Component+@Reference"]:::osgi
@@ -290,18 +282,6 @@ flowchart TB
 Conclusion: additive, with the single erasure being the atlas's own pre-named R5 CLI-half. The constellation
 holds.
 
-[NOTE]
-====
-*Confirmed in code.* CLI alignment shipped (`a925e877..92a56cea`): both CLIs boot embedded Felix,
-`netplan.api`→`netplan-port`, all three exec demoted `-core` to `runtime`, the 8 SPI files deleted, both
-CLIs run for real (EXIT 0). The pipeline grammar was unified into one runner, briefly shared as
-`pipeline-port`, then DISSOLVED into manifests-core's un-exported internal synthesis
-(`Phase`/`PhaseRunner`) once it had no other OSGi consumer. The boot was DECOMPOSED (`BootPlanner`/`BootPlan` +
-`FrameworkLauncher`/`BootedFramework` + `FrameworkLaunch`), retiring `OsgiRuntime` and the old
-`SeedRuntime` class — see link:../osgi/osgi-boot-decomposition-spec.adoc[boot decomposition]. The
-`pc`/`flp`/`plan` boxes are blue (their world colour), no green remaining in Diagram K.
-====
-
 === Design scenarios — the runtime capabilities as DSL sentences
 
 The third movement (see <<the-scenario-map>>) for the runtime migration. Every row of this view's
@@ -345,7 +325,7 @@ AND its additivity.
 .. GIVEN the two CLIs still flat on `ServiceLoader`
 .. WHEN the CLI alignment generalises the boot seam (manifests-cli + netplan-cli)
 .. THEN every `main()` entrypoint boots embedded Felix and reads its `-port` from the registry — AND
-   `netplan.api` moves into `netplan-port` so the consumed contract is single-exported.
+   `netplan.api` moves into `netplan-contract` so the consumed contract is single-exported.
 
 . *One synthesis grammar, internal to manifests-core* — `[playable]` blue +
 .. GIVEN the grammar duplicated as `TopicRunner` + `SynthesisTopicRunner`, briefly shared as `pipeline-port`
