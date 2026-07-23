@@ -37,14 +37,20 @@ public record IncusRunbookInput(
 
   /**
    * The flat provisioning scalars the host fills from its {@code BootstrapConfig} — the worktree
-   * root the provisioner writes under, the cluster/node identity, and whether the remote host
-   * mounts over an NFS automount. The scion feeds them to {@code
+   * root the provisioner writes under, the cluster/node identity, whether the remote host mounts
+   * over an NFS automount, and the {@code netPrefix} that automount rebases under (the host's
+   * {@code BootstrapConfig.netPrefix()}, e.g. {@code /net/<cluster>.local} — carried rather than
+   * re-derived so the formula stays single-sourced on the host). The scion feeds them to {@code
    * BootstrapPaths.fromLocalWorktree(root, cluster, node)} and (for the mount sources) {@code
    * asAutomountView(nfsAutomount, netPrefix)}. A sub-record filled blind by role, mirroring the
    * {@code PublishFacet}/{@code DebugFacet} pattern — the host names no path vocabulary.
    */
   public record Worktree(
-      String worktreeRoot, String clusterName, String nodeName, boolean nfsAutomount) {}
+      String worktreeRoot,
+      String clusterName,
+      String nodeName,
+      boolean nfsAutomount,
+      String netPrefix) {}
 
   /**
    * The flat seed-image build scalars the host fills from its {@code BootstrapConfig} — the image

@@ -108,8 +108,6 @@ public class IncusProvisionScenario
         ConsultationSource,
         ScenarioPlayer.Playable {
 
-  private static final String NODE = "bioskop-master";
-
   /**
    * The inbound channel the runbook handler ({@code IncusRunbookHandler.seedFrom}) seeds the {@link
    * IncusRunbookInput} through and this scenario receives it from (via {@link InputReceiver}). It
@@ -192,14 +190,18 @@ public class IncusProvisionScenario
     // live tag map the scion's within-run tags merge into.
     final ScenarioModel hostScenario = getScenario().getScenarioModel();
     final ReportModel hostTree = getScenario().getModel();
+    // The seed node's hostname is the config-derived cluster-node identity (the incus INSTANCE is
+    // named nodeName alone — see InstanceGrow); "seed" for an unamended survey with no worktree.
+    final String seedNode =
+        input.worktree().map(w -> w.clusterName() + "-" + w.nodeName()).orElse("seed");
     given()
-        .the_seed_node(NODE)
+        .the_seed_node(seedNode)
         .and()
         .prepared_through(observations)
         .and()
         .consulting_manifests_through(resolved.soil(), cellar);
     when()
-        .the_image_is_built()
+        .the_image_is_built(imageRequest(input.worktree(), input.image()))
         .and()
         .the_manifests_are_cultivated(hostScenario, hostTree)
         .and()
@@ -258,12 +260,41 @@ public class IncusProvisionScenario
   }
 
   /**
-   * The image-build request the scion drives. A fixed marker in the offline scenario (the mock
-   * ignores it); the live config-derived path translation is deferred, exactly as the cluster twin
-   * defers its kubeconfig.
+   * The image-build request the scion drives. When both amendments are present (a live cultivating
+   * run) it is derived from them: {@code distrobuilder} lives only on the remote {@code
+   * builderHost} ({@code bioskop-nixos}), so the edge always shells the build over ssh. The
+   * workspace it {@code cd}s into is the worktree root rebased onto the NFS automount view ({@code
+   * BootstrapPaths.asAutomountView}, e.g. {@code /net/bioskop.local/private/ …}), the SAME view the
+   * Mac reads the artifacts back through. The artifact dir is that root's OWN subpath, so it rides
+   * as a path RELATIVE to the workspace and the recipe joins the two — no second translation, and
+   * the host's absolutised {@code sharedFolder} is relativised back against the worktree root.
+   * Unamended (a bare survey or the offline scenario) it falls to a blank marker the surveying/mock
+   * builder ignores.
    */
-  private static ImageBuildRequest imageRequest() {
-    return new ImageBuildRequest("distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "");
+  private ImageBuildRequest imageRequest(
+      Optional<Worktree> maybeWorktree, Optional<Image> maybeImage) {
+    if (maybeWorktree.isEmpty() || maybeImage.isEmpty()) {
+      return new ImageBuildRequest(
+          "distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "");
+    }
+    final Worktree worktree = maybeWorktree.orElseThrow();
+    final Image image = maybeImage.orElseThrow();
+    final Path localRoot = Path.of(worktree.worktreeRoot());
+    final Path remoteRoot =
+        BootstrapPaths.fromLocalWorktree(localRoot, worktree.clusterName(), worktree.nodeName())
+            .asAutomountView(worktree.nfsAutomount(), worktree.netPrefix())
+            .worktreeRoot();
+    final Path artifactUnderWorktree =
+        localRoot
+            .relativize(localRoot.resolve(Path.of(image.sharedFolder())).normalize())
+            .resolve(image.alias());
+    return new ImageBuildRequest(
+        image.builderBinary(),
+        localRoot.toString(),
+        localRoot.resolve(artifactUnderWorktree).toString(),
+        image.builderHost(),
+        remoteRoot.toString(),
+        artifactUnderWorktree.toString());
   }
 
   /**
@@ -315,7 +346,7 @@ public class IncusProvisionScenario
   }
 
   /** Given: the seed node, the image builder, the observation sink, and the door. */
-  public static class Given extends Stage<Given> {
+  static class Given extends Stage<Given> {
 
     @ProvidedScenarioState List<ObservationWire> observations;
     @ProvidedScenarioState String soil;
@@ -358,7 +389,7 @@ public class IncusProvisionScenario
    * only the rsync into {@code host.live.d} is gated at reconcile (I6). So consulting manifests is
    * unconditional.
    */
-  public static class When extends Stage<When> {
+  static class When extends Stage<When> {
 
     @ExpectedScenarioState List<ObservationWire> observations;
     @ExpectedScenarioState String soil;
@@ -382,11 +413,11 @@ public class IncusProvisionScenario
     private final SeedCodec codec = new SeedCodec();
     private final ScenarioGraft graft = new ScenarioGraft();
 
-    public When the_image_is_built() {
+    public When the_image_is_built(@Hidden ImageBuildRequest request) {
       // Mode-blind: the frontier already chose the builder — CultivatingDistrobuilderImageBuilder
       // (shells distrobuilder/ssh) or SurveyingImageBuilder (plans, shells nothing). The scion just
       // drives it; a surveying run touches nothing and the step renders PENDING.
-      final Optional<String> failure = imageBuilder.orElseThrow().build(imageRequest());
+      final Optional<String> failure = imageBuilder.orElseThrow().build(request);
       if (failure.isPresent()) {
         record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failure.get());
         throw new AssertionError("incus image build failed: " + failure.get());
@@ -519,7 +550,7 @@ public class IncusProvisionScenario
    * were cultivated (a failure throws in the When). The readable closing line; the host then makes
    * the instance grow (Shape C) and verifies its reachability, not this scion.
    */
-  public static class Then extends Stage<Then> {
+  static class Then extends Stage<Then> {
 
     // The network view the WHEN produced — read here to seal it into the grow plan. Null for an
     // unamended survey (the_network_is_resolved skipped).

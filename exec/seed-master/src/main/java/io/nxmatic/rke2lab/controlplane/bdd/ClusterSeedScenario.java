@@ -224,6 +224,7 @@ public class ClusterSeedScenario
       scalars.put("clusterName", run.config().clusterName());
       scalars.put("nodeName", run.config().nodeName());
       scalars.put("nfsAutomount", run.config().nfsAutomount());
+      scalars.put("netPrefix", run.config().netPrefix());
       this.worktreeScalars = scalars;
       // The IMAGE amendment — the seed-image build scalars the incus scion folds into the
       // buildChecksum and the artifact paths it projects for the GROW. Same blind-subtree

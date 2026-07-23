@@ -28,7 +28,8 @@ class IncusAmendReflectorTest {
   @Test
   void it_binds_the_worktree_role_onto_the_worktree_scalars() {
     final Worktree scalars =
-        new Worktree("/srv/host/.local.d/worktree", "bioskop", "bioskop-master", true);
+        new Worktree(
+            "/srv/host/.local.d/worktree", "bioskop", "bioskop-master", true, "/net/bioskop.local");
     final SeedEnvelope roleValues =
         new SeedEnvelope(
             "incus",

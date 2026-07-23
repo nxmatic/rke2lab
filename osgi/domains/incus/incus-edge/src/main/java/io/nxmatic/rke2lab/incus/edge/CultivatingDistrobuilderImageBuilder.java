@@ -49,15 +49,21 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
   }
 
   private void buildOrThrow(ImageBuildRequest request) {
-    final Path workspace = Path.of(request.workspaceDir());
-    final String localExecutable = tryResolveExecutable(request.builderBinary());
-
-    if (!localExecutable.isBlank()) {
-      runLocalBuildOrThrow(workspace, localExecutable, request.localArtifactDir());
+    final ImageArtifacts artifacts =
+        new ImageArtifacts(Path.of(request.localArtifactDir()), recipe.digest());
+    if (artifacts.areFresh()) {
       return;
     }
 
-    runRemoteBuildOrThrow(request);
+    final Path workspace = Path.of(request.workspaceDir());
+    final String localExecutable = tryResolveExecutable(request.builderBinary());
+    if (!localExecutable.isBlank()) {
+      runLocalBuildOrThrow(workspace, localExecutable, request.localArtifactDir());
+    } else {
+      runRemoteBuildOrThrow(request);
+    }
+
+    artifacts.seal();
   }
 
   @Override
@@ -225,7 +231,7 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
     command.add("ssh");
     command.add(remoteHost);
     command.add("sh");
-    command.add("-s");
+    command.add("-xs");
     command.addAll(scriptArgs);
 
     final ProcessBuilder pb = new ProcessBuilder(command);
