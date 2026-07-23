@@ -3,14 +3,12 @@ set -euo pipefail
 
 # @codebase
 # Load RKE2Lab environment variables from sectioned ConfigMap/Secret manifests.
-# Contract: environment manifests are mounted at ${RKE2LAB_ENV_DIR} (default: /srv/host/rke2lab-environment.d)
 
+set -a
 RKE2LAB_SCRIPTS_DIR=${RKE2LAB_ROOT:=/srv/host}/systemd-scripts.d
 RKE2LAB_SYSTEMD_LIBEXEC_DIR=${RKE2LAB_SYSTEMD_LIBEXEC_DIR:-${RKE2LAB_ROOT}/systemd-libexec.d}
 HOME=/root
-
-export RKE2LAB_SCRIPTS_DIR
-export RKE2LAB_SYSTEMD_LIBEXEC_DIR
+set +a
 
 if [[ ! -r /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
     : "Install Nix Daemon and CLI tools to access yq"
@@ -107,7 +105,7 @@ rke2lab::env:load() {
     # BootstrapHostAssetMaterializer (SHELL_FILE strategy) — already wrapped set -a … set +a, so
     # sourcing it auto-exports every rke2lab variable. Filename is the convention shared with
     # EnvConfigHostAssetProvider.ENV_FILE; keep the two in sync.
-    local env_file="${RKE2LAB_SCRIPTS_DIR}/rke2lab-environment.sh"
+    local env_file="${RKE2LAB_SCRIPTS_DIR:-/srv/host/systemd-scripts.d}/rke2lab-environment.sh"
 
     if [[ ! -r "${env_file}" ]]; then
         echo "[rke2lab-env] missing environment file: ${env_file}" >&2

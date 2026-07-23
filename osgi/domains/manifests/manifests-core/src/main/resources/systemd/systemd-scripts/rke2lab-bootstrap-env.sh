@@ -80,7 +80,7 @@ nocloud:env:bootstrap() {
   }
 
   RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-  RKE2LAB_ENV_DIR=${RKE2LAB_ENV_DIR:-${RKE2LAB_ROOT}/rke2lab-environment.d}
+  RKE2LAB_ENV_FILE=${RKE2LAB_ENV_FILE:-${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-environment.sh}
   RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/rke2lab-worktree.d/.secrets"
 
   : "Ensure RKE2 secrets file is present and readable (read-only source of truth)"
@@ -96,26 +96,11 @@ nocloud:env:bootstrap() {
   set -a
 
   : "Source RKE2 environment manifests"
-  [[ -d "${RKE2LAB_ENV_DIR}" ]] || {
-    echo "[rke2lab-bootstrap-env] ERROR: environment directory missing: ${RKE2LAB_ENV_DIR}" >&2
+  [[ -f "${RKE2LAB_ENV_FILE}" ]] || {
+    echo "[rke2lab-bootstrap-env] ERROR: environment file missing: ${RKE2LAB_ENV_FILE}" >&2
     return 1
   }
-  for env_manifest in "${RKE2LAB_ENV_DIR}"/*.yml "${RKE2LAB_ENV_DIR}"/*.yaml; do
-    [[ -f "${env_manifest}" ]] || continue
-
-    kind="$(yq -r '.kind // ""' "${env_manifest}")"
-    case "${kind}" in
-      ConfigMap)
-        source <(yq eval -o=shell '.data // {}' "${env_manifest}")
-        ;;
-      Secret)
-        source <(yq eval -o=shell '((.stringData // {}) * ((.data // {}) | with_entries(.value |= @base64d)))' "${env_manifest}")
-        ;;
-      *)
-        continue
-        ;;
-    esac
-  done
+  source "${RKE2LAB_ENV_FILE}"
 
   : "Load RKE2-specific dynamic environment variables"
   ARCH="$(dpkg --print-architecture)"

@@ -33,14 +33,15 @@ public class NodeEnvIdentityContributor implements NodeEnvContributor {
       case "paths" ->
           Map.of(
               "RKE2LAB_ROOT", context.rootPath().toString(),
-              "RKE2LAB_ENV_DIR", context.envDirPath().toString(),
               "RKE2LAB_SCRIPTS_DIR", context.scriptsDirPath().toString(),
               "RKE2LAB_SYSTEMD_DIR", context.systemdDirPath().toString(),
               "RKE2LAB_CONFIG_DIR", context.configDirPath().toString(),
               "RKE2LAB_CLOUDCONFIG_NO_CLOUD_DIR", context.cloudconfigNocloudDirPath().toString(),
               "RKE2LAB_MANIFESTS_DIR", context.manifestsDirPath().toString(),
               "RKE2LAB_SHARED_DIR", context.sharedDirPath().toString(),
-              "RKE2LAB_KUBECONFIG_DIR", context.kubeconfigDirPath().toString());
+              "RKE2LAB_KUBECONFIG_DIR", context.kubeconfigDirPath().toString(),
+              "RKE2LAB_ENV_FILE",
+                  context.scriptsDirPath().resolve("rke2lab-environment.sh").toString());
       default -> Map.of();
     };
   }
