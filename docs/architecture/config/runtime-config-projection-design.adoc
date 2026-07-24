@@ -1,0 +1,235 @@
+= Runtime configuration — projection, the ClusterConfiguration service, and the value channel
+:toc: left
+:toclevels: 3
+
+*Status:* Design (brainstorm complete, awaiting review). +
+*Builds on:* link:config-restructuring-spec.adoc[the config-restructuring spec] (the shipped Stage-A
+single-source DTO) and the config-view's deferred *stages 3–4* (value channel + Config-Admin delivery
++ DS activation). +
+*Additive proof:* link:../atlas/config.adoc[Atlas L1 — Config view], Diagrams G/H.
+
+The design output is *C4 / UML diagrams*, not code. It fixes the architecture; the implementation
+follows the documented patterns and the shipped staging gates (`ContractPurity`, `REALM_BOUNDARY`).
+
+== Overview
+
+=== Problem statement
+
+The config-restructuring spec made the *control plane* single-source: Pulumi → `ConfigLoader` →
+`Rke2labConfig` (DTO) → derived `BootstrapConfig` / `ControlplanePolicy`. Three things remain open,
+and together they are one design:
+
+[cols="1,3",options="header"]
+|===
+| Issue | Detail
+
+| The `bioskop` leak
+| Cluster/node identity is served by *two* hand-maintained `NodeEnvContext` views that drift:
+  `DefaultNodeEnvContext` (in `manifests-core`, a compile-time `CLUSTER_NAME = "bioskop"`) and
+  `DefaultBootstrapNodeEnvContext` (in the host, derived from `Rke2labConfig`). Units that reach the
+  hardcoded twin emit `bioskop` regardless of the stack. `CloudConfigManifestsUnit` carries a third
+  copy of the constant. Switching a cluster (bioskop → nikopol) does not fully take.
+
+| The wrong-way crossing
+| `Rke2labConfig` (a pure model) reaches into `ConfigLoader` (host, `com.pulumi`). The L0 two-spaces
+  frame flags this as "a decomposition defect to invert"; `REALM_BOUNDARY` now gate-checks it.
+
+| No runtime reach
+| The synth context is an in-process `ManifestSynthesisContext` ThreadLocal. Once the OSGi runtime
+  (and synth with it) can run in a *separate/remote* process, a ThreadLocal cannot carry config to it.
+|===
+
+=== Decisions taken (design conversation)
+
+. *Config is exposed as a first-class OSGi service*, not merely the in-process ThreadLocal — because
+  the OSGi world may run remotely.
+. *Synth moves into the OSGi runtime*; the ThreadLocal is retired, consumers `@Reference` the service.
+. *Config is partitioned by domain*, ownership split across the control-plane / runtime boundary: the
+  control plane owns the Stage-A `InfraDomain` fragments (unchanged); the runtime owns the Stage-B
+  fragments (identity, policy, per-manifest-domain), published as services.
+. *Bootstrap paths are context-projected views*: the config layer hosts the adapting logic and
+  projects the view each domain needs for its execution context.
+
+=== Goals
+
+. *One identity source* — delete the two `NodeEnvContext` twins; project one view from the service.
+. *Location-transparent* — the same `ClusterConfiguration` contract is consumed in-process today and
+  across a process boundary tomorrow; consumers never change.
+. *Gate-legal by construction* — the module homes are exactly what `ContractPurity` /
+  `REALM_BOUNDARY` already enforce; no new seam is invented.
+. *Incremental* — the first slice (kill the leak) ships before the full registry / service.
+
+== The taxonomy homes (gate-enforced)
+
+The design invents no placement rules; it rides the shipped staging gates. See
+link:../osgi/staging-gates-governance-spec.adoc[the staging-gates governance spec].
+
+[cols="1,2,2",options="header"]
+|===
+| Layer | Home | Gate that enforces it
+
+| Data
+| a Config-Admin PID per runtime domain
+| — (framework-delivered)
+
+| Service + views
+| `ClusterConfiguration` interface + `BootstrapIdentity` / view records in a `type=contract` bundle
+  (beside `manifests-contract`)
+| `ContractPurity` — a contract exports records + interfaces, *never a concrete class*.
+
+| Implementation
+| a config `-core` bundle, `@Component`, reads Config-Admin, projects views
+| `ContractPurity` — the impl belongs in `-core`, pulled by SCR.
+
+| Host path-projection
+| a `-contract-host` bundle (the shipped `incus-contract-host` `BootstrapPaths` is the exemplar)
+| `REALM_BOUNDARY` — host-nature code stays in the flat realm.
+
+| Value delivery
+| Pulumi → the `type=seam` seed-broker gateway → Config-Admin
+| `REALM_BOUNDARY` — a contract may not reference `com.pulumi`; the crossing is the seam.
+|===
+
+== C4 — where runtime config sits
+
+[mermaid]
+....
+flowchart TB
+  pulumi["Pulumi stack single source"]
+  seam["seed-broker seam type=seam value channel"]
+  core["config -core Component ConfigAdmin backed"]
+  cc["ClusterConfiguration type=contract interface plus views"]
+  rcr["RuntimeConfigRegistry mirrors InfraConfigRegistry"]
+  proj["context-projected views"]
+  one["one NodeEnvContext projection"]
+  units["manifest units plus synth in OSGi"]
+  pulumi -->|delivered via| seam
+  seam -->|values| core
+  core -->|publishes| cc
+  rcr -->|domain fragments| cc
+  cc -->|identity plus views| one
+  proj -->|paths per context| one
+  one -->|single source| units
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class seam,core,cc,rcr,proj,one neu;
+....
+
+== The runtime registry mirrors the infra registry
+
+`InfraConfigRegistry` already partitions the Stage-A config by domain (`InfraDomain` enum → sealed
+`InfraConfigFragment` → registry keyed by `InfraDomainCatalog` id). The runtime side is the same shape
+one layer over, published as services rather than held in a plain registry.
+
+[mermaid]
+....
+flowchart TB
+  id["InfraDomain enum → InfraConfigFragment → InfraConfigRegistry SHIPPED"]
+  rd["RuntimeDomain enum → RuntimeConfigFragment → ConfigAdmin PID per domain → OSGi service NEW"]
+  id -.->|same shape| rd
+  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class id built;
+  class rd neu;
+....
+
+* The identity fragment (`cluster` name, `node` name, `api` endpoint → `BootstrapIdentity`) is the
+  cross-cutting seed nearly every unit needs; topology derives from it.
+* The `policy` fragment keys domain enablement off `ManifestDomainCatalog` (the `clusterApi`-vs-
+  `cluster-api` discipline), exactly as `ControlplanePolicy.isLinkEnabled` does today.
+
+== Context-projected views (the adapting logic)
+
+The seam already exists: `BootstrapConfig.pathOn(context, raw)` is the adapting rule and
+`BootstrapPaths.asHostView(context)` / `asStagingView(root)` project the whole path-set — today in
+`incus-contract-host`, over a two-value `WorktreeHost{DARWIN, NIXOS}` context. Generalise it:
+
+* widen the context axis to a first-class `Context` — `OPERATOR_LOCAL` / `CONTAINER` (`/srv/host`) /
+  `REMOTE_OSGI` — adding a context only when a consumer genuinely needs a different base;
+* let the config layer project `viewFor(domain, context)` — each domain a narrow view interface
+  (interface segregation), rendered for the active context;
+* collapse the two `NodeEnvContext` impls into that one projection.
+
+Mechanism: immutable records + projection methods (no framework); `Context` an enum (or sealed type
+if a context carries parameters, like the NFS prefix). Same idiom the codebase already uses.
+
+== Evolution — states
+
+=== State 0 — today
+
+Two `NodeEnvContext` views (`DefaultNodeEnvContext` hardcodes `bioskop`; `DefaultBootstrapNodeEnvContext`
+derives from `Rke2labConfig`); `Rke2labConfig → ConfigLoader` crosses the wrong way; synth in-process
+via the `ManifestSynthesisContext` ThreadLocal.
+
+=== State A — the leak dies (first slice)
+
+`DefaultNodeEnvContext` becomes a *projection* of the identity view (sourced, for now, from the
+existing `ManifestSynthesisContext` / `BootstrapIdentity`), and `DefaultBootstrapNodeEnvContext` +
+`CloudConfigManifestsUnit`'s constant delete. One source, no `bioskop` literal. No new bundle yet.
+
+=== State B — the ClusterConfiguration contract + core
+
+The `ClusterConfiguration` interface + view records land in a `type=contract` bundle; a config `-core`
+`@Component` publishes it, backed for now by the in-process value. Consumers `@Reference` it.
+
+=== State C — the value channel inverts
+
+`Rke2labConfig` stops reaching `ConfigLoader`; values arrive over the `type=seam` seed-broker gateway
+into Config-Admin. `REALM_BOUNDARY` goes green for the config island. Remote-ready.
+
+=== State D — RuntimeConfigRegistry + context projection
+
+The full `RuntimeDomain` registry contributes fragments; `viewFor(domain, context)` projects per
+context; synth runs as an OSGi `@Reference` consumer, the ThreadLocal retired.
+
+== Implementation increments
+
+[cols="1,4,2",options="header"]
+|===
+| Increment | Scope | Green when
+
+| *A* — kill the leak
+| One `NodeEnvContext` projection off the identity view; delete the host twin +
+  `CloudConfigManifestsUnit`'s `CLUSTER_NAME`; route the stray literals (`RuntimeRke2ConfigManifestsUnit`
+  token/node-name, mesh `DARWIN_HOST`/`RKE2_CLUSTER_NAME`, tailscale hostname, tekton proxy) through the
+  view. Update the tests that asserted `bioskop`.
+| Synth with `cluster.name = nikopol` emits nikopol everywhere; no `bioskop` literal in
+  `manifests-core`; build + tests green.
+
+| *B* — contract + core
+| `ClusterConfiguration` (contract) + config `-core` (`@Component`); consumers `@Reference` it.
+| Units resolve identity from the service; `ContractPurity` green on the contract bundle.
+
+| *C* — value channel
+| Deliver Pulumi values over the seed-broker seam into Config-Admin; drop the
+  `Rke2labConfig → ConfigLoader` reference.
+| `REALM_BOUNDARY` reports zero flat-realm config leaks; `pulumi preview` green.
+
+| *D* — registry + projection
+| `RuntimeDomain` registry; `viewFor(domain, context)`; synth as an OSGi consumer.
+| Config projects per context; ThreadLocal deleted; build green under Felix.
+|===
+
+== Review questions (for the gate)
+
+. *Ownership boundary of `network`.* The `InfraDomain.NETWORK` fragment (`lanBridgeParent`,
+  `vmnetNetworkName`) is host-provisioning → control plane. The *topology* (`ClusterNetworkBlueprint`
+  CIDRs/MACs/VIP, derived from the cluster name) is consumed by synth → runtime. Confirm topology is
+  runtime-owned, derived from the handed-over identity.
+. *Identity as its own runtime domain* (cross-cutting seed, topology derives from it) vs a field of a
+  `cluster` domain. Proposed: first-class identity fragment.
+. *Value-delivery mechanism.* Programmatic Config-Admin update from seed-master (simplest in-process)
+  vs a config artifact dropped for the runtime to load (fileinstall / ConfigMap agent) — the latter is
+  the remote-ready shape. Proposed: build the artifact seam; simplest loader first.
+. *Service scope.* Confirm `ClusterConfiguration` exposes the identity + topology slice (cohesive,
+  matches the records) rather than the whole `Rke2labConfig`.
+
+== Related documentation
+
+* link:config-restructuring-spec.adoc[Config-restructuring spec] — the Stage-A single-source DTO this
+  extends into the runtime.
+* link:../atlas/config.adoc[Atlas L1 — Config view] — the additive proof (Diagrams G/H) this spec
+  details.
+* link:../osgi/staging-gates-governance-spec.adoc[Staging-gates governance] — `ContractPurity` /
+  `REALM_BOUNDARY`, the laws that fix the module homes.
+* link:../manifests/manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog pattern] — the
+  single-source-of-truth catalog the `policy` fragment keys off.

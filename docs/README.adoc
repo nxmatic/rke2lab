@@ -28,6 +28,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 === Policies & Configuration
 
 * link:architecture/config/config-restructuring-spec.adoc[Configuration Restructuring Spec] - The `Rke2labConfig` DTO + `InfraDomain` model + doctor entry-gate: the single-source-of-truth operator config architecture
+* link:architecture/config/runtime-config-projection-design.adoc[Runtime Config Projection] - The runtime half: the `ClusterConfiguration` OSGi service (Config-Admin-backed, remote-ready), `RuntimeConfigRegistry`, context-projected views, and the collapse of the two drifting `NodeEnvContext` views that leak `bioskop`
 
 === Doctor & Runbook (BDD diagnostic model)
 
