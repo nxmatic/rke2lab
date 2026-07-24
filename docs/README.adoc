@@ -17,6 +17,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 * link:architecture/patterns/flake-build-entry-point.adoc[Flake as Build Entry Point] - Flake as the authoritative deploy build (Maven=dev loop, flake=release); store-built seed-master + manifests + NRI plugin
 * link:architecture/patterns/netplan-blueprint-single-source.adoc[Netplan Blueprint Single Source] - Cross-repo single source of truth for the network underlay; the flake runs the netplan jar (IFD) and exposes a flat `lib.networkBlueprint` that nix-darwin-home consumes via `deriveMacs`
+* link:architecture/patterns/service-contributors-views-adapters.adoc[Service / contributors / views / adapters] - The system's dominant DI idiom, named: a passive service (knows no one), contributors via a uniform SPI, narrow role-owned view-adapters, monotone cascade down the DAG. Already conformant in Doctor, seed-broker, host-asset, Pulumi outputs; hold-outs = `ManifestSynthesisContext`, `NodeEnvContext`
 
 === Bootstrap & Provisioning
 

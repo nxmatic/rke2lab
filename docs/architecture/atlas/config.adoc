@@ -4,6 +4,8 @@
 
 _Level-1 (per-subsystem) view of the link:../integration-atlas.adoc[integration atlas] (L0)._
 _L0 shows how this subsystem integrates with the others and the value that emerges; this file is the detail._
+_The runtime half (Diagrams G/H) is the first application of the
+link:../patterns/service-contributors-views-adapters.adoc[service / contributors / views / adapters pattern]._
 
 [[config-view]]
 == Config subsystem — per-subsystem view

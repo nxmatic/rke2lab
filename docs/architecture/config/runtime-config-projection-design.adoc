@@ -225,6 +225,8 @@ context; synth runs as an OSGi `@Reference` consumer, the ThreadLocal retired.
 
 == Related documentation
 
+* link:../patterns/service-contributors-views-adapters.adoc[Service / contributors / views / adapters
+  pattern] — the transverse pattern this config work is the first application of.
 * link:config-restructuring-spec.adoc[Config-restructuring spec] — the Stage-A single-source DTO this
   extends into the runtime.
 * link:../atlas/config.adoc[Atlas L1 — Config view] — the additive proof (Diagrams G/H) this spec
