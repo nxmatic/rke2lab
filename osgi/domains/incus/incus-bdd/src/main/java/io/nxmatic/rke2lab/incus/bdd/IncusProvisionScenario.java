@@ -203,7 +203,7 @@ public class IncusProvisionScenario
     when()
         .the_image_is_built(imageRequest(input.worktree(), input.image()))
         .and()
-        .the_manifests_are_cultivated(hostScenario, hostTree)
+        .the_manifests_are_cultivated(hostScenario, hostTree, input.worktree())
         .and()
         .the_host_assets_are_materialized(resolved)
         .and()
@@ -437,13 +437,20 @@ public class IncusProvisionScenario
      * The manifests scion picks a temp dir itself when the SOIL is blank (a bare survey).
      */
     public When the_manifests_are_cultivated(
-        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+        @Hidden ScenarioModel hostScenario,
+        @Hidden ReportModel hostTree,
+        @Hidden Optional<Worktree> worktree) {
       // AMEND: hand the broker {soil → path} by neutral role; the manifests amend reflector binds
       // it
       // onto ManifestsRunbookInput and returns the reconciled input, still under the runbook
       // coordinate.
       final ObjectNode roleValues = JsonNodeFactory.instance.objectNode();
       roleValues.put(Amendment.SOIL, soil);
+      // Forward the cluster/node identity as the manifests WORKTREE amendment — the SAME neutral
+      // provisioning scalars this scion reconstructs its own topology from. The manifests synthesis
+      // derives addressing for THIS cluster from the handed-over name (no hardcoded literal); the
+      // extra worktree scalars it does not need are ignored on decode. Absent = a bare survey.
+      worktree.ifPresent(w -> roleValues.set(Amendment.WORKTREE, codec.decode(codec.encode(w))));
       final SeedEnvelope amended =
           broker
               .orElseThrow()

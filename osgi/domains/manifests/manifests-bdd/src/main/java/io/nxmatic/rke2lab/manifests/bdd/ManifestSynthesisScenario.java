@@ -13,6 +13,7 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
+import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
@@ -191,11 +192,25 @@ public class ManifestSynthesisScenario
       // the root when the SOIL is a bare temp dir with no usable parent.
       final Path parent = root.getParent();
       final Path manifestFile = (parent == null ? root : parent).resolve("manifests.yaml");
-      final ManifestSynthesisRequest request =
+      final ManifestSynthesisRequest.Builder builder =
           ManifestSynthesisRequest.builder(root, manifestFile)
               .manifestDomainPolicy(java.util.Optional.of(domainPolicy))
-              .floxDebugPolicy(floxDebug)
-              .build();
+              .floxDebugPolicy(floxDebug);
+      // The cross-frontier identity view: reaped ONCE at this scion via the WORKTREE amendment,
+      // then
+      // handed to synthesis on the request — the synthesis root threads one NodeEnvContext derived
+      // from it to every unit. Absent (a bare survey / no worktree amended) → the request keeps its
+      // unknown identity and the synthesis renders a clearly-blank cluster.
+      facet
+          .worktree()
+          .ifPresent(
+              w ->
+                  builder.bootstrapIdentity(
+                      BootstrapIdentity.builder()
+                          .clusterName(w.clusterName())
+                          .nodeName(w.nodeName())
+                          .build()));
+      final ManifestSynthesisRequest request = builder.build();
       try {
         this.result = synthesis.orElseThrow().synthesize(request);
       } catch (IOException ex) {

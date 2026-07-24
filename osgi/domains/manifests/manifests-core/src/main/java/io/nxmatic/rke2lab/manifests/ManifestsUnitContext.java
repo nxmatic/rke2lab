@@ -2,6 +2,7 @@
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import org.cdk8s.Chart;
 
@@ -13,6 +14,7 @@ public record ManifestsUnitContext(
     Cdk8sApiObjectResolver resolver,
     NodeEnvContributorRegistry contributorRegistry,
     ManifestDomainPolicy manifestDomainPolicy,
+    NodeEnvContext nodeEnvContext,
     YamlMapper yaml) {
 
   public ManifestsUnitContext {
@@ -33,6 +35,9 @@ public record ManifestsUnitContext(
     }
     if (manifestDomainPolicy == null) {
       throw new IllegalArgumentException("manifestDomainPolicy must not be null");
+    }
+    if (nodeEnvContext == null) {
+      throw new IllegalArgumentException("nodeEnvContext must not be null");
     }
     if (yaml == null) {
       throw new IllegalArgumentException("yaml must not be null");

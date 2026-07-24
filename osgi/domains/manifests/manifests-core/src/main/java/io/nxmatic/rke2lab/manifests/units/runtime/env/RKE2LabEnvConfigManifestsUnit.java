@@ -7,7 +7,6 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
-import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.io.IOException;
@@ -37,7 +36,7 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext(context.manifestDomainPolicy());
+    final NodeEnvContext nodeEnvContext = context.nodeEnvContext();
     final NodeEnvContributorRegistry envContributorRegistry = context.contributorRegistry();
 
     // Sections are contributor-driven — every contributor's contributedSections() plus the built-in

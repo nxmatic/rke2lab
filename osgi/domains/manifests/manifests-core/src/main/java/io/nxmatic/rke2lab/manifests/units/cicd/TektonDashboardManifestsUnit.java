@@ -13,6 +13,11 @@ import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
+/**
+ * Tekton dashboard ingress + strip middleware. NOTE: renders its resources as {@code Map.of} blobs
+ * across private {@code createXxx} helpers — a de-soup candidate (see
+ * docs/architecture/manifests/manifests-unit-lifecycle.adoc § Known debt).
+ */
 public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.CICD + "/tekton-dashboard";
@@ -27,7 +32,7 @@ public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     createMiddleware(scope);
-    createIngress(scope);
+    createIngress(scope, context.nodeEnvContext().clusterName());
   }
 
   private ApiObject createMiddleware(final Construct scope) {
@@ -53,7 +58,7 @@ public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
     return middleware;
   }
 
-  private ApiObject createIngress(final Construct scope) {
+  private ApiObject createIngress(final Construct scope, final String clusterName) {
     ApiObject ingress =
         new ApiObject(
             scope,
@@ -88,7 +93,7 @@ public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
                 List.of(
                     Map.of(
                         "host",
-                        "bioskop-web-proxy.lan",
+                        clusterName + "-web-proxy.lan",
                         "http",
                         Map.of(
                             "paths",

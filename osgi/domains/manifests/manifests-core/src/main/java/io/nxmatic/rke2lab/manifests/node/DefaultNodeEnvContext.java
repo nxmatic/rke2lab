@@ -2,9 +2,9 @@ package io.nxmatic.rke2lab.manifests.node;
 
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.nio.file.Path;
-import java.util.Map;
 
 /**
  * Default synthesis-time {@link NodeEnvContext} backed by canonical netplan blueprint derivation.
@@ -13,27 +13,39 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
 
   private static final Path ROOT_PATH = Path.of("/srv/host");
 
-  private static final String CLUSTER_NAME = "bioskop";
+  /**
+   * The lab's control node. The blueprint requires a canonical node name; when the handed-over
+   * identity carries none (a bare/ephemeral run with no seeded identity), fall back to the single
+   * master this lab grows — the node role, not cluster identity.
+   */
+  private static final String DEFAULT_NODE_NAME = "master";
 
-  private static final String NODE_NAME = "master";
-
-  private final ClusterNetworkBlueprint blueprint =
-      ClusterNetworkBlueprint.builder()
-          .cluster(CLUSTER_NAME)
-          .node(NODE_NAME)
-          .deriveRecipeModel()
-          .build();
+  private final ClusterNetworkBlueprint blueprint;
 
   private final ManifestDomainPolicy manifestDomainPolicy;
 
-  /** The run's policy carrier — a synth-time unit passes the policy from its unit context. */
-  public DefaultNodeEnvContext(ManifestDomainPolicy manifestDomainPolicy) {
+  /**
+   * Derives the node's network blueprint from the run's handed-over {@link BootstrapIdentity} — the
+   * single source of the cluster name (no compile-time literal). The topology is a pure function of
+   * the cluster + node name (see {@code ClusterNetworkBlueprint.deriveRecipeModel}), so the
+   * identity is all this context needs to project the whole node environment.
+   */
+  public DefaultNodeEnvContext(
+      final BootstrapIdentity identity, final ManifestDomainPolicy manifestDomainPolicy) {
+    final String identityNode = identity.nodeName();
+    final String nodeName =
+        (identityNode == null
+                || identityNode.isBlank()
+                || BootstrapIdentity.UNKNOWN.equals(identityNode))
+            ? DEFAULT_NODE_NAME
+            : identityNode;
+    this.blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster(identity.clusterName())
+            .node(nodeName)
+            .deriveRecipeModel()
+            .build();
     this.manifestDomainPolicy = manifestDomainPolicy;
-  }
-
-  /** No policy in scope (units that emit no publish vars) — an empty, complete policy. */
-  public DefaultNodeEnvContext() {
-    this(new ManifestDomainPolicy(Map.of()));
   }
 
   @Override
@@ -202,5 +214,15 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
   @Override
   public String vipHostInetAddr() {
     return blueprint.vip().vipHostInetaddr().getHostAddress();
+  }
+
+  @Override
+  public String lanHostMacAddr() {
+    return blueprint.lan().hostMacaddr().value();
+  }
+
+  @Override
+  public String wanHostMacAddr() {
+    return blueprint.wan().hostMacaddr().value();
   }
 }

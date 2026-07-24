@@ -10,10 +10,12 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.contract.SshToAgeConverter;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.OnFailure;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.PhaseRunner;
+import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdBundleConfigMaps;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer;
@@ -311,6 +313,17 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           final CoherentManifestsDomainRegistry coherent =
               domainRegistry.resolve(DefaultManifestSynthesisService.this.resolver);
 
+          // The run-scoped policy + node environment: built ONCE from the request's handed-over
+          // identity (the single source of the cluster name) and threaded to every unit through its
+          // context — no unit re-derives it, no compile-time literal.
+          final ManifestDomainPolicy runPolicy =
+              state
+                  .request
+                  .manifestDomainPolicy()
+                  .orElseGet(() -> new ManifestDomainPolicy(java.util.Map.of()));
+          final NodeEnvContext nodeEnvContext =
+              new DefaultNodeEnvContext(state.request.bootstrapIdentity(), runPolicy);
+
           int manifestUnitHitCount = 0;
           for (ManifestsUnit manifestUnit : coherent.visitOrder()) {
             manifestUnitHitCount++;
@@ -325,10 +338,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                     manifestUnitId,
                     resolver,
                     DefaultManifestSynthesisService.this.contributorRegistry,
-                    state
-                        .request
-                        .manifestDomainPolicy()
-                        .orElseGet(() -> new ManifestDomainPolicy(java.util.Map.of())),
+                    runPolicy,
+                    nodeEnvContext,
                     DefaultManifestSynthesisService.this.yaml));
           }
 

@@ -79,6 +79,11 @@ public interface NodeEnvContext {
 
   String vipHostInetAddr(); // "10.80.7.10"
 
+  // Interface MAC addresses (blueprint-derived) — consumed by cloud-init network templating.
+  String lanHostMacAddr(); // "10:66:6a:4c:00:00"
+
+  String wanHostMacAddr(); // "52:54:00:00:00:00"
+
   // Publish policy — the run's manifest-domain decision (which layers are enabled). Carried here so
   // a node-env contributor can derive the RKE2LAB_MANIFESTS_PUBLISH_* vars from the same run-scoped
   // policy that drives the synth-time domain filter.

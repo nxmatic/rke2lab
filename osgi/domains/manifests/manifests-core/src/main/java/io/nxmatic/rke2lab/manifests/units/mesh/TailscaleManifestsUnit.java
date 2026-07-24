@@ -13,6 +13,11 @@ import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
+/**
+ * Tailscale operator connector + oauth secret. NOTE: renders its resources as {@code Map.of} blobs
+ * across private {@code createXxx} helpers — a de-soup candidate (see
+ * docs/architecture/manifests/manifests-unit-lifecycle.adoc § Known debt).
+ */
 public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.MESH + "/tailscale";
@@ -31,7 +36,7 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
     ApiObject namespace = createNamespace(scope);
     createSecret(scope, namespace);
     ApiObject helmChart = createHelmChart(scope, namespace);
-    createConnector(scope, helmChart);
+    createConnector(scope, helmChart, context.nodeEnvContext().clusterName());
   }
 
   private ApiObject createNamespace(final Construct scope) {
@@ -93,7 +98,8 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
     return helmChart;
   }
 
-  private void createConnector(final Construct scope, final ApiObject helmChart) {
+  private void createConnector(
+      final Construct scope, final ApiObject helmChart, final String clusterName) {
     ApiObject connector =
         new ApiObject(
             scope,
@@ -121,7 +127,7 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
             "/spec",
             Map.of(
                 "hostname",
-                "bioskop-controlplane",
+                clusterName + "-controlplane",
                 "subnetRouter",
                 Map.of("advertiseRoutes", List.of("10.80.7.10/32", "10.80.0.64/26")))));
   }

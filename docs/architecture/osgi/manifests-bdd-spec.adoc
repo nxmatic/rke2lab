@@ -339,6 +339,39 @@ serialized String across the realm boundary. It accepts the activation payload a
 seeds it where the scenario reads it (a registry service or a scenario static, the
 same scaffolding bbox uses for `lastRunbook`).
 
+== The gardening boundary — the scion gardens, the units are cultivated
+
+A load-bearing separation of concern, worth stating so it is not eroded: **the manifests units do
+NOT know the gardening.** The gardening lexicon — broker, coordinates, `Cellar`, sow/reap, scions —
+belongs to the *gardener*: the scion trio (`ManifestSynthesisScenario` + `ManifestsRunbookHandler` +
+`ManifestsBddScenarios`), the composition root. Below it, the `ManifestSynthesisService` and its CDK8s
+units are **gardening-ignorant** — pure domain synthesis, with no reference to the broker, a
+coordinate, or a cellar. In the gardening metaphor the units are the *cultivated*, not the
+*cultivators*: they receive their soil (the unit context) and grow (synthesise); the gardener did the
+sowing.
+
+This is not an inconsistency to "fix" by making units injectable/broker-aware. It is the layering, and
+it buys two properties:
+
+* *Portability.* `ManifestSynthesisService` runs under the scion (gardened) AND under the direct
+  `manifests-cli synthesize` call (no broker, no engine at all). If a unit knew the gardening, the
+  direct path would break. Their ignorance IS their portability — and `manifests-core` depends on
+  nothing from the scenario-engine, keeping the core→engine direction one-way.
+* *No sideways reach.* A unit that sowed a coordinate to fetch what it needs would be the
+  hidden-global-reached-sideways anti-pattern in broker clothing. Units declare their dependency at the
+  injection point (the context) instead — the reviewer's win.
+
+*The boundary is a value cascade, crossed once.* A cross-frontier view (cluster/node identity) is
+reaped ONCE at the gardener — the `RunbookCoordinate("manifests")` crossing delivers the `WORKTREE`
+amendment, from which `ManifestSynthesisScenario` sets `ManifestSynthesisRequest.bootstrapIdentity`.
+From there it is pure in-process narrowing: the synthesis root builds one `NodeEnvContext` from that
+identity and threads it to every unit through `ManifestsUnitContext` — the units consume their narrow
+view, never the broker. This is exactly the two-tier navigability of
+link:../patterns/service-contributors-views-adapters.adoc[the service/contributors/views/adapters
+pattern] (§ Navigability): coordinate-via-broker across the frontier, in-memory reference within the
+realm. It is also what killed the `bioskop` compile-time literal — the cluster name now flows from the
+run's identity, reaped at the gardener and cascaded to the ignorant units.
+
 == Why this closes several deltas at once
 
 * **The synthesis runs again** — driven as a scion, in-container, where SCR

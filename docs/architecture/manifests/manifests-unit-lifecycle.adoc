@@ -215,6 +215,19 @@ The target model touches all 30 units, so it is adopted in three deliberate step
 Until the prototype lands, the boot-unblocking group marker may ride whichever hook currently
 exists; its final home is the base `synthesize` once the model flips.
 
+== Known debt — de-soup the Map-literal units
+
+Some units render their resources as long `Map.of(...)` blobs inside a pile of private `createXxx(scope,
+…)` helpers — a catch-all decomposition that buries the resource shape in positional literals and threads
+scalars (e.g. the cluster name) through helper signatures. When a unit like this is next touched, *empty
+the catch-all*: lift the resource data into typed records / small local classes, keep each resource's own
+naming scheme cohesive with the resource, and let the unit consume its narrow view
+(`ManifestsUnitContext.nodeEnvContext()`) once. Do NOT smuggle a large de-soup into an unrelated fix — a
+big unit warrants a dedicated pass.
+
+Current candidates (observed while routing cluster identity through the node-env view, so the `bioskop`
+literal could die): `HeadscaleManifestsUnit`, `TailscaleManifestsUnit`, `TektonDashboardManifestsUnit`.
+
 == Related Documentation
 
 * link:rke2-install-phases.adoc[RKE2 Install Phases] — the per-(domain,phase) installer that

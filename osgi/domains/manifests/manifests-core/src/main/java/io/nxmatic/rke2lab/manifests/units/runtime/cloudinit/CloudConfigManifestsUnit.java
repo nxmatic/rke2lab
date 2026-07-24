@@ -5,8 +5,8 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
-import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,18 +20,8 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.RUNTIME + "/cloud-config";
 
-  private static final String CLUSTER_NAME = "bioskop";
-  private static final String NODE_NAME = "master";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "cloud-config");
-
-  private final ClusterNetworkBlueprint blueprint =
-      ClusterNetworkBlueprint.builder()
-          .cluster(CLUSTER_NAME)
-          .node(NODE_NAME)
-          .deriveRecipeModel()
-          .build();
 
   private final RuntimeCloudConfigAssets runtimeCloudConfigAssets =
       RuntimeCloudConfigAssets.builder().build();
@@ -42,10 +32,11 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    createCloudConfigManifest(scope);
+    createCloudConfigManifest(scope, context.nodeEnvContext());
   }
 
-  private void createCloudConfigManifest(final Construct scope) {
+  private void createCloudConfigManifest(
+      final Construct scope, final NodeEnvContext nodeEnvContext) {
     ApiObject configMap =
         new ApiObject(
             scope,
@@ -71,11 +62,11 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
     Map<String, String> configMapData = runtimeCloudConfigAssets.configMapData();
     String networkConfig = configMapData.get("networkData");
     if (networkConfig != null) {
-      // Replace template MACs with blueprint-derived values.
-      // The template uses bioskop cluster (id=0) MACs which match the blueprint
-      // for bioskop, but this allows generating manifests for other clusters.
-      String lanMac = blueprint.lan().hostMacaddr().value();
-      String wanMac = blueprint.wan().hostMacaddr().value();
+      // Replace the template's placeholder MACs with the run's identity-derived values — the node
+      // env projects them from the cluster/node blueprint, so the NoCloud seed matches whatever
+      // cluster this run synthesises for (no hardcoded cluster).
+      String lanMac = nodeEnvContext.lanHostMacAddr();
+      String wanMac = nodeEnvContext.wanHostMacAddr();
 
       networkConfig =
           networkConfig.replace("10:66:6a:4c:00:00", lanMac).replace("52:54:00:00:00:00", wanMac);

@@ -10,7 +10,6 @@ import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -37,7 +36,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext();
+    final NodeEnvContext nodeEnvContext = context.nodeEnvContext();
 
     createConfigMap(
         scope,
@@ -114,7 +113,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
         "|ConfigMap|default|rke2-etcd",
         orderedMap(
             entry("with-node-id", false),
-            entry("node-name", "bioskop-master"),
+            entry("node-name", nodeEnvContext.clusterName() + "-" + nodeEnvContext.nodeName()),
             entry("etcd-expose-metrics", false)));
     createConfigMap(
         scope,
@@ -154,7 +153,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
         "token.yaml",
         "RKE2 token fragment",
         "|ConfigMap|default|rke2-token",
-        Map.of("token", "bioskop"));
+        Map.of("token", nodeEnvContext.clusterToken()));
   }
 
   private void createConfigMap(

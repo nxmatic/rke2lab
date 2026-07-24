@@ -20,6 +20,12 @@ import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
+/**
+ * Headscale control-server manifests (deployment, config, bootstrap job, gateway, service, ACL,
+ * DERP). NOTE: renders its resources as {@code Map.of} blobs across many private {@code createXxx}
+ * helpers — a de-soup candidate (see docs/architecture/manifests/manifests-unit-lifecycle.adoc §
+ * Known debt).
+ */
 public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.MESH + "/headscale";
@@ -36,6 +42,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
+    final String clusterName = context.nodeEnvContext().clusterName();
 
     ApiObject namespace = context.resolver().require(MeshRefs.MESH_SYSTEM_NAMESPACE);
 
@@ -53,7 +60,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     ApiObject cmHeadscaleConfig = createConfigMapHeadscaleConfig(scope, namespace);
 
     ApiObject cmConfigInitScript = createConfigMapConfigInitScript(scope, namespace);
-    ApiObject cmHeadscaleEnv = createConfigMapHeadscaleEnv(scope, namespace);
+    ApiObject cmHeadscaleEnv = createConfigMapHeadscaleEnv(scope, namespace, clusterName);
 
     // The bootstrap job creates the real client-auth Secret at runtime (with the
     // preauth key extracted from headscale). We pre-create an empty placeholder
@@ -84,7 +91,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             cmDerp,
             cmExtraRecords,
             l2Policy);
-    ApiObject serviceHeadscale = createServiceHeadscale(scope, namespace, deploymentHeadscale);
+    ApiObject serviceHeadscale =
+        createServiceHeadscale(scope, namespace, deploymentHeadscale, clusterName);
     ApiObject bootstrapJob =
         createBootstrapJob(
             scope,
@@ -444,7 +452,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapHeadscaleEnv(final Construct scope, final ApiObject namespace) {
+  private ApiObject createConfigMapHeadscaleEnv(
+      final Construct scope, final ApiObject namespace, final String clusterName) {
     ApiObject configMap =
         configMapWithData(
             scope,
@@ -454,7 +463,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                 "CLUSTER_LAN_HEADSCALE_INETADDR",
                 "192.168.1.193",
                 "DARWIN_HOST",
-                "bioskop",
+                clusterName,
                 "HEADPLANE_NAMESPACE",
                 "${headplane-namespace}",
                 "HEADSCALE_NAMESPACE",
@@ -462,7 +471,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                 "HEADSCALE_URL",
                 "http://headscale." + HEADSCALE_NAMESPACE + ".svc.cluster.local:8080",
                 "RKE2_CLUSTER_NAME",
-                "bioskop",
+                clusterName,
                 "VIP_NETWORK_CIDR",
                 "10.80.7.0/24"));
     configMap.addDependency(namespace);
@@ -937,7 +946,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createServiceHeadscale(
-      final Construct scope, final ApiObject namespace, final ApiObject deployment) {
+      final Construct scope,
+      final ApiObject namespace,
+      final ApiObject deployment,
+      final String clusterName) {
     ApiObject service =
         new ApiObject(
             scope,
@@ -959,7 +971,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                                     "tailscale.com/expose",
                                     "true",
                                     "tailscale.com/hostname",
-                                    "bioskop-headscale")))
+                                    clusterName + "-headscale")))
                         .build())
                 .build());
     service.addDependency(namespace);

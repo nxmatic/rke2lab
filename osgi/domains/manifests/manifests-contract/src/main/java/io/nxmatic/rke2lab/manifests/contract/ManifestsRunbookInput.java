@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.manifests.contract;
 
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
+import java.util.Optional;
 
 /**
  * The wire contract for the manifests {@code runbook} trigger — the activation payload a sower must
@@ -40,7 +41,8 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 public record ManifestsRunbookInput(
     @Amendment(Amendment.FACET) PublishFacet publish,
     @Amendment(Amendment.FACET) DebugFacet debug,
-    @Amendment(Amendment.SOIL) String materializationRoot) {
+    @Amendment(Amendment.SOIL) String materializationRoot,
+    @Amendment(Amendment.WORKTREE) Optional<Worktree> worktree) {
 
   /**
    * The complete facet with every concern at its default — the operator's usual posture, debug off,
@@ -49,8 +51,21 @@ public record ManifestsRunbookInput(
    * complete sub-facet, so no incomplete state ever exists.
    */
   public static ManifestsRunbookInput defaults() {
-    return new ManifestsRunbookInput(PublishFacet.defaults(), DebugFacet.disabled(), "");
+    return new ManifestsRunbookInput(
+        PublishFacet.defaults(), DebugFacet.disabled(), "", Optional.empty());
   }
+
+  /**
+   * The cluster/node identity the gardener hands over as the {@link Amendment#WORKTREE} amendment —
+   * the same neutral provisioning-scalar role the incus scion reconstructs its topology from. The
+   * manifests scion needs only the identity subset (cluster + node name); the synthesis derives the
+   * whole network topology from the cluster name (a pure function — see {@code
+   * ClusterNetworkBlueprint.deriveRecipeModel}). A blind subtree mirroring the WORKTREE schema,
+   * naming no other domain's type; the host's extra worktree scalars are ignored on decode. EMPTY =
+   * unamended (a bare survey / the direct CLI call) — the synthesis falls back to an unknown
+   * identity.
+   */
+  public record Worktree(String clusterName, String nodeName) {}
 
   /**
    * The {@code manifests.publish} concern: which domain manifest layers the master publishes into
