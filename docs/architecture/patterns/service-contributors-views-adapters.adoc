@@ -46,8 +46,10 @@ fed by *many* contributors. The naive shapes rot:
   the concrete contributor (*contribution without acquaintance*).
 
 | *Views*
-| Narrow, immutable, interface-segregated projections of the service's data. A view keeps a reference
-  to the service (object-graph-navigability), so a role can re-restrict to a sibling view.
+| Narrow, immutable, interface-segregated projections of the service's data. A view stays *navigable
+  back to its source* so a role can re-restrict to a sibling view — but navigability takes TWO forms
+  by frontier (see <<navigability>>): an in-memory reference *in-process*, or a `SeedCoordinate` (a
+  wire value) resolved through the broker *across a frontier*.
 
 | *Adapters*
 | Owned by the consuming ROLE. Each role adapts the service down to exactly its view. A collaborator
@@ -101,6 +103,129 @@ flowchart TB
   reading B's body, no hidden reach. The minimal adapted view cannot lie (B cannot touch what A did
   not hand it).
 
+[[navigability]]
+== Navigability — two tiers by frontier
+
+Rule 3 says a view is navigable back to its source. HOW it navigates depends on whether the hop stays
+inside a realm or crosses a frontier — an in-memory reference cannot survive a process boundary, but a
+coordinate can. So navigability has two tiers, and the seam between them is a granularity decision.
+
+[cols="1,2,2",options="header"]
+|===
+| Tier | Navigation | The "back-reference"
+
+| *In-process* (within a realm) — fine, per-access, compile-typed
+| The view holds an in-memory reference to its source; a role re-restricts to a sibling view by a plain
+  method call. Cheap, typed. (`BootstrapPaths.asStagingView` / `asAutomountView` is the working
+  exemplar: a view returning sibling views of the same source.)
+| an object pointer
+
+| *Cross-frontier* (host↔OSGi today, remote tomorrow) — coarse, once-per-scope, wire-typed
+| The view is *named* by a `SeedCoordinate` (a wire value: `slug()` + `domain()`); navigate =
+  `broker.sow(coordinate, cellar, seed)`, reaping a value. Location-transparent — "same JVM today,
+  remote tomorrow, a broker detail the client never sees."
+| a `SeedCoordinate` (relocated into the broker)
+|===
+
+=== The broker IS the cross-frontier projection substrate
+
+The seed-broker is not merely a contributor-aggregator (its row in the exemplars table) — it is a
+*coordinate-addressed directory that returns a RESULT, never a reference*. That distinction is what
+lets it cross a frontier: unlike the OSGi service registry (which hands back the object for you to
+call, in-process only), the broker makes the call FOR you and hands back the reaped `SeedEnvelope`
+value, so the consumer never holds a remote pointer.
+
+[cols="1,1,1,1",options="header"]
+|===
+| Directory | Scope | Addressed by | Returns
+
+| OSGi registry (`@Reference`) | in-process | Java type | the *object* (you call it)
+| `SeedBroker` | cross-frontier | coordinate (a value) | the *result* (it calls)
+|===
+
+Coordinate→projection is *already live in production*: `ShapeCoordinate` → a domain reflector projects
+a coordinate's JSON Schema on demand. Navigability across the frontier is not a future mechanism to
+build — it exists; a domain that must be reachable across the frontier *contributes its coordinate +
+handler* to the existing broker.
+
+=== Reaching another domain's view — a C4 walk
+
+How domain A navigates to domain B's view *across a frontier*: it never holds B, nor B's source — it
+holds a coordinate, and the broker resolves it to a value.
+
+*Container — two realms, one door.* A and B may sit in different realms (host today, OSGi/remote
+tomorrow). Both depend on the ONE broker; neither depends on the other.
+
+[mermaid]
+....
+flowchart LR
+  subgraph hostRealm["host realm - same JVM today"]
+    a["domain A the consumer"]
+  end
+  broker["SeedBroker the one door passive, knows no domain"]
+  subgraph osgiRealm["OSGi realm - remote tomorrow"]
+    b["domain B owns the source contributes coordinate and handler"]
+  end
+  a -->|depends on the ONE broker| broker
+  b -->|contributes coordinate and handler| broker
+  classDef pass fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class broker pass;
+  class a,b neu;
+....
+
+*Component — routing by coordinate, returning a value.* The broker indexes handlers by coordinate and
+dispatches on the WANTED coordinate; the handler projects its source and encodes the view onto the wire.
+
+[mermaid]
+....
+flowchart TB
+  consumer["consumer resolves ONE SeedBroker routes by WANTED coordinate"]
+  broker["SeedBroker.sow wanted, cellar, seed"]
+  reg["index Map of SeedCoordinate to SeedHandler"]
+  hb["domain B handler serves ConfigCoordinate.IDENTITY"]
+  src["domain B source e.g. Config-Admin fragment"]
+  codec["SeedCodec encodes the view onto the wire"]
+  consumer -->|wanted coordinate| broker
+  broker --> reg
+  reg -->|routes to| hb
+  hb -->|projects| src
+  hb -->|encodes| codec
+  codec -->|reaped value envelope| broker
+  broker -->|value, not a reference| consumer
+  classDef pass fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class broker,reg pass;
+  class consumer,hb,src,codec neu;
+....
+
+*Flow — sow and reap.* The sequence a consumer sees; the world-crossing behind the door is invisible.
+
+[mermaid]
+....
+sequenceDiagram
+  participant A as domain A consumer
+  participant K as SeedBroker directory
+  participant H as domain B handler
+  A->>K: sow ConfigCoordinate.IDENTITY, cellar, seed
+  K->>H: route by WANTED coordinate
+  H->>H: project BootstrapIdentity from its source
+  H-->>K: reaped SeedEnvelope, encoded value
+  K-->>A: value, never a reference
+  Note over A: decode to BootstrapIdentity, then narrow fine in-process
+....
+
+=== The granularity seam (guardrail)
+
+The broker is COARSE — a serialize→sow→deserialize envelope round-trip. Right for a *realm boundary*
+crossed *once per scope* with a *cohesive view* (one `BootstrapIdentity`, one runbook, one schema).
+Sowing an envelope per accessor (`context.clusterCidr()`, one field, one path) would serialize JSON on
+every read and degrade everything to `String` — a misuse. Fine narrowing stays plain value-records /
+in-memory navigable views, cheap and typed, *inside* a realm. Rule of thumb: *broker = cross-realm,
+coarse, wire-typed, once* — the coordinate is the relocated back-reference; *value-record / navigable
+`View` = in-realm, fine, compile-typed, per-access* — the reference is in memory. A view that must
+cross is delivered coarse *once* by the broker, then narrowed fine in-process.
+
 == Anti-patterns this replaces
 
 * *Fat interface consumed narrowly* — one wide type passed whole; invert to segregated views.
@@ -125,7 +250,9 @@ Proof that the pattern holds in production — do NOT re-invert these:
 
 | Seed broker
 | `DefaultSeedBroker` (`host/`)
-| Aggregates `SeedHandler` via `@Reference(MULTIPLE)`; passive, knows no handler.
+| Aggregates `SeedHandler` via `@Reference(MULTIPLE)`; passive, knows no handler. *Also* the
+  cross-frontier projection substrate (see <<navigability>>) — a coordinate-addressed directory
+  returning a reaped value, not a reference.
 
 | Manifests domain channel
 | `ManifestsDomainRegistrar` → `ManifestsDomainRegistry`
@@ -193,8 +320,11 @@ the jGiven vehicle honest; the mechanism alone does not enforce it.
 
 == Generalization / foundation enrichment (future)
 
-With the pattern proven in 5+ subsystems the rule of three is long passed, so extracting a generic
-foundation is justified — but evidence-driven, not speculative:
+The pattern is proven in 5+ subsystems, so the temptation is a generic foundation. An exemplar survey
+under the frontier lens (see <<navigability>>) refuted that: *the honest foundation is mostly what
+already exists — ship ZERO new foundation types now.* Adaptation is not a config concern; it is the
+general act of a rich source crossing a role boundary, and the machinery for that already differs by
+tier:
 
 * *Already generic — do not reinvent.* Contributor AGGREGATION is OSGi DS `@Reference(MULTIPLE)`. SCR
   is the runtime's contribution foundation; lean on it.
@@ -203,10 +333,24 @@ foundation is justified — but evidence-driven, not speculative:
   sealed fragments + id↔type) vs Doctor (specialty routing). Forcing a generic registry leaks — this
   is the recorded deferral in link:../config/config-restructuring-spec.adoc[the config-restructuring
   spec] (`refactor/domain-registry-abstraction`).
-* *The real target — a VIEWS / ADAPTERS / CASCADE foundation*, common to none of them yet: a navigable
-  `View` (holds a reference to its source), a role-owned adapter contract, the monotone narrowing.
-  Extract it FROM working code — after the first application (`NodeEnvContext`), not before — so the
-  abstraction is drawn from a running instance, then confirmed against a second.
+* *Cross-frontier projection — NO new type; the broker already IS it.* Navigation across a frontier is
+  `broker.sow(coordinate, cellar, seed)`; the substrate (`SeedCoordinate`, `SeedHandler`,
+  `SeedEnvelope`, the sealed `ValueCoordinate`, the reflectors) is built and proven. A domain that must
+  be reachable across the frontier *contributes* its coordinate + handler — it does not extract an
+  abstraction. This is where Doctor's coarse `consult` crossing, manifests' `RunbookCoordinate`, and
+  the config value channel already converge.
+* *In-process projection — a navigable `View`, deferred by design.* The only genuinely new type worth
+  extracting: a `View` holding an in-memory reference to its source, a role-owned adapter, monotone
+  narrowing. Draw it FROM working code — after the first application (`NodeEnvContext`), not before —
+  then confirm against a second. `BootstrapPaths.asStagingView` is the working seed to generalise from.
+* *A standalone `Projection<S,V>` alias is SUBSUMED — do not add it.* Cross-frontier, projection already
+  IS `SeedHandler.handle`; in-process it already IS the adapter method (`asStagingView`,
+  `viewFor(domain, context)`). A `Projection extends Function` adds nothing over either concrete
+  mechanism and would be the speculative abstraction this project forbids.
+
+The litmus still holds: a candidate foundation must serve Doctor, the broker, and config alike. It does
+— because for the cross-frontier tier they already share the broker, and the in-process tier is one
+small `View` drawn from the first real application.
 
 == Related documentation
 
