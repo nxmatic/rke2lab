@@ -19,6 +19,16 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+    <!-- The codec imports jackson-core (JsonParser, TypeReference) and jackson-annotation directly,
+         not only through databind — declare them so the direct use is explicit. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
     <!-- jackson's own official datatype modules, registered EXPLICITLY by DocumentCodec: jsr310's
          JavaTimeModule (Instant ↔ ISO-8601, replacing a hand-rolled module) and jdk8's Jdk8Module
          (Optional). Realm-isolated jackson artifacts imported bundle-to-bundle like jackson-databind

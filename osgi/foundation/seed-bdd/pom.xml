@@ -65,6 +65,17 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
     </dependency>
+    <!-- The root scenario's main code drives the embedded launcher directly (bdd-as-engine), so
+         junit-platform-engine is a compile dep here, not only test. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <!-- The root scenario's main code parses jackson directly. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
 
     <!-- osgi.core: the world-opening stage reads the BundleContext off the connection to resolve the
          SeedBroker. provided — the framework carries it at runtime. -->

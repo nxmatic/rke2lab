@@ -48,6 +48,11 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
+    <!-- SeedEnvelope is imported directly (not only via seed-broker-codec) — declare the port. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
     <!-- The auth port LaunchSecretsWriter asks for the gh/flox token (§ provisioning-slice #10):
          the value crosses via AuthTokenContact, realised by auth-edge (gh/flox CLI). -->
     <dependency>
@@ -63,6 +68,11 @@
     </dependency>
     <!-- Generic YAML parse for the SEED_DIR strategy — unwrap the cloud-config ConfigMap into the
          NoCloud seed (§ provisioning-slice #2). No manifests coupling: a bare read into a Map. -->
+    <!-- ObjectMapper / JsonNode are imported directly, not only via the yaml dataformat above. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-yaml</artifactId>

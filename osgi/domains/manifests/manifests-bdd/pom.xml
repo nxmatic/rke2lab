@@ -55,6 +55,16 @@
       <groupId>com.tngtech.jgiven</groupId>
       <artifactId>jgiven-core</artifactId>
     </dependency>
+    <!-- The scenario's main code declares Jupiter extensions and drives the embedded launcher directly
+         (bdd-as-engine), so these are compile deps here, not only test. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.tngtech.jgiven</groupId>
       <artifactId>jgiven-junit5</artifactId>
