@@ -274,7 +274,13 @@ Proof that the pattern holds in production — do NOT re-invert these:
 
 == Remaining hold-outs (application targets)
 
-The synthesis side still carries the anti-patterns. Bringing them into conformance is the work:
+`NodeEnvContext` was the FIRST realized application: its fat interface (~35 accessors) is now a thin
+composite of three interface-segregated views — `BootstrapIdentity`, `NetworkTopology` (carrying the
+host MACs), and `HostPaths` — with every consumer re-typed onto the view that concerns it (commit
+`75627e53`). It is the working in-process `View` exemplar the generalization section draws from.
+
+The synthesis side still carries the anti-patterns elsewhere. Bringing them into conformance is the
+remaining work:
 
 [cols="1,1,3",options="header"]
 |===
@@ -286,14 +292,6 @@ The synthesis side still carries the anti-patterns. Bringing them into conforman
   call sites, each taking ONE slice. The views already exist (`BootstrapIdentity`, `NetworkTopology`,
   `ComponentVersions`, `ImageState`, `IncusIdentityMaterial`, `FloxDebugPolicy`, `SopsAgeMaterial`).
   Invert to injected narrow views; delete the ThreadLocal.
-
-| `NodeEnvContext` / `DefaultNodeEnvContext`
-| medium
-| Contributor half already textbook (`NodeEnvContributorRegistry`, `@Reference(MULTIPLE)`) and it is
-  instance-passed (not a hidden global) — but the fat interface (~35 accessors) is consumed narrowly
-  (e.g. `StorageNodeEnvContributor` touches zero of them). Segregate into `NetworkTopology`(+MACs),
-  `HostPaths`, and the identity view. See
-  link:../config/runtime-config-projection-design.adoc[the runtime-config projection spec].
 
 | `SystemdSynthesisContext`
 | small
