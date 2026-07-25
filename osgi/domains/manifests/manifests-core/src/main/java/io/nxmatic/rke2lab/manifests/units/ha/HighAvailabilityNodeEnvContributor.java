@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests.units.ha;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -29,12 +30,14 @@ public class HighAvailabilityNodeEnvContributor implements NodeEnvContributor {
   public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
-      case "network-vip" ->
-          Map.of(
-              "RKE2LAB_NETWORK_VIP_INTERFACE", context.vipInterface(),
-              "RKE2LAB_NETWORK_VIP_CIDR", context.vipCidr(),
-              "RKE2LAB_NETWORK_VIP_GATEWAY_INETADDR", context.vipGatewayInetAddr(),
-              "RKE2LAB_NETWORK_VIP_HOST_INETADDR", context.vipHostInetAddr());
+      case "network-vip" -> {
+        final NetworkTopology net = context.networkTopology();
+        yield Map.of(
+            "RKE2LAB_NETWORK_VIP_INTERFACE", net.vipInterface(),
+            "RKE2LAB_NETWORK_VIP_CIDR", net.vipCidr(),
+            "RKE2LAB_NETWORK_VIP_GATEWAY_INETADDR", net.vipGatewayInetAddr(),
+            "RKE2LAB_NETWORK_VIP_HOST_INETADDR", net.vipHostInetAddr());
+      }
       default -> Map.of();
     };
   }

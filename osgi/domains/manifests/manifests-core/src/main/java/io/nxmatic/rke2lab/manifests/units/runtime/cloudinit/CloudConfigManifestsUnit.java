@@ -65,8 +65,9 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
       // Replace the template's placeholder MACs with the run's identity-derived values — the node
       // env projects them from the cluster/node blueprint, so the NoCloud seed matches whatever
       // cluster this run synthesises for (no hardcoded cluster).
-      String lanMac = nodeEnvContext.lanHostMacAddr();
-      String wanMac = nodeEnvContext.wanHostMacAddr();
+      final var net = nodeEnvContext.networkTopology();
+      String lanMac = net.lanHostMacAddr();
+      String wanMac = net.wanHostMacAddr();
 
       networkConfig =
           networkConfig.replace("10:66:6a:4c:00:00", lanMac).replace("52:54:00:00:00:00", wanMac);

@@ -42,7 +42,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
-    final String clusterName = context.nodeEnvContext().clusterName();
+    final String clusterName = context.nodeEnvContext().bootstrapIdentity().clusterName();
 
     ApiObject namespace = context.resolver().require(MeshRefs.MESH_SYSTEM_NAMESPACE);
 

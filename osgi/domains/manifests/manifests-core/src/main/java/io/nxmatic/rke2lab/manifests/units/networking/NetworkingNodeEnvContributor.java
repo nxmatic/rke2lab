@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.manifests.units.networking;
 
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class NetworkingNodeEnvContributor implements NodeEnvContributor {
   @Override
   public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
+    final NetworkTopology net = context.networkTopology();
     return switch (sectionName) {
       case "cilium" ->
           Map.of(
@@ -37,28 +39,28 @@ public class NetworkingNodeEnvContributor implements NodeEnvContributor {
       case "network-cluster" ->
           Map.of(
               "RKE2LAB_NETWORK_CLUSTER_CIDR",
-              context.clusterCidr(),
+              net.clusterCidr(),
               "RKE2LAB_NETWORK_CLUSTER_LB_CIDR",
-              context.clusterLoadBalancerCidr(),
+              net.clusterLoadBalancerCidr(),
               "RKE2LAB_NETWORK_CLUSTER_LB_GATEWAY_INETADDR",
-              context.clusterLoadBalancerGatewayAddr(),
+              net.clusterLoadBalancerGatewayAddr(),
               "RKE2LAB_NETWORK_CLUSTER_POD_CIDR",
-              context.clusterPodCidr(),
+              net.clusterPodCidr(),
               "RKE2LAB_NETWORK_CLUSTER_SERVICE_CIDR",
-              context.clusterServiceCidr(),
+              net.clusterServiceCidr(),
               "RKE2LAB_NETWORK_CLUSTER_GATEWAY_INETADDR",
-              context.nodeNetworkGatewayAddr());
+              net.nodeNetworkGatewayAddr());
       case "network-node" ->
           Map.of(
-              "RKE2LAB_NETWORK_NODE_HOST_INETADDR", context.nodeHostInetAddr(),
-              "RKE2LAB_NETWORK_NODE_CIDR", context.nodeNetworkCidr(),
-              "RKE2LAB_NETWORK_NODE_GATEWAY_INETADDR", context.nodeNetworkGatewayAddr());
+              "RKE2LAB_NETWORK_NODE_HOST_INETADDR", net.nodeHostInetAddr(),
+              "RKE2LAB_NETWORK_NODE_CIDR", net.nodeNetworkCidr(),
+              "RKE2LAB_NETWORK_NODE_GATEWAY_INETADDR", net.nodeNetworkGatewayAddr());
       case "network-lan-wan" ->
           Map.of(
-              "RKE2LAB_NETWORK_LAN_INTERFACE", context.lanInterface(),
-              "RKE2LAB_NETWORK_LAN_HOST_INETADDR", context.lanHostInetAddr(),
-              "RKE2LAB_NETWORK_LAN_LB_CIDR", context.lanLoadBalancerCidr(),
-              "RKE2LAB_NETWORK_WAN_INTERFACE", context.wanInterface());
+              "RKE2LAB_NETWORK_LAN_INTERFACE", net.lanInterface(),
+              "RKE2LAB_NETWORK_LAN_HOST_INETADDR", net.lanHostInetAddr(),
+              "RKE2LAB_NETWORK_LAN_LB_CIDR", net.lanLoadBalancerCidr(),
+              "RKE2LAB_NETWORK_WAN_INTERFACE", net.wanInterface());
       default -> Map.of();
     };
   }

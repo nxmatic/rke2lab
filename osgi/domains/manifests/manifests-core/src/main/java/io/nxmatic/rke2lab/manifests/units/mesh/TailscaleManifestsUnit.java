@@ -36,7 +36,7 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
     ApiObject namespace = createNamespace(scope);
     createSecret(scope, namespace);
     ApiObject helmChart = createHelmChart(scope, namespace);
-    createConnector(scope, helmChart, context.nodeEnvContext().clusterName());
+    createConnector(scope, helmChart, context.nodeEnvContext().bootstrapIdentity().clusterName());
   }
 
   private ApiObject createNamespace(final Construct scope) {

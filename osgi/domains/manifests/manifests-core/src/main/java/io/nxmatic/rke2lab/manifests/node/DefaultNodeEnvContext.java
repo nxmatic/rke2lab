@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests.node;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.contract.profiles.HostPaths;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.nio.file.Path;
 
@@ -54,175 +56,61 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
   }
 
   @Override
-  public Path rootPath() {
-    return ROOT_PATH;
+  public HostPaths hostPaths() {
+    return HostPaths.builder()
+        .rootPath(ROOT_PATH)
+        .envDirPath(ROOT_PATH.resolve("rke2lab-environment.d"))
+        .scriptsDirPath(ROOT_PATH.resolve("systemd-scripts.d"))
+        .systemdDirPath(ROOT_PATH.resolve("systemd-units.d"))
+        .configDirPath(ROOT_PATH.resolve("rke2-config.d"))
+        .cloudconfigNocloudDirPath(ROOT_PATH.resolve("cloudconfig-nocloud.d"))
+        .manifestsDirPath(ROOT_PATH.resolve("rke2-manifests.d"))
+        .sharedDirPath(ROOT_PATH.resolve("rke2lab-share.d"))
+        .kubeconfigDirPath(ROOT_PATH.resolve("rke2lab-kube.d"))
+        .build();
   }
 
   @Override
-  public Path envDirPath() {
-    return ROOT_PATH.resolve("rke2lab-environment.d");
+  public BootstrapIdentity bootstrapIdentity() {
+    final String clusterName = blueprint.cluster().name();
+    final String nodeKind =
+        switch (blueprint.node().type()) {
+          case SERVER -> "server";
+          case AGENT -> "agent";
+        };
+    return BootstrapIdentity.builder()
+        .clusterName(clusterName)
+        .clusterId(blueprint.cluster().id())
+        .clusterToken(clusterName)
+        .clusterDomain("cluster.local")
+        .nodeName(blueprint.node().name())
+        .nodeId(blueprint.node().id())
+        .nodeKind(nodeKind)
+        .incusRemoteName(clusterName)
+        .build();
   }
 
   @Override
-  public Path scriptsDirPath() {
-    return ROOT_PATH.resolve("systemd-scripts.d");
-  }
-
-  @Override
-  public Path systemdDirPath() {
-    return ROOT_PATH.resolve("systemd-units.d");
-  }
-
-  @Override
-  public Path configDirPath() {
-    return ROOT_PATH.resolve("rke2-config.d");
-  }
-
-  @Override
-  public Path cloudconfigNocloudDirPath() {
-    return ROOT_PATH.resolve("cloudconfig-nocloud.d");
-  }
-
-  @Override
-  public Path manifestsDirPath() {
-    return ROOT_PATH.resolve("rke2-manifests.d");
-  }
-
-  @Override
-  public Path sharedDirPath() {
-    return ROOT_PATH.resolve("rke2lab-share.d");
-  }
-
-  @Override
-  public Path kubeconfigDirPath() {
-    return ROOT_PATH.resolve("rke2lab-kube.d");
-  }
-
-  @Override
-  public int nodeId() {
-    return blueprint.node().id();
-  }
-
-  @Override
-  public String nodeName() {
-    return blueprint.node().name();
-  }
-
-  @Override
-  public String nodeKind() {
-    return switch (blueprint.node().type()) {
-      case SERVER -> "server";
-      case AGENT -> "agent";
-    };
-  }
-
-  @Override
-  public int clusterId() {
-    return blueprint.cluster().id();
-  }
-
-  @Override
-  public String clusterName() {
-    return blueprint.cluster().name();
-  }
-
-  @Override
-  public String clusterToken() {
-    return clusterName();
-  }
-
-  @Override
-  public String clusterDomain() {
-    return "cluster.local";
-  }
-
-  @Override
-  public String clusterCidr() {
-    return blueprint.host().clusterCidr().toString();
-  }
-
-  @Override
-  public String clusterPodCidr() {
-    return "10.42.0.0/16";
-  }
-
-  @Override
-  public String clusterServiceCidr() {
-    return "10.43.0.0/16";
-  }
-
-  @Override
-  public String nodeHostInetAddr() {
-    return blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress();
-  }
-
-  @Override
-  public String nodeNetworkCidr() {
-    return blueprint.nodeNetwork().nodeCidr().toString();
-  }
-
-  @Override
-  public String nodeNetworkGatewayAddr() {
-    return blueprint.nodeNetwork().nodeGatewayInetaddr().getHostAddress();
-  }
-
-  @Override
-  public String clusterLoadBalancerCidr() {
-    return blueprint.loadBalancer().lbCidr().toString();
-  }
-
-  @Override
-  public String clusterLoadBalancerGatewayAddr() {
-    return blueprint.lan().headscaleInetaddr().getHostAddress();
-  }
-
-  @Override
-  public String lanInterface() {
-    return blueprint.interfaces().lanInterface();
-  }
-
-  @Override
-  public String lanHostInetAddr() {
-    return blueprint.lan().hostInetaddr().getHostAddress();
-  }
-
-  @Override
-  public String lanLoadBalancerCidr() {
-    return blueprint.lan().lbCidr().toString();
-  }
-
-  @Override
-  public String wanInterface() {
-    return blueprint.interfaces().wanInterface();
-  }
-
-  @Override
-  public String vipInterface() {
-    return blueprint.interfaces().vipInterface();
-  }
-
-  @Override
-  public String vipCidr() {
-    return blueprint.vip().vipCidr().toString();
-  }
-
-  @Override
-  public String vipGatewayInetAddr() {
-    return blueprint.vip().vipGatewayInetaddr().getHostAddress();
-  }
-
-  @Override
-  public String vipHostInetAddr() {
-    return blueprint.vip().vipHostInetaddr().getHostAddress();
-  }
-
-  @Override
-  public String lanHostMacAddr() {
-    return blueprint.lan().hostMacaddr().value();
-  }
-
-  @Override
-  public String wanHostMacAddr() {
-    return blueprint.wan().hostMacaddr().value();
+  public NetworkTopology networkTopology() {
+    return NetworkTopology.builder()
+        .clusterCidr(blueprint.host().clusterCidr().toString())
+        .clusterPodCidr("10.42.0.0/16")
+        .clusterServiceCidr("10.43.0.0/16")
+        .nodeHostInetAddr(blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress())
+        .nodeNetworkCidr(blueprint.nodeNetwork().nodeCidr().toString())
+        .nodeNetworkGatewayAddr(blueprint.nodeNetwork().nodeGatewayInetaddr().getHostAddress())
+        .clusterLoadBalancerCidr(blueprint.loadBalancer().lbCidr().toString())
+        .clusterLoadBalancerGatewayAddr(blueprint.lan().headscaleInetaddr().getHostAddress())
+        .lanInterface(blueprint.interfaces().lanInterface())
+        .lanHostInetAddr(blueprint.lan().hostInetaddr().getHostAddress())
+        .lanLoadBalancerCidr(blueprint.lan().lbCidr().toString())
+        .wanInterface(blueprint.interfaces().wanInterface())
+        .vipInterface(blueprint.interfaces().vipInterface())
+        .vipCidr(blueprint.vip().vipCidr().toString())
+        .vipGatewayInetAddr(blueprint.vip().vipGatewayInetaddr().getHostAddress())
+        .vipHostInetAddr(blueprint.vip().vipHostInetaddr().getHostAddress())
+        .lanHostMacAddr(blueprint.lan().hostMacaddr().value())
+        .wanHostMacAddr(blueprint.wan().hostMacaddr().value())
+        .build();
   }
 }

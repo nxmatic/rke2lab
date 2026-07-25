@@ -32,7 +32,7 @@ public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     createMiddleware(scope);
-    createIngress(scope, context.nodeEnvContext().clusterName());
+    createIngress(scope, context.nodeEnvContext().bootstrapIdentity().clusterName());
   }
 
   private ApiObject createMiddleware(final Construct scope) {

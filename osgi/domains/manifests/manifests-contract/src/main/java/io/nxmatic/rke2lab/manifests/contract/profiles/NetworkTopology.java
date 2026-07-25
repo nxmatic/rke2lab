@@ -30,7 +30,9 @@ public record NetworkTopology(
     String vipInterface,
     String vipCidr,
     String vipGatewayInetAddr,
-    String vipHostInetAddr) {
+    String vipHostInetAddr,
+    String lanHostMacAddr,
+    String wanHostMacAddr) {
 
   private static final NetworkTopology DEFAULT = builder().build();
 
@@ -51,6 +53,8 @@ public record NetworkTopology(
     vipCidr = nullToBlank(vipCidr);
     vipGatewayInetAddr = nullToBlank(vipGatewayInetAddr);
     vipHostInetAddr = nullToBlank(vipHostInetAddr);
+    lanHostMacAddr = nullToBlank(lanHostMacAddr);
+    wanHostMacAddr = nullToBlank(wanHostMacAddr);
   }
 
   /** Empty topology — used when nothing has been bound (tests, ephemeral runs). */
@@ -87,6 +91,8 @@ public record NetworkTopology(
     private String vipCidr = "";
     private String vipGatewayInetAddr = "";
     private String vipHostInetAddr = "";
+    private String lanHostMacAddr = "";
+    private String wanHostMacAddr = "";
 
     private Builder() {}
 
@@ -170,6 +176,16 @@ public record NetworkTopology(
       return this;
     }
 
+    public Builder lanHostMacAddr(final String v) {
+      this.lanHostMacAddr = v;
+      return this;
+    }
+
+    public Builder wanHostMacAddr(final String v) {
+      this.wanHostMacAddr = v;
+      return this;
+    }
+
     public NetworkTopology build() {
       return new NetworkTopology(
           clusterCidr,
@@ -187,7 +203,9 @@ public record NetworkTopology(
           vipInterface,
           vipCidr,
           vipGatewayInetAddr,
-          vipHostInetAddr);
+          vipHostInetAddr,
+          lanHostMacAddr,
+          wanHostMacAddr);
     }
   }
 }

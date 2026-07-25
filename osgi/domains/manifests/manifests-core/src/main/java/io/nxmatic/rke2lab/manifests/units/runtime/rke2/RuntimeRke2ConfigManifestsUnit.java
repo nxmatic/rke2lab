@@ -10,6 +10,8 @@ import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -37,13 +39,15 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final NodeEnvContext nodeEnvContext = context.nodeEnvContext();
+    final BootstrapIdentity id = nodeEnvContext.bootstrapIdentity();
+    final NetworkTopology net = nodeEnvContext.networkTopology();
 
     createConfigMap(
         scope,
         "advertise-address.yaml",
         "Advertise address fragment",
         "|ConfigMap|default|rke2-advertise-address",
-        Map.of("advertise-address", nodeEnvContext.nodeHostInetAddr()));
+        Map.of("advertise-address", net.nodeHostInetAddr()));
     createConfigMap(
         scope,
         "cidrs.yaml",
@@ -51,8 +55,8 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
         "|ConfigMap|default|rke2-cidrs",
         orderedMap(
             entry("kube-controller-manager-arg", List.of("node-cidr-mask-size-ipv4=24")),
-            entry("service-cidr", nodeEnvContext.clusterServiceCidr()),
-            entry("cluster-cidr", nodeEnvContext.clusterPodCidr())));
+            entry("service-cidr", net.clusterServiceCidr()),
+            entry("cluster-cidr", net.clusterPodCidr())));
     createConfigMap(
         scope,
         "cluster-init.yaml",
@@ -113,14 +117,14 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
         "|ConfigMap|default|rke2-etcd",
         orderedMap(
             entry("with-node-id", false),
-            entry("node-name", nodeEnvContext.clusterName() + "-" + nodeEnvContext.nodeName()),
+            entry("node-name", id.clusterName() + "-" + id.nodeName()),
             entry("etcd-expose-metrics", false)));
     createConfigMap(
         scope,
         "node-inetaddr.yaml",
         "Node IP fragment",
         "|ConfigMap|default|rke2-node-inetaddr",
-        Map.of("node-ip", nodeEnvContext.nodeHostInetAddr()));
+        Map.of("node-ip", net.nodeHostInetAddr()));
     createConfigMap(
         scope,
         "node-labels.yaml",
@@ -144,16 +148,16 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
                 "gateway",
                 "0.0.0.0",
                 "127.0.0.1",
-                nodeEnvContext.vipGatewayInetAddr(),
-                nodeEnvContext.nodeNetworkGatewayAddr(),
-                nodeEnvContext.nodeHostInetAddr(),
-                nodeEnvContext.lanHostInetAddr())));
+                net.vipGatewayInetAddr(),
+                net.nodeNetworkGatewayAddr(),
+                net.nodeHostInetAddr(),
+                net.lanHostInetAddr())));
     createConfigMap(
         scope,
         "token.yaml",
         "RKE2 token fragment",
         "|ConfigMap|default|rke2-token",
-        Map.of("token", nodeEnvContext.clusterToken()));
+        Map.of("token", id.clusterToken()));
   }
 
   private void createConfigMap(
