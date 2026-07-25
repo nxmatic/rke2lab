@@ -36,6 +36,7 @@ import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
+import io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -261,6 +262,18 @@ public class ClusterSeedScenario
           .context()
           .registerService(OpaqueCellar.class, cellarRealisation, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
+      // The manifests FACET amendment — the operator config subtree the root read from Pulumi,
+      // published as an ambient AmendmentContributor. The incus scion that consults the manifests
+      // amend holds only the per-consult SOIL + WORKTREE; the assembler merges this FACET in at the
+      // door, so `mesh: false` (and the rest of rke2lab:manifests:) reaches the synthesis without
+      // any sower carrying a role it does not own.
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              AmendmentContributor.class,
+              new ManifestsFacetContributor(run.manifestsFacet()),
+              new Hashtable<>());
       this.preflightGate =
           () ->
               EntryGatePolicyEnforcer.enforceAll(

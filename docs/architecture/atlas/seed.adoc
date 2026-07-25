@@ -21,7 +21,7 @@ The host logic drawn here (config, policy, readiness, incus, bbox) is being lift
 services the host calls; see link:../osgi/controlplane-to-osgi-migration-spec.adoc[control-plane → OSGi
 — migrating the domains] (the 87 Pulumi-free files migrated, only the 17 `com.pulumi` edge staying
 host). The seeding itself is expressed as BDD-as-engine — jGiven scenarios on the JUnit launcher
-(link:../bdd/bdd.adoc[design of record], GO 2026-07-04); the fluent `during/then` grammar it was first
+(link:../bdd/bdd.adoc[design of record], GO); the fluent `during/then` grammar it was first
 built on is gone (its engine dissolved into manifests-core's internal synthesis, the boot into
 `FrameworkLaunch`). What remains is wiring seed-master's own live pipeline onto the shipped socle — the
 ClusterSeed vertical, tracked below as the residue, not an avant→après evolution.
@@ -117,13 +117,13 @@ and loses four scattered anti-patterns.* Status: DESIGN — the living gate is t
 (it fixes the hang), then the systemd report, then the output registry.
 
 [[the-bdd-as-engine-turn]]
-== The seeding as jGiven scenarios (BDD-as-engine, GO 2026-07-04)
+== The seeding as jGiven scenarios (BDD-as-engine, GO)
 
 The seeding is expressed as *jGiven scenarios orchestrated by the JUnit Platform launcher*, the missing
 dynamics contributed as Jupiter extensions. Its spec is link:../bdd/bdd.adoc[BDD-as-engine]; the
 discovery record is link:../osgi/bdd-pipeline-poc-design.adoc[the bdd-pipeline POC] (ten measured
-learnings E1–E10). The engine-lifecycle socle SHIPPED (2026-07-05,
-link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec]): the launcher, connection, lever,
+learnings E1–E10). The engine-lifecycle socle SHIPPED
+(link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec]): the launcher, connection, lever,
 disciplines and a green connected `BulletproofPipeline` are live in `osgi/runtime/scenario-engine`. What
 remains is the ClusterSeed vertical (increment 2) that wires seed-master's own live pipeline onto that
 socle.
@@ -150,11 +150,11 @@ The seeding phases are jGiven `Stage`s; the value-DAG is carried by scenario-sta
 | the value-DAG | scenario-state runtime **+ a build-time DAG gate** | vertical: the value-DAG; gate = the closing task
 | phase composition | intro-words + `@NestedSteps` | vertical: the composing When stage
 | the runbook node label | `@As("…")` | vertical: per-phase `@As`
-| the launcher | the embedded JUnit Platform launcher | *socle SHIPPED:* `JUnitLauncherCore` (jGiven-free, in its own `osgi/runtime/junit-launcher` bundle since 2026-07-19 — a runner-only world installs it without dragging jGiven; `scenario-engine` depends on it)
+| the launcher | the embedded JUnit Platform launcher | *socle SHIPPED:* `JUnitLauncherCore` (jGiven-free, in its own `osgi/runtime/junit-launcher` bundle — a runner-only world installs it without dragging jGiven; `scenario-engine` depends on it)
 | the boot | `@SeedRuntime` self-boots via `OsgiConnection.embedded` (`FrameworkLaunch.embedded().launch()` under the hood) | *socle SHIPPED:* `SeedRuntime` + `OsgiConnection`
 | ambient host-facts | `ExtensionContext.Store` | *socle SHIPPED:* `BaseWorldExtension` Store; vertical seeds host-facts
 | the DAG safety gate | `SCENARIO_STATE_DAG` (`provided`/`required` topological) | vertical closing task (a `StagingGate`, existing ASM+`@GovernedBy` mould)
-| preview | the SURVEY/CULTIVATE mode chosen at the collaborator frontier (paired `Cultivating`/`Surveying` impls by LDAP filter, mode-blind scenarios) + the `PendingMarkingScenarioExecutor` render (E9) | vertical (Q3, designed 2026-07-19)
+| preview | the SURVEY/CULTIVATE mode chosen at the collaborator frontier (paired `Cultivating`/`Surveying` impls by LDAP filter, mode-blind scenarios) + the `PendingMarkingScenarioExecutor` render (E9) | vertical (Q3, designed)
 | the runbook | `ReportModel`, single source; outputs a projection of the value-DAG | vertical: `SeedRun(runbook, outputs)` harvest return
 |===
 
@@ -168,7 +168,7 @@ born WARN then flipped WARN→ERROR — the REALM_BOUNDARY ritual.
 === Diagram Q — the seeding orchestration
 
 The seeding is one `SeedScenario` played by the launcher over the shipped socle. Blue = shipped: the
-atlas invariants AND the engine-lifecycle socle (increment 1, 2026-07-05 — the acquired floor the
+atlas invariants AND the engine-lifecycle socle (increment 1 — the acquired floor the
 vertical rests on). Green = the ClusterSeed vertical (increment 2, what remains).
 
 [mermaid]
@@ -246,7 +246,7 @@ stale `netplan.api`/`netplan.port` packages), a compile-broken exec module to re
 
 === The go/no-go gate — closed; the socle shipped
 
-The seven go/no-go mechanisms were proven on a bench (2026-07-04, adversarial pass) and the GO was
+The seven go/no-go mechanisms were proven on a bench (adversarial pass) and the GO was
 graved; increment 1 (the engine-lifecycle socle) then SHIPPED the load-bearing ones for real —
 `JUnitLauncherCore` (the launcher premise + the dedicated-thread crossing), `OsgiConnection` +
 `StartLevelLever` + `@SeedRuntime`/`@IsolatedWorld` (the lifecycle), `BulletproofPipeline`/
@@ -332,7 +332,7 @@ machinery). Opening the gardening is the GIVEN, never a WHEN; the seven WHENs ar
 
 *The transaction crosses BOTH ways.* The RETURN sense (a scion's tags fold UP into the trunk, the root
 drains) was the original design; the ALLER sense (the root hands DOWN the in-flight write-set so a
-later crossing reads an earlier crossing's in-flight store) was added 2026-07-16, the twin of the
+later crossing reads an earlier crossing's in-flight store) was added as the twin of the
 `txId` channel — the sow carries the `txId` AND `writeSetOf(trunk)` (the encoded entries), both flat
 strings in the session store, the `ScenarioCellar` itself unchanged (a view on the caller's model) (§
 link:../osgi/seed-broker-spec.adoc#the-cellar-is-transactional[seed-broker-spec, write-set descends]).
@@ -346,7 +346,7 @@ in the SAME run (§ link:../osgi/host-cellar-realisation-spec.adoc[the reconcile
 . *The pipeline refuses to touch the live system in preview* — `[narrated]` green +
 .. GIVEN seven scattered `Deployment.getInstance().isDryRun()` reads, one consulted too late so the
    readiness probe waits a full minute for a kubeconfig a dry-run never publishes
-.. WHEN two ORTHOGONAL levers separate (decision 2026-07-11b): (RENDER) `PendingMarkingScenarioExecutor`
+.. WHEN two ORTHOGONAL levers separate (decision): (RENDER) `PendingMarkingScenarioExecutor`
    (E9) decouples rendering from execution — the tree builds, the reaching mode is rewritten
    NORMAL→PENDING; (TOUCH) the ambient `RunGate` service (from `RunMode`), published once in Felix by the
    host, is consulted by the SCION (which resolves it from its own registry alongside its contact + the
@@ -375,7 +375,7 @@ Scenario 2 (the output registry) is orthogonal and flips playable when the regis
 
 NOTE: *The full TARGET scenario map — the 6-step root runbook, which step grafts which domain scion, and
 the per-domain G/W/T distribution — lives at link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed
-scenario map] (settled 2026-07-11c).* This atlas view is the host-pipeline capabilities; the map is the
+scenario map] (settled).* This atlas view is the host-pipeline capabilities; the map is the
 concrete scenario instance those capabilities play.
 
 === Diagram R — the host realisation: from a fluent monolith to a gardening skeleton
@@ -417,7 +417,7 @@ link:../osgi/seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the runbook handl
 consumption into `sow` — the `com.pulumi.*` provisioning graph stays host (Pulumi cannot enter Felix). The manifests/flox synthesis is
 a graft cultivated fresh, not a cellar artifact (no second cellar; a cache could lie on version skew).
 
-*`ResourceManager` dissolves into the SCION's `Cellar.store` (2026-07-14).* The former host `ResourceManager` /
+*`ResourceManager` dissolves into the SCION's `Cellar.store`.* The former host `ResourceManager` /
 `ResourceCreationPipeline` built, per scion, a "thin graph mirror + `dependsOn` edge" — which is EXACTLY what
 `PulumiCellar.store` does (an `up()` registering a `CellarEntry` under the coordinate slug). So it is not
 re-created: *every scion, in-container, harvests AND stores* — the host lays the `Cellar` into Felix at boot
@@ -427,7 +427,7 @@ link:../osgi/host-cellar-realisation-spec.adoc#every-scion-contributes[host Cell
 contributes]).
 
 [NOTE]
-.The store is TRANSACTIONAL — the scion TAGS, the root DRAINS (2026-07-16, supersedes the durable-immediate reading)
+.The store is TRANSACTIONAL — the scion TAGS, the root DRAINS (supersedes the durable-immediate reading)
 ====
 The `store` API is unchanged (*every scion contributes* still holds — the scion calls `store`), but WHEN it
 becomes durable moves: the scion's `store` now posts a TAG on its `ReportModel` (the within-run write set),
@@ -463,7 +463,7 @@ cellar is the data (two channels). See § link:../osgi/host-cellar-realisation-s
 host Cellar realisation — every scion contributes].
 
 [NOTE]
-.The output gate and the broker-split compose — they are two distinct flows (2026-07-10)
+.The output gate and the broker-split compose — they are two distinct flows
 ====
 The host-adaptation brainstorm's *broker-split + CRUD-by-shell* (see
 link:../osgi/seed-broker-spec.adoc[seed-broker spec] § the stack is an envelope store) is ADDITIVE to
@@ -478,7 +478,7 @@ content (that path is the split's), which is exactly the `SeedBrokerCatalog.FIEL
 erasure the doctor atlas NEXT already carries. No box of Diagram P is erased or rewired.
 ====
 
-== The manifests scion + the config path + shape introspection (design 2026-07-13)
+== The manifests scion + the config path + shape introspection (design)
 
 The four shipped scions (bbox/incus/systemd/cluster) reach the master through
 `broker.sow(RUNBOOK)`. Two things were still missing and are now designed (specs:
@@ -487,40 +487,54 @@ link:../osgi/seed-broker-spec.adoc#shape-realization[seed-broker § shape]): the
 FIFTH scion (manifests — the synthesis, until now driven by nobody), and the CONFIG
 path by which any policy reaches any scion.
 
-=== Diagram T — the fifth scion and the one config path
+=== Diagram T — the fifth scion and the one config path (config IS the amendment)
 
-The synthesis stops being host-resolved (the realm-boundary anti-pattern) and
-becomes a scion sown like the others; and the operator's policy travels ONE way — a
-host-neutral policy in `SeedRun`, a facet per soil in each sow trigger.
+The synthesis stops being host-resolved (the realm-boundary anti-pattern) and becomes a
+scion sown like the others; and the operator's policy travels ONE way. The FIRST design
+sketched that one way as a host-neutral policy blob in `SeedRun` that the host sliced into
+a facet per soil per trigger. The EVOLVED model is sharper: *config IS the `@Amendment`* —
+the growth-context a sow needs. A scion's config need is a `FACET` amendment it DECLARES on
+its runbook input; the owner of that config CONTRIBUTES it at the amend door, where the
+`AmendmentAssembler` gathers it and merges it UNDER the per-consult roles the sower already
+sows (`SOIL`, `WORKTREE`). No host-side policy blob, no per-trigger slicing: the host owns
+no manifests vocabulary, it only registers a `FACET` `AmendmentContributor`.
 
 [mermaid]
 ....
 flowchart TB
-  cfg["operator config (Pulumi / CLI)"]
-  pol["one host-neutral policy in SeedRun<br/>{ manifests:{…}, cluster:{…}, … }"]
-  cfg --> pol
-  pol -->|"facet per soil in the trigger"| M
+  cfg["operator config (Pulumi rke2lab:manifests: / CLI)"]
+  fc["host FACET AmendmentContributor<br/>4th registerService in ClusterSeedScenario.Given<br/>(beside RunGate / OpaqueCellar / Parcel)"]
+  cfg --> fc
+  sow["incus SOWS AmendCoordinate(manifests)<br/>{ SOIL, WORKTREE } — per-consult, derived in-world"]
+  asm["AmendmentAssembler (beside DefaultSeedBroker)<br/>gathers contributors, returns { FACET }"]
+  refl["ManifestsAmendReflector<br/>merge(sown, gathered) then AmendmentBinder"]
+  fc -->|contributes FACET| asm
+  sow --> refl
+  asm -->|ambient FACET, merged under sown| refl
+  refl -->|amended ManifestsRunbookInput| M
   subgraph scions["domain scions (broker.sow(RUNBOOK), in-container)"]
-    B["bbox (∅ facet)"]
-    I["incus (∅)"]
-    S["systemd (∅ today)"]
-    C["cluster (∅ today)"]
-    M["manifests (NEW)<br/>facet → ManifestDomainPolicy (synth)<br/>+ RKE2LAB_MANIFESTS_PUBLISH_* overlay (publish)"]
+    M["manifests<br/>facets → ManifestDomainPolicy (synth)<br/>+ PublishNodeEnvContributor RKE2LAB_MANIFESTS_PUBLISH_* section (publish)"]
   end
   M -->|synth-time| tree["K8s + systemd + rke2-config tree"]
-  M -->|publish-time| ov["99-… controlplane overlay<br/>read by master install/ready scripts"]
+  M -->|publish-time| ov["env-config ConfigMap (a synthesised env section)<br/>read by master install/ready scripts — NO out-of-band overlay"]
 
   classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef new fill:#ffd,stroke:#aa2,stroke-width:2px;
-  class cfg,pol src;
-  class M new;
+  class cfg,fc src;
+  class asm,refl,M new;
 ....
 
-The two ends of the manifests policy (synth-time filter, publish-time overlay) both
-derive from its facet, in-container — dissolving the former host-side policy leak.
+The two ends of the manifests policy (synth-time filter, publish-time env section) both derive
+from its `FACET` (the composite `Facets` mirroring the `rke2lab:manifests:` subtree), decoded
+in-container — dissolving the former host-side policy leak. The publish vars are a SYNTHESISED
+env section (the `PublishNodeEnvContributor`'s `RKE2LAB_MANIFESTS_PUBLISH_*` keys in the
+env-config ConfigMap the master scripts read), NOT an out-of-band overlay file.
 `fromSystemProperties()` (CLI) and `toEnvMap()` (seed) collapse into this one
-facet-translation. `Readiness`/`Preview` become the cluster/systemd facets of the
-SAME policy, reachable the day those scions read their trigger — no new channel.
+facet-translation. `Readiness`/`Preview` become the
+cluster/systemd FACETs of the SAME channel, reachable the day those owners contribute theirs —
+no new mechanism, just another `AmendmentContributor`. See
+link:../osgi/seed-broker-spec.adoc[seed-broker § the AMEND verb] for the contributor/assembler
+foundation.
 
 === Diagram U — introspection has two symmetric operators (Split shipped, Shape to build)
 
@@ -555,7 +569,7 @@ over victools-wrapped) + domain (a `@SeedContract("runbook")` input wire-record,
 the typed home of the config facet). It is the a-priori-coupling eraser: a sower
 learns a payload's shape from the door instead of knowing it in advance.
 
-== The host tree the instance mounts — publish / validate / mount (design 2026-07-14)
+== The host tree the instance mounts — publish / validate / mount (design)
 
 === Diagram V — the host half: `host.N.staging.d` → `host.live.d` → `host.N.drift` + the two deltas + the contract in the cellar
 
@@ -574,7 +588,7 @@ entries carry the CONTRACT (checksums + provenance + `change`, immutable), the `
 entry references the `host.{SN}.staging.d` it mirrors (the ONLY mutable entry), each
 `host.{DN}.drift` references the staging the live had drifted from (its `live.syncedFrom`, frozen until
 recycled). The cellar is a FRIDGE (put / peek / take — § seed-broker-spec "the cellar is a
-fridge", 2026-07-15): CURRENT state is mutable (the live case, the ring pointer — reached by
+fridge"): CURRENT state is mutable (the live case, the ring pointer — reached by
 `<T> fetch`/`withdraw`), while its HISTORY axis (Pulumi's revision log) is append-only and gives
 the timeline of live promotions FREE (each live mutation a new store → a new history version);
 preview-vs-promoted is DEDUCED (a staging live never adopted). And because each staging entry
@@ -640,7 +654,7 @@ fire the sync — `host.live.d` untouched, no `drift` measured, and `live.synced
 it (traceable from the cellar, no mode-dir on the FS). Full model:
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar-realisation-spec § The host tree the instance mounts].
 
-CAUTION: *CORRECTION (2026-07-14) — the host tree belongs to INCUS, and the "host GROW" box is
+CAUTION: *CORRECTION — the host tree belongs to INCUS, and the "host GROW" box is
 OSGi-side, not host-flat.* The first preview proved the host-entry CRUD cannot sit in a host-flat
 reader: `HostTreeHead` (flat, in `seed-master`) decoded `Host*Entry` from `manifests-contract` (a
 `type=contract`, bundle-only bundle) — a realm leak that is a `NoClassDefFoundError` at runtime, the
@@ -660,7 +674,7 @@ the entries) runs in a DEDICATED incus `reconcile` scenario BEFORE the INSTANCE 
 the instance mounts stale content. The host keeps ONLY the Pulumi bind. The REALM_BOUNDARY gate (fixed the
 same day to see `type=contract`) WARNs on every remaining leak as the migration ratchet.
 
-CORRECTED 2026-07-15: the CRUD splits into TWO distinct incus scions, not one — `prepare` (image +
+CORRECTED: the CRUD splits into TWO distinct incus scions, not one — `prepare` (image +
 manifests → publishes `HostStagingEntry`) and `reconcile` (folds the head → decides `change = diff(pivot,
 source)` on checksums → `HostTreePromoter` in incus-core `jsync`s staging → `host.live.d` with a `.flox`
 exclude → commits `HostLiveEntry` only on a real promotion). The promoter is IN incus (OSGi), never

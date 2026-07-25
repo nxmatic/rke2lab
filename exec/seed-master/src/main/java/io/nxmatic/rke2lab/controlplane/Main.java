@@ -65,7 +65,8 @@ public final class Main {
     Pulumi.run(
         context -> {
           final RunMode runMode = RunMode.detect(true);
-          final Rke2labConfig config = Rke2labConfig.from(ConfigLoader.of(context.config()));
+          final ConfigLoader loader = ConfigLoader.of(context.config());
+          final Rke2labConfig config = Rke2labConfig.from(loader);
           final BootstrapConfig bootstrap = BootstrapConfig.from(config);
           final Parcel parcel = new Parcel(context.projectName(), context.stackName());
           final SeedRun run =
@@ -74,7 +75,10 @@ public final class Main {
                   parcel,
                   bootstrap,
                   config.entryGate().cleanWorktreeRequired().orElse(true),
-                  UUID.randomUUID().toString());
+                  UUID.randomUUID().toString(),
+                  // The manifests FACET, read verbatim from Pulumi config here (the only place the
+                  // envelope's Config is reachable) and carried for the GIVEN to publish.
+                  loader.subtreeJson("manifests"));
 
           try {
             final ReportModel runbook =

@@ -19,9 +19,10 @@ import org.junit.jupiter.api.Test;
  * reflector projects the JSON Schema of {@link ManifestsRunbookInput} OSGi-side and hands it back
  * as an opaque String, so a sower learns the payload shape holding no manifests class. Pins the
  * behaviors the sower relies on: the reflector serves the manifests shape meta-coordinate; the
- * projected schema is a non-empty object naming the yaml concern keys ({@code link}, {@code
- * debug}); an unknown coordinate is refused. Plus the invariant the whole config path rests on — a
- * yaml-shaped map (string "true", nested {enabled} wrappers) decodes into the wire-record verbatim.
+ * projected schema is a non-empty object naming the composite {@code facets} concern (with the yaml
+ * concern keys {@code publish} / {@code debug} nested under it); an unknown coordinate is refused.
+ * Plus the invariant the whole config path rests on — a yaml-shaped map (string "true", nested
+ * {enabled} wrappers) decodes into the wire-record verbatim.
  */
 class ManifestsShapeReflectorTest {
 
@@ -43,11 +44,13 @@ class ManifestsShapeReflectorTest {
     assertEquals(ShapeCoordinate.SLUG, reaped.coordinate());
     final var schema = CODEC.decode(reaped.payload());
     assertEquals("object", schema.path("type").asText());
-    // The top-level properties ARE the yaml concern keys — the design constraint the generic pluck
-    // depends on (the sower plucks manifests.<name> for each named property).
-    final var properties = schema.path("properties");
-    assertTrue(properties.has("publish"), "schema must name the 'publish' concern");
-    assertTrue(properties.has("debug"), "schema must name the 'debug' concern");
+    // Option A: the FACET is ONE composite 'facets' component at top level (the whole
+    // rke2lab:manifests: subtree the host contributes verbatim, bound to one field); the yaml
+    // concern keys publish/debug live under it. The schema names all three.
+    assertTrue(
+        schema.path("properties").has("facets"), "schema must name the composite 'facets' concern");
+    assertTrue(reaped.payload().contains("publish"), "schema must name the 'publish' concern");
+    assertTrue(reaped.payload().contains("debug"), "schema must name the 'debug' concern");
   }
 
   @Test
@@ -79,12 +82,14 @@ class ManifestsShapeReflectorTest {
             "nriPlugins", Map.of("flox", Map.of("enabled", "true")));
 
     final ManifestsRunbookInput input =
-        CODEC.fromMap(Map.of("publish", publish, "debug", debug), ManifestsRunbookInput.class);
+        CODEC.fromMap(
+            Map.of("facets", Map.of("publish", publish, "debug", debug)),
+            ManifestsRunbookInput.class);
 
-    assertTrue(input.publish().clusterApi());
-    assertFalse(input.publish().mesh());
-    assertTrue(input.debug().mesh().enabled());
-    assertFalse(input.debug().networking().enabled());
-    assertTrue(input.debug().nriPlugins().flox().enabled());
+    assertTrue(input.facets().publish().clusterApi());
+    assertFalse(input.facets().publish().mesh());
+    assertTrue(input.facets().debug().mesh().enabled());
+    assertFalse(input.facets().debug().networking().enabled());
+    assertTrue(input.facets().debug().nriPlugins().flox().enabled());
   }
 }

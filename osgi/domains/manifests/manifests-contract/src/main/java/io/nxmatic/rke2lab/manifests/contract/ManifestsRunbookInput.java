@@ -11,36 +11,37 @@ import java.util.Optional;
  * broker door rather than compiling the class (see docs/architecture/osgi/seed-broker-spec.adoc §
  * introspection).
  *
- * <p>Its components carry two kinds of {@link Amendment}, distinguished by role — the amont mapping
- * the schema alone cannot express (see seed-broker-spec § @Amendment):
+ * <p>Its components carry three kinds of {@link Amendment}, each a SINGLE field its role binds by
+ * value (the amont mapping the schema alone cannot express — see seed-broker-spec § @Amendment):
  *
  * <ul>
- *   <li>{@link Amendment#FACET} — {@link #publish} and {@link #debug} ARE the {@code
- *       rke2lab:manifests:} concern keys of {@code Pulumi.dev.yaml}, each nested record mirroring
- *       that concern's yaml sub-map EXACTLY. The host fills a FACET by a blind subtree copy guided
- *       by the schema's names ({@code manifests.publish} / {@code manifests.debug}), naming no
- *       manifests vocabulary — the schema matching the yaml is what makes the copy blind. NOTE: the
- *       seed path (the incus graft) currently amends only {@code SOIL}, so the FACETs fall to
- *       {@link #defaults()}; wiring the config subtree onto them lands when the exec sowers migrate
- *       to the runbook model.
+ *   <li>{@link Amendment#FACET} — {@link #facets} is the WHOLE {@code rke2lab:manifests:} concern
+ *       map of {@code Pulumi.dev.yaml} ({@code {publish, debug}}), one composite component so the
+ *       role binds to ONE field. The host contributes the yaml subtree verbatim as the FACET value
+ *       (an {@link io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor} it registers into the
+ *       world); the assembler gathers it at the amend door and the binder places it on {@code
+ *       facets}, naming no manifests vocabulary — {@link Facets} mirroring the yaml is what keeps
+ *       the copy blind. When no contributor offers FACET (a bare {@code shape} probe, a survey), it
+ *       falls to {@link #defaults()}.
  *   <li>{@link Amendment#SOIL} — {@link #materializationRoot} is NOT in the yaml: it is the plot
  *       the scion materialises into, which only the host knows (it holds {@code BootstrapPaths}).
  *       The host fills it by role — the SOIL amendment — from its provisioning state (the
  *       staging-view {@code manifestsRoot}), never from a yaml key. Blank when unamended (a bare
  *       {@code shape} probe, or a survey run) — the scion then materialises into a temp dir.
+ *   <li>{@link Amendment#WORKTREE} — {@link #worktree} carries the cluster/node identity (see the
+ *       {@code Worktree} note below).
  * </ul>
  *
- * <p>Because the host only forwards subtrees + fills amendments by role, ALL the domain knowledge
- * lives in the scion (OSGi-side): it decodes this record (jackson coerces the yaml's string {@code
- * "true"} to {@code boolean}), flattens the nesting, and translates into its own vocabulary —
- * {@link ManifestDomainPolicy} (synth-time filter) + {@code FloxDebugPolicy} (per-layer debug) +
- * the {@code RKE2LAB_MANIFESTS_PUBLISH_*} publish-time env contributions. The host names no {@code
+ * <p>Because the host only fills amendments by role, ALL the domain knowledge lives in the scion
+ * (OSGi-side): it decodes this record (jackson coerces the yaml's string {@code "true"} to {@code
+ * boolean}), flattens the nesting, and translates into its own vocabulary — {@link
+ * ManifestDomainPolicy} (synth-time filter) + {@code FloxDebugPolicy} (per-layer debug) + the
+ * {@code RKE2LAB_MANIFESTS_PUBLISH_*} publish-time env contributions. The host names no {@code
  * manifests.contract} translation type.
  */
 @SeedContract("runbook")
 public record ManifestsRunbookInput(
-    @Amendment(Amendment.FACET) PublishFacet publish,
-    @Amendment(Amendment.FACET) DebugFacet debug,
+    @Amendment(Amendment.FACET) Facets facets,
     @Amendment(Amendment.SOIL) String materializationRoot,
     @Amendment(Amendment.WORKTREE) Optional<Worktree> worktree) {
 
@@ -51,8 +52,21 @@ public record ManifestsRunbookInput(
    * complete sub-facet, so no incomplete state ever exists.
    */
   public static ManifestsRunbookInput defaults() {
-    return new ManifestsRunbookInput(
-        PublishFacet.defaults(), DebugFacet.disabled(), "", Optional.empty());
+    return new ManifestsRunbookInput(Facets.defaults(), "", Optional.empty());
+  }
+
+  /**
+   * The {@code rke2lab:manifests:} concern map, mirroring its yaml sub-map EXACTLY ({@code
+   * {publish, debug}}) — the single {@link Amendment#FACET} component so the role binds to ONE
+   * field (the binder rejects a role borne by several components as ambiguous). The host
+   * contributes this whole subtree verbatim; the scion reads {@code facets().publish()} / {@code
+   * facets().debug()} and flattens each.
+   */
+  public record Facets(PublishFacet publish, DebugFacet debug) {
+
+    public static Facets defaults() {
+      return new Facets(PublishFacet.defaults(), DebugFacet.disabled());
+    }
   }
 
   /**

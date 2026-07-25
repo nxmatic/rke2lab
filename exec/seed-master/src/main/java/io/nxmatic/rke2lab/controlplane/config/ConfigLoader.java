@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.Config;
 import java.net.URI;
 import java.nio.file.Path;
@@ -110,6 +112,26 @@ public final class ConfigLoader {
     ((Map<String, Object>) value)
         .forEach((entryKey, entryValue) -> result.put(entryKey, String.valueOf(entryValue)));
     return result;
+  }
+
+  private static final ObjectMapper JSON = new ObjectMapper();
+
+  /**
+   * The raw nested subtree at {@code section}, serialized verbatim as a JSON {@code String} — the
+   * blind copy a host {@code AmendmentContributor} forwards by role (the {@code manifests} FACET),
+   * naming no domain vocabulary: jackson coerces the yaml's string scalars into the wire-record
+   * OSGi-side. Empty string when the section is absent, so the amendment falls to its defaults.
+   */
+  public String subtreeJson(String section) {
+    final Optional<Map<String, Object>> subtree = sectionReader.read(section);
+    if (subtree.isEmpty()) {
+      return "";
+    }
+    try {
+      return JSON.writeValueAsString(subtree.get());
+    } catch (JsonProcessingException ex) {
+      throw new IllegalStateException("failed to serialize config subtree '" + section + "'", ex);
+    }
   }
 
   // --- require* : accumulate on absence, return placeholder ---

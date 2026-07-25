@@ -20,7 +20,7 @@ transitionally (its real provider needs `HealthSystem.admit(patient)`, a separat
 increment) and folds into the door when that lands — the one item on the broker unification worklist
 (§ <<open-extensibility-chantier>>). The host-side migration (§ <<remaining-migration>>) is the other.
 
-*Conceived next (2026-07-09, § <<contribution-and-opacity>>):* the contribution + opacity turn that
+*Conceived next (§ <<contribution-and-opacity>>):* the contribution + opacity turn that
 makes a domain OWN its vocabulary and renders every `Document` truly opaque to the host. Four moves,
 staged: (1) `Coordinate` becomes an *interface* (`slug()`, like `WireEnum`), each domain contributes its
 own enum (`DoctorCoordinate implements Coordinate`); (2) `@DocumentContract` binds by `String slug`, not
@@ -177,7 +177,7 @@ the door — the OpenAPI endpoint we had described but never served.
 [[shape-realization]]
 ==== Realization status — foundation SHIPPED, per-domain reflector pending
 
-The introspection verb above is designed and load-bearing. Surfaced 2026-07-13 when
+The introspection verb above is designed and load-bearing. Surfaced when
 `manifests-cli`, becoming a sower, needed to ask the broker for the payload it must
 supply and found no verb to ask with. It is built in two pieces; **piece 1 (the
 broker-generic foundation) is shipped, piece 2 (the per-domain reflector + its input
@@ -253,25 +253,27 @@ aval they meet on `Role`:
 ----
 @SeedContract("runbook")
 public record ManifestsRunbookInput(
-    @Amendment(Amendment.FACET) PublishFacet publish,  // host is to fill FACET by blind subtree copy from manifests.publish (not yet wired: seed path amends only SOIL → defaults)
-    @Amendment(Amendment.FACET) DebugFacet debug,
-    @Amendment(Amendment.SOIL)  String materializationRoot) {}  // host fills SOIL from BootstrapPaths
+    @Amendment(Amendment.FACET)    Facets facets,               // the whole rke2lab:manifests: subtree {publish, debug}, ONE component so the role binds to ONE field
+    @Amendment(Amendment.SOIL)     String materializationRoot,  // host fills SOIL from BootstrapPaths
+    @Amendment(Amendment.WORKTREE) Optional<Worktree> worktree) {}  // cluster/node identity, the neutral scalars incus reconstructs its topology from
 
-// host, amending the soil before it sows (the WHICH is an explicit host affixation,
-// exactly as materializeToStaging chose stagingManifestsRoot on main):
-//   amendment SOIL  <- paths.asStagingView(slot).manifestsRoot()   (wired)
-//   amendment FACET <- blind subtree copy from manifests.publish / manifests.debug
-//                      (designed, NOT yet wired: the FACETs fall to defaults())
+// EACH role fills ONE component, so the fill is uniform — the binder places each value by role:
+//   amendment SOIL     <- paths.asStagingView(slot).manifestsRoot()   (SOWN per-consult by incus)
+//   amendment WORKTREE <- the cluster/node scalars                    (SOWN per-consult by incus)
+//   amendment FACET    <- the rke2lab:manifests: subtree              (CONTRIBUTED by the host, gathered at the door — § the AMEND verb)
 ----
 
 `Amendment` is a neutral vocabulary of String constants (the twin of `Role`): `SOIL`
-(the plot to materialise into), `FACET` (the activation facet), more as growth-needs
-appear. The domain (the soil) DECLARES its needs by annotating its input record; the
-host AMENDS the soil by filling those roles from `BootstrapPaths` + the facet. The
-`WHICH` — which of the seventeen roots is `SOIL` — is an explicit host affixation
-(`manifestsRoot` in staging view), NOT a name-match derived from the schema: the
-topology knowledge is the host's, irreducibly, the same knowledge `IncusResourceBootstrap`
-carried on main. The schema VALIDATES the amended payload; the role SELECTS the state.
+(the plot to materialise into), `FACET` (the activation facet — the operator's config),
+`WORKTREE` / `IMAGE` (provisioning scalars), more as growth-needs appear. The domain (the
+soil) DECLARES its needs by annotating its input record; the amend is filled by role from
+whoever OWNS each role's state. A role must name ONE component (the binder rejects an
+ambiguous role borne by several — so `FACET` is the single composite `Facets` component
+mirroring the yaml subtree, NOT two `publish`/`debug` fields). The `WHICH` — which of the
+seventeen roots is `SOIL` — is an explicit host affixation (`manifestsRoot` in staging
+view), NOT a name-match derived from the schema: the topology knowledge is the host's,
+irreducibly, the same knowledge `IncusResourceBootstrap` carried on main. The schema
+VALIDATES the amended payload; the role SELECTS the state.
 
 === The two natures of a SOIL — intra-world vs CROSSING (the pattern, generalised)
 
@@ -334,7 +336,7 @@ So materializing `shape` is a build in **two pieces**, mirroring the shipped
   `@SeedContract(slug)` names; the host reaps an opaque JSON-Schema `String`, holding
   no domain class.
 +
-*Projection engine — victools, wrapped (decided 2026-07-13).* The projector does
+*Projection engine — victools, wrapped (decided).* The projector does
 NOT hand-roll schema generation — we do not re-implement a JSON-Schema generator.
 It uses `com.github.victools:jsonschema-generator` (+ `jsonschema-module-jackson`),
 which emits Draft 2020-12 and already handles nested wire-records, seam enums,
@@ -357,7 +359,7 @@ Only piece 1 is broker-generic; piece 2 is what each domain brings. Until piece 
 ships, a sower cannot discover a payload's shape — it must know it a priori, which
 is the a-priori coupling the whole introspection turn removes.
 
-==== The AMEND verb — realising the fill-by-role (SHIPPED 2026-07-14)
+==== The AMEND verb — realising the fill-by-role (SHIPPED)
 
 Shape DESCRIBES the input; a third amont verb FILLS it by role, so a sower holds a value under a neutral
 role and never names the target's field. `AmendCoordinate(domain)` (in `ValueCoordinate permits`, beside
@@ -366,14 +368,40 @@ home, so an amend reflector needs no schema-generator closure; the twin of `Reco
 stays in `seed-broker-shape` with its victools weight) is the broker-generic role→field bridge, working on
 JSON: given a record's
 `defaults` and a `{role → value}` map, it binds each offered role onto the `@Amendment` component that role
-names (loud on absent/ambiguous; a role borne by several components — `ManifestsRunbookInput` marks both
-`publish` and `debug` FACET — is fine unless offered). A domain contributes a `@Component` amend reflector
+names (loud on absent/ambiguous). A role borne by MORE than one component is ambiguous to bind by value, so
+no wire-record offers one: `FACET` is the single composite `Facets` component (mirroring the yaml subtree),
+not two `publish`/`debug` fields. A domain contributes a `@Component` amend reflector
 (`ManifestsAmendReflector` serves `AmendCoordinate("manifests")`, binding onto `ManifestsRunbookInput`).
+
+*Amend-filling is MULTI-CONTRIBUTOR — each role filled by whoever OWNS its state, at the same neutral door.*
+A role is either PER-CONSULT (derived in-world at the crossing, SOWN by the sower) or AMBIENT (a standing
+fact an owner holds, CONTRIBUTED once). incus SOWS the per-consult roles it derives — `SOIL` (the plot it
+materialises), `WORKTREE` (the identity it received); the host CONTRIBUTES the ambient `FACET` (the operator
+config it read from `rke2lab:manifests:`). The binder already binds a PARTIAL role-map (it rejects only an
+undeclared or ambiguous role), so the two fillings MERGE at the door: the sown per-consult roles override
+the contributed ambient ones. Two foundation types realise the contribution, both jackson-free port SPIs (a
+value is a serialized JSON `String`, per the seam rule):
+
+* `AmendmentContributor` — an owner's standing `{coordinate, {role → value}}`, published as a service.
+  Contribution-without-acquaintance, the codebase idiom: OSGi-native owners publish as `@Component`; a
+  host-side owner (the root's `FACET`) registers the SAME service through the framework `BundleContext` it
+  already holds — the FOURTH `registerService` in `ClusterSeedScenario.Given`, beside the `RunGate` /
+  `OpaqueCellar` / `Parcel` it already lays into the world.
+* `AmendmentAssembler` — gathers the contributors for a coordinate (`@Reference(MULTIPLE)`, knows none of
+  them) and returns their merged `{role → value}` (fail-loud if two contributors claim one role, the broker's
+  doubly-served discipline). Its OSGi-side impl lives BESIDE `DefaultSeedBroker`, not
+  inside it: the broker's one responsibility is routing coordinates, the assembler's is gathering
+  contributions. The contributor reference is DYNAMIC, unlike the broker's STATIC handler roster: the host's
+  `FACET` contributor is `registerService`d at RUNTIME from the GIVEN, long after the assembler activated at
+  boot — a static reference would capture the boot-time (empty) set and miss it, so the collection is rebound
+  live. The amend reflector `@Reference`s the assembler, merges the gathered ambient roles UNDER
+  the sown payload, decodes each with its own codec, and binds.
 
 This is where the broker earns its role as the door that RECONCILES two points of view: incus (the first
 metier scion→scion) holds a plot under role `soil` and sows `AmendCoordinate("manifests")` then
-`RunbookCoordinate("manifests")` — it names no manifests field, the reconciliation lives at the door, not
-in the manifests runbook handler (which receives an already-filled input). The scion input wire-records
+`RunbookCoordinate("manifests")` — it names no manifests field, offers only the roles it owns, and the door
+enriches with the ambient `FACET` it does not. The reconciliation lives at the door, not in the manifests
+runbook handler (which receives an already-filled input). The scion input wire-records
 carry these amendments: `ManifestsRunbookInput` (its `@Amendment(SOIL) materializationRoot`),
 `IncusRunbookInput` (incus's own SOIL, forwarded to manifests). A scion's conserved harvest is a wire-record
 too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the scion harvests and stores) and
@@ -385,7 +413,7 @@ under — that the host fetches to grow the instance, Shape C).
 
 `OPTIONS` (above) answers *"what is coordinate X's shape"* — but the client must already NAME X. The
 REST table lists a SECOND discovery idiom the design had not developed: HATEOAS — the server's response
-carries the links the client may follow next, IN the response. Our transposition (settled 2026-07-10):
+carries the links the client may follow next, IN the response. Our transposition (settled):
 *a reaped plant carries the coordinates it can be sown at next.* The client holds an opaque plant and
 learns, FROM IT, what it may re-sow — the exact missing knowledge (*how do I know the coordinate to sow
 next?*). Crucially this needs NO new verb: following a link is a `sow` at the advertised coordinate,
@@ -532,7 +560,7 @@ the runbook rides a separate observability channel (serialized, grafted, never r
 own split: status/headers for the machine, a log body for the human.
 
 [[two-cellars-durable-vs-ephemeral]]
-=== Three channels for a crossing fact — decide / persist / render (2026-07-15)
+=== Three channels for a crossing fact — decide / persist / render
 
 A fact travelling scion→host takes ONE of THREE channels, each answering a DIFFERENT question, with
 zero overlap. Confusing them is what tempts a fact into the wrong carrier (routing a decision through
@@ -549,7 +577,7 @@ over-durabilises it).
 |===
 
 The two lower rows are two CELLARS distinguished by LIFETIME; the `tagMap` IS a cellar SCOPED TO THE
-SCENARIO — a `{key → value}` map that rides the ReportModel across the realm. AUDIT (2026-07-15):
+SCENARIO — a `{key → value}` map that rides the ReportModel across the realm. AUDIT:
 nothing ephemeral transits the durable `Cellar` today — its uses are all cross-run (doctor
 record/ledger, incus/bbox harvests, `CellarStage`'s resume state "where we start from"); the inputs
 brought to the soil (the amendments) come from host config / in-world compute, never the Cellar. The
@@ -638,7 +666,7 @@ The host never names `*BddScenarios` nor a `*Coordinate` enum — only the found
 string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
 verdict.
 
-NOTE: *The host side of the graft is TWO live handles, not one (learnt live, 2026-07-19).* jGiven
+NOTE: *The host side of the graft is TWO live handles, not one (learnt live).* jGiven
 appends the current `ScenarioModel` to its `ReportModel` only when the scenario FINISHES, so mid-run —
 inside the WHEN doing the graft — `getModel().getScenarios()` is EMPTY. The scion STEPS therefore
 graft into the live current `ScenarioModel` (`getScenario().getScenarioModel()`, the trunk already
@@ -650,7 +678,7 @@ fatal on the first live run. `ScenarioGraft.graftUnder(hostScenario, hostTree, r
 takes both handles; `ScenarioGraft` stays report-model-pure, the caller supplies the two.
 
 [[the-scenario-outcome-channel]]
-==== How the played model comes back — the `ScenarioOutcome` channel, not a static holder (2026-07-18)
+==== How the played model comes back — the `ScenarioOutcome` channel, not a static holder
 
 The handler plays the scenario on `JUnitLauncherCore`, then must reap what the run produced — the
 jGiven `ReportModel` (the runbook) and, for a fork-B scenario, the doctor consultations it raised. That
@@ -693,7 +721,7 @@ never throw-instead-of-render.
 * *`RunbookEnvelope`* — the reap the handler serialises (runbook JSON + consultations) is ONE record
   in the engine's `.container` package (§ one generic handler, a strategy per domain), no longer
   duplicated per domain.
-* *A body that never ran surfaces the REAL cause, not a null (hardening 2026-07-19).* The outcome
+* *A body that never ran surfaces the REAL cause, not a null (hardening).* The outcome
   channel is fail-at-END only for a body that RAN — but a BEFORE-phase failure (test-instance
   post-processing, `@OsgiService` injection, a `beforeAll`) aborts the node before the body, so the
   extension never seeds an outcome. Reading it back then NPE'd on the null, MASKING the true cause
@@ -703,7 +731,7 @@ never throw-instead-of-render.
   gained `find` (returns `Optional`, the frontier rule) beside the strict `read`.
 
 [[one-generic-handler-a-strategy-per-domain]]
-==== One generic handler, a strategy per domain — the front-door dedup (2026-07-18)
+==== One generic handler, a strategy per domain — the front-door dedup
 
 The shape above left TWO artefacts per domain, near-identical: the `@Component *RunbookHandler`
 (cast the cellar, relay the transaction, wrap `InterruptedException`) and a static `*BddScenarios`
@@ -816,7 +844,7 @@ it stays the service verb it always was — consistent with `consult` STAYING a 
 above), not becoming a handler.
 
 [[the-osgi-service-bridge]]
-==== The lookup is PUSH-injected, not hand-pulled — the `@OsgiService` bridge (2026-07-18)
+==== The lookup is PUSH-injected, not hand-pulled — the `@OsgiService` bridge
 
 "A scion resolves all its collaborators by lookup" was, at first, a hand-written PULL: every scion
 carried a byte-identical triad — `ScenarioRegistry.of(this).require(BboxReconciler.class, "…")`,
@@ -1158,7 +1186,7 @@ META-coordinate. The REFLECTION happens OSGi-side, in the meta-handler, where th
 loaded (its own realm) and the markers are declared — the runtime twin of the build-time
 `RecordSchemaProjector`.
 
-The markers, settled (2026-07-10) — TWO role annotations, named for what a component IS, not a verb (an
+The markers, settled — TWO role annotations, named for what a component IS, not a verb (an
 annotation is a role, like `@Column` not `@Persist`):
 
 * *`@Scion`* (the rename of the former `@Graft`) — marks a wire-record component that is an addressable
@@ -1192,7 +1220,7 @@ outputs", so the nature dictates the legal mechanism); an append-only timeline �
 
 === The stack is an envelope store; a stored envelope re-sows; CRUD addresses the SHELL
 
-The frontier's job, stated at the storage level (settled 2026-07-10): *the Pulumi stack is a store of
+The frontier's job, stated at the storage level (settled): *the Pulumi stack is a store of
 sealed envelopes.* The frontier writes a `SeedEnvelope` verbatim, later re-reads it, and a re-read
 envelope is a SEED again — `sow → plant → (stored in the stack) → seed`, the horticultural cycle closed.
 This is the SAME "ask the broker for the slot names, transport the payload opaque" mechanism, seen from
@@ -1228,7 +1256,7 @@ not by field — today's `outputsNamed("consultationReport")` becomes `outputsNa
 the cross-resource collection (one element per rootstock) is unchanged, returning a list of opaque
 envelopes. *UPDATE* is already opaque — a new `up()` appends a history entry under the stable resource
 name; the timeline is the update log. *DELETE* is `withdraw` — take one coordinate's case out; it is no
-longer there until re-stored (correction 2026-07-15: the earlier "DELETE n/a, append-only" was an USAGE —
+longer there until re-stored (correction: the earlier "DELETE n/a, append-only" was an USAGE —
 the doctor's — mistaken for a LAW of the cellar; see § the fridge below). The one mechanical change that
 makes CRUD opaque is that `StackSnapshot.outputsNamed` stops being keyed on a domain field and starts
 being keyed on a coordinate slug — that single reshape kills both leak names (`SeedBrokerCatalog.FIELD_*`,
@@ -1236,7 +1264,7 @@ the `OUTPUT_KEY` constants). The stored unit is the sealed payload `String` unde
 supplied: store the sealed String, return the sealed String, the name comes from the plant.
 
 [[the-cellar-is-a-fridge]]
-==== The cellar is a FRIDGE (put / peek / take), not an append-only journal (correction 2026-07-15)
+==== The cellar is a FRIDGE (put / peek / take), not an append-only journal (correction)
 
 The spec above promoted ONE usage (the doctor's — accumulate visits, never remove) into a LAW of the
 cellar ("append-only, DELETE n/a"). The user's real-life intuition debunks it: a fridge is CURRENT STATE
@@ -1267,7 +1295,7 @@ The RING usage is what JUSTIFIES `withdraw` (without it, `withdraw` was a soluti
 bounded staging rotation already exists as `HostSlotSelector` (incus-core, N=3 `ROTATION`, hard-coded — not
 yet a Pulumi-config knob): the next slot is `(max present + 1) mod 3`, the wrapped position overwritten by
 the fresh replica (the identity is the POSITION, not the age), the `live.syncedFrom` slot PINNED out of
-rotation (R1). DECISION (2026-07-15): the position's truth MOVES from the filesystem to the cellar —
+rotation (R1). DECISION: the position's truth MOVES from the filesystem to the cellar —
 `HostSlotSelector` consults the cellar (`fetch` the `host-staging` entries → occupancy → `(max+1) mod N`)
 instead of `Files.list(nodeRoot)`; its logic (position, wrap, pin) is unchanged, only the source of
 occupancy. FS↔cellar reconciliation (an orphan dir with no entry, or the reverse) is EXPLICITLY DEFERRED.
@@ -1336,7 +1364,7 @@ side, only the neutral parcel sits between them.
 
 The interface that materialises the envelope CRUD must speak ONLY the broker vocabulary — never a doctor
 word. A port named `MedicalRecordJournal` means the FRONTIER knows the doctor: the leak moved from the
-payload to the interface NAME. But naming matters in a subtler way too (correction 2026-07-11b): the port
+payload to the interface NAME. But naming matters in a subtler way too (correction): the port
 is NOT in the gardening register at all — `pulumi-edge` grows nothing, it is the COMMISSIONER's storage
 (the conservation register, adjacent to gardening). So the neutral port is a *`Cellar`* — the
 commissioner's addressable store (a FRIDGE: put / peek / take — § the cellar is a fridge below), addressed
@@ -1367,7 +1395,7 @@ cellar operation — so the two registers share no word, the decorrelation state
 [NOTE]
 .Two faces: the opaque seam (`OpaqueCellar`) and the typed OSGi view (`Cellar` via `CodecCellar`)
 ====
-The cellar has TWO interfaces, split by realm rather than joined by inheritance (settled 2026-07-15):
+The cellar has TWO interfaces, split by realm rather than joined by inheritance (settled):
 
 * `OpaqueCellar` (`seed-broker-port`) — the SEAM: `store` / `fetch(parcel)` / `fetch(parcel,
   coordinate)` / `withdraw(parcel, coordinate)` / `neighbours`, all in sealed `SeedEnvelope`s. The host
@@ -1411,7 +1439,7 @@ needs a versioning/staleness answer — not yet designed, and not required by th
 ====
 
 [[cellar-transactional]]
-==== The cellar is TRANSACTIONAL — a UNIVERSAL ScenarioCellar, the ReportModel IS the transaction (2026-07-16, converged)
+==== The cellar is TRANSACTIONAL — a UNIVERSAL ScenarioCellar, the ReportModel IS the transaction (converged)
 
 A run must accumulate stores and persist them atomically at a boundary. The design converged over several
 turns; the debunked framings are recorded so they are not re-attempted:
@@ -1453,7 +1481,7 @@ turns; the debunked framings are recorded so they are not re-attempted:
   (`UUID.randomUUID()`) and propagated to fragments by the sow's `Optional<String>` param. It no longer
   decides root/fragment (the `RunRole` does) — it stays an observability datum, never indexed in a map.
 
-*The TRANSACTION is a PARAMETER of the sow — and it IS the `Cellar` (2026-07-16).* Nesting is OSGi→OSGi
+*The TRANSACTION is a PARAMETER of the sow — and it IS the `Cellar`.* Nesting is OSGi→OSGi
 REAL (`IncusProvisionScenario` sows `RunbookCoordinate("manifests")`) — so "root" is NOT "host-flat".
 Filiation travels PARENT→CHILD through the sow. The transaction qualifies the CROSSING (the act of sowing),
 NOT the document (a `SeedEnvelope` also carries REAPED responses that bear no transaction). Earlier this was
@@ -1477,7 +1505,7 @@ cellar.
 two transactional accessors (`transactionId()`, `entriesEncoded()`). It must NOT cast to the concrete
 `ScenarioCellar`: that class is a dual REALM-LIBRARY (flat host-side, a bundle package in-container), so it
 exists as two `Class` objects — casting the crossed cellar to it throws `ClassCastException`, the
-DUPLICATE_REALM_CLASS split (surfaced 2026-07-18 the first time a scion crossing actually ran host→bundle).
+DUPLICATE_REALM_CLASS split (surfaced the first time a scion crossing actually ran host→bundle).
 The fix: a seam sub-interface `TransactionalCellar extends Cellar` in `seed-broker-port` (system-exported,
 ONE copy), carrying exactly the two flat-typed accessors (`Optional<String>`, `List<String>` — seam-eligible,
 nothing concrete crosses). `ScenarioCellar implements TransactionalCellar`; the handlers cast to the seam.
@@ -1518,7 +1546,7 @@ tags `store` already posted during the body; the verdict comes from JUnit, not j
 `ExecutionStatus`. The cellar reads the model LAZILY (first `store`), so the order between this
 `TestInstancePostProcessor` and jGiven's is a non-issue.
 
-===== The three neutral channels the extension reads — role, identity, write-set (2026-07-16)
+===== The three neutral channels the extension reads — role, identity, write-set
 
 The extension lives in `scenario-engine` (runtime); `SeedRun` lives in `exec/seed-master` (the host world,
 where `Main` runs). The module direction is `seed-master → scenario-engine`, NEVER the reverse — so the
@@ -1583,7 +1611,7 @@ renderings — so the two cannot diverge. `liveRoot` stays a pure tag (a within-
 entry behind it). A durable envelope rides the model as a `Tag` (round-trip verified, narrated), not an
 opaque `Attachment`.
 
-===== The write-set descends too — the ALLER sense of the transaction (2026-07-16)
+===== The write-set descends too — the ALLER sense of the transaction
 
 The design above carried the transaction ONE way: a fragment posts tags, the graft folds them UP into the
 trunk (`scion → host`, the RETURN), and the root drains. That is the return sense of the transaction. The
@@ -1681,7 +1709,7 @@ run, not a property of any seed — so it is published ONCE as a neutral ambient
 Felix at boot. Its VALUE depends on `pulumi-edge` (projected from `RunMode.detect()` → Pulumi's
 `isDryRun`), so the HOST publishes it live; a test `registerService`s its own.
 
-*The FRONTIER selects; the scenario is mode-blind (reverses "the scion consults it per-step", 2026-07-11).*
+*The FRONTIER selects; the scenario is mode-blind (reverses "the scion consults it per-step").*
 The mode is no longer read inside a scenario. The `@OsgiService` bridge reads the ambient `RunGate` ONCE
 and resolves every collaborator with an LDAP filter that picks the right implementation:
 `(|(rke2lab.gardening=<mode>)(!(rke2lab.gardening=*)))` — the matching half of a paired collaborator, OR
@@ -1690,7 +1718,7 @@ any un-paired service (which carries no `rke2lab.gardening` property, so the `!(
 the cultivating or surveying impl transparently; it NO LONGER injects `RunGate` at all. The mode-branch is
 aspirated out of the scenario AND the edge, into the one place the mode is known — the frontier.
 
-*Two implementations, not a `dryRun` flag (supersedes the 2026-07-19 short-circuit-in-one-impl).* A
+*Two implementations, not a `dryRun` flag (supersedes the short-circuit-in-one-impl).* A
 materialiser's contract DROPS its `dryRun` parameter; it becomes a PAIR, each impl mode-pure:
 * `Cultivating…` — the live tool: opens the session, applies, promotes.
 * `Surveying…` — the plan tool: it projects the honest plan from the real desired input, contacting the
@@ -1716,13 +1744,13 @@ Two orthogonal axes the earlier "mock pattern" wrongly conflated:
 |===
 
 So preview is an HONEST plan (E9 narrates it PENDING), not a green lie fed by fabricated data. The static
-fakes/mocks are retired (decision 2026-07-11b): `SystemdAdapterStage.seedHealthyProbe` and
+fakes/mocks are retired (decision): `SystemdAdapterStage.seedHealthyProbe` and
 `ClusterReadinessStage.seedReadyContact` are DELETED, and with them the host's `SystemdStatusSnapshot` /
 `ClusterReadinessContact` imports — a large part of why the core still spoke metier.
 
 === The migration criterion + sequencing: host speaks seed only, doctor logic migrates to the domain
 
-The governing criterion for the host worklist (user, 2026-07-10): **the host modules speak ONLY seed (the
+The governing criterion for the host worklist (user): **the host modules speak ONLY seed (the
 neutral gardening vocabulary); ALL logic that speaks doctor migrates into the doctor domain.** A binary
 test per site: *does this host code name a doctor type/field?* If yes → it moves OSGi-side; if it touches
 only `SeedEnvelope`/`SeedCoordinate`/a parcel → it stays, as legitimate transport.
@@ -1819,7 +1847,7 @@ Two coarse greps remain useful as quick eyeballs (the gate is the real check):
 The contract layer above is built and locked; the *host-side surface* that must speak it is not fully
 migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces:
 
-* *Getting a `SeedBroker` host-side is SOLVED (verified 2026-07-10).* `DefaultSeedBroker` is
+* *Getting a `SeedBroker` host-side is SOLVED (verified).* `DefaultSeedBroker` is
   `@Component(service = SeedBroker.class)` — a published OSGi service resolved through
   `OsgiConnection.awaitService(SeedBroker.class, …)`. Two host contexts already do it: a pipeline stage
   holding a connection (`SystemdAdapterStage` already sows a `readiness-verdict`), and an offline CLI
@@ -1837,9 +1865,9 @@ migrated. What remains, tracked as a worklist the `REALM_BOUNDARY` gate surfaces
   (`SystemdAdapterResource` in seed-master, which decodes `Consultation.class`) files the graft
   coordinates the plant advertises (§ <<hateoas-the-plant-advertises>>), never decoding.
 * *The offline dump* (`MedicalRecordDump`) opens Felix when it needs the broker — booting OSGi for a dump
-  is acceptable (user, 2026-07-10), so it goes uniform with `RecordInterventionCommand`: no host-pure
+  is acceptable (user), so it goes uniform with `RecordInterventionCommand`: no host-pure
   transcoder exception. Rendering-as-YAML becomes a `sow`.
-* *Live vs preview + edge visibility — DESIGNED 2026-07-11b (see § <<live-preview-rungate>>, §
+* *Live vs preview + edge visibility — DESIGNED (see § <<live-preview-rungate>>, §
   <<edge-reaches-osgi>>).* The static mock pattern is retired: preview is E9's PENDING render + the real
   edge inert under the ambient `RunGate`. The host `Cellar` reaches its OSGi consumer by
   `registerService` at boot, satisfied by start-level ORDER (the reference stays static + mandatory). The

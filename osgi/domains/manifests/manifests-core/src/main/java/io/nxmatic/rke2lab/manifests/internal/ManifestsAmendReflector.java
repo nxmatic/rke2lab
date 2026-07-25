@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.AmendmentBinder;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.AmendmentAssembler;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
@@ -12,7 +13,9 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 /**
  * Manifests' contribution of the amend verb: it serves {@link AmendCoordinate}{@code ("manifests")}
@@ -41,6 +44,12 @@ public final class ManifestsAmendReflector implements SeedHandler {
 
   private final SeedCodec codec = new SeedCodec();
   private final AmendmentBinder binder = new AmendmentBinder();
+  private final AmendmentAssembler assembler;
+
+  @Activate
+  public ManifestsAmendReflector(@Reference AmendmentAssembler assembler) {
+    this.assembler = assembler;
+  }
 
   @Override
   public SeedCoordinate serves() {
@@ -54,7 +63,14 @@ public final class ManifestsAmendReflector implements SeedHandler {
       throw new IllegalArgumentException(
           "manifests amends no input for coordinate '" + seed.coordinate() + "'");
     }
-    final Map<String, JsonNode> roleValues = roleValues(codec.decode(seed.payload()));
+    // Ambient roles (e.g. FACET, the operator config only the host holds) gathered at the door and
+    // merged UNDER the roles the sower offered — a sower's per-consult value (SOIL, WORKTREE) wins
+    // over an ambient contribution on the same role. No sower carries a role it does not own.
+    final Map<String, JsonNode> roleValues = new LinkedHashMap<>();
+    assembler
+        .gather(new AmendCoordinate(DOMAIN))
+        .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
+    roleValues.putAll(roleValues(codec.decode(seed.payload())));
     final JsonNode defaults = codec.decode(codec.encode(ManifestsRunbookInput.defaults()));
     final JsonNode amended = binder.bind(bearer, defaults, roleValues);
     // Returned under the runbook coordinate: the amended payload is ready to sow at

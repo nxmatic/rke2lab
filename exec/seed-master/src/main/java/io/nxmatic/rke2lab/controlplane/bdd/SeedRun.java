@@ -17,10 +17,17 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
  * so a launched scion inherits it, for AUDIT correlation across the crossing (§
  * cellar-transactional). It is not the drain discriminant (the {@code RunRole} is); it is the
  * observability thread that ties a scion's work back to the run that sowed it.
+ *
+ * <p>{@code manifestsFacet} is the raw {@code rke2lab:manifests:} config subtree serialized
+ * verbatim as a JSON {@code String} — a Pulumi-config fact only the envelope can read, carried so
+ * the GIVEN can publish it as the manifests {@code FACET} amendment (a host {@code
+ * AmendmentContributor} the assembler gathers at the amend door). Empty when the section is absent;
+ * the FACET then defaults.
  */
 public record SeedRun(
     RunMode runMode,
     Parcel parcel,
     BootstrapConfig config,
     boolean cleanWorktreeRequired,
-    String txId) {}
+    String txId,
+    String manifestsFacet) {}

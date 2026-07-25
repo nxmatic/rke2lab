@@ -155,7 +155,7 @@ public class ManifestSynthesisScenario
     @MonotonicNonNull private Path outdir;
 
     public When the_policy_is_derived_from_the_facet() {
-      final ManifestsRunbookInput.PublishFacet publish = facet.publish();
+      final ManifestsRunbookInput.PublishFacet publish = facet.facets().publish();
       // The one policy the run carries: base infra (cluster/runtime/platform) always on; the rest
       // follow the facet. It drives BOTH the synth-time domain filter AND — threaded through the
       // synthesis into the env-config unit — the PublishNodeEnvContributor's RKE2LAB_MANIFESTS_
@@ -179,7 +179,7 @@ public class ManifestSynthesisScenario
     }
 
     public When the_manifests_are_synthesized() {
-      final ManifestsRunbookInput.DebugFacet debug = facet.debug();
+      final ManifestsRunbookInput.DebugFacet debug = facet.facets().debug();
       final FloxDebugPolicy floxDebug =
           new FloxDebugPolicy(
               debug.mesh().enabled(),
