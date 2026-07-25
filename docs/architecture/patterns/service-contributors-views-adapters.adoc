@@ -352,8 +352,10 @@ small `View` drawn from the first real application.
 
 == Related documentation
 
-* link:../config/runtime-config-projection-design.adoc[Runtime config projection] — the first
-  application of this pattern (the `NodeEnvContext` / `ManifestSynthesisContext` hold-outs).
+* link:../osgi/seed-broker-spec.adoc[Seed-broker spec] (§ @Amendment) — the amendment channel, the
+  first application of this pattern (config pushed as `@Amendment` roles onto a domain's wire-record).
+* link:../config/runtime-config-projection-design.adoc[Runtime config — guard note] — why the pulled
+  `ClusterConfiguration` service was discarded for that channel; a guard against rebuilding it.
 * link:../config/config-restructuring-spec.adoc[Config-restructuring spec] — the canonical
   contributor/registry exemplar (`InfraDomain` / `InfraConfigRegistry`).
 * link:../manifests/manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog pattern] — the

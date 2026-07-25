@@ -96,12 +96,15 @@ monotone proof held. The above figures are kept as the design-time proof; the sp
 into `docs/architecture/` at merge.
 ====
 
-=== Diagram G — value-channel half: BEFORE (the wrong-way crossing + the two drifting views)
+=== Diagram G — value-channel half: BEFORE (the wrong-way crossing + the hardcoded leak)
 
 The schema half (E/F) left two things open: the `Rke2labConfig → ConfigLoader` crossing the
-two-spaces frame flags, and — on the synth side — TWO hand-maintained `NodeEnvContext` views that
-drift (the `bioskop`-literal leak). See
-link:../config/runtime-config-projection-design.adoc[the runtime-config-projection spec].
+two-spaces frame flags, and — on the synth side — a hardcoded `bioskop` identity, duplicated across
+`DefaultNodeEnvContext` (a compile-time constant) and `CloudConfigManifestsUnit` (a second copy).
+
+NOTE: an earlier draft framed this as two drifting `NodeEnvContext` classes (`DefaultNodeEnvContext`
++ a `DefaultBootstrapNodeEnvContext` host twin). No such twin ever existed — the duplication lived
+*inside* `DefaultNodeEnvContext` as the `bioskop` constant, plus the `CloudConfigManifestsUnit` copy.
 
 [mermaid]
 ....
@@ -109,75 +112,85 @@ flowchart TB
   rke2["Rke2labConfig pure record"]
   loader["ConfigLoader host reads Pulumi"]
   dne["DefaultNodeEnvContext hardcodes bioskop"]
-  dbn["DefaultBootstrapNodeEnvContext host twin"]
+  cc["CloudConfigManifestsUnit copies the constant"]
   units["manifest units plus synth"]
   rke2 -.->|wrong-way crossing| loader
-  dne -->|view A leaks bioskop| units
-  dbn -->|view B| units
+  dne -->|leaks bioskop| units
+  cc -->|second copy| units
   classDef built fill:#eef,stroke:#88a,stroke-width:1px;
-  class rke2,loader,dne,dbn,units built;
+  class rke2,loader,dne,cc,units built;
 ....
 
-=== Diagram H — AFTER (+ seed-broker value channel, ClusterConfiguration service, RuntimeConfigRegistry, context views, one projection)
+=== Diagram H — AFTER (config IS the amendment: the seed-broker channel, not a ClusterConfiguration service)
+
+The pulled `ClusterConfiguration` service design (discarded — see
+link:../config/runtime-config-projection-design.adoc[the guard note]) dissolved into
+the seed-broker amendment channel: the host PUSHES config as amendments, the domain's reflector binds
+them onto its wire-record, consumers read the projected views. Aligned with link:seed.adoc[the seed
+atlas] Diagram T ("config IS the amendment"). See link:../osgi/seed-broker-spec.adoc[the seed-broker
+spec] (§ @Amendment) for the mechanism.
 
 [mermaid]
 ....
 flowchart TB
-  rke2["Rke2labConfig pure no ConfigLoader ref"]
-  seam["seed-broker seam value channel"]
-  cc["ClusterConfiguration type=contract interface plus view records"]
-  core["config -core Component ConfigAdmin backed"]
-  rcr["RuntimeConfigRegistry mirrors InfraConfigRegistry"]
-  proj["context-projected views generalize asHostView"]
-  one["one NodeEnvContext projection"]
+  pulumi["Pulumi single source cluster.name"]
+  host["host reads config verbatim JSON string pre-seam"]
+  fac["ManifestsFacetContributor Amendment FACET"]
+  sow["scenario sows WORKTREE identity plus SOIL"]
+  asm["AmendmentAssembler gathers ambient fail-loud on orphan"]
+  broker["SeedBroker routes the sow fail-loud on unserved"]
+  refl["ManifestsAmendReflector merges ambient under sown then binds"]
+  input["ManifestsRunbookInput wire-record @Amendment components"]
+  views["NodeEnvContext three view records identity topology paths"]
   units["manifest units plus synth"]
-  gates["ContractPurity plus REALM_BOUNDARY gates"]
-  rke2 -->|delivered via| seam
-  seam -->|values| core
-  core -->|publishes| cc
-  rcr -->|domain fragments| cc
-  cc -->|identity plus views| one
-  proj -->|paths per context| one
-  cc -->|reuses BootstrapIdentity| one
-  one -->|single source| units
-  gates -.->|police| cc
+  pulumi -->|read once| host
+  host -->|FACET| fac
+  fac -->|contributes| asm
+  sow -->|WORKTREE SOIL| broker
+  broker -->|routes| refl
+  asm -->|ambient| refl
+  refl -->|reconciled| input
+  input -->|projects| views
+  views -->|single source| units
   classDef built fill:#eef,stroke:#88a,stroke-width:1px;
   classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
-  class rke2,units built;
-  class seam,cc,core,rcr,proj,one,gates neu;
+  class pulumi,units built;
+  class host,fac,sow,asm,broker,refl,input,views neu;
 ....
 
 === Verdict — does the value-channel half hold?
 
 . *Additive core.* `InfraDomain` / `InfraConfigRegistry` / `Rke2labConfig`'s record shape, the shipped
-  extender + Metatype (E/F), and `BootstrapIdentity` (`manifests-contract`) are unchanged. Green
-  additions: the seed-broker value channel, `ClusterConfiguration` (a `type=contract` face),
-  the config `-core` impl, `RuntimeConfigRegistry`, and the context-projected views.
+  extender + Metatype (E/F), and `BootstrapIdentity` (`manifests-contract`) are unchanged. The value
+  channel is the seed-broker amendment mechanism (`AmendmentContributor` / `AmendmentAssembler` in
+  `seed-broker-port`, the domain reflector in `-core`) — additive, no production island touched.
 
-. *Named erasure #1 — the crossing inversion (pre-sanctioned).* `Rke2labConfig` stops reaching
-  `ConfigLoader`; values arrive over the seed-broker seam. This is the "wrong-direction crossing … to
-  invert" the L0 two-spaces frame already named, now enforced by `REALM_BOUNDARY` — a conscious,
-  justified breaking change (the same species as the runtime view's R5), not a silent redraw.
+. *Named erasure #1 — the crossing inversion.* `Rke2labConfig` no longer needs `ConfigLoader` on the
+  synth path: the host reads its config verbatim and pushes it as an amendment (a serialized JSON
+  `String`, the seam rule), decoded OSGi-side by the domain's own codec. The value crosses the
+  frontier as data, not as a host reference — the "wrong-direction crossing … to invert" the L0
+  two-spaces frame named.
 
-. *Named erasure #2 — the two `NodeEnvContext` views collapse.* `DefaultNodeEnvContext` (the hardcoded
-  `bioskop` view) and `DefaultBootstrapNodeEnvContext` (the host twin) become one projection off
-  `ClusterConfiguration`. Deleting the duplication IS the fix — the drift between them is the leak.
+. *Named erasure #2 — the hardcoded leak collapses.* The `bioskop` constant in `DefaultNodeEnvContext`
+  and its copy in `CloudConfigManifestsUnit` are gone; identity flows from the WORKTREE amendment into
+  one `NodeEnvContext` that projects three view records (identity / topology / paths). Deleting the
+  duplication IS the fix. *(SHIPPED — commit `e9bf9656`.)*
 
-. *Rides existing law, invents no seam.* `ContractPurity` (contract exports records + interfaces,
-  never a concrete class → impl in `-core`) and `REALM_BOUNDARY` (a contract may not reference host
-  types → value delivery crosses via the `type=seam` seed-broker) already enforce exactly these homes;
-  host path-projection lives in `-contract-host` (the shipped `incus-contract-host` `BootstrapPaths`
-  is the exemplar). Nothing new crosses the frontier.
+. *`ClusterConfiguration` dissolved, not built.* The pulled `ClusterConfiguration` service +
+  `RuntimeConfigRegistry` + per-domain Config-Admin PID (now discarded — see the guard note) were
+  SUPERSEDED by the amendment channel: PULL (a consumer `@Reference`s a service and asks) became PUSH
+  (the host contributes at the door; the value arrives pre-bound on the wire-record). The push shape
+  is location-transparent by the seam rule and invents no new service type.
 
-Conclusion: the value-channel half is additive on the shipped base, with two named, pre-sanctioned
-erasures — the L0 inversion mandate and the leak fix.
+Conclusion: the value-channel half shipped as the seed-broker amendment channel — the leak fix (State
+A) is live; the `ClusterConfiguration` service is superseded, not pending.
 
 [NOTE]
 ====
-*Design, not yet built.* Spec: link:../config/runtime-config-projection-design.adoc[runtime-config
-projection]. Figures are the design-time proof; flip green→blue per increment. First buildable slice:
-the single `NodeEnvContext` projection off the identity view (kills the `bioskop` leak), ahead of the
-full `RuntimeConfigRegistry` + Config-Admin service.
+*State A shipped; the mechanism is the amendment channel, not a `ClusterConfiguration` service.* The
+`bioskop` leak is dead (one `NodeEnvContext`, three view records). The pulled `ClusterConfiguration`
+service was discarded — see link:../config/runtime-config-projection-design.adoc[the guard note] and
+link:../osgi/seed-broker-spec.adoc[the seed-broker spec] (§ @Amendment) for the realized push channel.
 ====
 
 === Design scenarios — the config capabilities as DSL sentences
@@ -211,23 +224,27 @@ halves are playable on the OSGi bench; the value channel is narrated.
 .. THEN config values are delivered to components and activate them through the framework — AND this
    composes onto the shipped registry, additive.
 
-. *Runtime domains own their config, mirroring the infra registry* — `[narrated]` amber +
-.. GIVEN `InfraConfigRegistry` owns the Stage-A provisioning fragments (control plane)
-.. WHEN a `RuntimeConfigRegistry` contributes the Stage-B fragments (identity, policy, per-domain)
-.. THEN each runtime domain owns its config slice, published as a `ClusterConfiguration` face — AND
-   the shape is the infra registry's, one layer over, so nothing is rewritten.
+. *Each domain receives its config as an amendment bound onto its wire-record* — `[shipped]` green +
+.. GIVEN the host holds the operator config (`rke2lab:manifests:`) and the cluster identity it derives
+.. WHEN it contributes the FACET as a standing `AmendmentContributor` and sows the WORKTREE / SOIL roles
+.. THEN the domain's amend reflector merges them and binds them onto `ManifestsRunbookInput` — the
+   handler receives an already-filled input, naming no config field. (commit `8f9b3e95`)
 
-. *A domain view is projected per execution context* — `[narrated]` amber +
-.. GIVEN the shipped `incus-contract-host` `BootstrapPaths.asHostView` context-adaptation seam
-.. WHEN the config layer projects `viewFor(domain, context)` (operator-local / container / remote-OSGi)
-.. THEN each domain reads a view adapted to its context — AND the seam is generalised, not duplicated.
+. *A consumer reads a narrow view, not the fat context* — `[shipped]` green +
+.. GIVEN `NodeEnvContext` once exposed every path, node, cluster and network accessor at once
+.. WHEN it is segregated into three view records (identity / topology / paths) it composes
+.. THEN each consumer reads only the view it needs (interface segregation) — AND the per-context path
+   adaptation stays the shipped `incus-contract-host` `BootstrapPaths.asHostView`, ungeneralised (YAGNI).
+   (commit `75627e53`)
 
-. *One NodeEnvContext projection replaces the two hardcoded views* — `[narrated]` amber +
-.. GIVEN `DefaultNodeEnvContext` (hardcoded `bioskop`) and `DefaultBootstrapNodeEnvContext` (host twin)
-.. WHEN both collapse into one projection off the `ClusterConfiguration` identity view
-.. THEN cluster identity has a single source and the `bioskop` leak cannot recur by construction — AND
-   the collapse is the two-spaces inversion realised, gate-checked by `REALM_BOUNDARY`.
+. *One NodeEnvContext projection replaces the hardcoded identity* — `[shipped]` green +
+.. GIVEN `DefaultNodeEnvContext` hardcoded `CLUSTER_NAME = "bioskop"`, copied in `CloudConfigManifestsUnit`
+.. WHEN identity flows from the WORKTREE amendment into one `NodeEnvContext` projecting the identity view
+.. THEN cluster identity has a single source and the `bioskop` leak cannot recur — AND no
+   `DefaultBootstrapNodeEnvContext` twin ever existed; the duplication was the constant, now deleted.
+   (commit `e9bf9656`)
 
 *Coverage of this view:* 7 capabilities, 7 scenarios — complete per <<scenario-completeness>>. Two
-playable-green (proven on the bench, not yet in production); five narrated-amber (the value/activation
-half + the runtime-config projection, all design, gated).
+playable-green (proven on the bench); three shipped-green (the runtime-config projection, in
+production — commits `e9bf9656` / `75627e53` / `8f9b3e95`); two narrated-amber (the value/activation
+half, design, gated).

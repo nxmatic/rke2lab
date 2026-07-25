@@ -408,6 +408,42 @@ too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the
 `IncusHarvest` (the prep intention incus stores — the image recipe digest + the soil the tree was cultivated
 under — that the host fetches to grow the instance, Shape C).
 
+==== Amend integrity — the orphan seam, the loud guard, the phase boundary
+
+The fill-by-role has two mismatch paths, and only ONE is silent. A coordinate reached by a SOW is
+routed through the broker, which is LOUD: `DefaultSeedBroker.sow` throws on a coordinate no handler
+serves. So a sower's `AmendCoordinate(slug)` typed as a raw literal (incus sowing
+`AmendCoordinate("manifests")`) carries NO silent risk — a typo hits the broker and throws; incus
+needs no shared slug constant and no dependency on the target's contract. The GATHER path is the
+exception: `AmendmentAssembler.gather` matches a contributor's coordinate against the reflector's by
+`equals`; a contributor published for a coordinate NO grower serves is silently ORPHANED — its roles
+never gather, the amend falls to its defaults, nothing throws. That is the one silent seam.
+
+*BETA — the loud guard closes it generically.* The assembler already fails loud when two contributors
+claim one role (the broker's doubly-served discipline); it ALSO cross-checks each bound contributor's
+`coordinate()` against the SERVED set — the same `SeedHandler` roster the broker routes on — and
+throws on an orphan (`"contributor for a coordinate no grower serves"`). This turns the silent GATHER
+path loud for every domain, so a slug divergence is caught at bind, never swallowed. Consequence: the
+slug needs no shared constant to be SAFE — loud divergence replaces compile-time equality. A shared
+`ManifestsCoordinates.DOMAIN` (referenced by the reflector + the host contributor) stays a local
+readability win (ALPHA), not the load-bearing guarantee.
+
+*The phase boundary BETA rests on.* The orphan-check is race-free only if every grower (amend
+reflector) is ACTIVE before any contributor binds. Today the sole contributor is the host's `FACET`,
+`registerService`d from the GIVEN after `FrameworkLaunch.embedded().launch()` — the launch lifts the
+reflectors first, so the boundary holds by construction (the launch must `awaitService` the
+`SeedHandler`s — verify it does). A future OSGi-native (bundle) contributor is NOT launch-sequenced;
+it needs a start-level guarantee. `BootPlanner` already pins every bundle to a level BY ROLE (PASSIVE
+/ LOGGING / FRAMEWORK_RUNTIME / BUNDLES) — but a grower and a bundle contributor both land at
+BUNDLES(4): one layer, no ordering. The rule: when the first bundle contributor lands (a foreseeable
+step once Decision 4's artifact-seam lets a contribution read config in-OSGi rather than from Pulumi),
+add `START_LEVEL_CONTRIBUTORS = 5` above BUNDLES and route the contributor role there, growers staying
+at 4 — the framework then guarantees growers-active-before-contributor-binds. Because *started* (the
+framework's start-level unit) is not *activated* (SCR's, on its own thread), this ordering is a
+load-bearing OSGi unknown to PROVE, not assume: a `bench` spike — a synthetic grower @4 + contributor
+@5 asserting the contributor observes every grower ACTIVE (not merely started) — is its proof ground,
+exactly the disposable-Felix remit bench already serves.
+
 [[hateoas-the-plant-advertises]]
 === HATEOAS — the plant advertises what can be sown next (the second discovery idiom)
 
