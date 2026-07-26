@@ -61,6 +61,24 @@
       <artifactId>bench-fragment-contribution</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- the start-level ordering proof: growers pinned at BUNDLES(4), a contributor at level 5.
+         The api is a test dep so its package is system-exported (shared class for a typed
+         awaitService); the grower/contributor bundles are located by their embed capability. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-startlevel-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-startlevel-grower</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-startlevel-contributor</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>

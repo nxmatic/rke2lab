@@ -23,6 +23,9 @@
     <module>bench-scr-consumer</module>
     <module>bench-fragment-host</module>
     <module>bench-fragment-contribution</module>
+    <module>bench-startlevel-api</module>
+    <module>bench-startlevel-grower</module>
+    <module>bench-startlevel-contributor</module>
     <module>bench-tests</module>
   </modules>
 </project>
