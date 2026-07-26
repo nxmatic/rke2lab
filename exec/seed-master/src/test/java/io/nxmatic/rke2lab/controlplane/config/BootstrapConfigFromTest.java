@@ -30,6 +30,9 @@ class BootstrapConfigFromTest {
     assertEquals("rke2lab", boot.profileName());
     assertEquals("lan-br", boot.lanBridgeParent());
     assertEquals("vmnet-br", boot.vmnetNetworkName());
+    assertEquals("mammoth-skate.ts.net", boot.tailnet());
+    // The NFS automount root routes over the tailscale MagicDNS FQDN, not the LAN mDNS .local.
+    assertEquals("/net/bioskop.mammoth-skate.ts.net", boot.netPrefix());
     assertEquals(URI.create("https://10.66.106.10:6443"), boot.apiEndpoint());
     assertEquals(true, boot.nfsAutomount());
     assertEquals("bioskop-master", boot.systemdAdapterDbusHost());

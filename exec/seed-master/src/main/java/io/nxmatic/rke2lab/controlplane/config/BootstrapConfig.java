@@ -23,6 +23,7 @@ public record BootstrapConfig(
     String profileName,
     String lanBridgeParent,
     String vmnetNetworkName,
+    String tailnet,
     URI apiEndpoint,
     Path kubeconfigRef,
     boolean nfsAutomount,
@@ -37,17 +38,16 @@ public record BootstrapConfig(
   private static final String DEFAULT_CLUSTER_NAME = "bioskop";
   private static final String DEFAULT_NODE_NAME = "master";
   private static final String DEFAULT_INCUS_PROJECT = "rke2lab";
-  private static final String DEFAULT_INCUS_DEFAULT_REMOTE = "bioskop-nixos";
-  private static final URI DEFAULT_INCUS_REMOTE_ADDRESS =
-      URI.create("https://bioskop-nixos.local:8443");
   private static final String DEFAULT_IMAGE_ALIAS = "control-node";
-  private static final String DEFAULT_IMAGE_BUILDER_HOST = "bioskop-nixos.local";
   private static final String DEFAULT_PROFILE_NAME = "rke2lab";
   private static final String DEFAULT_LAN_BRIDGE_PARENT = "lan-br";
   private static final String DEFAULT_VMNET_NETWORK_NAME = "vmnet-br";
+  // The tailscale tailnet DNS suffix. Resolvable host/automount addresses use the MagicDNS FQDN
+  // <host>.<tailnet> so they route over the tailscale overlay (stable across the physical LAN),
+  // rather than the LAN mDNS <host>.local.
+  private static final String DEFAULT_TAILNET = "mammoth-skate.ts.net";
   private static final URI DEFAULT_API_ENDPOINT = URI.create("https://10.66.106.10:6443");
   private static final boolean DEFAULT_NFS_AUTOMOUNT = true;
-  private static final String DEFAULT_SYSTEMD_ADAPTER_DBUS_HOST = "bioskop-master";
   private static final int DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT = 12434;
   private static final int DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT = 3;
   private static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofMinutes(10);
@@ -63,6 +63,14 @@ public record BootstrapConfig(
    */
   public static BootstrapConfig from(Rke2labConfig config) {
     final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
+    final String nodeName = config.node().name().orElse(DEFAULT_NODE_NAME);
+    // The rke2lab host naming convention is derived from the cluster name — the infra is identical
+    // across clusters, only the prefix differs: the NixOS host is <cluster>-nixos. Its resolvable
+    // addresses (the incus remote URL, the image builder host) carry the .local FQDN so they
+    // resolve
+    // over mDNS; the incus remote LABEL (defaultRemote) and the dbus host stay bare. Deriving here
+    // keeps the cluster name a single source in config.
+    final String nixosHost = clusterName + "-nixos";
 
     // Cluster-scoped kubeconfig: one file per cluster at .local.d/<cluster>/kubeconfig.yaml.
     final Path kubeconfigRef =
@@ -74,21 +82,25 @@ public record BootstrapConfig(
     return new BootstrapConfig(
         config.worktree().dir(),
         clusterName,
-        config.node().name().orElse(DEFAULT_NODE_NAME),
+        nodeName,
         config.incus().project().orElse(DEFAULT_INCUS_PROJECT),
-        config.incus().defaultRemote().orElse(DEFAULT_INCUS_DEFAULT_REMOTE),
-        config.incus().remoteAddress().orElse(DEFAULT_INCUS_REMOTE_ADDRESS),
+        config.incus().defaultRemote().orElseGet(() -> nixosHost),
+        config
+            .incus()
+            .remoteAddress()
+            .orElseGet(() -> URI.create("https://" + nixosHost + ".local:8443")),
         config.incus().configDir(),
         config.image().alias().orElse(DEFAULT_IMAGE_ALIAS),
-        config.image().builderHost().orElse(DEFAULT_IMAGE_BUILDER_HOST),
+        config.image().builderHost().orElseGet(() -> nixosHost + ".local"),
         config.image().sharedFolder(),
         config.profile().name().orElse(DEFAULT_PROFILE_NAME),
         config.network().lanBridgeParent().orElse(DEFAULT_LAN_BRIDGE_PARENT),
         config.network().vmnetNetworkName().orElse(DEFAULT_VMNET_NETWORK_NAME),
+        config.network().tailnet().orElse(DEFAULT_TAILNET),
         config.api().endpoint().orElse(DEFAULT_API_ENDPOINT),
         kubeconfigRef,
         config.network().nfsAutomount().orElse(DEFAULT_NFS_AUTOMOUNT),
-        config.systemd().dbusHost().orElse(DEFAULT_SYSTEMD_ADAPTER_DBUS_HOST),
+        config.systemd().dbusHost().orElseGet(() -> clusterName + "-" + nodeName),
         config.systemd().dbusPort().orElse(DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT),
         config
             .hostAsset()
@@ -116,6 +128,9 @@ public record BootstrapConfig(
   }
 
   public String netPrefix() {
-    return "/net/" + clusterName + ".local";
+    // The autofs -hosts root the NIXOS host mounts the Mac's NFS exports under: /net/<host>. The
+    // host is the tailscale MagicDNS FQDN <cluster>.<tailnet> so the automount routes over the
+    // tailscale overlay (stable, reachable) rather than the physical LAN's mDNS <cluster>.local.
+    return "/net/" + clusterName + "." + tailnet;
   }
 }

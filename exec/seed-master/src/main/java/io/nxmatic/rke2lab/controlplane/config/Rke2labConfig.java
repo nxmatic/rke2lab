@@ -131,7 +131,8 @@ public record Rke2labConfig(
   public record NetworkConfig(
       Optional<String> lanBridgeParent,
       Optional<String> vmnetNetworkName,
-      Optional<Boolean> nfsAutomount)
+      Optional<Boolean> nfsAutomount,
+      Optional<String> tailnet)
       implements InfraConfigFragment {}
 
   public record WorktreeConfig(Path dir) implements InfraConfigFragment {}

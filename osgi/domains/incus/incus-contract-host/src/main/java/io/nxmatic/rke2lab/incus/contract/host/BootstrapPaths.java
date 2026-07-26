@@ -192,7 +192,8 @@ public record BootstrapPaths(
    * the remote NIXOS host MOUNTS them over its NFS automount to grow the instance. This view yields
    * the SOURCES of the instance's disk mounts (each paired with its {@link HostPathCatalog}
    * target). When {@code nfsAutomount} is off the paths are unchanged (same machine); otherwise
-   * each absolute path is rebased under {@code netPrefix} (e.g. {@code /net/<cluster>.local}).
+   * each absolute path is rebased under {@code netPrefix} (e.g. {@code /net/<cluster>.<tailnet>},
+   * the tailscale MagicDNS FQDN).
    */
   public BootstrapPaths asAutomountView(boolean nfsAutomount, String netPrefix) {
     return builder()
@@ -222,6 +223,12 @@ public record BootstrapPaths(
    * returned unchanged; a {@code /private/...} path gets {@code netPrefix} prepended, any other
    * absolute path gets {@code netPrefix + /private} prepended (the automount root the NIXOS host
    * exports the Mac's {@code /private} tree under).
+   *
+   * <p>TODO(nikopol): the {@code /private} prepend assumes the worktree lives under the Mac's
+   * {@code /private} tree (the bioskop layout, {@code /private/var/lib/git/...}). nikopol's
+   * worktree is under {@code /Volumes/git-worktree-store/...}, which the Mac exports directly (no
+   * {@code /private} segment), so that branch mis-maps it. Reconcile against the settled
+   * nix-darwin-home export layout (real-path resolution rather than a {@code /private} heuristic).
    */
   static Path automountPath(Path rawPath, boolean nfsAutomount, String netPrefix) {
     final Path normalized = rawPath.toAbsolutePath().normalize();
