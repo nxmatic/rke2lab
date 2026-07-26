@@ -39,6 +39,7 @@ import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -459,7 +460,8 @@ public class IncusProvisionScenarioInContainerTest {
   private static final class RecordingCellar implements Cellar {
 
     @Override
-    public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {}
+    public <T> void store(
+        Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {}
 
     @Override
     public <T> List<T> fetch(Parcel parcel, Class<T> type) {

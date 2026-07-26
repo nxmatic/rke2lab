@@ -24,6 +24,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -289,7 +290,8 @@ public class IncusReconcileScenarioInContainerTest {
     }
 
     @Override
-    public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {}
+    public <T> void store(
+        Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {}
 
     @Override
     @SuppressWarnings("unchecked")

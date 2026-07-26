@@ -22,6 +22,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -159,7 +160,8 @@ class HealthSystemContributionTest {
   private static Cellar emptyCellar() {
     return new Cellar() {
       @Override
-      public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {}
+      public <T> void store(
+          Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {}
 
       @Override
       public <T> List<T> fetch(Parcel parcel, Class<T> type) {

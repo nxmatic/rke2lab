@@ -1,0 +1,115 @@
+package io.nxmatic.rke2lab.seed.broker.internal;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The seal path THROUGH the typed cellar: a {@link Sensitivity#SEALED} store leaves ciphertext in
+ * the opaque backend (the harvest plaintext never reaches the host store), and fetch reveals it
+ * back — while a {@link Sensitivity#PLAIN} store files the value in clear. Proves the OSGi-side
+ * clean / smudge wiring end to end over an in-memory backend (no Pulumi).
+ */
+class CodecCellarSealTest {
+
+  private static final Parcel PARCEL = new Parcel("bioskop", "dev");
+
+  private enum Coord implements SeedCoordinate {
+    SECRET;
+
+    @Override
+    public String slug() {
+      return "test-secret";
+    }
+
+    @Override
+    public String domain() {
+      return "test";
+    }
+  }
+
+  private record Secret(String clientKey) {}
+
+  @Test
+  void aSealedStoreLeavesCiphertextInTheBackendAndFetchReveals() {
+    final CapturingOpaque backend = new CapturingOpaque();
+    final CodecCellar cellar = new CodecCellar(backend);
+    final Secret secret = new Secret("-----BEGIN KEY-----topsecret");
+
+    cellar.store(PARCEL, Coord.SECRET, secret, Sensitivity.SEALED);
+
+    final String stored = backend.last().payload();
+    assertFalse(
+        stored.contains("topsecret"),
+        "the backend holds ciphertext — the harvest plaintext never crossed to the host store");
+    assertTrue(stored.startsWith("cellar:sealed:"), "the stored payload self-identifies as sealed");
+    assertEquals(
+        secret,
+        cellar.fetch(PARCEL, Coord.SECRET, Secret.class).orElseThrow(),
+        "fetch reveals the sealed harvest back to the original value");
+  }
+
+  @Test
+  void aPlainStoreLeavesTheHarvestInClear() {
+    final CapturingOpaque backend = new CapturingOpaque();
+    final CodecCellar cellar = new CodecCellar(backend);
+
+    cellar.store(PARCEL, Coord.SECRET, new Secret("reservations-summary"));
+
+    assertTrue(
+        backend.last().payload().contains("reservations-summary"),
+        "a PLAIN store files the harvest in clear (the default)");
+    assertEquals(
+        new Secret("reservations-summary"),
+        cellar.fetch(PARCEL, Coord.SECRET, Secret.class).orElseThrow(),
+        "a PLAIN value round-trips untouched (reveal is a no-op on a non-sealed payload)");
+  }
+
+  /** Minimal in-memory backend: last-wins per coordinate, keeping the last stored envelope. */
+  private static final class CapturingOpaque implements OpaqueCellar {
+
+    private final Map<String, SeedEnvelope> byCoordinate = new LinkedHashMap<>();
+    private SeedEnvelope last;
+
+    @Override
+    public void store(Parcel parcel, SeedEnvelope vegetal) {
+      this.last = vegetal;
+      byCoordinate.put(vegetal.coordinate(), vegetal);
+    }
+
+    SeedEnvelope last() {
+      return last;
+    }
+
+    @Override
+    public List<SeedEnvelope> fetch(Parcel parcel) {
+      return List.copyOf(byCoordinate.values());
+    }
+
+    @Override
+    public Optional<SeedEnvelope> fetch(Parcel parcel, SeedCoordinate coordinate) {
+      return Optional.ofNullable(byCoordinate.get(coordinate.slug()));
+    }
+
+    @Override
+    public Optional<SeedEnvelope> withdraw(Parcel parcel, SeedCoordinate coordinate) {
+      return Optional.ofNullable(byCoordinate.remove(coordinate.slug()));
+    }
+
+    @Override
+    public List<Parcel> neighbours(Parcel parcel) {
+      return List.of(parcel);
+    }
+  }
+}

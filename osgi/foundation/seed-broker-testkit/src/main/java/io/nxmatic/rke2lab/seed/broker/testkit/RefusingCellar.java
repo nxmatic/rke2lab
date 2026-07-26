@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.seed.broker.testkit;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +31,8 @@ public final class RefusingCellar implements Cellar {
   }
 
   @Override
-  public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
+  public <T> void store(
+      Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {
     throw refuse();
   }
 

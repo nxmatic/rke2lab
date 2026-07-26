@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.seed.broker.testkit;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,7 +28,10 @@ public final class InMemoryCellar implements Cellar {
   private final Map<Parcel, Map<String, List<Object>>> byParcel = new LinkedHashMap<>();
 
   @Override
-  public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
+  public <T> void store(
+      Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {
+    // Holds decoded values directly (no codec, no cipher), so sensitivity is a no-op here — the
+    // seal/reveal round-trip is exercised on the real CodecCellar / the cipher's own test.
     byParcel
         .computeIfAbsent(parcel, p -> new LinkedHashMap<>())
         .computeIfAbsent(coordinate.slug(), c -> new ArrayList<>())

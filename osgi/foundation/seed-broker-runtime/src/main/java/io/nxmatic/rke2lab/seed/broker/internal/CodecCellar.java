@@ -1,11 +1,14 @@
 package io.nxmatic.rke2lab.seed.broker.internal;
 
+import io.nxmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.CellarCipher;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +33,9 @@ public final class CodecCellar implements Cellar {
 
   private final OpaqueCellar opaque;
   private final SeedCodec codec = new SeedCodec();
+  // The mono clean/smudge filter (§ cellar-secrets). Sealing happens HERE, OSGi-side, before the
+  // envelope crosses to the host backend — so a SEALED harvest's plaintext never leaves the realm.
+  private final CellarCipher cipher = new PassphraseCellarCipher();
 
   @Activate
   public CodecCellar(@Reference OpaqueCellar opaque) {
@@ -37,9 +43,11 @@ public final class CodecCellar implements Cellar {
   }
 
   @Override
-  public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
-    opaque.store(
-        parcel, new SeedEnvelope(coordinate.domain(), coordinate.slug(), codec.encode(value)));
+  public <T> void store(
+      Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {
+    final String encoded = codec.encode(value);
+    final String payload = sensitivity == Sensitivity.SEALED ? cipher.seal(encoded) : encoded;
+    opaque.store(parcel, new SeedEnvelope(coordinate.domain(), coordinate.slug(), payload));
   }
 
   @Override
@@ -50,7 +58,7 @@ public final class CodecCellar implements Cellar {
     final List<T> decoded = new ArrayList<>();
     for (SeedEnvelope envelope : opaque.fetch(parcel)) {
       try {
-        decoded.add(codec.decode(envelope, type));
+        decoded.add(codec.decode(revealed(envelope), type));
       } catch (RuntimeException skip) {
         // not readable into type (a tombstone, a foreign coordinate, a malformed payload) — skip
         // it.
@@ -61,16 +69,29 @@ public final class CodecCellar implements Cellar {
 
   @Override
   public <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
-    return opaque.fetch(parcel, coordinate).map(envelope -> codec.decode(envelope, type));
+    return opaque.fetch(parcel, coordinate).map(envelope -> codec.decode(revealed(envelope), type));
   }
 
   @Override
   public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
-    return opaque.withdraw(parcel, coordinate).map(envelope -> codec.decode(envelope, type));
+    return opaque
+        .withdraw(parcel, coordinate)
+        .map(envelope -> codec.decode(revealed(envelope), type));
   }
 
   @Override
   public List<Parcel> neighbours(Parcel parcel) {
     return opaque.neighbours(parcel);
+  }
+
+  /**
+   * Smudge — reveal a fetched envelope's payload before it is decoded. Self-identifying: a {@link
+   * Sensitivity#PLAIN} store (never sealed) passes through untouched, so the same read path serves
+   * sealed and clear. Keeps the coordinate ({@code domain}/{@code coordinate}) so the {@code
+   * decode(SeedEnvelope, …)} contract-guard still fires.
+   */
+  private SeedEnvelope revealed(SeedEnvelope envelope) {
+    return new SeedEnvelope(
+        envelope.domain(), envelope.coordinate(), cipher.reveal(envelope.payload()));
   }
 }

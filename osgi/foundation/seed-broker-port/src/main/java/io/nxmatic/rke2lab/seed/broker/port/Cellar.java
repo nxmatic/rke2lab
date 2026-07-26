@@ -22,10 +22,24 @@ import java.util.Optional;
 public interface Cellar {
 
   /**
-   * File a decoded value at its coordinate — the typed twin of {@link OpaqueCellar#store}: the impl
-   * encodes {@code value} under {@code coordinate} via the realm's codec, then files the envelope.
+   * File a decoded value at its coordinate with an explicit {@link Sensitivity} — the typed twin of
+   * {@link OpaqueCellar#store}: the impl encodes {@code value} under {@code coordinate} via the
+   * realm's codec, SEALS it through the {@code CellarCipher} when {@code sensitivity} is {@link
+   * Sensitivity#SEALED} (so its plaintext never rides the run's write set nor reaches the durable
+   * backend), then files the envelope. The scion DECLARES the sensitivity here, where the harvest
+   * is born (§ cellar-secrets, re-declare where born).
    */
-  <T> void store(Parcel parcel, SeedCoordinate coordinate, T value);
+  <T> void store(Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity);
+
+  /**
+   * File a decoded value in clear — the {@link Sensitivity#PLAIN} convenience over {@link
+   * #store(Parcel, SeedCoordinate, Object, Sensitivity)}, the common case (most harvests hold
+   * nothing secret). A scion with a secret harvest calls the four-arg form with {@link
+   * Sensitivity#SEALED}.
+   */
+  default <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
+    store(parcel, coordinate, value, Sensitivity.PLAIN);
+  }
 
   /**
    * The whole timeline DECODED into {@code type} — one {@code T} per readable entry, oldest first

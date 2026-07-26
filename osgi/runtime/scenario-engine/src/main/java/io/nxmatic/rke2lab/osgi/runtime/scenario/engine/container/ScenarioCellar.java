@@ -1,11 +1,14 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.CellarCipher;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -41,6 +44,11 @@ public final class ScenarioCellar implements TransactionalCellar {
   private final Supplier<Cellar> durableReads;
   private final String txId;
   private final SeedCodec codec = new SeedCodec();
+  // The mono clean/smudge filter (§ cellar-secrets). A SEALED store is sealed HERE, so its sealed
+  // payload is what rides the run's write-set tag across the graft and drains to the durable
+  // backend
+  // — the harvest plaintext never crosses the seam.
+  private final CellarCipher cipher = new PassphraseCellarCipher();
 
   /**
    * @param model the run's {@link ReportModel} (read lazily, but live already when the extension
@@ -201,8 +209,11 @@ public final class ScenarioCellar implements TransactionalCellar {
   }
 
   @Override
-  public <T> void store(Parcel parcel, SeedCoordinate coordinate, T value) {
-    append(new Entry(parcel, SeedEnvelope.of(coordinate, codec.encode(value)), false, false));
+  public <T> void store(
+      Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {
+    final String encoded = codec.encode(value);
+    final String payload = sensitivity == Sensitivity.SEALED ? cipher.seal(encoded) : encoded;
+    append(new Entry(parcel, SeedEnvelope.of(coordinate, payload), false, false));
   }
 
   /** Append one operation to the read-write set — a new {@link Tag#ENTRY} tag, in store order. */
@@ -230,7 +241,7 @@ public final class ScenarioCellar implements TransactionalCellar {
     // shadowed, not consulted).
     return latest
         .filter(entry -> !entry.tombstone())
-        .map(entry -> codec.decode(entry.envelope().payload(), type));
+        .map(entry -> codec.decode(cipher.reveal(entry.envelope().payload()), type));
   }
 
   /**
@@ -245,7 +256,7 @@ public final class ScenarioCellar implements TransactionalCellar {
     final List<T> overlaid = new ArrayList<>();
     for (Entry entry : currentSetEntries(parcel)) {
       try {
-        overlaid.add(codec.decode(entry.envelope().payload(), type));
+        overlaid.add(codec.decode(cipher.reveal(entry.envelope().payload()), type));
       } catch (RuntimeException skip) {
         // not readable into type (a foreign coordinate) — skip, keep the fold going.
       }
