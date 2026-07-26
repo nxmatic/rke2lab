@@ -62,8 +62,11 @@ public class BboxReconciliationScenario
         BboxReconciliationScenario.Then>
     implements CellarReceiver<Cellar>, ConsultationSource, ScenarioPlayer.Playable {
 
-  /** The router base-URI the scion reconciles against; the mock edge ignores it. */
-  private static final URI ROUTER = URI.create("http://mabbox.bytel.fr");
+  // The router base-URI the scion reconciles against; the mock edge ignores it. HTTPS is mandatory:
+  // the Bbox 302-redirects http→https, and a POST following that redirect is downgraded to GET,
+  // which the POST-only /api/v1/login answers 404 — the cause of the reconcile's "404 Operation not
+  // found". The cert is a public DigiCert for mabbox.bytel.fr, so no trust override is needed.
+  private static final URI ROUTER = URI.create("https://mabbox.bytel.fr");
 
   /** The bbox admin secret; the mock edge ignores it, a fixed marker suffices in the scenario. */
   private static final String ADMIN_PASSWORD = "admin";
