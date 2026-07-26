@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 
 /**
  * The Pulumi entry point — Layer 1 of the amorce (see
@@ -89,7 +90,20 @@ public final class Main {
                         wiring ->
                             List.of(DiscoverySelectors.selectClass(ClusterSeedScenario.class)),
                         (launcher, request, sessionStore) -> {
-                          launcher.execute(request);
+                          final var listener = new SummaryGeneratingListener();
+                          launcher.execute(request, listener);
+                          final var summary = listener.getSummary();
+                          if (summary.getTotalFailureCount() > 0) {
+                            // A setup/container failure never seeds a ScenarioOutcome, so reading
+                            // it
+                            // would throw the misleading "no @SeedScenario" and mask the real
+                            // cause.
+                            final var first = summary.getFailures().get(0);
+                            throw new IllegalStateException(
+                                "scenario failed before it could seed an outcome: "
+                                    + first.getTestIdentifier().getDisplayName(),
+                                first.getException());
+                          }
                           return new ScenarioOutcomeSeed().read(sessionStore).runbook();
                         },
                         ClusterSeedScenario.SEED
