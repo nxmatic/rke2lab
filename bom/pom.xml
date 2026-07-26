@@ -22,7 +22,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <dbus.java.version>5.2.0</dbus.java.version>
-    <java-systemd.version>3.0.0-SNAPSHOT</java-systemd.version>
+    <java-systemd.version>3.0.0-rc.2</java-systemd.version>
     <grpc.version>1.82.0</grpc.version>
     <pulumi.version>1.30.0</pulumi.version>
     <pulumi.command.version>1.2.1</pulumi.command.version>
