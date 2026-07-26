@@ -238,6 +238,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <!-- The worktree the seed cultivates: Main derives worktree.dir from it (jgit walks up to the
+         .git), and the entry gate opens the repository through it. The single findGitDir door. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>worktree</artifactId>
+    </dependency>
     <!-- The seed-broker seam: Document + SeedBroker. The stage sows a checkpoint Document through
          the broker and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>

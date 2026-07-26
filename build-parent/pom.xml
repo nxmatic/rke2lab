@@ -434,6 +434,11 @@
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>worktree</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
         <groupId>io.nxmatic.rke2lab.sdks</groupId>
         <artifactId>incus</artifactId>
         <version>${rke2lab.version}</version>

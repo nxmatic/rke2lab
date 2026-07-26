@@ -9,6 +9,5 @@ public sealed interface InfraConfigFragment
     permits Rke2labConfig.IncusConfig,
         Rke2labConfig.ImageConfig,
         Rke2labConfig.NetworkConfig,
-        Rke2labConfig.WorktreeConfig,
         Rke2labConfig.SystemdAdapterConfig,
         Rke2labConfig.HostAssetConfig {}

@@ -24,7 +24,6 @@ class ConfigEntryGateScenarioTest
     final Map<String, Map<String, Object>> sections = new HashMap<>();
     sections.put("incus", Map.of("configDir", "/Users/nxmatic/.config/incus"));
     sections.put("image", Map.of("sharedFolder", "/srv/distrobuilder"));
-    sections.put("worktree", Map.of("dir", "/private/var/lib/git/nxmatic/rke2lab"));
     return sections;
   }
 
@@ -40,6 +39,6 @@ class ConfigEntryGateScenarioTest
     // Empty configuration: every mandatory input absent, in InfraDomain.values() order.
     given().the_operator_configuration(loaderOf(Map.of()));
     when().the_configuration_is_loaded();
-    then().the_missing_inputs_are("incus.configDir", "image.sharedFolder", "worktree.dir");
+    then().the_missing_inputs_are("incus.configDir", "image.sharedFolder");
   }
 }

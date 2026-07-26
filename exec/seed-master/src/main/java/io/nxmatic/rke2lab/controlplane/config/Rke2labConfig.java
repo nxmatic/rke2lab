@@ -104,10 +104,6 @@ public record Rke2labConfig(
     return infra.fragment(InfraDomainCatalog.NETWORK, NetworkConfig.class);
   }
 
-  public WorktreeConfig worktree() {
-    return infra.fragment(InfraDomainCatalog.WORKTREE, WorktreeConfig.class);
-  }
-
   public SystemdAdapterConfig systemd() {
     return infra.fragment(InfraDomainCatalog.SYSTEMD, SystemdAdapterConfig.class);
   }
@@ -134,8 +130,6 @@ public record Rke2labConfig(
       Optional<Boolean> nfsAutomount,
       Optional<String> tailnet)
       implements InfraConfigFragment {}
-
-  public record WorktreeConfig(Path dir) implements InfraConfigFragment {}
 
   public record SystemdAdapterConfig(Optional<String> dbusHost, Optional<Integer> dbusPort)
       implements InfraConfigFragment {}

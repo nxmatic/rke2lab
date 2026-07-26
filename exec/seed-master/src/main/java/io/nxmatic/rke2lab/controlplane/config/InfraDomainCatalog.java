@@ -12,11 +12,10 @@ public final class InfraDomainCatalog {
   public static final String INCUS = "incus";
   public static final String IMAGE = "image";
   public static final String NETWORK = "network";
-  public static final String WORKTREE = "worktree";
   public static final String SYSTEMD = "systemd";
   public static final String HOST = "host";
 
-  private static final List<String> ALL = List.of(INCUS, IMAGE, NETWORK, WORKTREE, SYSTEMD, HOST);
+  private static final List<String> ALL = List.of(INCUS, IMAGE, NETWORK, SYSTEMD, HOST);
 
   private InfraDomainCatalog() {}
 

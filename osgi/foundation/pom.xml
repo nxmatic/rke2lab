@@ -17,6 +17,7 @@
 
   <modules>
     <module>domain-annotations</module>
+    <module>worktree</module>
     <module>seed-broker-port</module>
     <module>seed-broker-runtime</module>
     <module>seed-broker-codec</module>

@@ -53,15 +53,14 @@ public record BootstrapConfig(
   private static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofMinutes(10);
 
   /**
-   * Derive the Stage A bootstrap config from the root DTO. Mandatory values ({@code worktree.dir},
-   * {@code incus.configDir}, {@code image.sharedFolder}) are already validated at load, so they
-   * arrive non-null. Optional values get their default here.
-   *
-   * <p>Future: if {@code worktree.dir} is not accessible (e.g. a Nix {@code nix run} with no
-   * worktree), a {@code worktree.source = github} clone fallback is planned — see the config
-   * restructuring spec. Not implemented yet.
+   * Derive the Stage A bootstrap config from the root DTO plus the runtime-derived {@code
+   * worktreeRoot}. The worktree is NOT config: the root knows its own worktree (jgit walks up to
+   * the {@code .git} from the process directory, § {@code Worktree}), so storing it in config would
+   * only collide across worktrees. Mandatory config values ({@code incus.configDir}, {@code
+   * image.sharedFolder}) are already validated at load, so they arrive non-null; optional values
+   * get their default here.
    */
-  public static BootstrapConfig from(Rke2labConfig config) {
+  public static BootstrapConfig from(Rke2labConfig config, Path worktreeRoot) {
     final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
     final String nodeName = config.node().name().orElse(DEFAULT_NODE_NAME);
     // The rke2lab host naming convention is derived from the cluster name — the infra is identical
@@ -80,7 +79,7 @@ public record BootstrapConfig(
             .orElseGet(() -> Path.of(".local.d", clusterName, "kubeconfig.yaml").normalize());
 
     return new BootstrapConfig(
-        config.worktree().dir(),
+        worktreeRoot,
         clusterName,
         nodeName,
         config.incus().project().orElse(DEFAULT_INCUS_PROJECT),

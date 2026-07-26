@@ -1,15 +1,16 @@
 package io.nxmatic.rke2lab.incus.core;
 
 import io.nxmatic.rke2lab.incus.contract.HostStagingEntry.Provenance;
+import io.nxmatic.rke2lab.worktree.Worktree;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.Optional;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 /**
  * Reads a worktree's provenance — the HEAD {@code sha} + whether the tree is {@code dirty} — into a
@@ -27,13 +28,11 @@ public final class GitProvenanceReader {
    * treated as clean rather than failing the prep.
    */
   public Provenance read(Path worktreeRoot) {
-    final FileRepositoryBuilder builder = new FileRepositoryBuilder();
-    builder.setWorkTree(worktreeRoot.toFile());
-    builder.findGitDir(worktreeRoot.toFile());
-    if (builder.getGitDir() == null) {
+    final Optional<Repository> opened = Worktree.at(worktreeRoot).openRepository();
+    if (opened.isEmpty()) {
       return new Provenance("", false);
     }
-    try (Repository repo = builder.build()) {
+    try (Repository repo = opened.get()) {
       final ObjectId head = repo.resolve(Constants.HEAD);
       if (head == null) {
         return new Provenance("", false);

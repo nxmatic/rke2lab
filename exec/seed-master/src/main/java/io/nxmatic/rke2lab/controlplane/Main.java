@@ -22,6 +22,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.worktree.Worktree;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
@@ -68,7 +69,12 @@ public final class Main {
           final RunMode runMode = RunMode.detect(true);
           final ConfigLoader loader = ConfigLoader.of(context.config());
           final Rke2labConfig config = Rke2labConfig.from(loader);
-          final BootstrapConfig bootstrap = BootstrapConfig.from(config);
+          // worktree.dir is NOT config — the root derives its own worktree at runtime: jgit walks
+          // up to the .git from the process directory (§ Worktree), so a launch from any
+          // subdirectory still resolves the real root. Storing it in config would only collide
+          // across worktrees.
+          final Path worktreeRoot = Worktree.locatedFrom(Path.of("").toAbsolutePath()).root();
+          final BootstrapConfig bootstrap = BootstrapConfig.from(config, worktreeRoot);
           final Parcel parcel = new Parcel(context.projectName(), context.stackName());
           final SeedRun run =
               new SeedRun(

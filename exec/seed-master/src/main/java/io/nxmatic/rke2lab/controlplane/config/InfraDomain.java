@@ -44,13 +44,6 @@ public enum InfraDomain {
     }
   },
 
-  WORKTREE(InfraDomainCatalog.WORKTREE) {
-    @Override
-    InfraConfigFragment contribute(ConfigLoader loader) {
-      return new Rke2labConfig.WorktreeConfig(loader.requirePath(domainId(), "dir"));
-    }
-  },
-
   SYSTEMD(InfraDomainCatalog.SYSTEMD) {
     @Override
     InfraConfigFragment contribute(ConfigLoader loader) {

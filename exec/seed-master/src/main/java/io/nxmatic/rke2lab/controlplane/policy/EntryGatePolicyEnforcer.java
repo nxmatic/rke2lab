@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
+import io.nxmatic.rke2lab.worktree.Worktree;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,7 +14,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -48,14 +48,15 @@ public final class EntryGatePolicyEnforcer {
   private static void enforceCleanWorktree(Path worktreePath) {
     final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
     try {
-      final FileRepositoryBuilder builder =
-          new FileRepositoryBuilder().findGitDir(normalizedWorktreePath.toFile());
-      if (builder.getGitDir() == null) {
-        throw new IllegalStateException(
-            "No git repository found for worktree: " + normalizedWorktreePath);
-      }
+      final Repository repository =
+          Worktree.at(normalizedWorktreePath)
+              .openRepository()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "No git repository found for worktree: " + normalizedWorktreePath));
 
-      try (Repository repository = builder.build();
+      try (repository;
           Git git = new Git(repository)) {
         final Status status = git.status().call();
         if (status.isClean()) {
@@ -93,14 +94,15 @@ public final class EntryGatePolicyEnforcer {
     }
     final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
     try {
-      final FileRepositoryBuilder builder =
-          new FileRepositoryBuilder().findGitDir(normalizedWorktreePath.toFile());
-      if (builder.getGitDir() == null) {
-        throw new IllegalStateException(
-            "No git repository found for worktree: " + normalizedWorktreePath);
-      }
+      final Repository repository =
+          Worktree.at(normalizedWorktreePath)
+              .openRepository()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "No git repository found for worktree: " + normalizedWorktreePath));
 
-      try (Repository repository = builder.build()) {
+      try (repository) {
         final ObjectId oldTreeId = repository.resolve("HEAD~1^{tree}");
         final ObjectId newTreeId = repository.resolve("HEAD^{tree}");
         if (oldTreeId == null || newTreeId == null) {
