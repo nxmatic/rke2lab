@@ -5,11 +5,17 @@ import io.nxmatic.rke2lab.seed.broker.port.AmendmentAssembler;
 import io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedHandler;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceReference;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -41,13 +47,38 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 @Component(service = AmendmentAssembler.class)
 public final class DefaultAmendmentAssembler implements AmendmentAssembler {
 
-  // Package-private (not private) so the same-package unit test injects the two rosters directly;
-  // SCR binds them by reflection regardless of visibility.
+  // Package-private (not private) so the same-package unit test injects the contributor roster
+  // directly; SCR binds it by reflection regardless of visibility.
   @Reference(cardinality = ReferenceCardinality.MULTIPLE, policy = ReferencePolicy.DYNAMIC)
   volatile List<AmendmentContributor> contributors = List.of();
 
+  // ServiceReferences, NOT the SeedHandler services: SCR binds these WITHOUT constructing the
+  // handlers, so THIS component's activation never triggers SeedHandler construction. That breaks a
+  // boot service-factory cycle — the SeedBroker's constructor collects List<SeedHandler>, one of
+  // which is an amend reflector whose OWN constructor @References this assembler; were growers the
+  // service type, activating the assembler would re-get every SeedHandler (that reflector included)
+  // while it is still mid-construction → "ServiceFactory.getService() resulted in a cycle". Deref
+  // is
+  // deferred to gather() through growerRoster, post-boot, where the BETA guard already runs and
+  // every grower is built.
   @Reference(cardinality = ReferenceCardinality.MULTIPLE, policy = ReferencePolicy.DYNAMIC)
-  volatile List<SeedHandler> growers = List.of();
+  volatile List<ServiceReference<SeedHandler>> growerRefs = List.of();
+
+  // The grower roster resolved at gather time (never at activation): production derefs growerRefs
+  // through the BundleContext; the same-package unit test supplies a fixed roster via the test
+  // constructor. Held as a supplier so neither path leaves the assembler in a partial state.
+  private final Supplier<Collection<SeedHandler>> growerRoster;
+
+  @Activate
+  public DefaultAmendmentAssembler(BundleContext bundleContext) {
+    this.growerRoster =
+        () -> growerRefs.stream().map(bundleContext::getService).filter(Objects::nonNull).toList();
+  }
+
+  // Test seam: a fixed grower roster, no OSGi lookup (the test injects contributors on the field).
+  DefaultAmendmentAssembler(Collection<SeedHandler> growers) {
+    this.growerRoster = () -> growers;
+  }
 
   @Override
   public Map<String, String> gather(AmendCoordinate coordinate) {
@@ -78,7 +109,9 @@ public final class DefaultAmendmentAssembler implements AmendmentAssembler {
   /** BETA: every contributor must fill a coordinate some grower serves, or it is a wiring bug. */
   private void failOnOrphanContributor() {
     final Set<SeedCoordinate> served =
-        growers.stream().map(SeedHandler::serves).collect(Collectors.toUnmodifiableSet());
+        growerRoster.get().stream()
+            .map(SeedHandler::serves)
+            .collect(Collectors.toUnmodifiableSet());
     for (AmendmentContributor contributor : contributors) {
       if (!served.contains(contributor.coordinate())) {
         throw new IllegalStateException(

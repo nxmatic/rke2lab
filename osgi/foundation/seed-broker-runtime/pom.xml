@@ -39,6 +39,15 @@
       <artifactId>org.osgi.service.component.annotations</artifactId>
       <scope>provided</scope>
     </dependency>
+
+    <!-- BundleContext + ServiceReference: DefaultAmendmentAssembler binds grower ServiceReferences
+         (not the services) and derefs them lazily at gather() — see its cycle-break note. Provided:
+         the framework's system bundle exports org.osgi.framework at runtime. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

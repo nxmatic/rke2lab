@@ -44,9 +44,10 @@ class DefaultAmendmentAssemblerTest {
 
   private static DefaultAmendmentAssembler assembler(
       List<AmendmentContributor> contributors, List<SeedHandler> growers) {
-    final DefaultAmendmentAssembler assembler = new DefaultAmendmentAssembler();
+    // The test constructor supplies the grower roster directly (production derefs OSGi
+    // ServiceReferences lazily at gather; the test needs no OSGi). Contributors bind on the field.
+    final DefaultAmendmentAssembler assembler = new DefaultAmendmentAssembler(growers);
     assembler.contributors = contributors;
-    assembler.growers = growers;
     return assembler;
   }
 
