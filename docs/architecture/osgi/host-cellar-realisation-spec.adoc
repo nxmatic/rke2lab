@@ -1231,3 +1231,6 @@ scenario map], not here.
   figure, the CRUD-by-shell model this narrows.
 * link:seed-spec.adoc#migration[Seed spec — migration] — the domain-by-domain dissolution this unblocks.
 * link:bdd.adoc#clusterseed-scenario-map[The ClusterSeed scenario map] — the graft-caller runbook above.
+* link:../atlas/cellar-secrets.adoc[Cellar secrets & the clean/smudge filter] — the clean/smudge
+  filter at this cellar's boundary: the sensitivity attribute (consulted by coordinate) and
+  encryption *for recipients* (the single passphrase generalised to age/sops).

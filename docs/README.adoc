@@ -30,6 +30,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 * link:architecture/config/config-restructuring-spec.adoc[Configuration Restructuring Spec] - The `Rke2labConfig` DTO + `InfraDomain` model + doctor entry-gate: the single-source-of-truth operator config architecture
 * link:architecture/config/runtime-config-projection-design.adoc[Runtime config — guard note] - Why the pulled `ClusterConfiguration` service was discarded for the seed-broker amendment channel; a guard against rebuilding it. The realized mechanism lives in the seed-broker spec (§ @Amendment).
+* link:architecture/atlas/cellar-secrets.adoc[Cellar secrets & the clean/smudge filter] (⚠️ Design Only) - How the root unifies stack config + worktree secrets onto the one amendment channel (coordinate = domain · role = kind · sensitivity = attribute), and the git-modelled clean/smudge filter that seals sensitive harvest at the cellar for recipients.
 
 === Doctor & Runbook (BDD diagnostic model)
 

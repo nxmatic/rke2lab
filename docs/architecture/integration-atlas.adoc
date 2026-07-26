@@ -318,6 +318,10 @@ monotone before/after figures.
   preview`/`up`: the output gate, the preview `ExecutionCondition` (`RunMode` re-posed off the erased
   `LiveGate`), the null-safety governance note, and the graved avant/après of the BDD-as-engine turn
   (Diagram Q). Folds in link:bdd/bdd.adoc[the pipeline (OSGi-owned)].
+* link:atlas/cellar-secrets.adoc[Cellar secrets & the clean/smudge filter] (⚠️ Design Only) — the
+  secrets/filter subsystem: stack config + worktree secrets unified on the one amendment channel
+  (coordinate = domain · role = kind · sensitivity = attribute); the git-modelled cellar clean/smudge
+  filter and the recipient gap the `bench-cellar` proof closes.
 
 == Related documentation
 

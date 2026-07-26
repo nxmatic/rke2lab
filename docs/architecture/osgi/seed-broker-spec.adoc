@@ -2104,3 +2104,6 @@ for: ONE frontier door (seed-broker), everything else inter-domain wiring that n
   `SCHEMA_CONCORD` gates that mechanize this spec's invariant and contract at build time.
 * link:../bdd/bdd.adoc[The pipeline — BDD-as-engine] — the model the GROUND/GATEWAY/APPLY host flow
   feeds.
+* link:../atlas/cellar-secrets.adoc[Cellar secrets & the clean/smudge filter] — how secrets ride
+  this amendment channel alongside config (coordinate = domain, role = `FACET`, sensitivity = a
+  per-value attribute), and the cellar clean/smudge filter that seals the sensitive harvest.
