@@ -21,6 +21,12 @@ import java.util.Map;
  */
 public final class ManifestsFacetContributor implements AmendmentContributor {
 
+  // The domain slug stays a literal here — NOT ManifestsCoordinate.domain(): this host contributor
+  // runs in the FLAT realm, which the realm-boundary law forbids from referencing a bundle-only
+  // package (manifests.contract). incus's sow keeps the literal for the same reason; BETA (the
+  // assembler's orphan-guard) makes a divergence between this literal and the reflector's
+  // coordinate
+  // LOUD, so the seam the constant cannot cross is guarded by the guard instead.
   private static final AmendCoordinate MANIFESTS = new AmendCoordinate("manifests");
 
   private final String facetJson;

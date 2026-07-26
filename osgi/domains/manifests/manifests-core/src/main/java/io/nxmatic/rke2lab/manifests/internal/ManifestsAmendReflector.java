@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.manifests.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.nxmatic.rke2lab.manifests.contract.ManifestsCoordinate;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.seed.broker.codec.AmendmentBinder;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
-import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.AmendmentAssembler;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
@@ -35,7 +35,7 @@ import org.osgi.service.component.annotations.Reference;
 @Component(service = SeedHandler.class)
 public final class ManifestsAmendReflector implements SeedHandler {
 
-  private static final String DOMAIN = "manifests";
+  private static final String DOMAIN = ManifestsCoordinate.DOMAIN;
 
   /**
    * The manifests input wire-records that bear amendments, indexed by {@code @SeedContract} slug.
@@ -53,7 +53,7 @@ public final class ManifestsAmendReflector implements SeedHandler {
 
   @Override
   public SeedCoordinate serves() {
-    return new AmendCoordinate(DOMAIN);
+    return ManifestsCoordinate.AMEND;
   }
 
   @Override
@@ -68,7 +68,7 @@ public final class ManifestsAmendReflector implements SeedHandler {
     // over an ambient contribution on the same role. No sower carries a role it does not own.
     final Map<String, JsonNode> roleValues = new LinkedHashMap<>();
     assembler
-        .gather(new AmendCoordinate(DOMAIN))
+        .gather(ManifestsCoordinate.AMEND)
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
     final JsonNode defaults = codec.decode(codec.encode(ManifestsRunbookInput.defaults()));

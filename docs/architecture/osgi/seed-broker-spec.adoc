@@ -423,16 +423,44 @@ never gather, the amend falls to its defaults, nothing throws. That is the one s
 claim one role (the broker's doubly-served discipline); it ALSO cross-checks each bound contributor's
 `coordinate()` against the SERVED set — the same `SeedHandler` roster the broker routes on — and
 throws on an orphan (`"contributor for a coordinate no grower serves"`). This turns the silent GATHER
-path loud for every domain, so a slug divergence is caught at bind, never swallowed. Consequence: the
-slug needs no shared constant to be SAFE — loud divergence replaces compile-time equality. A shared
-`ManifestsCoordinates.DOMAIN` (referenced by the reflector + the host contributor) stays a local
-readability win (ALPHA), not the load-bearing guarantee.
+path loud for every domain, so a slug divergence is caught at the gather, never swallowed. Consequence:
+the slug needs no shared constant to be SAFE — loud divergence replaces compile-time equality. The ALPHA
+readability half is `ManifestsCoordinate` — the manifests domain's seed coordinates, declared and owned
+in ONE place from one `DOMAIN`, so its growers never diverge as raw literals.
+
+It is an ENUM, like its siblings `BboxCoordinate` / `IncusCoordinate` — the `contract-purity` law admits
+only records / enums / sealed ADT / interfaces from a contract module, never a concrete class. But WHAT
+the enum holds differs structurally — the coordinate-ownership taxonomy (the two shapes):
+
+* *Enum WITH VALUES — homogeneous value-coordinates* (bbox, incus). A domain that CONSERVES a harvest
+  owns the cellar documents it stores — `BBOX_RESERVATIONS`, `INCUS_PREP` — all the SAME kind, differing
+  only by slug, and it controls both ends (it serves AND stores them, in-domain). One enum implementing
+  `SeedCoordinate`, values by slug, `DOMAIN` private (encapsulated in the values). No magic string.
+* *EMPTY enum with META-coordinate CONSTANTS — heterogeneous* (manifests). A domain that
+  SYNTHESISES-and-GRAFTS — materialises into the soil, stores no harvest (its conservation is delegated
+  to the consulter's plot) — owns no value-coordinate, so its enum enumerates NOTHING. It is addressed
+  only through the SHARED meta-coordinate types (`AmendCoordinate` / `ShapeCoordinate` / `RunbookCoordinate`),
+  which are DIFFERENT record types: an enum cannot hold values of different types, and even forced, enum
+  identity-`equals` would not match the RECORD a sower builds (`new AmendCoordinate("manifests")`),
+  breaking the broker's `equals`-routing. So the empty enum holds them as typed record CONSTANTS
+  (`AMEND` / `SHAPE` / `RUNBOOK`) keyed by one exposed `DOMAIN`. The reflectors serve them, the assembler
+  gathers on `AMEND`; a SOWER (incus) and the HOST FACET contributor keep the `"manifests"` literal —
+  both run where this bundle-only contract is out of reach (incus does not depend on it; the host is
+  FLAT-realm, which the realm-boundary law bars from a bundle package), and BETA guards THAT seam.
+
+The alignment is at the PRINCIPLE (single-source, declare-and-use-in-one-place) and the FORM (both enums);
+only what the enum carries differs. ALPHA is a readability win; BETA is the load-bearing guarantee. (When
+the unitrepo thesis makes manifest units first-class grown artifacts, manifests gains real
+value-coordinates and its enum grows values.)
 
 *The phase boundary BETA rests on.* The orphan-check is race-free only if every grower (amend
-reflector) is ACTIVE before any contributor binds. Today the sole contributor is the host's `FACET`,
-`registerService`d from the GIVEN after `FrameworkLaunch.embedded().launch()` — the launch lifts the
-reflectors first, so the boundary holds by construction (the launch must `awaitService` the
-`SeedHandler`s — verify it does). A future OSGi-native (bundle) contributor is NOT launch-sequenced;
+reflector) is ACTIVE before any contributor binds — so it runs at the GATHER (the consult), not at the
+bind. Today the sole contributor is the host's `FACET`, `registerService`d from the GIVEN after
+`FrameworkLaunch.embedded().launch()`; the launch drives the framework to its start level (a
+`FrameworkEvent.STARTED` await) but does NOT `awaitService` the growers, and SCR activates on its own
+thread — so a grower could still be inactive at the instant the contributor binds. The gather, by
+contrast, happens deep in the run (after boot, the GIVEN, and DS settling), so both rosters are complete
+and the check cannot false-throw. A future OSGi-native (bundle) contributor is NOT launch-sequenced;
 it needs a start-level guarantee. `BootPlanner` already pins every bundle to a level BY ROLE (PASSIVE
 / LOGGING / FRAMEWORK_RUNTIME / BUNDLES) — but a grower and a bundle contributor both land at
 BUNDLES(4): one layer, no ordering. The rule: when the first bundle contributor lands (a foreseeable

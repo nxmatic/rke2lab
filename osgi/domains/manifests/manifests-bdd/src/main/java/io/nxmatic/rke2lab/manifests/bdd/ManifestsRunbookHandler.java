@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.manifests.bdd;
 
+import io.nxmatic.rke2lab.manifests.contract.ManifestsCoordinate;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GenericRunbookHandler;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
@@ -24,7 +25,7 @@ import org.osgi.service.component.annotations.Component;
 @Component(service = SeedHandler.class)
 public final class ManifestsRunbookHandler extends GenericRunbookHandler {
 
-  private static final RunbookCoordinate COORDINATE = new RunbookCoordinate("manifests");
+  private static final RunbookCoordinate COORDINATE = ManifestsCoordinate.RUNBOOK;
 
   private final SeedCodec codec = new SeedCodec();
 
