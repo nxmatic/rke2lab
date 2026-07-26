@@ -1,2 +1,2 @@
-instance-id: bioskop-master
-local-hostname: bioskop-master
+instance-id: __RKE2LAB_HOST__
+local-hostname: __RKE2LAB_HOST__

@@ -59,8 +59,6 @@ public class IncusReconcileScenario
         IncusReconcileScenario.Given, IncusReconcileScenario.When, IncusReconcileScenario.Then>
     implements CellarReceiver<ScenarioCellar>, ScenarioPlayer.Playable {
 
-  private static final String NODE = "bioskop-master";
-
   private final Scenario<Given, When, Then> scenario = createScenario();
 
   // The transactional cellar the extension injects before the body — reconcile READS the host-tree
@@ -93,7 +91,7 @@ public class IncusReconcileScenario
     // gate.
     final AtomicReference<Promotion> promotion = new AtomicReference<>(Promotion.notPromoted());
     given()
-        .the_host_tree(NODE)
+        .the_host_tree(parcel.qualifiedName())
         .and()
         .reconciling_through(cellar, parcel, reconciliation, promotion);
     when().the_change_is_decided().and().the_live_is_promoted();

@@ -58,26 +58,26 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
                         .build())
                 .build());
 
-    // Template network-config with blueprint MAC addresses
-    Map<String, String> configMapData = runtimeCloudConfigAssets.configMapData();
-    String networkConfig = configMapData.get("networkData");
+    // Template the NoCloud seed with the run's identity — the node env projects the cluster/node
+    // blueprint, so the seed matches whatever cluster this run synthesises for (no hardcoded
+    // cluster). Two placeholders are filled: the host name (meta-data + user-data) and the
+    // network-config MACs.
+    final var id = nodeEnvContext.bootstrapIdentity();
+    final String hostName = id.clusterName() + "-" + id.nodeName();
+
+    final Map<String, String> mutableData = new HashMap<>(runtimeCloudConfigAssets.configMapData());
+    mutableData.replaceAll((key, value) -> value.replace("__RKE2LAB_HOST__", hostName));
+
+    final String networkConfig = mutableData.get("networkData");
     if (networkConfig != null) {
-      // Replace the template's placeholder MACs with the run's identity-derived values — the node
-      // env projects them from the cluster/node blueprint, so the NoCloud seed matches whatever
-      // cluster this run synthesises for (no hardcoded cluster).
       final var net = nodeEnvContext.networkTopology();
-      String lanMac = net.lanHostMacAddr();
-      String wanMac = net.wanHostMacAddr();
-
-      networkConfig =
-          networkConfig.replace("10:66:6a:4c:00:00", lanMac).replace("52:54:00:00:00:00", wanMac);
-
-      // Create new map with updated network config
-      Map<String, String> mutableData = new HashMap<>(configMapData);
-      mutableData.put("networkData", networkConfig);
-      configMapData = Map.copyOf(mutableData);
+      mutableData.put(
+          "networkData",
+          networkConfig
+              .replace("10:66:6a:4c:00:00", net.lanHostMacAddr())
+              .replace("52:54:00:00:00:00", net.wanHostMacAddr()));
     }
 
-    configMap.addJsonPatch(JsonPatch.add("/data", configMapData));
+    configMap.addJsonPatch(JsonPatch.add("/data", Map.copyOf(mutableData)));
   }
 }

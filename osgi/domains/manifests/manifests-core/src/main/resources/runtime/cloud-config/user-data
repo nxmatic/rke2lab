@@ -22,7 +22,7 @@ write_files:
     content: |
       [DHCP]
       SendHostname=yes
-      Hostname=bioskop-master
+      Hostname=__RKE2LAB_HOST__
   # systemd-networkd drop-in to prevent vmnet0 DHCP from installing routes/DNS
   - path: /etc/systemd/network/10-netplan-lan0.network.d/90-no-default.conf
     permissions: "0644"
@@ -190,7 +190,7 @@ runcmd:
     ]
   # Activate RKE2 environment (this will also activate Flox for the shim installer script)
   - /srv/host/systemd-scripts.d/rke2lab-activate.sh
-hostname: bioskop-master
+hostname: __RKE2LAB_HOST__
 manage_resolv_conf: true
 resolv_conf:
   searchdomains:
