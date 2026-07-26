@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.bbox.core
 
 Export-Package: io.nxmatic.rke2lab.bbox.core
@@ -8,6 +10,3 @@ Export-Package: io.nxmatic.rke2lab.bbox.core
 # bbox-contract (type=contract); this module holds only the enumerator, so the contract-purity guard
 # on bbox-contract stays clean.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=bbox-core
-# JSpecify annotations are compile-only null-safety metadata, runtime-retained → drop from imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

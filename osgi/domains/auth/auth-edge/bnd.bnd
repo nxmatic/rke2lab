@@ -1,13 +1,7 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.auth.edge
 # Self-declares this jar as an embeddable EDGE bundle (scanned + installed under META-INF/bundles by
 # the same io.nxmatic.rke2lab.embed capability as the other carriers). See incus-edge.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=edge; edge=auth
 
-# No -includeresource: this edge embeds NOTHING. The token contact is pure ProcessBuilder over the
-# JDK (gh / flox on PATH), no nested jars — like incus-edge's ssh contact.
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

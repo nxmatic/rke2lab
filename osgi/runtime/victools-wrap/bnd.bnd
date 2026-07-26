@@ -1,3 +1,4 @@
+-include: ../../bundle-parent/annotations.bnd
 Bundle-SymbolicName: io.nxmatic.rke2lab.victools.wrap
 
 # The whole wrap: stamp OSGi headers onto victools jsonschema-generator + jsonschema-module-jackson
@@ -12,8 +13,7 @@ Export-Package: com.github.victools.*;version=4.38.0
 # from the bytecode; the only manual touch is dropping compile-only annotation packages (jspecify,
 # findbugs) that no bundle resolves at runtime.
 Import-Package: \
-    !org.jspecify.annotations, \
+    ${annotation-noimports}, \
     !edu.umd.cs.findbugs.annotations, \
     *
 
--noimportjava: true

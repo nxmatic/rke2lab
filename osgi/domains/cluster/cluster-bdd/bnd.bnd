@@ -1,3 +1,4 @@
+-include: ../../../bundle-parent/annotations.bnd
 Bundle-SymbolicName: io.nxmatic.rke2lab.cluster.bdd
 
 # A type=model embeddable bundle (scanned + installed under META-INF/bundles by the
@@ -24,11 +25,9 @@ Service-Component: OSGI-INF/*.xml
 #   - com.tngtech.jgiven.impl — byte-buddy defines the proxy of a state-carrying Stage here
 # JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
 Import-Package: \
-    !org.jspecify.annotations, \
-    !org.checkerframework.checker.nullness.qual, \
+    ${annotation-noimports}, \
     com.tngtech.jgiven.impl, \
     com.tngtech.jgiven.impl.intercept, \
     com.tngtech.jgiven.*, \
     *
 
--noimportjava: true

@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.incus.contract.host
 Export-Package: io.nxmatic.rke2lab.incus.contract.host
 # type=library — the incus domain's dual-realm host face: what BOTH realms genuinely consume. The
@@ -19,6 +21,3 @@ Export-Package: io.nxmatic.rke2lab.incus.contract.host
 # both sides (the scion picks its slot, the host derives the 17 mounts) — so the plan needs no device
 # view. It carries no @Component, so it does NOT Require the SCR extender.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=library
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

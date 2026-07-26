@@ -1,9 +1,3 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.startlevel.grower
 # Test fixture, selected by installMatching via LDAP filter over these attributes (not by file name).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=startlevel; role=grower
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

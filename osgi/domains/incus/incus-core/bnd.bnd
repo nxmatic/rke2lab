@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.incus.core
 
 Export-Package: io.nxmatic.rke2lab.incus.core
@@ -15,6 +17,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=incus-core
 -includeresource: \
   jsync-engine-*.jar;lib:=true, \
   jsync-vfs-*.jar;lib:=true
-# JSpecify annotations are compile-only null-safety metadata, runtime-retained → drop from imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

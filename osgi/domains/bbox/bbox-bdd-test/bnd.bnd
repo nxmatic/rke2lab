@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.bbox.bdd.test
 
 # THE fragment header: attach to the bbox-bdd bundle by its BSN, sharing its classloader and package
@@ -19,4 +21,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=bbox; role=bdd
 # manual Import-Package here — the include's wildcard suffices.
 -include: ${.}/../../../runtime/scenario-testkit/src/main/resources/jgiven-fragment.bnd
 
--noimportjava: true

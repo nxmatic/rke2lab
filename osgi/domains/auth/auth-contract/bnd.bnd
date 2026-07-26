@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.auth.contract
 Export-Package: io.nxmatic.rke2lab.auth.contract
 # type=contract — the auth domain's consumer-side vocabulary (the AuthTokenContact verb + the flat
@@ -7,6 +9,3 @@ Export-Package: io.nxmatic.rke2lab.auth.contract
 # NOT Require the SCR extender. The contract-purity guard fails the build if this bundle exports a
 # concrete class. Supersedes the dissolved auth-port seam.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=contract
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

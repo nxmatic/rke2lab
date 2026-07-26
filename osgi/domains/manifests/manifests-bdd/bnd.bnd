@@ -1,3 +1,4 @@
+-include: ../../../bundle-parent/annotations.bnd
 Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.bdd
 
 # A type=model embeddable bundle (scanned + installed under META-INF/bundles by the
@@ -18,11 +19,9 @@ Service-Component: OSGI-INF/*.xml
 # jGiven's runtime-woven packages, invisible to bnd's bytecode analysis, forced exactly as bbox-bdd
 # does (byte-buddy DEFINES stage-proxy classes into these at runtime). JSpecify is compile-only.
 Import-Package: \
-    !org.jspecify.annotations, \
-    !org.checkerframework.checker.nullness.qual, \
+    ${annotation-noimports}, \
     com.tngtech.jgiven.impl, \
     com.tngtech.jgiven.impl.intercept, \
     com.tngtech.jgiven.*, \
     *
 
--noimportjava: true

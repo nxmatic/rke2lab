@@ -1,3 +1,5 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.sshtoage.edge
 # Self-declares this jar as an embeddable bundle to install under META-INF/bundles/. OsgiRuntime
 # scans the staged jars for the NAMESPACE (io.nxmatic.rke2lab.embed) and installs every carrier;
@@ -6,9 +8,3 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.sshtoage.edge
 # is the first carrier whose nature is edge, not model: a model is in-domain logic; an edge is the
 # system's door toward an external tool.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=edge; edge=ssh-to-age
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

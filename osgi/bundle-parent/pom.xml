@@ -41,6 +41,11 @@
           <groupId>biz.aQute.bnd</groupId>
           <artifactId>bnd-maven-plugin</artifactId>
           <version>${bnd.version}</version>
+          <!-- Shared bnd instructions are NOT single-sourced here: the bnd-maven-plugin <bnd>
+               configuration is a silent, implicit inheritance a reader can't see from a module's
+               own bnd.bnd. Each bundle instead -includes ./annotations.bnd EXPLICITLY (relative
+               path, same convention as this pom's <relativePath>) — see that file for the
+               compile-only annotation-import exclusions every bundle must apply. -->
           <executions>
             <execution>
               <goals>

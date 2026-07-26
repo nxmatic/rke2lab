@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.incus.core.test
 
 # THE fragment header: attach to the incus-core bundle by its BSN, sharing its classloader and
@@ -18,4 +20,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=incus; role=co
 # contract value types). Mirrors manifests-core-test.
 -include: ${.}/../../../runtime/scenario-testkit/src/main/resources/jgiven-fragment.bnd
 
--noimportjava: true

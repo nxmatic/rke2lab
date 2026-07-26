@@ -1,3 +1,5 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.scenario.probe
 
 # Export the package so the same-package -test fragment can be authored against it. The
@@ -5,12 +7,3 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.scenario.probe
 # bundle's classloader and package, reaches it white-box.
 Export-Package: io.nxmatic.rke2lab.scenario.probe;version=0.1.0
 
-# A pure POJO bundle: it imports nothing of jGiven. The byte-buddy import the in-host scenario
-# needs at runtime is contributed by the -test FRAGMENT and merged into this host at resolution —
-# the whole point of the model.
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

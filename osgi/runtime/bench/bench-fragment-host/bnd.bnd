@@ -15,9 +15,3 @@ Service-Component: OSGI-INF/*.xml
 
 # Installed by what it declares, never by a Bundle-SymbolicName literal.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=fragment; role=host
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

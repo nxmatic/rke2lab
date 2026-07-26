@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.cluster.core
 # No Export-Package: this bundle's only content is the cluster diagnostician in the non-exported
 # io.nxmatic.rke2lab.cluster.internal package. It is SEALED — it crosses to the doctor as the
@@ -8,9 +10,3 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.cluster.core
 # ClusterSpecialist @Component activates here and registers itself as a Specialist for the health
 # system's tier-scoped @Reference to collect.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=cluster
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

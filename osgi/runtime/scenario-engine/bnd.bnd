@@ -1,3 +1,4 @@
+-include: ../../bundle-parent/annotations.bnd
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgi.runtime.scenario.engine
 
 # Exported = the IN-REALM halves only, importable by a host -test fragment: the in-container runner
@@ -31,8 +32,7 @@ Export-Package: \
 # OutOfContainerFrameworkExtension reads ClasspathBundleIndex from it (system-exported by the
 # in-container harness), so a consumer wires it or fails at resolution.
 Import-Package: \
-    !org.jspecify.annotations, \
-    !org.checkerframework.checker.nullness.qual, \
+    ${annotation-noimports}, \
     org.osgi.framework.launch;resolution:=optional, \
     org.osgi.service.component.runtime*;resolution:=optional, \
     org.osgi.service.log;resolution:=optional, \
@@ -41,4 +41,3 @@ Import-Package: \
     org.slf4j;resolution:=optional, \
     *
 
--noimportjava: true

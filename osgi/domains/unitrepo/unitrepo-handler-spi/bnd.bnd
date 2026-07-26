@@ -1,11 +1,7 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.unitrepo.handler.spi
 Export-Package: io.nxmatic.rke2lab.unitrepo.handler.spi
 # Embeddable model bundle: the UnitHandler SPI + the unitrepo.handler extender capability. Staged
 # like the other domains so it installs in the framework rather than sitting flat on the host JCL.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=unitrepo-handler-spi
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

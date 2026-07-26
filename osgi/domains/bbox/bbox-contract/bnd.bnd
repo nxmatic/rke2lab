@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.bbox.contract
 
 Export-Package: io.nxmatic.rke2lab.bbox.contract
@@ -10,6 +12,3 @@ Export-Package: io.nxmatic.rke2lab.bbox.contract
 # mocks the interface via registerService. The contract-purity guard fails the build if this bundle
 # exports a concrete class — BlueprintRowEnumerator stays in bbox-core for exactly that reason.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=contract
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

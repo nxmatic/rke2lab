@@ -22,4 +22,3 @@ Import-Package: \
     org.jspecify.annotations;resolution:=optional, \
     *
 
--noimportjava: true

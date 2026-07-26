@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.contract
 
 Export-Package: io.nxmatic.rke2lab.doctor.contract
@@ -13,6 +15,3 @@ Export-Package: io.nxmatic.rke2lab.doctor.contract
 # concrete class. Supersedes the dissolved doctor-port seam AND the former doctor-records bundle
 # (they fused: a record bundle is a contract with no interface).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=contract
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

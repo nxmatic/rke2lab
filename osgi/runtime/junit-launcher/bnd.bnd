@@ -1,3 +1,4 @@
+-include: ../../bundle-parent/annotations.bnd
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgi.runtime.junit.launcher
 
 # The jGiven-FREE runner: export ONLY the runner package. No jGiven import exists here by
@@ -14,8 +15,7 @@ Export-Package: io.nxmatic.rke2lab.osgi.runtime.junit.launcher
 # + osgi.framework.wiring fall through to * (mandatory), provided by the runner bundles + the system
 # bundle.
 Import-Package: \
-    !org.jspecify.annotations, \
+    ${annotation-noimports}, \
     org.slf4j;resolution:=optional, \
     *
 
--noimportjava: true

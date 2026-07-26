@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.cluster.edge.test
 
 # THE fragment header: attach to the cluster-edge bundle by its BSN, sharing its classloader and
@@ -17,5 +19,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=cluster; role=
 # needs — org.junit.jupiter.engine (ClusterEdgeTests names JupiterTestEngine.class), jupiter.api, the
 # scenario-engine runner, cluster.contract (the contact it calls, resolved through the host) — is
 # computed by bnd from bytecode and captured by the trailing * wildcard.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

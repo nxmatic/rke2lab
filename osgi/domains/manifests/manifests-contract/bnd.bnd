@@ -1,4 +1,6 @@
+-include: ../../../bundle-parent/annotations.bnd
 Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.contract
+Import-Package: ${annotation-noimports}, *
 Export-Package: \
     io.nxmatic.rke2lab.manifests.contract,\
     io.nxmatic.rke2lab.manifests.contract.hostasset,\
@@ -11,6 +13,3 @@ Export-Package: \
 # the SCR extender. The contract-purity guard fails the build if this bundle exports a concrete
 # class. Supersedes the dissolved manifests-port seam (all three packages).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=contract
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

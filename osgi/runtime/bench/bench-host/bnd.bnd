@@ -5,9 +5,3 @@ Export-Package: io.nxmatic.rke2lab.osgibench.host
 # host: it provides the osgi.extender the config fixture requires. (Merged with the osgi.extender
 # capability bnd generates from @Component — both coexist in the manifest.)
 Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=extender; role=host
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

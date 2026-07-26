@@ -1,3 +1,5 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.seed.broker.runtime
 # Exports NOTHING: the door contract (SeedBroker, SeedHandler) is the seed-broker seam; this
 # bundle only IMPLEMENTS it. io.nxmatic.rke2lab.seed.broker.internal (DefaultSeedBroker) is sealed —
@@ -8,7 +10,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=runtime
 # @Reference(MULTIPLE) List<SeedHandler>), but belonging to no domain. It exports nothing, so it is
 # not a seam and not subject to the leak guard. See maven-embed-staging-ext EmbedCapability#isRuntime.
 Service-Component: OSGI-INF/*.xml
-# JSpecify annotations are compile-only null-safety metadata, RUNTIME-retained; drop the computed
-# Import-Package for a package nothing resolves at runtime.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

@@ -1,8 +1,2 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.scr.api
 Export-Package: io.nxmatic.rke2lab.osgibench.scr
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

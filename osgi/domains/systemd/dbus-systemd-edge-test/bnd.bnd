@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.dbus.systemd.edge.test
 
 # THE fragment header: attach to the dbus-systemd-edge bundle by its BSN, sharing its classloader and
@@ -17,5 +19,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=systemd; role=
 # (DbusSystemdEdgeTests names JupiterTestEngine.class), jupiter.api, the scenario-engine runner,
 # systemd.contract (the probe + request, resolved through the host) — is computed by bnd from bytecode
 # and captured by the trailing * wildcard.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

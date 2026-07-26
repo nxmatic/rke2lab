@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.cdk8s
 
 # Export the cdk8s vocabulary to the OSGi world. cdk8s is a manifests-domain concern, so it loads on
@@ -38,9 +40,3 @@ Export-Package: \
 # the cdk8s runtime the manifests domain owns.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=manifests-cdk8s
 
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

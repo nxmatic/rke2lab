@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.contract.test
 
 # THE fragment header: attach to the doctor-records bundle by its BSN, sharing its classloader and
@@ -14,6 +16,3 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=doctor; role=c
 # it through the doctor-records host (the way doctor-port-test used to export it).
 Export-Package: io.nxmatic.rke2lab.doctor.testkit
 
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

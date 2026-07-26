@@ -1,3 +1,5 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.cluster.contract
 Export-Package: io.nxmatic.rke2lab.cluster.contract
 # type=contract — the cluster domain's readiness vocabulary + the neutral ClusterReadinessContact the
@@ -7,6 +9,3 @@ Export-Package: io.nxmatic.rke2lab.cluster.contract
 # contract-purity guard fails the build if this bundle exports a concrete class. Supersedes the
 # dissolved cluster-port seam.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=contract
-# JSpecify annotations are compile-only null metadata, runtime-retained → drop from computed imports.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

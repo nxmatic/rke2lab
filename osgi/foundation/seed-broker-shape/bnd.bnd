@@ -1,9 +1,4 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.seed.broker.shape
 Export-Package: io.nxmatic.rke2lab.seed.broker.shape
-# The amont introspection engine. OSGi-ONLY (no type=library, unlike seed-broker-codec): only
-# in-container reflectors project a schema; the host reaps the opaque JSON-Schema String and never
-# binds victools. So this bundle is a plain installed bundle, importing victools (from victools-wrap)
-# and jackson bundle-to-bundle. bnd computes Import-Package from the bytecode; drop the compile-only
-# JSpecify package no bundle resolves at runtime.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true

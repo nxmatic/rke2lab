@@ -1,3 +1,5 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.seed.broker.codec
 Export-Package: \
     io.nxmatic.rke2lab.seed.broker.codec
@@ -9,16 +11,3 @@ Export-Package: \
 # bound to its own jackson), so DUPLICATE_REALM_CLASS exempts it like jackson. The .internal jackson
 # glue (WireEnumModule) is NOT exported — only DocumentCodec is the API.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=library
-# The jackson datatype modules DocumentCodec registers — jackson-datatype-jsr310 (JavaTimeModule,
-# Instant) and jackson-datatype-jdk8 (Jdk8Module, Optional) — are IMPORTED bundle-to-bundle, exactly
-# like jackson-databind — NOT nested. Both are genuine OSGi bundles; the staging closure stages each
-# as a realm-library (this type=library imports its export) and keeps it flat host-side, so each realm
-# binds its own copy. (Nesting is only needed when a ServiceLoader<Module> discovers the module off a
-# classloader — as jsii's findAndRegisterModules does for jsr310 in manifests-cdk8s. We register
-# modules EXPLICITLY, so there is no ServiceLoader and no nesting — even for jsr310 here.)
-# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
-# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
-# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
-# computed imports; the annotations do their job at compile/analysis time only.
-Import-Package: !org.jspecify.annotations, *
--noimportjava: true
