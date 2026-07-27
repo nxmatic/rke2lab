@@ -7,11 +7,11 @@
  * crosses. The {@code Worktree} service interface (worktree-contract) returns {@link Provenance} /
  * {@link WorkingState} from here.
  *
- * <p>SPEC_COVERAGE is held at {@code WARN} (acknowledged debt, not IGNORE): the component's full
- * contract has no dedicated {@code docs/} spec yet — the atlas {@code cellar-secrets} note explains
- * only WHY the worktree is derived. The worktree component spec is the master's to write (see the
- * {@code feature/cluster-seed-scenario} handoff); once written, drop this annotation to relock the
- * package at the default {@code ERROR}.
+ * <p>SPEC_COVERAGE is held at {@code WARN} (acknowledged debt, not IGNORE). The spec now exists —
+ * {@code docs/architecture/osgi/worktree-component-spec.adoc} names every export — so the
+ * documentation debt is paid. The {@code WARN}→default-{@code ERROR} relock is deferred to the Q1+Q2
+ * session, which dissolves this dual-realm face into the OSGi-only {@code worktree-contract} (see the
+ * spec § refinement); relocking the FINAL package once, rather than a package about to move.
  */
 @org.osgi.annotation.versioning.Version("1.0.0")
 @org.jspecify.annotations.NullMarked

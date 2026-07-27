@@ -491,7 +491,8 @@ IN it, not as a sow param)); `SystemdBddScenarios` → `SystemdAdapterScenario`;
 SCENARIO: the cluster seed grows to a ready cluster
   GIVEN a commissioner's request (the run's facts) and an open framework
     AND a RunGate that says whether we cultivate or only survey (live vs preview)
-  WHEN the entry gates are enforced       THEN we have the right to sow (clean worktree, flake lock)  [preflight, pure host]
+  WHEN the worktree is surveyed           THEN its git facts are harvested (root · HEAD provenance · working state)  [worktree soil, graft-caller]  [CODED]
+  WHEN the entry gates are enforced       THEN we have the right to sow (working state within policy · flake.lock coherent — each config-toggleable)  [preflight, host today → OSGi-side gates + worktree capability, planned]
   WHEN the parcel's state is fetched      THEN I know where I start from (idempotent sowing)   [Cellar.fetch, pure host]
   WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]        [CODED]
   WHEN the instance is prepared              THEN sow incus's scenario (image·graft·nocloud·secrets·harvest), graft it  [incus, graft-caller]  [CODED; nocloud/secrets beats = VISION]
@@ -589,7 +590,9 @@ no "material synthesised" host step; the incus scion (or a manifests scion it co
 in-container) sows the synthesis and uses the fresh graft. The cellar stays out of the manifests story.
 
 *Deferred scoping (honest gap):* auth / netplan / unitrepo have contracts but no step here — whether they
-become steps or are consulted by a scion is not yet decided. The ClusterSeed path above is fully mapped.
+become steps or are consulted by a scion is not yet decided. (Worktree, once a static host helper, is now a
+realized soil with its own survey crossing — see link:../osgi/worktree-component-spec.adoc[the worktree
+component spec].) The ClusterSeed path above is fully mapped.
 
 == Where a scenario lives — the placement & naming rule
 
