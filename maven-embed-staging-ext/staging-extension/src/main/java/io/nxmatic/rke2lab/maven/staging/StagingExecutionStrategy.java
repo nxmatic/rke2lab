@@ -500,9 +500,9 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   /**
    * The {@code groupId:artifactId} keys the exec-module declares DIRECTLY — the root graph node's
    * immediate children. A direct third-party dependency is the developer's explicit "I need this
-   * host-flat" intent (the parallel of a {@code type=library} self-declaring its dual nature); the
-   * closure treats such a bundle as a realm library so it is staged AND kept flat. The jar carries
-   * no directness signal — only the graph shape does — so it is read here, once, from the
+   * host-flat" intent (the parallel of a {@code type=dual-realm} self-declaring its dual nature);
+   * the closure treats such a bundle as a realm library so it is staged AND kept flat. The jar
+   * carries no directness signal — only the graph shape does — so it is read here, once, from the
    * resolution result.
    */
   private static Set<String> directlyDeclaredGas(DependencyResolutionResult result) {

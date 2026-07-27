@@ -15,7 +15,7 @@
   <description>The HOST face of the incus contract — what BOTH realms genuinely consume. The GROW
     runs host-flat (outside Felix, com.pulumi lives there) yet is still the incus domain talking to
     itself across the realm boundary com.pulumi imposes: the scion (OSGi) PROJECTS an InstanceGrowPlan
-    and the host GROW ACTUALISES it. type=library dual-realm, like seed-broker-codec: staged as a
+    and the host GROW ACTUALISES it. type=dual-realm dual-realm, like seed-broker-codec: staged as a
     bundle OSGi-side AND kept flat host-side (the GROW fetches and decodes via the dual-realm codec).
     It carries the flat value views (InstanceGrowPlan + sub-views) AND the pure path logic both realms
     share (BootstrapPaths — the scion materialises into it, the host derives the instance mounts from

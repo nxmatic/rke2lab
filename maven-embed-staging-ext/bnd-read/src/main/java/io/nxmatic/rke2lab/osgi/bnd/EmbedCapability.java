@@ -69,17 +69,19 @@ public record EmbedCapability(Clause clause) {
   public static final String TYPE_FIXTURE = "fixture";
 
   /**
-   * OUR OWN dual-realm library: logic we wrote that depends on a realm-isolated third-party library
+   * OUR OWN DUAL-REALM carrier: logic we wrote that depends on a realm-isolated third-party library
    * (jackson) and is needed in BOTH realms. It follows jackson's own treatment — staged as a bundle
    * (installed in-framework, binding the OSGi copy of its dependency) AND kept flat in the host
    * uber-jar (binding the host copy). Unlike a {@code model}/{@code edge}/{@code record} (bundle
-   * ONLY, excluded from flat), a {@code library} is BOTH realms at once. Its exported package
+   * ONLY, excluded from flat), a {@code dual-realm} is BOTH realms at once. Its exported package
    * legitimately lives in two realms — exempt from {@code DUPLICATE_REALM_CLASS} like jackson,
    * because it is NOT a seam surface (no type of it crosses the String-only seam; each realm holds
-   * its own copy bound to its own jackson). Exemplar: {@code seed-broker-codec} (the {@code
-   * SeedCodec}, one source, two realm-bound copies).
+   * its own copy bound to its own jackson). A {@code dual-realm} is only justified when BOTH realms
+   * actually consume it — a carrier referenced from only one realm is wearing the wrong face
+   * (demote it to a plain bundle, or keep it host-flat). Exemplar: {@code seed-broker-codec} (the
+   * {@code SeedCodec}, one source, two realm-bound copies).
    */
-  public static final String TYPE_LIBRARY = "library";
+  public static final String TYPE_DUAL_REALM = "dual-realm";
 
   /**
    * A neutral runtime MECHANISM installed in-framework: a {@code @Component} that is neither a
@@ -132,13 +134,13 @@ public record EmbedCapability(Clause clause) {
   }
 
   /**
-   * Whether this carrier is our own dual-realm library — staged as a bundle AND kept flat in the
+   * Whether this carrier is our own DUAL-REALM carrier — staged as a bundle AND kept flat in the
    * host (jackson's treatment, for our code). The staging closure turns on this to stage it yet
    * keep it in the flat uber-jar; {@code DUPLICATE_REALM_CLASS} exempts its exported package (not a
    * seam surface, each realm holds its own copy).
    */
-  public boolean isLibrary() {
-    return TYPE_LIBRARY.equals(type());
+  public boolean isDualRealm() {
+    return TYPE_DUAL_REALM.equals(type());
   }
 
   /**

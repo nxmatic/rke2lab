@@ -18,7 +18,7 @@ import java.util.Map;
 /**
  * The JSON (de)serialization + (capability) validation of {@code SeedEnvelope} payloads — the JSON
  * analogue of the manifests domain's {@code YamlMapper}. Written ONCE here; loaded per realm as our
- * own dual-realm library bundle ({@code embed; type=library}): staged as a bundle OSGi-side
+ * own dual-realm library bundle ({@code embed; type=dual-realm}): staged as a bundle OSGi-side
  * (binding the OSGi jackson) and shaded flat host-side (binding the host jackson). No codec type
  * crosses the String-only seed-broker seam — each realm holds its own copy, exactly as jackson is
  * dual-loaded.

@@ -623,7 +623,7 @@ InstanceGrowPlan(
     List<GrowMountView> mounts)     // the 13 resolved disk mounts: deviceName, source, target
 ----
 
-*It lives in a NEW module `incus-contract-host` — the HOST FACE of the incus contract, `type=library`
+*It lives in a NEW module `incus-contract-host` — the HOST FACE of the incus contract, `type=dual-realm`
 dual-realm.* Its coordinate `IncusGrowCoordinate.INSTANCE_GROW_PLAN` lives here too (NOT in the OSGi-only
 `IncusCoordinate`: the pure-host GROW cannot compile against `incus-contract`, and a slug spelled
 host-side is the magic-string anti-pattern). Its rationale: `incus-contract` is `type=contract`
@@ -631,7 +631,7 @@ OSGi-only (the host reads no incus type back; the `contract-purity` guard forbid
 needs the plan TYPED to decode it (the `SeedCodec`, dual-realm, reflects on the `Class` the host's
 classpath holds). NO transgression of the seam-purity rule: producer (incus scion) AND consumer (incus
 grow) are the SAME domain — incus speaks to incus across the REALM boundary, not a domain leaking to
-another. The dual-realm-intra-domain is orthogonal to seam purity. It is the first `type=library` of a
+another. The dual-realm-intra-domain is orthogonal to seam purity. It is the first `type=dual-realm` of a
 domain (the only prior one, `seed-broker-codec`, is a foundation).
 
 *Governance — the dual-realm library rule (widened 2026-07-17).* The red line for this module is NOT

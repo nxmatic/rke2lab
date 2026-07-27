@@ -506,7 +506,7 @@ prepare beat in front — corrected 2026-07-15):
   the host fetches. No VM yet.
 . **(pure-host beat) the instance GROWS** — the host fetches ONE immutable
   `InstanceGrowPlan` (network view + image view + cloudInitChecksum — assembled and
-  stored by the scion at PREPARE's end, in the `incus-contract-host` `type=library`
+  stored by the scion at PREPARE's end, in the `incus-contract-host` `type=dual-realm`
   module), declares the resource graph (Project/Network/Profile/Image/Instance) and the
   Pulumi engine drives the Incus provider over gRPC to create the VM with `running=true`,
   binding the 13 mounts (delta #8) onto the already-promoted `host.live.d`. Pure-host

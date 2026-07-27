@@ -3,8 +3,8 @@
 :toclevels: 3
 
 Status: the domain *as built* is ✅ Complete (committed `eb50886f` + `079ce552`); the realm
-refinement in <<refinement>> has Q1 (self-contained grow plan) and Q2 (entry gate OSGi-side) ✅
-landed — only the final fold of `worktree-contract-host` into `worktree-contract` remains.
+refinement in <<refinement>> is fully ✅ landed — Q1 (self-contained grow plan), Q2 (entry gate
+OSGi-side), AND the final fold of `worktree-contract-host` into an OSGi-only `worktree-contract`.
 
 This spec discharges the `SPEC_COVERAGE` obligation of the worktree contract packages by naming every
 exported type: `Worktree`, `GatePolicy`, `WorktreeRunbookInput`, `WorktreeFacts`, `WorktreeCoordinate`,
@@ -30,12 +30,10 @@ The domain has four modules:
 | Module | Role
 
 | `worktree-contract` (`type=contract`, pkg `io.nxmatic.rke2lab.worktree`)
-| The jgit-free `Worktree` service interface (OSGi consumers `@Reference` it — the incus scion),
-plus the entry-gate wire types `GatePolicy` and `WorktreeRunbookInput` (`@SeedContract("runbook")`).
-
-| `worktree-contract-host` (`type=library`, dual-realm, pkg `io.nxmatic.rke2lab.worktree.host`)
-| The cellar-harvested wire types: `WorktreeFacts`, `WorktreeCoordinate`, `Provenance`,
-`WorkingState`. See <<refinement>> — this dual-realm face is slated to fold into `worktree-contract`.
+| The jgit-free `Worktree` service interface (OSGi consumers `@Reference` it — the incus scion), the
+entry-gate wire types `GatePolicy` and `WorktreeRunbookInput` (`@SeedContract("runbook")`), AND the
+cellar-harvested wire types folded in from the former `worktree-contract-host` (see <<refinement>>):
+`WorktreeFacts`, `WorktreeCoordinate`, `Provenance`, `WorkingState`. OSGi-only.
 
 | `worktree-core` (pkg `io.nxmatic.rke2lab.worktree.internal`)
 | `JgitWorktree` `@Component` — self-locates the root at activation; jgit lives only here.
@@ -51,7 +49,7 @@ amend door that binds the injected `GatePolicy` FACET — the twin of `IncusAmen
 * **`Worktree`** (contract) — the service: `root()` (the absolute, normalised anchor every
   provisioning path derives from), `provenance()`, `workingState()`, and `flakeLockCoherent()` (the
   `HEAD~1..HEAD` check — a `flake.nix` inputs change without its `flake.lock`). jgit-free — only JDK
-  types and the `worktree.host` records cross it.
+  types and the `worktree` records cross it.
 * **`GatePolicy`** (contract) — the entry-gate POLICY, injected into the worktree crossing as the
   `FACET` amendment. Two sub-gates, each toggled: `cleanWorktreeRequired` (+ the `toleratedPaths`
   allowed to be uncommitted) and `flakeLockRequired` (default OFF). Its `enforce(WorktreeFacts)`
@@ -91,15 +89,17 @@ The consumers read the harvest *from the cellar* (fetch-not-push), the same disc
 `InstanceGrowPlan` rides — a domain-owned coordinate keyed by its wire slug crosses the realm through
 the cellar, without the broker ever routing a domain enum.
 
-== Realm model — as built (Q1+Q2 landed)
+== Realm model — as built (Q1+Q2 + fold landed)
 
-`worktree-contract-host` is still a dual-realm `type=library` (the twin of `incus-contract-host`), but
-as of Q1+Q2 NOTHING host-side consumes it any more. The two former host consumers are both gone: the
-entry gate moved INTO the worktree crossing (an OSGi THEN that enforces an injected `GatePolicy`
-against the just-harvested `WorkingState`), and the host GROW actualises the self-contained
-`InstanceGrowPlan` ALONE (the incus scion projects the 13 disk mounts as `GrowMountView`s — no
-worktree fetch). So `WorktreeFacts` is consumed *only* OSGi-side now; the dual-realm face carries no
-host reader and is ready to fold (the remaining step, <<refinement>>).
+The worktree domain is now OSGi-only: the former dual-realm `worktree-contract-host` has been FOLDED
+into `worktree-contract` (`type=contract`) and DELETED. Two Q1+Q2 changes had removed both host
+consumers first: the entry gate moved INTO the worktree crossing (an OSGi THEN that enforces an
+injected `GatePolicy` against the just-harvested `WorkingState`), and the host GROW actualises the
+self-contained `InstanceGrowPlan` ALONE (the incus scion projects the 13 disk mounts as
+`GrowMountView`s — no worktree fetch). With no host reader left, `WorktreeFacts` /`WorktreeCoordinate`
+/`Provenance`/`WorkingState` are consumed *only* OSGi-side, so the dual-realm face had no reason to
+exist — it folded (see <<refinement>> for the principle, and the symmetric `REALM_BOUNDARY` rule that
+now makes this class of drift a build ERROR).
 
 [mermaid]
 ....
@@ -121,7 +121,7 @@ The worktree root still reaches the host — but *inside the incus `InstanceGrow
 sources, an incus dual-realm type), never as a worktree type.
 
 [[refinement]]
-== Realm refinement — the remaining fold (📋 the last step)
+== Realm refinement — the fold (✅ landed)
 
 === The principle it rests on
 
@@ -148,21 +148,23 @@ Two changes removed both host-side reads, and with them the reason for the dual-
   against the `WorkingState` it just harvested — the worktree domain gates its OWN ground under a
   caller-supplied policy, no host worktree fetch.
 
-=== The consequence — the fold (📋 remaining)
+=== The consequence — the fold (✅ landed)
 
 With both host reads gone, `WorktreeFacts`/`WorktreeCoordinate`/`WorkingState`/`Provenance` are
-consumed *only* OSGi-side → `worktree-contract-host` folds into an OSGi-only `worktree-contract`. The
-worktree root still reaches the host, but *inside the incus `InstanceGrowPlan`* (the `GrowMountView`
-sources, an incus dual-realm type), never as a worktree type. The `SPEC_COVERAGE` obligation on these
-exports travels with them into `worktree-contract` (the default `ERROR`, covered by this spec).
+consumed *only* OSGi-side, so `worktree-contract-host` FOLDED into the OSGi-only `worktree-contract`
+(`type=contract`) and the module was deleted. The worktree root still reaches the host, but *inside
+the incus `InstanceGrowPlan`* (the `GrowMountView` sources, an incus dual-realm type), never as a
+worktree type. The `SPEC_COVERAGE` obligation on these exports travelled with them into
+`worktree-contract` (the default `ERROR`, covered by this spec).
 
 [NOTE]
 ====
-`SPEC_COVERAGE` on `worktree.host` stays at `WARN` until this fold lands: this spec pays the
-documentation debt, and the `WARN`→default-`ERROR` relock is applied on the *final* (OSGi-only)
-package, rather than churning a package about to move. A companion governance gate — `REALM_BOUNDARY`
-extended to flag a `type=dual-realm` (formerly `type=library`) module with ZERO host-realm importers
-— is the mechanical forcing function that will DEMAND this fold once it lands.
+The forcing function DESIGNED for this class of drift (📋 enforcement pending, lands test-first as its
+own step): a SYMMETRIC `REALM_BOUNDARY` rule — a `type=dual-realm` module must be referenced from BOTH
+realms, and the gate ERRORs when EITHER realm has zero importers, naming the empty one. Had it been in
+force, once Q1+Q2 emptied the host realm's references to `worktree-contract-host` it would have failed
+the build until the fold — dual staging is earned only when both realms genuinely consume the carrier.
+The fold here was done by hand ahead of the rule.
 ====
 
 == Open questions (from the working session)

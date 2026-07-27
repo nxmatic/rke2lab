@@ -211,9 +211,9 @@ THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed s
 *Designed-not-coded (2026-07-17), the GROW enablement:* PREPARE gains `the_network_is_resolved` (WHEN)
 + `the_instance_grow_plan_is_published` (THEN) — the scion resolves `NetplanSynthesisService`, computes
 `buildChecksum` OSGi-side, and assembles ONE immutable `InstanceGrowPlan` (network view + image view +
-cloudInitChecksum) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=library`
+cloudInitChecksum) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=dual-realm`
 dual-realm module `incus-contract-host` (the host face of the incus contract — flat value records only,
-no logic; the first `type=library` of a domain). The GROW between reconcile and verify is pure-host
+no logic; the first `type=dual-realm` of a domain). The GROW between reconcile and verify is pure-host
 (`com.pulumi` + provider invokes only — it fetches the plan and actualises, computes nothing of the
 domain), NOT a scion; the import-lookup it keeps is a provider invoke, not ssh. The probe pulls out to a
 VERIFY beat (post-grow). See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar §

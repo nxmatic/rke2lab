@@ -130,15 +130,15 @@ public record StagingClosure(
 
     /**
      * The packages the host already serves flat — the build-time mirror of {@code
-     * system.packages.extra}: every package a model/edge bundle OR our dual-realm {@code
-     * type=library} imports. A {@code library} is itself kept flat host-side, so the jackson (etc.)
-     * packages IT imports must be served flat too, exactly as a domain's imports are. An import
-     * whose package is here resolves against the host classloader, so its exporter stays flat,
-     * never staged.
+     * system.packages.extra}: every package a model/edge bundle OR our {@code type=dual-realm}
+     * carrier imports. A {@code dual-realm} carrier is itself kept flat host-side, so the jackson
+     * (etc.) packages IT imports must be served flat too, exactly as a domain's imports are. An
+     * import whose package is here resolves against the host classloader, so its exporter stays
+     * flat, never staged.
      */
     private void indexHostFlatPackages() {
       for (ResolvedBundle bundle : resolved) {
-        if (bundle.embed().map(e -> e.isDomain() || e.isLibrary()).orElse(false)) {
+        if (bundle.embed().map(e -> e.isDomain() || e.isDualRealm()).orElse(false)) {
           hostFlatPackages.addAll(bundle.imports().names());
         }
       }
@@ -157,15 +157,15 @@ public record StagingClosure(
     }
 
     /**
-     * Third-party OSGi bundles exporting a package a domain OR {@code type=library} bundle imports
-     * — staged AND kept flat. A {@code library} (e.g. the codec) drives realm-library detection
-     * just like a domain: the jackson datatype jars it imports (jackson-datatype-jdk8) must be
-     * staged for the OSGi wire AND kept flat for the library's host copy.
+     * Third-party OSGi bundles exporting a package a domain OR {@code type=dual-realm} bundle
+     * imports — staged AND kept flat. A {@code library} (e.g. the codec) drives realm-library
+     * detection just like a domain: the jackson datatype jars it imports (jackson-datatype-jdk8)
+     * must be staged for the OSGi wire AND kept flat for the library's host copy.
      */
     private void seedRealmLibraries() {
       final Set<String> domainImports = new LinkedHashSet<>();
       for (ResolvedBundle b : resolved) {
-        if (b.embed().map(e -> e.isDomain() || e.isLibrary()).orElse(false)) {
+        if (b.embed().map(e -> e.isDomain() || e.isDualRealm()).orElse(false)) {
           domainImports.addAll(b.imports().names());
         }
       }
@@ -237,13 +237,13 @@ public record StagingClosure(
      * A realm library — staged AND kept flat (dual). Two kinds:
      *
      * <ul>
-     *   <li>OUR OWN dual-realm library: a bundle self-declaring {@code embed; type=library} (e.g.
-     *       {@code gateway-document-codec}). It states its dual nature explicitly, so it is a realm
-     *       library by declaration — no import analysis needed.
+     *   <li>OUR OWN dual-realm library: a bundle self-declaring {@code embed; type=dual-realm}
+     *       (e.g. {@code gateway-document-codec}). It states its dual nature explicitly, so it is a
+     *       realm library by declaration — no import analysis needed.
      *   <li>a THIRD-PARTY OSGi bundle (not ours, not a seam, not the launcher) that EITHER exports
      *       a domain import OR is DIRECTLY DECLARED by the exec-module. A direct declaration is the
      *       developer's explicit "keep it host-flat" intent — the parallel of a {@code
-     *       type=library} self-declaring its dual nature — so a directly-declared third-party
+     *       type=dual-realm} self-declaring its dual nature — so a directly-declared third-party
      *       bundle that also gets staged (e.g. {@code gson}: the exec declares it compile AND the
      *       bbox client pulls it into the staging closure) is kept flat too. Either signal is
      *       subject to the SAME boot-stack guard: a package already served in-framework by a
@@ -258,8 +258,9 @@ public record StagingClosure(
         return false;
       }
       if (b.embed().isPresent()) {
-        // Ours: only a type=library is dual (staged + flat); model/edge/record/seam are not.
-        return b.embed().orElseThrow().isLibrary();
+        // Ours: only a type=dual-realm carrier lives in both realms (staged + flat);
+        // model/edge/record/seam are not.
+        return b.embed().orElseThrow().isDualRealm();
       }
       // A third-party bundle whose exports the boot-stack already serves in-framework is never a
       // realm library — a second exporter would break resolution (slf4j). This guards BOTH signals.

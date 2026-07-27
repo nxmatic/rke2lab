@@ -61,12 +61,12 @@ crossing in the WRONG direction, a decomposition defect to invert.
 ====
 A `type=contract` bundle is OSGi-only *by seam purity*: the host reads no domain type back typed, it
 speaks only to the broker (the `contract-purity` guard fails the build if a contract exports a concrete
-class). The one sanctioned exception is a `type=library` bundle, staged in-framework AND kept flat in
+class). The one sanctioned exception is a `type=dual-realm` bundle, staged in-framework AND kept flat in
 the host uber-jar — TWO copies, each bound to its realm — because it carries NO seam surface: only flat
 values cross, each realm holds its own copy. `seed-broker-codec` is the founding case (a foundation:
 serves all domains, both worlds).
 
-`incus-contract-host` (2026-07-17) is the first `type=library` of a DOMAIN, and it refines the rule:
+`incus-contract-host` (2026-07-17) is the first `type=dual-realm` of a DOMAIN, and it refines the rule:
 the dual-realm here is *intra-domain*. incus must run part of its logic host-flat — the GROW beat,
 because `com.pulumi` cannot enter Felix — so the incus SCION (OSGi) and the incus GROW (host) are two
 halves of ONE domain that need to share flat value records (the `InstanceGrowPlan`) ACROSS the realm
