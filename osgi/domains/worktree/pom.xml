@@ -15,13 +15,12 @@
   <name>osgi/domains/worktree</name>
   <description>The worktree domain: the worktree the seed cultivates, as ONE OSGi @Component that
     KNOWS its own git facts (root, HEAD provenance, working state). worktree-contract is the OSGi
-    service interface (Worktree) scions @Reference; worktree-contract-host is the dual-realm host
-    face (WorktreeFacts + WorktreeCoordinate + Provenance + WorkingState) the soil harvests into the
-    cellar and the flat host fetches back. worktree-core is the jgit-backed impl (JgitWorktree), jgit
-    sealed behind it, exporting nothing. worktree-bdd is the worktree soil scenario.</description>
+    service interface (Worktree) scions @Reference, alongside the facts records (WorktreeFacts +
+    WorktreeCoordinate + Provenance + WorkingState) the soil harvests into the cellar and consumers
+    fetch back. worktree-core is the jgit-backed impl (JgitWorktree), jgit sealed behind it,
+    exporting nothing. worktree-bdd is the worktree soil scenario.</description>
 
   <modules>
-    <module>worktree-contract-host</module>
     <module>worktree-contract</module>
     <module>worktree-core</module>
     <module>worktree-bdd</module>

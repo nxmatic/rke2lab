@@ -20,21 +20,23 @@
     a realm.</description>
 
   <dependencies>
-    <!-- The Worktree service the soil reads the facts off (OSGi-side @Reference via the injector). -->
+    <!-- The Worktree service the soil reads the facts off (OSGi-side @Reference via the injector),
+         plus WorktreeFacts + WorktreeCoordinate: the harvest record and the cellar coordinate. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>worktree-contract</artifactId>
-    </dependency>
-    <!-- WorktreeFacts + WorktreeCoordinate: the harvest record and the cellar coordinate. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>worktree-contract-host</artifactId>
     </dependency>
     <!-- The frontier vocabulary: Cellar + Parcel the harvest is stored through, RunbookCoordinate +
          SeedHandler the runbook handler serves. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <!-- SeedCodec + AmendmentBinder: the handler decodes the runbook trigger and the amend reflector
+         binds the FACET (the entry-gate GatePolicy) into WorktreeRunbookInput. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
          the jgiven-wrap bundle, pulled into the live world by this bundle's import closure. -->

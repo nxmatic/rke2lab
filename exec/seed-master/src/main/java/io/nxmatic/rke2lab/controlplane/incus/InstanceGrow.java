@@ -18,12 +18,10 @@ import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
-import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths.HostPathCatalog;
 import io.nxmatic.rke2lab.incus.contract.host.GrowImageView;
+import io.nxmatic.rke2lab.incus.contract.host.GrowMountView;
 import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,14 +44,12 @@ import java.util.function.Consumer;
 public final class InstanceGrow {
 
   private final BootstrapConfig config;
-  private final Path worktreeRoot;
   private final IncusProviderContext providerContext;
   private final IncusImportLookup importLookup;
   private final Consumer<String> log;
 
-  public InstanceGrow(BootstrapConfig config, Path worktreeRoot, Consumer<String> log) {
+  public InstanceGrow(BootstrapConfig config, Consumer<String> log) {
     this.config = config;
-    this.worktreeRoot = worktreeRoot;
     this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
     this.importLookup = new IncusImportLookup(providerContext, log);
     this.log = log;
@@ -232,7 +228,7 @@ public final class InstanceGrow {
             .profiles(profileName.applyValue(List::of))
             .config(instanceConfig)
             .running(true)
-            .devices(seedInstanceDevices(plan.network()))
+            .devices(seedInstanceDevices(plan))
             .build(),
         CustomResourceOptions.builder()
             .provider(providerContext.provider())
@@ -243,46 +239,21 @@ public final class InstanceGrow {
   }
 
   /**
-   * The 17 instance devices, derived host-side from {@link BootstrapPaths} — the same topology the
-   * scion materialised into (dual-realm), NFS-automount translated for the NixOS host that mounts
-   * them. 2 NICs (hwaddrs from the plan's network view), 2 unix-char (fixed), 13 disks (host source
-   * from the automount view, guest target from {@link HostPathCatalog}).
+   * The 17 instance devices — 2 NICs (hwaddrs from the plan's network view), 2 unix-char (fixed),
+   * and the 13 disk {@link GrowMountView mounts} the scion already resolved OSGi-side
+   * (source↔target pairs, NFS-automount translated). The host derives NO path here: it poses the
+   * plan's mounts as {@code disk} devices, holding no {@code BootstrapPaths} and no worktree root.
    */
-  private List<InstanceDeviceArgs> seedInstanceDevices(GrowNetworkView network) {
-    final BootstrapPaths paths =
-        BootstrapPaths.fromLocalWorktree(worktreeRoot, config.clusterName(), config.nodeName())
-            .asLiveView()
-            .asAutomountView(config.nfsAutomount(), config.netPrefix());
-
+  private List<InstanceDeviceArgs> seedInstanceDevices(InstanceGrowPlan plan) {
+    final GrowNetworkView network = plan.network();
     final List<InstanceDeviceArgs> devices = new ArrayList<>();
     devices.add(nic("lan0", network.lanHwaddr(), "lan0", "bridged", config.lanBridgeParent()));
     devices.add(nic("vmnet0", network.wanHwaddr(), "vmnet0", "bridged", config.vmnetNetworkName()));
     devices.add(unixChar("kmsg.dev", "/dev/kmsg", "/dev/kmsg"));
     devices.add(unixChar("zfs.dev", "/dev/zfs", "/dev/zfs"));
-    devices.add(disk("worktree.dir", paths.worktreeRoot(), HostPathCatalog.WORKTREE.path()));
-    devices.add(
-        disk("rke2lab.environment.dir", paths.runtimeEnvConfigRoot(), HostPathCatalog.ENV.path()));
-    devices.add(disk("rke2lab.scripts.dir", paths.scriptsRoot(), HostPathCatalog.SCRIPTS.path()));
-    devices.add(disk("git.dir", paths.gitRoot(), HostPathCatalog.GIT_WORKTREE.path()));
-    devices.add(
-        disk(
-            "rke2lab.systemd.libexec.dir",
-            paths.systemdLibexecRoot(),
-            HostPathCatalog.SYSTEMD_LIBEXEC.path()));
-    devices.add(
-        disk("rke2lab.system.dir", paths.systemdRoot(), HostPathCatalog.SYSTEMD_UNITS.path()));
-    devices.add(disk("manifests.dir", paths.manifestsRoot(), HostPathCatalog.MANIFESTS.path()));
-    devices.add(
-        disk("rke2.config.dir", paths.runtimeRke2ConfigRoot(), HostPathCatalog.RKE2_CONFIG.path()));
-    devices.add(
-        disk(
-            "cloudconfig.nocloud.dir",
-            paths.runtimeCloudConfigRoot(),
-            HostPathCatalog.CLOUDCONFIG_NOCLOUD.path()));
-    devices.add(disk("shared.dir", paths.shareRoot(), HostPathCatalog.SHARE.path()));
-    devices.add(disk("daemonset.dir", paths.daemonsetRoot(), HostPathCatalog.DAEMONSET.path()));
-    devices.add(disk("kubeconfig.dir", paths.kubeconfigRoot(), HostPathCatalog.KUBECONFIG.path()));
-    devices.add(disk("nocloud.dir", paths.cloudSeedRoot(), HostPathCatalog.NOCLOUD_SEED.path()));
+    for (GrowMountView mount : plan.mounts()) {
+      devices.add(disk(mount.deviceName(), mount.source(), mount.target()));
+    }
     return List.copyOf(devices);
   }
 
@@ -298,8 +269,8 @@ public final class InstanceGrow {
     return device(name, "unix-char", Map.of("source", source, "path", path));
   }
 
-  private static InstanceDeviceArgs disk(String name, Path source, String path) {
-    return device(name, "disk", Map.of("source", source.toString(), "path", path));
+  private static InstanceDeviceArgs disk(String name, String source, String path) {
+    return device(name, "disk", Map.of("source", source, "path", path));
   }
 
   private static InstanceDeviceArgs device(

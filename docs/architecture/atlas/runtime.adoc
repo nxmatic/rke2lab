@@ -29,7 +29,7 @@ services from the registry, and OSGi logs converge on the host's Logback via Pax
 flowchart TB
   subgraph proc["seed-master exec-jar (one process, one binary:)"]
     subgraph host["HOST world — flat classpath"]
-      seam["host seam<br/>IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
+      seam["host seam<br/>IncusResourceBootstrap"]:::host
       rt["FrameworkLaunch.embedded<br/>(framework-launcher — boots Felix)"]:::host
       grpc["Pulumi SDK + grpc-netty"]:::host
       lb["SLF4J + Logback"]:::host
@@ -131,7 +131,7 @@ flowchart TB
     reg2["NodeEnvContributorRegistry (in-bundle)"]:::osgi
   end
   subgraph HOST["host space — actualises"]
-    seam0["IncusResourceBootstrap.singleSpiProvider / EntryGatePolicyEnforcer"]:::host
+    seam0["IncusResourceBootstrap.singleSpiProvider"]:::host
   end
   sl["java.util.ServiceLoader + META-INF/services"]:::found
   seam0 -->|"ServiceLoader.load"| sl
@@ -157,7 +157,7 @@ flowchart TB
     reg2["NodeEnvContributorRegistry @Component+@Reference (R3)"]:::neu
   end
   subgraph HOST["host space — actualises"]
-    seam0["IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
+    seam0["IncusResourceBootstrap"]:::host
     fx["embedded Felix + felix.scr, inside Pulumi.run (R4)"]:::neu
   end
   sl["java.util.ServiceLoader + META-INF/services — now only the un-migrated CLIs (R5 deletes)"]:::found
@@ -231,7 +231,7 @@ flowchart TB
     plan["BootPlanner → BootPlan (pure decision)"]:::osgi
   end
   subgraph HOST["host space — actualises"]
-    seam0["IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
+    seam0["IncusResourceBootstrap"]:::host
     fx["embedded Felix + felix.scr (R4)"]:::osgi
     flp["FrameworkLaunch.embedded().launch()<br/>(plain launch: FrameworkLauncher → BootedFramework)"]:::host
   end

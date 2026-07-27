@@ -14,18 +14,14 @@
   <description>The worktree domain's jgit-backed core: JgitWorktree (@Component service = Worktree)
     locates the process's own worktree and reads its git facts (root, HEAD provenance, working
     state). jgit is a BSN bundle imported not embedded, sealed in the internal package and never
-    exported — the exported Worktree view lives in worktree-contract, its facts records in
-    worktree-contract-host. Exports NOTHING: consumers reach the SERVICE (Worktree), never the impl.</description>
+    exported — the exported Worktree view and its facts records live in worktree-contract. Exports
+    NOTHING: consumers reach the SERVICE (Worktree), never the impl.</description>
 
   <dependencies>
+    <!-- The Worktree interface and the facts records (Provenance / WorkingState) JgitWorktree returns. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>worktree-contract</artifactId>
-    </dependency>
-    <!-- Provenance / WorkingState: the facts records JgitWorktree returns. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>worktree-contract-host</artifactId>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

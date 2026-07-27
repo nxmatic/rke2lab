@@ -27,6 +27,7 @@ import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Facet;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Image;
 import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
+import io.nxmatic.rke2lab.incus.contract.host.GrowMountView;
 import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
@@ -55,7 +56,8 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
-import io.nxmatic.rke2lab.worktree.Worktree;
+import io.nxmatic.rke2lab.worktree.WorktreeCoordinate;
+import io.nxmatic.rke2lab.worktree.WorktreeFacts;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -143,14 +145,6 @@ public class IncusProvisionScenario
   @OsgiService(await = false)
   private Optional<ConsultingService> doctor = Optional.empty();
 
-  // The worktree the seed cultivates, as ONE OSGi service — the scion reads its root() (the anchor
-  // BootstrapPaths derives from) and its provenance() (the HEAD sha + dirty the staging entry
-  // freezes). It replaces the worktreeRoot scalar the host used to sow: the component self-locates
-  // its own root, so the host no longer carries it. await=false like the doctor — an offline/survey
-  // world boots without it, and the unamended path never dereferences it.
-  @OsgiService(await = false)
-  private Optional<Worktree> worktree = Optional.empty();
-
   // The consultations the run raised on a failed build/unreachable instance — the
   // ScenarioOutcomeExtension PULLS them (ConsultationSource) at the run boundary. Set in the @Test
   // after the body (jGiven defers a failed step's throw to scenario-end); empty until then.
@@ -181,11 +175,17 @@ public class IncusProvisionScenario
     final Parcel parcel = this.parcel.orElseThrow();
     final IncusRunbookInput input =
         Objects.requireNonNull(this.input, "the IncusRunbookInput was not seeded before the body");
-    // The worktree root the scion anchors every path on — read from the Worktree OSGi component
-    // (which self-locates it), present only for an AMENDED run (a survey has no facet, so it never
-    // touches the service — see the await=false note on the field).
+    // The worktree root the scion anchors every path on — TAKEN from the cellar, where the worktree
+    // soil harvested it at the first crossing. The worktree facts are immutable across the run, so
+    // the scion fetches the snapshot rather than re-walking git live (fetch-not-push: harvest once,
+    // take many). Present only for an AMENDED run (a survey has no facet, so it never dereferences
+    // the harvest).
+    final Optional<WorktreeFacts> worktreeFacts =
+        cellar.fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class);
     final Optional<Path> worktreeRoot =
-        input.facet().isPresent() ? Optional.of(worktree.orElseThrow().root()) : Optional.empty();
+        input.facet().isPresent()
+            ? Optional.of(Path.of(worktreeFacts.orElseThrow().root()))
+            : Optional.empty();
     // The scion reconstructs the provisioning topology from the FACET the host amended + the root
     // it
     // read (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE —
@@ -327,10 +327,12 @@ public class IncusProvisionScenario
       Path cloudSeedRoot,
       Path secretsFile,
       String clusterName,
-      String nodeName) {
+      String nodeName,
+      boolean nfsAutomount,
+      String netPrefix) {
 
     static final Resolved UNAMENDED =
-        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), "", "");
+        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), "", "", false, "");
 
     static Resolved from(
         Optional<Facet> maybeFacet, Optional<Path> worktreeRoot, Cellar cellar, Parcel parcel) {
@@ -351,7 +353,9 @@ public class IncusProvisionScenario
           staging.cloudSeedRoot(),
           staging.secretsFile(),
           facet.clusterName(),
-          facet.nodeName());
+          facet.nodeName(),
+          facet.nfsAutomount(),
+          facet.netPrefix());
     }
 
     boolean isAmended() {
@@ -581,12 +585,6 @@ public class IncusProvisionScenario
     // the Then reads its recipe digest, no longer threaded from the scenario.
     @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
 
-    // The Worktree component the staging publication reads provenance() from — POST-materialisation
-    // (a staging written under the tree can dirty it), so it is read here, not at resolution. Only
-    // dereferenced in the amended branch; await=false so a survey world boots without it.
-    @OsgiService(await = false)
-    private Optional<Worktree> worktree = Optional.empty();
-
     public Then the_instance_is_prepared() {
       return self();
     }
@@ -615,12 +613,12 @@ public class IncusProvisionScenario
      * Publish the {@link HostStagingEntry} for the slot this run materialised — the host-tree fact
      * reconcile folds later to decide the promotion (§ host-cellar-realisation, the reconcile
      * cycle). It checksums the WHOLE staging tree ({@link HostTreeChecksummer}) — the discriminant
-     * reconcile diffs against the pivot — and captures the worktree's git provenance (the {@link
-     * Worktree} component's {@code provenance()}: sha + dirty), frozen with the immutable staging
-     * (the fold keeps N stagings, so this history survives, unlike the last-wins live). Skipped for
-     * an unamended survey (no slot materialised). The store is unconditional on the gate: the
-     * cellar itself routes conserve vs pre-reserve, so a preview run still records its staging
-     * entry (only the promotion's live entry is gated, at reconcile).
+     * reconcile diffs against the pivot — and captures the worktree's git provenance (taken from
+     * the harvested {@link WorktreeFacts} snapshot in the cellar: sha + dirty), frozen with the
+     * immutable staging (the fold keeps N stagings, so this history survives, unlike the last-wins
+     * live). Skipped for an unamended survey (no slot materialised). The store is unconditional on
+     * the gate: the cellar itself routes conserve vs pre-reserve, so a preview run still records
+     * its staging entry (only the promotion's live entry is gated, at reconcile).
      */
     public Then the_staging_is_published(
         @Hidden Resolved resolved, @Hidden Cellar cellar, @Hidden Parcel parcel) {
@@ -628,9 +626,16 @@ public class IncusProvisionScenario
         return self();
       }
       final Path stagingRoot = Path.of(resolved.stagingRoot());
-      // The worktree provenance (HEAD sha + dirty) the Worktree component knows, mapped onto the
-      // staging entry's own Provenance — no jgit here, the component seals it.
-      final var provenance = worktree.orElseThrow().provenance();
+      // The worktree provenance (HEAD sha + dirty) — TAKEN from the harvested WorktreeFacts in the
+      // cellar (the soil's first-crossing snapshot), the source breadcrumb this staging was
+      // cultivated FROM. Pre-materialisation is the RIGHT provenance for the entry: the source git
+      // state, not the staging write's own incidental dirt. Immutable across the run, so taken from
+      // the cellar rather than re-walked (fetch-not-push). No jgit here.
+      final var provenance =
+          cellar
+              .fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class)
+              .orElseThrow()
+              .provenance();
       final HostStagingEntry entry =
           HostStagingEntry.of(
               resolved.stagingRoot(),
@@ -660,6 +665,17 @@ public class IncusProvisionScenario
       if (!resolved.isAmended() || networkView == null) {
         return self();
       }
+      // The 13 disk mounts resolved OSGi-side: the LIVE tree (host.live.d) the instance mounts,
+      // rebased onto the NFS-automount view the remote NixOS host reads through — the same chain
+      // the
+      // host GROW used to compute itself. Now the scion projects them, so the GROW poses them
+      // alone.
+      final List<GrowMountView> mounts =
+          BootstrapPaths.fromLocalWorktree(
+                  resolved.worktreeRoot(), resolved.clusterName(), resolved.nodeName())
+              .asLiveView()
+              .asAutomountView(resolved.nfsAutomount(), resolved.netPrefix())
+              .instanceMounts();
       final InstanceGrowPlan plan =
           new GrowPlanAssembler(
                   image.alias(),
@@ -668,7 +684,7 @@ public class IncusProvisionScenario
                   imageBuilder.orElseThrow().recipeDigest(),
                   Path.of(image.sharedFolder()),
                   resolved.cloudSeedRoot())
-              .assemble(networkView);
+              .assemble(networkView, mounts);
       cellar.store(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, plan);
       return self();
     }

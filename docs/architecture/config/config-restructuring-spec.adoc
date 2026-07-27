@@ -461,9 +461,9 @@ spec § "The framework log-level knob".
 == Remediation via the doctor pattern
 
 A missing or malformed mandatory key is, in the doctor's vocabulary, a *symptom*. Config
-validation is an *entry gate* - a precondition checked *before* provisioning, the same species as
-`EntryGatePolicyEnforcer`. So when it fails, the operator should get a *prescription*, not a bare
-stack trace.
+validation is an *entry gate* - a precondition checked *before* provisioning, the same species of
+front-door check as the clean-worktree entry gate. So when it fails, the operator should get a
+*prescription*, not a bare stack trace.
 
 === Config is the doctor pattern's first use case
 

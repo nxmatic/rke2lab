@@ -617,9 +617,10 @@ No incremental accumulation (that would mutate), no three separate views fetched
 [listing]
 ----
 InstanceGrowPlan(
-    GrowNetworkView network,      // group: lanHwaddr, wanHwaddr, dnsmasqConfig (Map)
-    GrowImageView   image,        // group: imageAlias, metadataPath, dataPath, buildChecksum
-    String cloudInitChecksum)     // instance scalar → at the ROOT (the plan IS the instance's)
+    GrowNetworkView network,        // group: lanHwaddr, wanHwaddr, dnsmasqConfig (Map)
+    GrowImageView   image,          // group: imageAlias, metadataPath, dataPath, buildChecksum
+    String cloudInitChecksum,       // instance scalar → at the ROOT (the plan IS the instance's)
+    List<GrowMountView> mounts)     // the 13 resolved disk mounts: deviceName, source, target
 ----
 
 *It lives in a NEW module `incus-contract-host` — the HOST FACE of the incus contract, `type=library`
@@ -637,10 +638,12 @@ domain (the only prior one, `seed-broker-codec`, is a foundation).
 "records only / no logic" — it is *no dependency absent from either realm*. A type may carry pure logic
 here IFF it depends only on the JDK + jspecify (no OSGi type, no other domain, no service reference) and
 is owned by this one domain. So besides the flat views it also holds `BootstrapPaths` — the provisioning
-topology (pure `java.nio.file.Path` derivation) the scion materialises into AND the host derives the 17
-instance mounts from. That is why the plan carries NO device view: the host, holding `BootstrapConfig`
-scalars + `BootstrapPaths`, derives the mounts itself (`fromLocalWorktree(...).asAutomountView(...)` +
-the `HostPathCatalog` guest paths) — the scion-projects/host-actualises rule applied to paths.
+topology (pure `java.nio.file.Path` derivation) the scion materialises into AND derives the 13 instance
+disk mounts from, OSGi-side (`fromLocalWorktree(...).asLiveView().asAutomountView(...).instanceMounts()`,
+each root paired with its `HostPathCatalog` guest target). The plan carries those resolved mounts as
+`GrowMountView` records (2026-07-27): the scion projects the source↔target pairs, the host poses them as
+`disk` devices and derives no path, holds no `BootstrapPaths` and no worktree root — the
+scion-projects/host-actualises rule applied to paths TOO, so the GROW actualises the plan ALONE.
 
 *The scion-side producers (incus-core, OSGi-only).* Three collaborators assemble the plan, each named
 by `IncusProvisionScenario`'s PREPARE beats: `GrowNetworkResolver` (resolves `NetplanSynthesisService`
@@ -897,8 +900,8 @@ timeline *host-side*. Playing the first preview PROVED that wrong: `HostTreeHead
 `seed-master` and decoded `HostStagingEntry`/`HostLiveEntry`/`HostDriftEntry` — types in
 `manifests-contract`, a `type=contract` bundle (staged, NOT flat). A flat class touching a bundle-only
 contract type is a REALM leak; at runtime it is a `NoClassDefFoundError`. It is the SAME anti-pattern
-as the pre-existing `EntryGatePolicyEnforcer → ManifestUpdateGate` leak — host-flat code reading a
-domain's typed contract.
+as the former host-flat `EntryGatePolicyEnforcer → ManifestUpdateGate` leak (since removed) — host-flat
+code reading a domain's typed contract.
 
 *Who OWNS the host tree — incus, not manifests.* The first reflex was to give the host-tree CRUD to
 manifests (that is where `Host*Entry` sat). WRONG. The HOST TREE (`host.N.staging.d` entire —

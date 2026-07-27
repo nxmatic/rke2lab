@@ -47,19 +47,14 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
-    <!-- The worktree domain's jgit-free contract: the scion @OsgiService-injects the Worktree service
-         to read its root() (the anchor for BootstrapPaths) and provenance() (the staging entry's sha
-         + dirty), replacing the worktreeRoot scalar the host used to sow and the deleted
-         GitProvenanceReader. -->
+    <!-- The worktree domain's jgit-free contract: the scion fetches the harvested WorktreeFacts
+         (WorktreeCoordinate.FACTS) from the cellar to read the staging entry's provenance (sha +
+         dirty), and the facts records (Provenance/WorkingState) the staging Then maps onto
+         HostStagingEntry.Provenance — replacing the worktreeRoot scalar the host used to sow and
+         the deleted GitProvenanceReader. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>worktree-contract</artifactId>
-    </dependency>
-    <!-- The worktree facts records (Provenance/WorkingState) the Worktree service returns and the
-         staging Then maps onto HostStagingEntry.Provenance. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>worktree-contract-host</artifactId>
     </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a build/exec failure. -->
     <dependency>

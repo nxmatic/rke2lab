@@ -7,5 +7,6 @@ Export-Package: io.nxmatic.rke2lab.worktree
 # seam and NOT flat host-side (the host reads the facts through the cellar, never this interface).
 # worktree-core's JgitWorktree satisfies it, jgit sealed behind the impl. It carries no @Component,
 # so it does NOT Require the SCR extender; the contract-purity guard fails the build if it exports a
-# concrete class (it exports only the interface). Its return records live in worktree-contract-host.
+# concrete service impl (it exports the interface plus its jgit-free value records:
+# Provenance / WorkingState / WorktreeFacts / WorktreeCoordinate).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=contract

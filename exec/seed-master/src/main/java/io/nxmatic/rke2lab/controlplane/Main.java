@@ -80,7 +80,9 @@ public final class Main {
                   runMode,
                   parcel,
                   bootstrap,
-                  config.entryGate().cleanWorktreeRequired().orElse(true),
+                  config.entryGate().cleanWorktreeRequired().orElse(false),
+                  config.entryGate().toleratedPaths(),
+                  config.entryGate().flakeLockRequired().orElse(false),
                   UUID.randomUUID().toString(),
                   // The manifests FACET, read verbatim from Pulumi config here (the only place the
                   // envelope's Config is reachable) and carried for the GIVEN to publish.

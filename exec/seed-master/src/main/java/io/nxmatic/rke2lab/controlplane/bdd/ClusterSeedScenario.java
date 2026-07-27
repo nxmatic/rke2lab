@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.Stage;
@@ -17,7 +18,6 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
-import io.nxmatic.rke2lab.controlplane.policy.EntryGatePolicyEnforcer;
 import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
@@ -29,8 +29,6 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.seed.bdd.CellarStage;
-import io.nxmatic.rke2lab.seed.bdd.PreflightGate;
-import io.nxmatic.rke2lab.seed.bdd.PreflightStage;
 import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
 import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
@@ -42,9 +40,6 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
-import io.nxmatic.rke2lab.worktree.host.WorktreeCoordinate;
-import io.nxmatic.rke2lab.worktree.host.WorktreeFacts;
-import java.nio.file.Path;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Objects;
@@ -160,8 +155,6 @@ public class ClusterSeedScenario
     when()
         .the_worktree_is_surveyed(hostScenario, hostTree)
         .and()
-        .the_entry_gates_are_enforced()
-        .and()
         .the_parcels_state_is_fetched()
         .and()
         .the_network_reservations_are_settled(hostScenario, hostTree)
@@ -182,8 +175,9 @@ public class ClusterSeedScenario
    * The GIVEN bootstraps the open gardening from the received {@link RunMode}: open the {@link
    * Gardening} (boot Felix, find the gardener), publish the {@link RunGate} into the registry so
    * the scions resolve it, and build the host realisations the WHENs use — the {@link
-   * PulumiCellar}, the {@link PreflightGate}, the {@link Parcel}. All of it is narration; opening
-   * the gardening is a precondition, not a step.
+   * PulumiCellar}, the {@link Parcel}, and the ambient FACET contributors (incus, manifests, and
+   * the worktree entry-gate policy). All of it is narration; opening the gardening is a
+   * precondition, not a step.
    */
   public static class Given extends Stage<Given> {
 
@@ -192,7 +186,6 @@ public class ClusterSeedScenario
     // boundary). Named for its role, distinct from the working `cellar` below — the When already
     // consumes it as `cellarRealisation`.
     @ProvidedScenarioState PulumiCellar cellarRealisation;
-    @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
 
     // The IMAGE amendment subtree the incus crossing sows per-consult. Name-resolved (the When
@@ -288,20 +281,24 @@ public class ClusterSeedScenario
               AmendmentContributor.class,
               new FacetContributor(new AmendCoordinate("incus-provision"), incusFacet.toString()),
               new Hashtable<>());
-      // The entry gate reads the worktree's WorkingState from the facts the worktree soil harvested
-      // into the cellar (it runs as the first crossing, before this gate) — the host keeps the
-      // policy (which uncommitted paths matter), the worktree owns the raw fact. No jgit host-side.
-      this.preflightGate =
-          () ->
-              EntryGatePolicyEnforcer.enforceAll(
-                  cellar
-                      .fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class)
-                      .orElseThrow(
-                          () ->
-                              new IllegalStateException(
-                                  "the worktree soil harvested no facts before the entry gate"))
-                      .workingState(),
-                  run.cleanWorktreeRequired());
+      // The entry-gate FACET — the run's GatePolicy (clean-worktree requirement + tolerated paths),
+      // contributed AMBIENT the way the incus/manifests FACETs are. The worktree crossing (the
+      // first
+      // one) enforces it OSGi-side against the WorkingState it harvests, and fails the run there if
+      // the ground is unclean beyond tolerance. The host names NO worktree type — only opaque JSON
+      // on the FACET role; no host jgit, no host worktree-fact fetch, no host preflight.
+      final ObjectNode gateFacet = JsonNodeFactory.instance.objectNode();
+      gateFacet.put("cleanWorktreeRequired", run.cleanWorktreeRequired());
+      gateFacet.put("flakeLockRequired", run.flakeLockRequired());
+      final ArrayNode tolerated = gateFacet.putArray("toleratedPaths");
+      run.toleratedWorktreePaths().forEach(tolerated::add);
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              AmendmentContributor.class,
+              new FacetContributor(new AmendCoordinate("worktree"), gateFacet.toString()),
+              new Hashtable<>());
       return self();
     }
   }
@@ -309,7 +306,6 @@ public class ClusterSeedScenario
   /** The seven WHENs — preflight, the cellar bookends, and the four sow-and-graft crossings. */
   public static class When extends Stage<When> {
 
-    @ScenarioStage PreflightStage preflight;
     @ScenarioStage CellarStage cellar;
     @ScenarioStage SowAndGraftStage sowAndGraft;
 
@@ -322,7 +318,6 @@ public class ClusterSeedScenario
     // so mid-run only the transactional overlay carries it (read-your-writes). Resolved by TYPE:
     // Cellar and PulumiCellar are disjoint interfaces, no clash with cellarRealisation.
     @ScenarioState Cellar workingCellar;
-    @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
 
     // Name-resolved as it was in the Given (the paired worktree subtree is gone; the discipline
@@ -343,13 +338,6 @@ public class ClusterSeedScenario
       sowAndGraft
           .sowing("worktree", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the worktree is surveyed");
-      return self();
-    }
-
-    @NestedSteps
-    @As("the entry gates are enforced")
-    public When the_entry_gates_are_enforced() {
-      preflight.gatedBy(preflightGate).the_entry_gates_are_enforced();
       return self();
     }
 
@@ -412,10 +400,9 @@ public class ClusterSeedScenario
       // cannot enter Felix, so it runs here, host-flat, between the promote (reconcile) and systemd
       // (which runs inside the instance). It fetches the InstanceGrowPlan the incus scion projected
       // (decoded host-side via the dual-realm codec) and actualises it: Project→{Network,Profile,
-      // Image}→Instance + the 17 mounts it derives from BootstrapPaths. Gated on a live Pulumi
-      // deployment on THIS worker thread (PulumiDeploymentSeed installs it) — absent in a
-      // standalone
-      // /offline run, where there is nothing to grow.
+      // Image}→Instance + the 13 mounts the plan already carries (the scion resolved them OSGi-side
+      // — the GROW derives no path). Gated on a live Pulumi deployment on THIS worker thread
+      // (PulumiDeploymentSeed installs it) — absent in a standalone/offline run, nothing to grow.
       if (!PulumiDeploymentSeed.isDeploymentPresent()) {
         return self();
       }
@@ -424,22 +411,12 @@ public class ClusterSeedScenario
       // provision crossing), and the drain to the durable backend happens only at the run
       // boundary — after this step. So mid-run only the transactional overlay carries the plan
       // (read-your-writes). Reading the durable backend here saw an empty case and grew nothing,
-      // so a preview (which never drains) declared no instance and no mounts.
-      // The worktree root the GROW derives the 17 instance mounts from comes from the same overlay:
-      // the worktree soil harvested it at the first crossing (WorktreeCoordinate.FACTS), so the
-      // host
-      // reads it back here rather than carrying it in config.
-      final Path worktreeRoot =
-          workingCellar
-              .fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class)
-              .map(facts -> Path.of(facts.root()))
-              .orElseThrow(
-                  () ->
-                      new IllegalStateException(
-                          "the worktree soil harvested no facts before the grow"));
+      // so a preview (which never drains) declared no instance and no mounts. The plan is now
+      // self-contained (network + image + cloud-init + the 13 resolved mounts), so the GROW no
+      // longer fetches the worktree facts — it actualises the plan alone.
       workingCellar
           .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
-          .ifPresent(plan -> new InstanceGrow(config, worktreeRoot, line -> {}).grow(plan));
+          .ifPresent(plan -> new InstanceGrow(config, line -> {}).grow(plan));
       return self();
     }
 

@@ -7,8 +7,8 @@
 NOTE: This is *design*, folded into rke2lab. It records a chosen-but-unbuilt
 substrate decision for the unit repository. As of this writing there is *no*
 `ContentStore` and no unitrepo storage code in the reactor: JGit
-(`org.eclipse.jgit`) is a dependency of `exec/seed-master` only, where it backs
-`GitMetadataExtractor` and `EntryGatePolicyEnforcer`. Treat everything below as
+(`org.eclipse.jgit`) is used only in the worktree domain, where it backs
+`JgitWorktree` (`worktree-core`). Treat everything below as
 the target shape of the storage substrate, not as something present today.
 
 unitrepo is *inspired by* git's object model. This doc does the fidelity verification the design
@@ -21,8 +21,8 @@ and records the decision that **a unitrepo unit IS a git tree** (option B below)
 
 The `ContentStore` unit — not yet built — is to be a content-addressed blob store. Rather than
 hand-roll it, the design chooses to build it on JGit, reusing git's object machinery (addressed
-objects, DAG, dedup, reflog, GC, fetch/clone). JGit is already a declared dependency of
-`exec/seed-master` (used today in `GitMetadataExtractor` and `EntryGatePolicyEnforcer`), so this is
+objects, DAG, dedup, reflog, GC, fetch/clone). JGit is already a declared dependency in the reactor
+(used today by `JgitWorktree` in `worktree-core`), so this is
 reuse of an already-present library, not a new third-party dependency — though the storage code
 itself remains to be written.
 

@@ -238,13 +238,6 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
-    <!-- The worktree domain's dual-realm host face: the host fetches the WorktreeFacts the worktree
-         soil harvested (WorktreeCoordinate) from the cellar — the root for the GROW mounts, the
-         WorkingState for the entry gate. jgit-free; no Worktree service reference crosses. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>worktree-contract-host</artifactId>
-    </dependency>
     <!-- The seed-broker seam: Document + SeedBroker. The stage sows a checkpoint Document through
          the broker and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>

@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.worktree.host;
+package io.nxmatic.rke2lab.worktree;
 
 /**
  * The HEAD provenance of a worktree — the commit {@code sha} it sits on and whether it is {@code

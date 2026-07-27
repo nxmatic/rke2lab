@@ -5,19 +5,20 @@
 [NOTE]
 ====
 *Status:* being implemented (2026-07-12). `seed-bdd` is the FOUNDATION module holding the gardening spine
-common to every seed exec — the host runbook stages spoken in the gardening register (the preflight gate,
-`Cellar` fetch/store, the sow-and-graft caller) plus the open `Gardening` the GIVEN carries. An exec
+common to every seed exec — the host runbook stages spoken in the gardening register (`Cellar`
+fetch/store, the sow-and-graft caller) plus the open `Gardening` the GIVEN carries. An exec
 (`seed-master`, and the seed execs after it) adds only its OWN root composition: which scions, in what
 order. It realises the host half of link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario
 map] atop link:gardening-model-spec.adoc[the gardening model]. Opening the gardening is NOT a WHEN — the
 map's GIVEN is "I have access to the open gardening", so the driver opens the `Gardening` instance and
-hands it to the scenario's Given; the seven WHENs are preflight → fetch → four sow-and-graft → store.
+hands it to the scenario's Given; the WHENs are the worktree survey → cellar fetch → the sow-and-graft
+crossings → cellar store, with the clean-worktree entry gate now enforced inside the worktree crossing.
 ====
 
 == Why a module — common spine vs per-exec composition
 
-The target host runbook is uniform: every root step is EITHER pure-host gardening (`Cellar` fetch/store,
-preflight) OR a *sow-and-graft caller* (sow a domain scenario toward the gardening, graft its scion). The
+The target host runbook is uniform: every root step is EITHER pure-host gardening (`Cellar` fetch/store)
+OR a *sow-and-graft caller* (sow a domain scenario toward the gardening, graft its scion). The
 STAGES that speak these gestures are the same for every seed exec; only the COMPOSITION — the phase order,
 which scion each step sows — is exec-specific. So the stages are common (`seed-bdd`), the composition is
 the exec's (`seed-master` writes its `ClusterSeedScenario`, a later exec writes its own).
@@ -25,9 +26,9 @@ the exec's (`seed-master` writes its `ClusterSeedScenario`, a later exec writes 
 [cols="1,2",options="header"]
 |===
 | layer | contents · home
-| *common* | the gardening stages (`Cellar` fetch/store, the sow-and-graft caller, preflight, the world
+| *common* | the gardening stages (`Cellar` fetch/store, the sow-and-graft caller, the world
 opening + the seeding harness) — **`osgi/foundation/seed-bdd`**
-| *per-exec* | `Main` + the concrete root scenario (the phase chain: preflight → … → outputs) — the exec
+| *per-exec* | `Main` + the concrete root scenario (the phase chain: worktree survey → … → outputs) — the exec
 module (**`seed-master`**, …)
 |===
 
@@ -46,7 +47,7 @@ not by module.
   tomorrow (remote — the same door, the same gesture, § REST embedded-today / remote-tomorrow). So the
   reusable half travels; the package is exported for that future in-realm reuse.
 * *The GRAFT COMPOSITION + the rest of the spine are NOT exported* — the base package `seed.bdd`
-  (`SowAndGraftStage`, the `CellarStage`, the `PreflightStage`/`PreflightGate`). `SowAndGraftStage`
+  (`SowAndGraftStage`, the `CellarStage`). `SowAndGraftStage`
   composes `ScenarioGraft` for the HOST ROOT's crossings and runs on the flat host classpath, never
   wired in-container — exporting a host stage would let a bundle load a second copy of a seam class
   (the `DUPLICATE_REALM_CLASS` collision the engine's bnd guards against). `ScenarioGraft` ITSELF,
@@ -75,7 +76,6 @@ flowchart TB
     subgraph base["seed.bdd — NOT exported (host-flat, tree-local)"]
       sg["SowAndGraftStage<br/>composes sow + graft"]
       ce["CellarStage — fetch/store"]
-      pf["PreflightStage + PreflightGate"]
     end
   end
   port["seed-broker-port<br/>SeedBroker · RunbookCoordinate · Cellar · RunGate"]
@@ -92,7 +92,7 @@ flowchart TB
   classDef flat fill:#fff4e6,stroke:#ff9900;
   classDef dep fill:#e1f5ff,stroke:#0066cc;
   class sow,g exp;
-  class base,sg,ce,pf flat;
+  class base,sg,ce flat;
   class port,eng dep;
 ----
 
@@ -198,9 +198,10 @@ scenario's GIVEN, read as narration: take the `Gardening` OVER the world extensi
 (`Gardening.over(connection)` — the connection `BaseWorldExtension`/`@SeedRuntime` opened and owns at the
 class scope; the GIVEN does NOT boot a second framework), publish the `RunGate` into the registry so the
 scions resolve it (`registerService`, not a handler — the ambient run-condition the map's GIVEN names),
-build the `Cellar` realisation (`PulumiCellar.fromEnvironment`) and the `PreflightGate` (delegating to the
-exec's entry-gate enforcer), name the `Parcel`, publish the `txId`. The map's GIVEN — "I have access to the
-open gardening, and a RunGate" — IS this bootstrap; opening the gardening is a precondition, never a WHEN.
+build the `Cellar` realisation (`PulumiCellar.fromEnvironment`), name the `Parcel`, publish the `txId`. The
+map's GIVEN — "I have access to the open gardening, and a RunGate" — IS this bootstrap; opening the
+gardening is a precondition, never a WHEN. (The clean-worktree entry gate is no longer built here: it is
+contributed as a FACET amendment and enforced OSGi-side inside the worktree crossing.)
 
 *What crosses layer 1 → layer 2, all through the session store.* The launcher's inbound channel
 (`JUnitLauncherCore.run(…, seedSessionStore)`) carries what only `Main` can know: the `SeedRun` (bearing

@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.incus.core;
 
 import io.nxmatic.rke2lab.incus.contract.host.GrowImageView;
+import io.nxmatic.rke2lab.incus.contract.host.GrowMountView;
 import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
 import java.io.IOException;
@@ -54,9 +55,14 @@ public final class GrowPlanAssembler {
     this.cloudSeedRoot = cloudSeedRoot;
   }
 
-  /** Seal the network view + the image + the cloud-init checksum into the immutable plan. */
-  public InstanceGrowPlan assemble(GrowNetworkView network) {
-    return new InstanceGrowPlan(network, imageView(), cloudInitChecksum());
+  /**
+   * Seal the network view + the image + the cloud-init checksum + the resolved disk mounts into the
+   * immutable plan. The scion resolved the mounts OSGi-side ({@link GrowMountView#resolveFrom} off
+   * the live + automount {@code BootstrapPaths}) so the host GROW poses them without deriving a
+   * single path.
+   */
+  public InstanceGrowPlan assemble(GrowNetworkView network, List<GrowMountView> mounts) {
+    return new InstanceGrowPlan(network, imageView(), cloudInitChecksum(), mounts);
   }
 
   private GrowImageView imageView() {

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The central component that collects {@link PulumiOutputContributor}s and assembles the final
@@ -46,16 +47,18 @@ public final class PulumiOutputRegistry {
           .forEach(
               (key, value) -> {
                 final String previousOwner = keyOwner.putIfAbsent(key, contributor.namespace());
-                if (previousOwner != null) {
-                  throw new IllegalStateException(
-                      "output key '"
-                          + key
-                          + "' contributed by both '"
-                          + previousOwner
-                          + "' and '"
-                          + contributor.namespace()
-                          + "'");
-                }
+                Optional.ofNullable(previousOwner)
+                    .ifPresent(
+                        owner -> {
+                          throw new IllegalStateException(
+                              "output key '"
+                                  + key
+                                  + "' contributed by both '"
+                                  + owner
+                                  + "' and '"
+                                  + contributor.namespace()
+                                  + "'");
+                        });
                 outputs.put(key, value);
               });
     }

@@ -4,6 +4,7 @@ import com.pulumi.Config;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.osgi.service.log.LogLevel;
@@ -81,7 +82,10 @@ public record Rke2labConfig(
             new ReadinessConfig(
                 loader.optionalBoolean("readiness", "enabled"),
                 loader.optionalDuration("readiness", "timeout")),
-            new EntryGateConfig(loader.optionalBoolean("entryGate.cleanWorktree", "required")),
+            new EntryGateConfig(
+                loader.optionalBoolean("entryGate.cleanWorktree", "required"),
+                loader.stringList("entryGate.cleanWorktree", "tolerated"),
+                loader.optionalBoolean("entryGate.flakeLock", "required")),
             new BboxConfig(loader.optionalBoolean("bbox.reconcile", "failOnError")),
             new LoggingConfig(
                 loader.optional("logging", "level").map(Rke2labConfig::parseLogLevel)));
@@ -154,7 +158,18 @@ public record Rke2labConfig(
 
   public record ReadinessConfig(Optional<Boolean> enabled, Optional<Duration> timeout) {}
 
-  public record EntryGateConfig(Optional<Boolean> cleanWorktreeRequired) {}
+  /**
+   * The worktree entry gate. {@code cleanWorktreeRequired} arms the clean-worktree sub-gate and
+   * {@code toleratedPaths} is its injected leniency — the worktree-relative paths (or path
+   * prefixes) allowed to be uncommitted while it still passes (the ambient files a multi-session
+   * working tree carries: {@code .secrets}, {@code Pulumi.dev.yaml}, …). {@code flakeLockRequired}
+   * arms the flake-lock-coherence sub-gate (default OFF). The gate itself hardcodes NONE of this;
+   * the policy is the operator's, declared here.
+   */
+  public record EntryGateConfig(
+      Optional<Boolean> cleanWorktreeRequired,
+      List<String> toleratedPaths,
+      Optional<Boolean> flakeLockRequired) {}
 
   public record BboxConfig(Optional<Boolean> failOnError) {}
 

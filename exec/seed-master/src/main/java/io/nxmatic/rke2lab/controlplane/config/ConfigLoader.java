@@ -114,6 +114,20 @@ public final class ConfigLoader {
     return result;
   }
 
+  /**
+   * Reads a nested string list (e.g. {@code entryGate.cleanWorktree.tolerated} = {@code
+   * [".secrets", "Pulumi.dev.yaml"]}). Empty list when the key is absent. Elements are stringified
+   * so a non-string scalar degrades to its text form rather than crashing.
+   */
+  @SuppressWarnings("unchecked")
+  public List<String> stringList(String section, String key) {
+    final Object value = sectionReader.read(section).map(map -> map.get(key)).orElse(null);
+    if (!(value instanceof List)) {
+      return List.of();
+    }
+    return ((List<Object>) value).stream().map(String::valueOf).toList();
+  }
+
   private static final ObjectMapper JSON = new ObjectMapper();
 
   /**

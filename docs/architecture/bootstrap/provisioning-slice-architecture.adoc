@@ -240,8 +240,8 @@ OSGi-side as `NodeEnvOverlayService` — is the sink; it awaits a caller in the 
 
 `IncusResourceBootstrap` (host, ~3800 lines) fused the Pulumi graph *and* a
 `ProvisioningTargetRegistry` of the five targets above. A top-down cut, driven by
-the target ClusterSeed scenario map (which shows only the gardening: preflight →
-`Cellar.fetch` → sow-and-graft → `Cellar.store`), removed the whole class before
+the target ClusterSeed scenario map (which shows only the gardening: worktree
+survey → `Cellar.fetch` → sow-and-graft → `Cellar.store`), removed the whole class before
 the replacement scions existed. The result is seven open deltas:
 
 [cols="1,3,2",options="header"]
@@ -404,8 +404,9 @@ founding rule) surfaced the same wall from three angles, all one cause:
   (`registry has 0`). On `main` the same delayed components published fine; the
   difference is not version, start-levels, or DS-runtime packages (all equivalent).
 * **The pattern itself is condemned** — a host (flat realm) resolving a domain
-  service by type is exactly the realm-boundary anti-pattern
-  (`EntryGatePolicyEnforcer.awaitService(ManifestUpdateGate)`). The gardening model
+  service by type is exactly the realm-boundary anti-pattern the former host-flat
+  entry gate fell into when it reached for a domain gate by type
+  (`EntryGatePolicyEnforcer.awaitService(ManifestUpdateGate)`, since removed). The gardening model
   forbids it: the host does not reach into the registry for domain logic, **it
   sows**.
 

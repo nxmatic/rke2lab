@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.incus.contract.host;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -230,6 +231,47 @@ public record BootstrapPaths(
    * {@code /private} segment), so that branch mis-maps it. Reconcile against the settled
    * nix-darwin-home export layout (real-path resolution rather than a {@code /private} heuristic).
    */
+  /**
+   * The 13 instance disk mounts derived from THIS view — each materialisation root becomes a mount
+   * SOURCE, paired with its {@link HostPathCatalog} guest TARGET, under a stable device name. Call
+   * it on the live + automount view ({@code asLiveView().asAutomountView(...)}): the scion projects
+   * the result into the {@code InstanceGrowPlan} so the host GROW poses the mounts without deriving
+   * a single path (the derivation the host used to do inline now lives here, on the topology
+   * owner).
+   */
+  public List<GrowMountView> instanceMounts() {
+    return List.of(
+        new GrowMountView("worktree.dir", worktreeRoot.toString(), HostPathCatalog.WORKTREE.path()),
+        new GrowMountView(
+            "rke2lab.environment.dir", runtimeEnvConfigRoot.toString(), HostPathCatalog.ENV.path()),
+        new GrowMountView(
+            "rke2lab.scripts.dir", scriptsRoot.toString(), HostPathCatalog.SCRIPTS.path()),
+        new GrowMountView("git.dir", gitRoot.toString(), HostPathCatalog.GIT_WORKTREE.path()),
+        new GrowMountView(
+            "rke2lab.systemd.libexec.dir",
+            systemdLibexecRoot.toString(),
+            HostPathCatalog.SYSTEMD_LIBEXEC.path()),
+        new GrowMountView(
+            "rke2lab.system.dir", systemdRoot.toString(), HostPathCatalog.SYSTEMD_UNITS.path()),
+        new GrowMountView(
+            "manifests.dir", manifestsRoot.toString(), HostPathCatalog.MANIFESTS.path()),
+        new GrowMountView(
+            "rke2.config.dir",
+            runtimeRke2ConfigRoot.toString(),
+            HostPathCatalog.RKE2_CONFIG.path()),
+        new GrowMountView(
+            "cloudconfig.nocloud.dir",
+            runtimeCloudConfigRoot.toString(),
+            HostPathCatalog.CLOUDCONFIG_NOCLOUD.path()),
+        new GrowMountView("shared.dir", shareRoot.toString(), HostPathCatalog.SHARE.path()),
+        new GrowMountView(
+            "daemonset.dir", daemonsetRoot.toString(), HostPathCatalog.DAEMONSET.path()),
+        new GrowMountView(
+            "kubeconfig.dir", kubeconfigRoot.toString(), HostPathCatalog.KUBECONFIG.path()),
+        new GrowMountView(
+            "nocloud.dir", cloudSeedRoot.toString(), HostPathCatalog.NOCLOUD_SEED.path()));
+  }
+
   static Path automountPath(Path rawPath, boolean nfsAutomount, String netPrefix) {
     final Path normalized = rawPath.toAbsolutePath().normalize();
     if (!nfsAutomount) {

@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.worktree.host;
+package io.nxmatic.rke2lab.worktree;
 
 import java.util.List;
 

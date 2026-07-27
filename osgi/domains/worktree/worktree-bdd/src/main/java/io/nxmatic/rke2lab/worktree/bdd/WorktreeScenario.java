@@ -8,16 +8,23 @@ import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.worktree.GatePolicy;
+import io.nxmatic.rke2lab.worktree.WorkingState;
 import io.nxmatic.rke2lab.worktree.Worktree;
-import io.nxmatic.rke2lab.worktree.host.WorktreeCoordinate;
-import io.nxmatic.rke2lab.worktree.host.WorktreeFacts;
+import io.nxmatic.rke2lab.worktree.WorktreeCoordinate;
+import io.nxmatic.rke2lab.worktree.WorktreeFacts;
+import io.nxmatic.rke2lab.worktree.WorktreeRunbookInput;
 import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The worktree soil — a production jGiven scenario told in the WORKTREE DOMAIN's own vocabulary,
@@ -39,13 +46,30 @@ import org.junit.jupiter.api.Test;
 @SeedScenario
 public class WorktreeScenario
     extends ScenarioTestBase<WorktreeScenario.Given, WorktreeScenario.When, WorktreeScenario.Then>
-    implements CellarReceiver<Cellar>, ScenarioPlayer.Playable {
+    implements CellarReceiver<Cellar>,
+        InputReceiver<WorktreeRunbookInput>,
+        ScenarioPlayer.Playable {
+
+  /**
+   * The inbound channel the {@code WorktreeRunbookHandler.seedFrom} seeds the {@link
+   * WorktreeRunbookInput} through and this scenario receives it from (via {@link InputReceiver}) —
+   * the entry-gate {@link GatePolicy} the host amended at the {@code worktree} door. Registered as
+   * a {@link RegisterExtension} so its {@code TestInstancePostProcessor} fires before the body
+   * reads {@link #input}, the way the incus scion's channel does.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<WorktreeRunbookInput> INPUT =
+      new ScenarioInputSeed<>(WorktreeRunbookInput.class, "worktree-runbook-input");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
   // The transactional cellar the extension injects before the body — the harvest is stored into it,
   // and the host reads it back within the run (read-your-writes). Null until receiveCellar sets it.
   private Cellar cellar;
+
+  // The activation input the front-door seeds before the body (InputReceiver) — it carries the
+  // entry-gate FACET. Null until receiveInput sets it; an unamended crossing falls to defaults().
+  @MonotonicNonNull private WorktreeRunbookInput input;
 
   // The current parcel the host publishes at the GIVEN; the soil files its harvest under it.
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
@@ -60,11 +84,20 @@ public class WorktreeScenario
     this.cellar = cellar;
   }
 
+  @Override
+  public void receiveInput(WorktreeRunbookInput input) {
+    this.input = input;
+  }
+
   @Test
   void the_worktree_facts_are_harvested() {
+    final WorktreeRunbookInput activation = input != null ? input : WorktreeRunbookInput.defaults();
     given().the_worktree("seed");
     when().the_git_facts_are_read();
-    then().the_facts_are_harvested(cellar, parcel.orElseThrow());
+    then()
+        .the_facts_are_harvested(cellar, parcel.orElseThrow())
+        .and()
+        .the_entry_gate_is_enforced(activation.gate().orElseGet(GatePolicy::defaults));
   }
 
   /** Given: the worktree the seed cultivates — a name, for the readable line. */
@@ -90,7 +123,10 @@ public class WorktreeScenario
       final Worktree resolved = worktree.orElseThrow();
       this.facts =
           new WorktreeFacts(
-              resolved.root().toString(), resolved.provenance(), resolved.workingState());
+              resolved.root().toString(),
+              resolved.provenance(),
+              resolved.workingState(),
+              resolved.flakeLockCoherent());
       return self();
     }
   }
@@ -106,6 +142,18 @@ public class WorktreeScenario
 
     public Then the_facts_are_harvested(@Hidden Cellar cellar, @Hidden Parcel parcel) {
       cellar.store(parcel, WorktreeCoordinate.FACTS, facts);
+      return self();
+    }
+
+    /**
+     * Enforce the run's entry {@link GatePolicy} against the harvested {@link WorkingState} — the
+     * gate the host used to run flat-side, now OSGi-side against the freshly-read fact. It throws
+     * when the ground is unclean beyond tolerance, failing this first crossing before any effectful
+     * sow. An unamended crossing gets {@link GatePolicy#defaults()} (no requirement) — a pure
+     * survey harvests without gating.
+     */
+    public Then the_entry_gate_is_enforced(@Hidden GatePolicy gate) {
+      gate.enforce(facts);
       return self();
     }
   }

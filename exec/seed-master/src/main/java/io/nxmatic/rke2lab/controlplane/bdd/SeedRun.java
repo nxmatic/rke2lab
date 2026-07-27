@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import java.util.List;
 
 /**
  * The commissioner's request — the run's facts, captured by {@code Main} INSIDE {@code Pulumi.run}
@@ -29,5 +30,7 @@ public record SeedRun(
     Parcel parcel,
     BootstrapConfig config,
     boolean cleanWorktreeRequired,
+    List<String> toleratedWorktreePaths,
+    boolean flakeLockRequired,
     String txId,
     String manifestsFacet) {}
