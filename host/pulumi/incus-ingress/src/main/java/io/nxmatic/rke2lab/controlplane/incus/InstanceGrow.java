@@ -17,10 +17,10 @@ import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.incus.ingress.GrowImageView;
 import io.nxmatic.rke2lab.incus.ingress.GrowMountView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
+import io.nxmatic.rke2lab.incus.ingress.IngressConfig;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,21 +34,22 @@ import java.util.function.Consumer;
  * scion-projects/host-actualises rule). It runs OUTSIDE Felix (the Pulumi graph cannot enter it),
  * so it is NOT a scion; it computes NOTHING of the domain — it fetches the plan, adopts
  * pre-existing project/network via provider invokes ({@link IncusImportLookup}), and declares
- * Project→{Network,Profile,Image}→Instance from the plan's flat values plus the mounts it derives
- * from {@link BootstrapPaths} (dual-realm, same topology the scion materialised into).
+ * Project→{Network,Profile,Image}→Instance from the plan's own flat values (network, image,
+ * cloud-init checksum, and the 13 resolved mounts the scion already projected).
  *
- * <p>Instance-passing: it holds the run's {@link BootstrapConfig}, the {@link IncusProviderContext}
- * it builds once, the {@link IncusImportLookup} riding that context's invoke options, and a log
- * sink. Its one act is {@link #grow(InstanceGrowPlan)}.
+ * <p>Instance-passing: it holds the run's {@link IngressConfig} (the ingress vocabulary the run
+ * fills — it names no seed-master type), the {@link IncusProviderContext} it builds once, the
+ * {@link IncusImportLookup} riding that context's invoke options, and a log sink. Its one act is
+ * {@link #grow(InstanceGrowPlan)}.
  */
 public final class InstanceGrow {
 
-  private final BootstrapConfig config;
+  private final IngressConfig config;
   private final IncusProviderContext providerContext;
   private final IncusImportLookup importLookup;
   private final Consumer<String> log;
 
-  public InstanceGrow(BootstrapConfig config, Consumer<String> log) {
+  public InstanceGrow(IngressConfig config, Consumer<String> log) {
     this.config = config;
     this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
     this.importLookup = new IncusImportLookup(providerContext, log);

@@ -4,7 +4,7 @@ import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.incus.Provider;
 import com.pulumi.incus.ProviderArgs;
 import com.pulumi.incus.inputs.ProviderRemoteArgs;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.incus.ingress.IngressConfig;
 
 /**
  * Shared provider wiring for the host GROW's Incus resource operations and invoke calls — the
@@ -14,11 +14,11 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
  */
 public record IncusProviderContext(Provider provider, InvokeOptions invokeOptions) {
 
-  public static IncusProviderContext forBootstrap(String providerName, BootstrapConfig config) {
+  public static IncusProviderContext forBootstrap(String providerName, IngressConfig config) {
     final ProviderRemoteArgs.Builder remoteArgsBuilder =
         ProviderRemoteArgs.builder()
             .name(config.incusDefaultRemote())
-            .address(config.incusRemoteAddress().toString())
+            .address(config.incusRemoteAddress())
             .protocol("incus");
 
     final ProviderArgs.Builder providerArgsBuilder =
@@ -27,8 +27,8 @@ public record IncusProviderContext(Provider provider, InvokeOptions invokeOption
             .acceptRemoteCertificate(false)
             .generateClientCertificates(false)
             .remotes(remoteArgsBuilder.build());
-    if (config.incusConfigDir() != null && !config.incusConfigDir().toString().isBlank()) {
-      providerArgsBuilder.configDir(config.incusConfigDir().toString());
+    if (config.incusConfigDir() != null && !config.incusConfigDir().isBlank()) {
+      providerArgsBuilder.configDir(config.incusConfigDir());
     }
 
     final Provider provider = new Provider(providerName, providerArgsBuilder.build());

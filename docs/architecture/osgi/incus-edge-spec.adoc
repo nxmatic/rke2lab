@@ -213,10 +213,15 @@ THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed s
 `buildChecksum` OSGi-side, and assembles ONE immutable `InstanceGrowPlan` (network view + image view +
 cloudInitChecksum) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=dual-realm`
 dual-realm module `incus-ingress-contract` (the host face of the incus contract — flat value records only,
-no logic; the first `type=dual-realm` of a domain). The GROW between reconcile and verify is pure-host
-(`com.pulumi` + provider invokes only — it fetches the plan and actualises, computes nothing of the
-domain), NOT a scion; the import-lookup it keeps is a provider invoke, not ssh. The probe pulls out to a
-VERIFY beat (post-grow). See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar §
+no logic; the first `type=dual-realm` of a domain). The contract also carries `IngressConfig` — the flat
+config the host fills to actualise (incus project/remote + node/profile/bridge names) — so the actualiser
+reads ONE authoritative vocabulary and names no seed-master type. The GROW between reconcile and verify is
+pure-host (`com.pulumi` + provider invokes only — it fetches the plan and actualises, computes nothing of
+the domain), NOT a scion; the import-lookup it keeps is a provider invoke, not ssh. Its actualiser
+(`InstanceGrow` + `IncusProviderContext` + `IncusImportLookup`) lives in the host module `incus-ingress`
+(`host/pulumi/`, package `io.nxmatic.rke2lab.controlplane.incus`): the run fetches the plan and DELEGATES
+the grow to it, filling an `IngressConfig` from its `BootstrapConfig` — no `com.pulumi.incus` in
+seed-master itself. The probe pulls out to a VERIFY beat (post-grow). See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar §
 the-grow-anatomy] (the scion-projects/host-actualises rule + the plan) and
 link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas.
 

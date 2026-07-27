@@ -31,15 +31,19 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
     </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab.sdks</groupId>
-      <artifactId>incus</artifactId>
-    </dependency>
-    <!-- The dual-realm host face of the incus contract: the host GROW fetches the InstanceGrowPlan
-         the scion projected and actualises it on the Pulumi graph (type=dual-realm, flat host-side). -->
+    <!-- The incus ingress contract: the InstanceGrowPlan the scion projects (the run fetches it and
+         delegates the grow), the IngressConfig the run fills, and BootstrapPaths (dual-realm, flat
+         host-side). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
+    </dependency>
+    <!-- The Pulumi actualiser of the ingress flow: the run delegates the instance grow to
+         InstanceGrow here, filling an IngressConfig from its BootstrapConfig — no com.pulumi.incus in
+         seed-master itself any more. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>incus-ingress</artifactId>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

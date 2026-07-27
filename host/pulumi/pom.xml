@@ -21,5 +21,6 @@
     <module>pulumi-generated-sdks/incus</module>
     <module>pulumi-edge</module>
     <module>pulumi-edge-testkit</module>
+    <module>incus-ingress</module>
   </modules>
 </project>

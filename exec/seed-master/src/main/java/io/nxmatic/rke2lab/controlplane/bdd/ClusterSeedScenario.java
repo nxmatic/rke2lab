@@ -19,6 +19,7 @@ import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
 import io.nxmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
+import io.nxmatic.rke2lab.incus.ingress.IngressConfig;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
@@ -414,9 +415,22 @@ public class ClusterSeedScenario
       // so a preview (which never drains) declared no instance and no mounts. The plan is now
       // self-contained (network + image + cloud-init + the 13 resolved mounts), so the GROW no
       // longer fetches the worktree facts — it actualises the plan alone.
+      // Fill the ingress contract's config from the run's BootstrapConfig and delegate the grow to
+      // the pulumi actualiser: the run names no com.pulumi type, it only fetches the plan and hands
+      // the actualiser a flat IngressConfig (a URI/Path rendered to its string form here).
+      final IngressConfig ingress =
+          new IngressConfig(
+              config.incusProject(),
+              config.incusDefaultRemote(),
+              config.incusRemoteAddress().toString(),
+              config.incusConfigDir() == null ? "" : config.incusConfigDir().toString(),
+              config.nodeName(),
+              config.profileName(),
+              config.lanBridgeParent(),
+              config.vmnetNetworkName());
       workingCellar
           .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
-          .ifPresent(plan -> new InstanceGrow(config, line -> {}).grow(plan));
+          .ifPresent(plan -> new InstanceGrow(ingress, line -> {}).grow(plan));
       return self();
     }
 
