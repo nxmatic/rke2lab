@@ -12,7 +12,6 @@ class BootstrapConfigFromTest {
   @Test
   void mandatory_values_pass_through() {
     final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
-    assertEquals(Path.of("/private/var/lib/git/nxmatic/rke2lab"), boot.worktreeDir());
     assertEquals(Path.of("/Users/nxmatic/.config/incus"), boot.incusConfigDir());
     assertEquals(Path.of("/srv/distrobuilder"), boot.imageSharedFolder());
   }

@@ -22,7 +22,6 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
 import io.nxmatic.rke2lab.pulumi.edge.RunMode;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
-import io.nxmatic.rke2lab.worktree.Worktree;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
@@ -69,12 +68,12 @@ public final class Main {
           final RunMode runMode = RunMode.detect(true);
           final ConfigLoader loader = ConfigLoader.of(context.config());
           final Rke2labConfig config = Rke2labConfig.from(loader);
-          // worktree.dir is NOT config — the root derives its own worktree at runtime: jgit walks
-          // up to the .git from the process directory (§ Worktree), so a launch from any
-          // subdirectory still resolves the real root. Storing it in config would only collide
-          // across worktrees.
-          final Path worktreeRoot = Worktree.locatedFrom(Path.of("").toAbsolutePath()).root();
-          final BootstrapConfig bootstrap = BootstrapConfig.from(config, worktreeRoot);
+          // worktree.dir is NOT config and NOT derived here: the worktree soil (OSGi-side, played
+          // as
+          // the first crossing) harvests its own root into the cellar via its Worktree component,
+          // and the host fetches it back where it needs it (the GROW mounts). Storing it in config
+          // would only collide across worktrees; deriving it here would duplicate the component.
+          final BootstrapConfig bootstrap = BootstrapConfig.from(config);
           final Parcel parcel = new Parcel(context.projectName(), context.stackName());
           final SeedRun run =
               new SeedRun(

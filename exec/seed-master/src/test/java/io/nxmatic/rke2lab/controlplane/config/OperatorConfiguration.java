@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -84,14 +83,8 @@ public final class OperatorConfiguration {
     return Rke2labConfig.from(asLoader());
   }
 
-  /**
-   * The canonical test worktree root — the runtime derivation ({@code Worktree}) is out of scope
-   * for a config fixture, so the derived path is supplied directly.
-   */
-  public static final Path WORKTREE_ROOT = Path.of("/private/var/lib/git/nxmatic/rke2lab");
-
   public BootstrapConfig asBootstrapConfig() {
-    return BootstrapConfig.from(asDto(), WORKTREE_ROOT);
+    return BootstrapConfig.from(asDto());
   }
 
   private Map<String, Map<String, Object>> deepCopy() {

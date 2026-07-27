@@ -1,0 +1,12 @@
+-include: ../../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
+Bundle-SymbolicName: io.nxmatic.rke2lab.worktree.contract.host
+Export-Package: io.nxmatic.rke2lab.worktree.host
+# type=library — the worktree domain's dual-realm host face: the flat wire vocabulary the worktree
+# soil harvests into the cellar (WorktreeFacts + its Provenance/WorkingState) at the WorktreeCoordinate,
+# and the flat host fetches back. Like incus-contract-host it is staged as a bundle OSGi-side AND kept
+# flat host-side, so its exported package legitimately lives in two realms and DUPLICATE_REALM_CLASS
+# exempts it: the host decodes WorktreeFacts into its OWN copy of the record via the dual-realm codec.
+# It carries only JDK types and the seed-broker seam (SeedCoordinate/SeedContract) — jgit-FREE — so
+# nothing third-party crosses. No @Component, so it does NOT Require the SCR extender.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=library

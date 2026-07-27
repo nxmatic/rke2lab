@@ -46,12 +46,14 @@ import java.util.function.Consumer;
 public final class InstanceGrow {
 
   private final BootstrapConfig config;
+  private final Path worktreeRoot;
   private final IncusProviderContext providerContext;
   private final IncusImportLookup importLookup;
   private final Consumer<String> log;
 
-  public InstanceGrow(BootstrapConfig config, Consumer<String> log) {
+  public InstanceGrow(BootstrapConfig config, Path worktreeRoot, Consumer<String> log) {
     this.config = config;
+    this.worktreeRoot = worktreeRoot;
     this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
     this.importLookup = new IncusImportLookup(providerContext, log);
     this.log = log;
@@ -248,8 +250,7 @@ public final class InstanceGrow {
    */
   private List<InstanceDeviceArgs> seedInstanceDevices(GrowNetworkView network) {
     final BootstrapPaths paths =
-        BootstrapPaths.fromLocalWorktree(
-                config.localWorktreePath(), config.clusterName(), config.nodeName())
+        BootstrapPaths.fromLocalWorktree(worktreeRoot, config.clusterName(), config.nodeName())
             .asLiveView()
             .asAutomountView(config.nfsAutomount(), config.netPrefix());
 

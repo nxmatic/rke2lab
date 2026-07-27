@@ -82,18 +82,6 @@
       <groupId>io.github.java-diff-utils</groupId>
       <artifactId>java-diff-utils</artifactId>
     </dependency>
-    <!-- The staging's provenance: GitProvenanceReader reads the worktree HEAD sha + dirty. It rests
-         on the worktree foundation for the findGitDir door; jgit stays a direct dep for the HEAD
-         resolve + status it does on the opened Repository. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>worktree</artifactId>
-    </dependency>
-    <!-- JGit carries a BSN (org.eclipse.jgit), so it is imported as a bundle, no embed. -->
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit</artifactId>
-    </dependency>
     <!-- ACT: HostTreePromoter jsyncs a staging into host.live.d. jsync ships a nu manifest (no BSN),
          so it cannot be imported as a bundle — it is EMBEDDED in this bundle's Bundle-ClassPath
          (bnd -includeresource;lib:=true), one consumer, no *-wrap module. -->

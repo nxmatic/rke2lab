@@ -25,6 +25,7 @@
     <module>ssh-to-age-edge</module>
     <module>incus</module>
     <module>bbox</module>
+    <module>worktree</module>
     <module>auth</module>
   </modules>
 </project>

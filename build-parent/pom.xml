@@ -435,7 +435,22 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>worktree</artifactId>
+        <artifactId>worktree-contract-host</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>worktree-contract</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>worktree-core</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>worktree-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>

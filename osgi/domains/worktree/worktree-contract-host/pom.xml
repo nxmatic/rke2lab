@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>worktree-contract-host</artifactId>
+  <name>osgi/domains/worktree/worktree-contract-host</name>
+  <description>The HOST face of the worktree contract — the dual-realm wire vocabulary BOTH realms
+    consume: the @SeedContract WorktreeFacts (root + Provenance + WorkingState) the worktree soil
+    harvests into the cellar at the WorktreeCoordinate, and the flat host fetches back for the GROW
+    root and the entry gate. Same form as incus-contract-host: type=library, staged as a bundle
+    OSGi-side AND kept flat host-side, so the host decodes WorktreeFacts into its OWN copy via the
+    dual-realm codec — no jgit type and no service reference crosses. jgit-FREE by construction (JDK
+    types + the seed-broker seam only).</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+    </dependency>
+    <!-- SeedContract + SeedCoordinate. provided: the seed-broker seam is system-exported in BOTH
+         realms, so this contract compiles against it and bnd emits an Import-Package, but it must
+         NOT embed it (that would duplicate the seam class → a realm collision). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

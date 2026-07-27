@@ -56,6 +56,14 @@
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- IncusAmendReflectorTest names IncusAmendReflector directly (@Component), so javac must read
+         the @Component annotation off its class file to compile the reference. provided — SCR
+         supplies it at runtime; the test only needs it on the compile classpath. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <!-- the passenger decodes the harvested RunbookEnvelope + the consultation payloads with jackson. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>

@@ -10,22 +10,25 @@ import java.util.Optional;
  * wire-record; the {@code shape} meta-coordinate projects its JSON Schema so a sower learns the
  * shape from the broker door rather than compiling the class.
  *
- * <p>It carries two {@link Amendment}s. {@link #worktree} is the {@link Amendment#WORKTREE} — the
- * flat provisioning scalars the host holds (its {@code BootstrapConfig}) and the incus scion needs
- * to RECONSTRUCT the whole provisioning topology in-world (§ host-cellar-realisation, the whole
- * topology is computed OSGi-side). The host fills it by role — a blind subtree the schema guides,
- * naming no incus field — and the scion computes its own {@code BootstrapPaths} from it: it picks
- * the rotation slot, derives the staging tree, and forwards THAT as the manifests SOIL (the plot
- * the tree the instance mounts is materialised under). So the SOIL is no longer an input the host
- * pre-computes — the scion resolves it. {@link #image} is the {@link Amendment#IMAGE} — the seed-
- * image build scalars the scion folds into the {@code buildChecksum} and the artifact paths it
- * projects for the host GROW. Both are {@link Optional}: an EMPTY amendment is the honest model of
- * "unamended" (a bare {@code shape} probe or an offline scenario) — the scion falls back to a temp
- * dir / skips the grow-plan — rather than a record carried with blank-string sentinel fields.
+ * <p>It carries two {@link Amendment}s. {@link #facet} is the {@link Amendment#FACET} — the stable
+ * provisioning identity the host holds (its {@code BootstrapConfig}): the cluster/node names, the
+ * NFS automount toggle, and the {@code netPrefix} that automount rebases under. It is a FACET, not
+ * a per-consult ROW: the value never changes across a run, so the host contributes it AMBIENT (an
+ * {@link io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor} the assembler gathers at the
+ * amend door) rather than sowing it in the trigger. The scion combines it with the worktree root it
+ * reads from the {@code Worktree} OSGi component (which self-locates its own root — no longer a
+ * scalar the host carries) to reconstruct the whole provisioning topology in-world (§
+ * host-cellar-realisation, the topology is computed OSGi-side): it picks the rotation slot, derives
+ * the staging tree, and forwards THAT as the manifests SOIL. {@link #image} is the {@link
+ * Amendment#IMAGE} — the seed-image build scalars the scion folds into the {@code buildChecksum}
+ * and the artifact paths it projects for the host GROW. Both are {@link Optional}: an EMPTY
+ * amendment is the honest model of "unamended" (a bare {@code shape} probe or an offline scenario)
+ * — the scion falls back to a temp dir / skips the grow-plan — rather than a record carried with
+ * blank-string sentinel fields.
  */
 @SeedContract("runbook")
 public record IncusRunbookInput(
-    @Amendment(Amendment.WORKTREE) Optional<Worktree> worktree,
+    @Amendment(Amendment.FACET) Optional<Facet> facet,
     @Amendment(Amendment.IMAGE) Optional<Image> image) {
 
   /**
@@ -36,21 +39,19 @@ public record IncusRunbookInput(
   }
 
   /**
-   * The flat provisioning scalars the host fills from its {@code BootstrapConfig} — the worktree
-   * root the provisioner writes under, the cluster/node identity, whether the remote host mounts
-   * over an NFS automount, and the {@code netPrefix} that automount rebases under (the host's
-   * {@code BootstrapConfig.netPrefix()}, e.g. {@code /net/<cluster>.local} — carried rather than
-   * re-derived so the formula stays single-sourced on the host). The scion feeds them to {@code
-   * BootstrapPaths.fromLocalWorktree(root, cluster, node)} and (for the mount sources) {@code
-   * asAutomountView(nfsAutomount, netPrefix)}. A sub-record filled blind by role, mirroring the
-   * {@code PublishFacet}/{@code DebugFacet} pattern — the host names no path vocabulary.
+   * The stable provisioning identity the host contributes as the {@link Amendment#FACET} — the
+   * cluster/node names, whether the remote host mounts over an NFS automount, and the {@code
+   * netPrefix} that automount rebases under (the host's {@code BootstrapConfig.netPrefix()}, e.g.
+   * {@code /net/<cluster>.<tailnet>} — carried rather than re-derived so the formula stays
+   * single-sourced on the host). The worktree ROOT is NOT here: the scion reads it from the {@code
+   * Worktree} OSGi component. The scion feeds these to {@code
+   * BootstrapPaths.fromLocalWorktree(root, cluster, node)} (the root from the component) and (for
+   * the mount sources) {@code asAutomountView(nfsAutomount, netPrefix)}. A sub-record filled blind
+   * by role, mirroring the {@code PublishFacet}/{@code DebugFacet} pattern — the host names no path
+   * vocabulary.
    */
-  public record Worktree(
-      String worktreeRoot,
-      String clusterName,
-      String nodeName,
-      boolean nfsAutomount,
-      String netPrefix) {}
+  public record Facet(
+      String clusterName, String nodeName, boolean nfsAutomount, String netPrefix) {}
 
   /**
    * The flat seed-image build scalars the host fills from its {@code BootstrapConfig} — the image

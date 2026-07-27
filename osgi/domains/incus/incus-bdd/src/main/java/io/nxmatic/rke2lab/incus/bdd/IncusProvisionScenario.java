@@ -24,14 +24,13 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
+import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Facet;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Image;
-import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Worktree;
 import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
 import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.contract.host.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
 import io.nxmatic.rke2lab.incus.core.BootstrapHostAssetMaterializer;
-import io.nxmatic.rke2lab.incus.core.GitProvenanceReader;
 import io.nxmatic.rke2lab.incus.core.GrowNetworkResolver;
 import io.nxmatic.rke2lab.incus.core.GrowPlanAssembler;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
@@ -56,6 +55,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedBroker;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.worktree.Worktree;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -143,6 +143,14 @@ public class IncusProvisionScenario
   @OsgiService(await = false)
   private Optional<ConsultingService> doctor = Optional.empty();
 
+  // The worktree the seed cultivates, as ONE OSGi service — the scion reads its root() (the anchor
+  // BootstrapPaths derives from) and its provenance() (the HEAD sha + dirty the staging entry
+  // freezes). It replaces the worktreeRoot scalar the host used to sow: the component self-locates
+  // its own root, so the host no longer carries it. await=false like the doctor — an offline/survey
+  // world boots without it, and the unamended path never dereferences it.
+  @OsgiService(await = false)
+  private Optional<Worktree> worktree = Optional.empty();
+
   // The consultations the run raised on a failed build/unreachable instance — the
   // ScenarioOutcomeExtension PULLS them (ConsultationSource) at the run boundary. Set in the @Test
   // after the body (jGiven defers a failed step's throw to scenario-end); empty until then.
@@ -173,11 +181,16 @@ public class IncusProvisionScenario
     final Parcel parcel = this.parcel.orElseThrow();
     final IncusRunbookInput input =
         Objects.requireNonNull(this.input, "the IncusRunbookInput was not seeded before the body");
-    // The scion reconstructs the provisioning topology from the flat worktree scalars the host
-    // amended (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE
-    // —
+    // The worktree root the scion anchors every path on — read from the Worktree OSGi component
+    // (which self-locates it), present only for an AMENDED run (a survey has no facet, so it never
+    // touches the service — see the await=false note on the field).
+    final Optional<Path> worktreeRoot =
+        input.facet().isPresent() ? Optional.of(worktree.orElseThrow().root()) : Optional.empty();
+    // The scion reconstructs the provisioning topology from the FACET the host amended + the root
+    // it
+    // read (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE —
     // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
-    final Resolved resolved = Resolved.from(input.worktree(), cellar, parcel);
+    final Resolved resolved = Resolved.from(input.facet(), worktreeRoot, cellar, parcel);
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -193,7 +206,7 @@ public class IncusProvisionScenario
     // The seed node's hostname is the config-derived cluster-node identity (the incus INSTANCE is
     // named nodeName alone — see InstanceGrow); "seed" for an unamended survey with no worktree.
     final String seedNode =
-        input.worktree().map(w -> w.clusterName() + "-" + w.nodeName()).orElse("seed");
+        input.facet().map(f -> f.clusterName() + "-" + f.nodeName()).orElse("seed");
     given()
         .the_seed_node(seedNode)
         .and()
@@ -201,9 +214,9 @@ public class IncusProvisionScenario
         .and()
         .consulting_manifests_through(resolved.soil(), cellar);
     when()
-        .the_image_is_built(imageRequest(input.worktree(), input.image()))
+        .the_image_is_built(imageRequest(worktreeRoot, input.facet(), input.image()))
         .and()
-        .the_manifests_are_cultivated(hostScenario, hostTree, input.worktree())
+        .the_manifests_are_cultivated(hostScenario, hostTree, input.facet())
         .and()
         .the_host_assets_are_materialized(resolved)
         .and()
@@ -272,17 +285,17 @@ public class IncusProvisionScenario
    * builder ignores.
    */
   private ImageBuildRequest imageRequest(
-      Optional<Worktree> maybeWorktree, Optional<Image> maybeImage) {
-    if (maybeWorktree.isEmpty() || maybeImage.isEmpty()) {
+      Optional<Path> worktreeRoot, Optional<Facet> maybeFacet, Optional<Image> maybeImage) {
+    if (maybeFacet.isEmpty() || maybeImage.isEmpty()) {
       return new ImageBuildRequest(
           "distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "");
     }
-    final Worktree worktree = maybeWorktree.orElseThrow();
+    final Facet facet = maybeFacet.orElseThrow();
     final Image image = maybeImage.orElseThrow();
-    final Path localRoot = Path.of(worktree.worktreeRoot());
+    final Path localRoot = worktreeRoot.orElseThrow();
     final Path remoteRoot =
-        BootstrapPaths.fromLocalWorktree(localRoot, worktree.clusterName(), worktree.nodeName())
-            .asAutomountView(worktree.nfsAutomount(), worktree.netPrefix())
+        BootstrapPaths.fromLocalWorktree(localRoot, facet.clusterName(), facet.nodeName())
+            .asAutomountView(facet.nfsAutomount(), facet.netPrefix())
             .worktreeRoot();
     final Path artifactUnderWorktree =
         localRoot
@@ -319,14 +332,15 @@ public class IncusProvisionScenario
     static final Resolved UNAMENDED =
         new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), "", "");
 
-    static Resolved from(Optional<Worktree> maybeWorktree, Cellar cellar, Parcel parcel) {
-      if (maybeWorktree.isEmpty()) {
+    static Resolved from(
+        Optional<Facet> maybeFacet, Optional<Path> worktreeRoot, Cellar cellar, Parcel parcel) {
+      if (maybeFacet.isEmpty()) {
         return UNAMENDED;
       }
-      final Worktree worktree = maybeWorktree.orElseThrow();
-      final Path root = Path.of(worktree.worktreeRoot());
+      final Facet facet = maybeFacet.orElseThrow();
+      final Path root = worktreeRoot.orElseThrow();
       final BootstrapPaths local =
-          BootstrapPaths.fromLocalWorktree(root, worktree.clusterName(), worktree.nodeName());
+          BootstrapPaths.fromLocalWorktree(root, facet.clusterName(), facet.nodeName());
       final Path slot = new HostSlotSelector(local.clusterNodeRoot(), cellar, parcel).nextStaging();
       final BootstrapPaths staging = local.asStagingView(slot);
       return new Resolved(
@@ -336,8 +350,8 @@ public class IncusProvisionScenario
           root,
           staging.cloudSeedRoot(),
           staging.secretsFile(),
-          worktree.clusterName(),
-          worktree.nodeName());
+          facet.clusterName(),
+          facet.nodeName());
     }
 
     boolean isAmended() {
@@ -439,7 +453,7 @@ public class IncusProvisionScenario
     public When the_manifests_are_cultivated(
         @Hidden ScenarioModel hostScenario,
         @Hidden ReportModel hostTree,
-        @Hidden Optional<Worktree> worktree) {
+        @Hidden Optional<Facet> facet) {
       // AMEND: hand the broker {soil → path} by neutral role; the manifests amend reflector binds
       // it
       // onto ManifestsRunbookInput and returns the reconciled input, still under the runbook
@@ -447,10 +461,10 @@ public class IncusProvisionScenario
       final ObjectNode roleValues = JsonNodeFactory.instance.objectNode();
       roleValues.put(Amendment.SOIL, soil);
       // Forward the cluster/node identity as the manifests WORKTREE amendment — the SAME neutral
-      // provisioning scalars this scion reconstructs its own topology from. The manifests synthesis
-      // derives addressing for THIS cluster from the handed-over name (no hardcoded literal); the
-      // extra worktree scalars it does not need are ignored on decode. Absent = a bare survey.
-      worktree.ifPresent(w -> roleValues.set(Amendment.WORKTREE, codec.decode(codec.encode(w))));
+      // provisioning identity this scion reads from its own FACET. The manifests synthesis derives
+      // addressing for THIS cluster from the handed-over name (no hardcoded literal); the extra
+      // facet scalars it does not need are ignored on decode. Absent = a bare survey.
+      facet.ifPresent(f -> roleValues.set(Amendment.WORKTREE, codec.decode(codec.encode(f))));
       final SeedEnvelope amended =
           broker
               .orElseThrow()
@@ -567,6 +581,12 @@ public class IncusProvisionScenario
     // the Then reads its recipe digest, no longer threaded from the scenario.
     @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
 
+    // The Worktree component the staging publication reads provenance() from — POST-materialisation
+    // (a staging written under the tree can dirty it), so it is read here, not at resolution. Only
+    // dereferenced in the amended branch; await=false so a survey world boots without it.
+    @OsgiService(await = false)
+    private Optional<Worktree> worktree = Optional.empty();
+
     public Then the_instance_is_prepared() {
       return self();
     }
@@ -595,12 +615,12 @@ public class IncusProvisionScenario
      * Publish the {@link HostStagingEntry} for the slot this run materialised — the host-tree fact
      * reconcile folds later to decide the promotion (§ host-cellar-realisation, the reconcile
      * cycle). It checksums the WHOLE staging tree ({@link HostTreeChecksummer}) — the discriminant
-     * reconcile diffs against the pivot — and captures the worktree's git provenance ({@link
-     * GitProvenanceReader}: sha + dirty), frozen with the immutable staging (the fold keeps N
-     * stagings, so this history survives, unlike the last-wins live). Skipped for an unamended
-     * survey (no slot materialised). The store is unconditional on the gate: the cellar itself
-     * routes conserve vs pre-reserve, so a preview run still records its staging entry (only the
-     * promotion's live entry is gated, at reconcile).
+     * reconcile diffs against the pivot — and captures the worktree's git provenance (the {@link
+     * Worktree} component's {@code provenance()}: sha + dirty), frozen with the immutable staging
+     * (the fold keeps N stagings, so this history survives, unlike the last-wins live). Skipped for
+     * an unamended survey (no slot materialised). The store is unconditional on the gate: the
+     * cellar itself routes conserve vs pre-reserve, so a preview run still records its staging
+     * entry (only the promotion's live entry is gated, at reconcile).
      */
     public Then the_staging_is_published(
         @Hidden Resolved resolved, @Hidden Cellar cellar, @Hidden Parcel parcel) {
@@ -608,11 +628,14 @@ public class IncusProvisionScenario
         return self();
       }
       final Path stagingRoot = Path.of(resolved.stagingRoot());
+      // The worktree provenance (HEAD sha + dirty) the Worktree component knows, mapped onto the
+      // staging entry's own Provenance — no jgit here, the component seals it.
+      final var provenance = worktree.orElseThrow().provenance();
       final HostStagingEntry entry =
           HostStagingEntry.of(
               resolved.stagingRoot(),
               new HostTreeChecksummer().checksum(stagingRoot),
-              new GitProvenanceReader().read(resolved.worktreeRoot()));
+              new HostStagingEntry.Provenance(provenance.sha(), provenance.dirty()));
       cellar.store(parcel, IncusCoordinate.HOST_STAGING, entry);
       return self();
     }

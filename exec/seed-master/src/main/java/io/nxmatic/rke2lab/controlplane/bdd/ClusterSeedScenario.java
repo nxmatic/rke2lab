@@ -35,12 +35,16 @@ import io.nxmatic.rke2lab.seed.bdd.SeedReceiver;
 import io.nxmatic.rke2lab.seed.bdd.SessionSeed;
 import io.nxmatic.rke2lab.seed.bdd.SowAndGraftStage;
 import io.nxmatic.rke2lab.seed.bdd.sow.Gardening;
+import io.nxmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import io.nxmatic.rke2lab.worktree.host.WorktreeCoordinate;
+import io.nxmatic.rke2lab.worktree.host.WorktreeFacts;
+import java.nio.file.Path;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Objects;
@@ -154,6 +158,8 @@ public class ClusterSeedScenario
             cellar, "the ScenarioCellar was not injected before the scenario ran");
     given().i_have_access_to_the_open_gardening(seedRun, world, tx);
     when()
+        .the_worktree_is_surveyed(hostScenario, hostTree)
+        .and()
         .the_entry_gates_are_enforced()
         .and()
         .the_parcels_state_is_fetched()
@@ -189,11 +195,9 @@ public class ClusterSeedScenario
     @ProvidedScenarioState PreflightGate preflightGate;
     @ProvidedScenarioState Parcel parcel;
 
-    // Two JsonNode subtrees in one stage: jGiven shares state BY TYPE by default, so name-resolve
-    // both to avoid an AmbiguousResolutionException (the When picks each back by field name).
-    @ProvidedScenarioState(resolution = Resolution.NAME)
-    JsonNode worktreeScalars;
-
+    // The IMAGE amendment subtree the incus crossing sows per-consult. Name-resolved (the When
+    // picks
+    // it back by field name) — the discipline the former paired worktree subtree also used.
     @ProvidedScenarioState(resolution = Resolution.NAME)
     JsonNode imageScalars;
 
@@ -213,24 +217,12 @@ public class ClusterSeedScenario
       // the extension closes it at afterAll (the leak the hand-rolled open() left is gone).
       this.gardening = Gardening.over(world);
       this.cellar = cellar;
-      // The host no longer computes the provisioning topology: the tree is incus's, so the incus
-      // scion reconstructs it in-world from the flat worktree scalars the host hands it (§
-      // host-cellar-realisation, computed OSGi-side) and picks its own rotation slot. The host
-      // holds
-      // only those scalars — built here as a blind subtree mirroring the incus contract's WORKTREE
-      // schema, naming no incus type — and hands them to the incus crossing by the WORKTREE
-      // amendment.
-      final ObjectNode scalars = JsonNodeFactory.instance.objectNode();
-      scalars.put("worktreeRoot", run.config().localWorktreePath().toString());
-      scalars.put("clusterName", run.config().clusterName());
-      scalars.put("nodeName", run.config().nodeName());
-      scalars.put("nfsAutomount", run.config().nfsAutomount());
-      scalars.put("netPrefix", run.config().netPrefix());
-      this.worktreeScalars = scalars;
       // The IMAGE amendment — the seed-image build scalars the incus scion folds into the
-      // buildChecksum and the artifact paths it projects for the GROW. Same blind-subtree
-      // discipline
-      // as WORKTREE: the host names only the neutral IMAGE role's schema fields, no incus type.
+      // buildChecksum and the artifact paths it projects for the GROW. A blind subtree: the host
+      // names only the neutral IMAGE role's schema fields, no incus type. (The worktree ROOT is no
+      // longer sown: the worktree soil harvests it into the cellar and the scion reads it from its
+      // own Worktree component; the stable cluster/node identity is contributed as the incus FACET
+      // below.)
       final ObjectNode imageScalars = JsonNodeFactory.instance.objectNode();
       imageScalars.put("alias", run.config().imageAlias());
       imageScalars.put("builderBinary", run.config().imageBuilderBinary());
@@ -263,21 +255,53 @@ public class ClusterSeedScenario
           .registerService(OpaqueCellar.class, cellarRealisation, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
       // The manifests FACET amendment — the operator config subtree the root read from Pulumi,
-      // published as an ambient AmendmentContributor. The incus scion that consults the manifests
-      // amend holds only the per-consult SOIL + WORKTREE; the assembler merges this FACET in at the
-      // door, so `mesh: false` (and the rest of rke2lab:manifests:) reaches the synthesis without
-      // any sower carrying a role it does not own.
+      // published as an ambient AmendmentContributor (the same generic FacetContributor the incus
+      // FACET uses below). The incus scion that consults the manifests amend holds only the
+      // per-consult SOIL + WORKTREE; the assembler merges this FACET in at the door, so `mesh:
+      // false` (and the rest of rke2lab:manifests:) reaches the synthesis without any sower
+      // carrying
+      // a role it does not own.
       gardening
           .connection()
           .context()
           .registerService(
               AmendmentContributor.class,
-              new ManifestsFacetContributor(run.manifestsFacet()),
+              new FacetContributor(new AmendCoordinate("manifests"), run.manifestsFacet()),
               new Hashtable<>());
+      // The incus FACET — the stable provisioning identity (cluster/node, NFS automount, netPrefix)
+      // the scion combines with the worktree root it reads from its Worktree component. A FACET,
+      // not
+      // a per-consult ROW: the value never changes across the run, so it is contributed AMBIENT
+      // (the
+      // assembler merges it at the incus-provision amend door) rather than sown in the trigger.
+      // Note
+      // NO worktreeRoot — that is the worktree soil's harvest, no longer a host-carried scalar.
+      final ObjectNode incusFacet = JsonNodeFactory.instance.objectNode();
+      incusFacet.put("clusterName", run.config().clusterName());
+      incusFacet.put("nodeName", run.config().nodeName());
+      incusFacet.put("nfsAutomount", run.config().nfsAutomount());
+      incusFacet.put("netPrefix", run.config().netPrefix());
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              AmendmentContributor.class,
+              new FacetContributor(new AmendCoordinate("incus-provision"), incusFacet.toString()),
+              new Hashtable<>());
+      // The entry gate reads the worktree's WorkingState from the facts the worktree soil harvested
+      // into the cellar (it runs as the first crossing, before this gate) — the host keeps the
+      // policy (which uncommitted paths matter), the worktree owns the raw fact. No jgit host-side.
       this.preflightGate =
           () ->
               EntryGatePolicyEnforcer.enforceAll(
-                  run.config().localWorktreePath(), run.cleanWorktreeRequired());
+                  cellar
+                      .fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class)
+                      .orElseThrow(
+                          () ->
+                              new IllegalStateException(
+                                  "the worktree soil harvested no facts before the entry gate"))
+                      .workingState(),
+                  run.cleanWorktreeRequired());
       return self();
     }
   }
@@ -301,15 +325,26 @@ public class ClusterSeedScenario
     @ScenarioState PreflightGate preflightGate;
     @ScenarioState Parcel parcel;
 
-    // Name-resolved on both sides of the crossing: two JsonNode subtrees share the same TYPE, so
-    // jGiven must pick each by field name here as it did in the Given (else AmbiguousResolution).
-    @ScenarioState(resolution = ScenarioState.Resolution.NAME)
-    JsonNode worktreeScalars;
-
+    // Name-resolved as it was in the Given (the paired worktree subtree is gone; the discipline
+    // stays so the field is picked back by name).
     @ScenarioState(resolution = ScenarioState.Resolution.NAME)
     JsonNode imageScalars;
 
     @ScenarioState BootstrapConfig config;
+
+    @NestedSteps
+    @As("the worktree is surveyed")
+    public When the_worktree_is_surveyed(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // The FIRST crossing: the worktree soil harvests its git facts (root + provenance + working
+      // state) into the cellar at WorktreeCoordinate.FACTS. The entry gate reads the working state
+      // from it (next crossing), and the GROW reads the root from it — fetch-not-push, no host
+      // jgit.
+      sowAndGraft
+          .sowing("worktree", gardening, hostScenario, hostTree)
+          .the_scion_is_sown_and_grafted("the worktree is surveyed");
+      return self();
+    }
 
     @NestedSteps
     @As("the entry gates are enforced")
@@ -339,19 +374,20 @@ public class ClusterSeedScenario
     @As("the instance is provisioned")
     public When the_instance_is_provisioned(
         @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
-      // Two amendments hand incus the flat scalars from BootstrapConfig. WORKTREE — the worktree
-      // root, cluster/node, NFS automount: the scion reconstructs the topology, picks its own
-      // rotation slot, and derives the manifests SOIL itself. IMAGE — the seed-image build scalars
-      // the scion folds into the buildChecksum and the artifact paths it projects for the GROW (§
-      // host-cellar-realisation, computed OSGi-side). The host names only the neutral roles, never
-      // an incus field nor a path — the scion owns the tree.
+      // ONE per-consult amendment hands incus the IMAGE scalars from BootstrapConfig — the seed-
+      // image build scalars the scion folds into the buildChecksum and the artifact paths it
+      // projects for the GROW (§ host-cellar-realisation, computed OSGi-side). The stable cluster/
+      // node identity is the ambient incus FACET (contributed at the GIVEN, merged at the door);
+      // the
+      // worktree root the scion reads from its own Worktree component. The host names only the
+      // neutral IMAGE role — never an incus field nor a path.
       sowAndGraft
           .sowing(
               "incus-provision",
               gardening,
               hostScenario,
               hostTree,
-              Map.of(Amendment.WORKTREE, worktreeScalars, Amendment.IMAGE, imageScalars))
+              Map.of(Amendment.IMAGE, imageScalars))
           .the_scion_is_sown_and_grafted("the instance is provisioned");
       return self();
     }
@@ -389,9 +425,21 @@ public class ClusterSeedScenario
       // boundary — after this step. So mid-run only the transactional overlay carries the plan
       // (read-your-writes). Reading the durable backend here saw an empty case and grew nothing,
       // so a preview (which never drains) declared no instance and no mounts.
+      // The worktree root the GROW derives the 17 instance mounts from comes from the same overlay:
+      // the worktree soil harvested it at the first crossing (WorktreeCoordinate.FACTS), so the
+      // host
+      // reads it back here rather than carrying it in config.
+      final Path worktreeRoot =
+          workingCellar
+              .fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class)
+              .map(facts -> Path.of(facts.root()))
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "the worktree soil harvested no facts before the grow"));
       workingCellar
           .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
-          .ifPresent(plan -> new InstanceGrow(config, line -> {}).grow(plan));
+          .ifPresent(plan -> new InstanceGrow(config, worktreeRoot, line -> {}).grow(plan));
       return self();
     }
 
