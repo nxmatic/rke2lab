@@ -31,6 +31,10 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-census</artifactId>
+    </dependency>
     <!-- The incus ingress contract: the InstanceGrowPlan the scion projects (the run fetches it and
          delegates the grow), the IngressConfig the run fills, and BootstrapPaths (dual-realm, flat
          host-side). -->
@@ -183,7 +187,8 @@
       <artifactId>bbox-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- netplan-core: the @Component DefaultNetplanSynthesisService publishing NetplanSynthesisService.
+    <!-- netplan-core: the @Component DefaultNetplanSynthesisService publishing
+    NetplanSynthesisService.
          The incus-provision scion's network-view beat resolves it via @OsgiService (require); without
          this bundle staged, the registry holds only the netplan CONTRACT and the scion's before-phase
          fails ("the scenario produced no outcome"). runtime scope — seed-master never compiles against
@@ -266,7 +271,8 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
-    <!-- The common gardening spine: the host runbook stages ClusterSeedScenario composes (preflight,
+    <!-- The common gardening spine: the host runbook stages ClusterSeedScenario composes
+    (preflight,
          Cellar fetch/store, sow-and-graft) + the open Gardening the GIVEN bootstraps + the SessionSeed
          bootstrap channel. Consumed FLAT (seed-bdd's host-side base package is not exported). -->
     <dependency>
@@ -387,7 +393,8 @@
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.service.log</artifactId>
     </dependency>
-    <!-- Declarative Services on the test classpath: felix.scr + the DS-runtime API trio it wires to,
+    <!-- Declarative Services on the test classpath: felix.scr + the DS-runtime API trio it wires
+    to,
          so the in-container SystemdAdapterStageTest can start SCR (withScr()) and have it activate
          the fragment-contributed @Components. Not inherited (seed-master uses bundle-parent, not
          bundle-test-parent). -->
@@ -521,7 +528,8 @@
             </goals>
             <phase>package</phase>
             <configuration>
-              <!-- The shade excludes (the jars staged as bundles, kept OUT of the flat uber-jar) are
+              <!-- The shade excludes (the jars staged as bundles, kept OUT of the flat uber-jar)
+              are
                    DERIVED and injected by the osgi-staging-extension from what the bundles declare —
                    no hand-list here. The empty artifactSet is the seam the extension fills; see
                    StagingExecutionStrategy. -->
@@ -529,7 +537,8 @@
                 <excludes/>
               </artifactSet>
               <transformers>
-                <!-- Re-inject THIS module's logback.xml past the shared shade filter, which excludes
+                <!-- Re-inject THIS module's logback.xml past the shared shade filter, which
+                excludes
                      logback.xml for the CLIs (they inject their own here, same as this). seed-master
                      now ships one too (the FILE appender for debugging the Pulumi-launched process),
                      so it must re-add it exactly as the CLIs do or logback boots on its default
