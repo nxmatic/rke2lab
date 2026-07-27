@@ -91,7 +91,8 @@ public class BboxReconciliationScenarioInContainerTest {
     // through the cellar's OWN generic API — a ScenarioCellar over the LIVE model with an empty
     // durable side, so fetch returns the run's own write (read-your-writes). At the
     // bbox-reservations coordinate, carrying the folded summary (12 MATCHING rows).
-    final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, RecordingCellar::new, "");
+    final ScenarioCellar cellar =
+        new ScenarioCellar(() -> runbook, RecordingCellar::new, Optional.empty());
     final BboxHarvest summary =
         cellar
             .fetch(PARCEL, BboxCoordinate.BBOX_RESERVATIONS, BboxHarvest.class)

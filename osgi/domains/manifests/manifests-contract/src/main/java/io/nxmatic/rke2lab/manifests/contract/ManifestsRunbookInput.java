@@ -26,8 +26,9 @@ import java.util.Optional;
  *   <li>{@link Amendment#SOIL} — {@link #materializationRoot} is NOT in the yaml: it is the plot
  *       the scion materialises into, which only the host knows (it holds {@code BootstrapPaths}).
  *       The host fills it by role — the SOIL amendment — from its provisioning state (the
- *       staging-view {@code manifestsRoot}), never from a yaml key. Blank when unamended (a bare
- *       {@code shape} probe, or a survey run) — the scion then materialises into a temp dir.
+ *       staging-view {@code manifestsRoot}), never from a yaml key. {@link Optional#empty()} when
+ *       unamended (a bare {@code shape} probe, or a survey run) — the scion then materialises into
+ *       a temp dir; absence is an empty {@link Optional}, never a blank string.
  *   <li>{@link Amendment#WORKTREE} — {@link #worktree} carries the cluster/node identity (see the
  *       {@code Worktree} note below).
  * </ul>
@@ -42,17 +43,17 @@ import java.util.Optional;
 @SeedContract("runbook")
 public record ManifestsRunbookInput(
     @Amendment(Amendment.FACET) Facets facets,
-    @Amendment(Amendment.SOIL) String materializationRoot,
+    @Amendment(Amendment.SOIL) Optional<String> materializationRoot,
     @Amendment(Amendment.WORKTREE) Optional<Worktree> worktree) {
 
   /**
    * The complete facet with every concern at its default — the operator's usual posture, debug off,
-   * and an UNAMENDED soil (blank {@code materializationRoot} → the scion surveys into a temp dir).
-   * The seed a scion holds before a sow arrives (never a partial instance): every component is a
-   * complete sub-facet, so no incomplete state ever exists.
+   * and an UNAMENDED soil ({@link Optional#empty()} {@code materializationRoot} → the scion surveys
+   * into a temp dir). The seed a scion holds before a sow arrives (never a partial instance): every
+   * component is a complete sub-facet, so no incomplete state ever exists.
    */
   public static ManifestsRunbookInput defaults() {
-    return new ManifestsRunbookInput(Facets.defaults(), "", Optional.empty());
+    return new ManifestsRunbookInput(Facets.defaults(), Optional.empty(), Optional.empty());
   }
 
   /**

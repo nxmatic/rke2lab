@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.util.Optional;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -50,7 +51,7 @@ public final class ScenarioCellarExtension
     // read side is resolved on first fetch.
     final CellarReceiver<ScenarioCellar> receiver =
         (CellarReceiver<ScenarioCellar>) context.getRequiredTestInstance();
-    final String txId = TxIdSeed.read(context).orElse("");
+    final Optional<String> txId = TxIdSeed.read(context);
     final ScenarioCellar cellar =
         new ScenarioCellar(
             ScenarioCellarExtension::currentModel, () -> resolve(context, Cellar.class), txId);

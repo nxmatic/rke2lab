@@ -105,7 +105,8 @@ public class IncusProvisionScenarioInContainerTest {
     // through the cellar's OWN generic API — a ScenarioCellar over the LIVE model with an empty
     // durable side, so fetch returns the run's own write (read-your-writes). At the incus-prep
     // coordinate, carrying the recipe digest + the soil the tree was cultivated under (Shape C).
-    final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, RecordingCellar::new, "");
+    final ScenarioCellar cellar =
+        new ScenarioCellar(() -> runbook, RecordingCellar::new, Optional.empty());
     final IncusHarvest harvest =
         cellar
             .fetch(PARCEL, IncusCoordinate.INCUS_PREP, IncusHarvest.class)

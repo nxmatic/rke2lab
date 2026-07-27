@@ -35,18 +35,19 @@ public final class IncusImportLookup {
     FAILED
   }
 
-  private record LookupResult(String importId, LookupState state, Optional<Boolean> managed) {
+  private record LookupResult(
+      Optional<String> importId, LookupState state, Optional<Boolean> managed) {
 
-    private static LookupResult found(String importId, @Nullable Boolean managed) {
+    private static LookupResult found(Optional<String> importId, @Nullable Boolean managed) {
       return new LookupResult(importId, LookupState.FOUND, Optional.ofNullable(managed));
     }
 
     private static LookupResult notFound() {
-      return new LookupResult("", LookupState.NOT_FOUND, Optional.empty());
+      return new LookupResult(Optional.empty(), LookupState.NOT_FOUND, Optional.empty());
     }
 
     private static LookupResult failed() {
-      return new LookupResult("", LookupState.FAILED, Optional.empty());
+      return new LookupResult(Optional.empty(), LookupState.FAILED, Optional.empty());
     }
   }
 
@@ -58,8 +59,8 @@ public final class IncusImportLookup {
     this.log = log;
   }
 
-  /** The import id to adopt an existing project, or {@code ""} when none is found. */
-  public String existingProjectId(String projectName) {
+  /** The import id to adopt an existing project, or empty when none is found. */
+  public Optional<String> existingProjectId(String projectName) {
     log.accept("incus lookup getProject: start name=" + projectName);
     try {
       final var project =
@@ -68,18 +69,17 @@ public final class IncusImportLookup {
               .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
               .join();
       if (project == null) {
-        return "";
+        return Optional.empty();
       }
-      final String providerId = normalizeImportId(project.id());
-      return providerId.isBlank() ? normalizeImportId(project.name()) : providerId;
+      return normalizeImportId(project.id()).or(() -> normalizeImportId(project.name()));
     } catch (Exception ex) {
       log.accept("incus lookup getProject: failed (" + summarizeLookupFailure(ex) + ")");
-      return "";
+      return Optional.empty();
     }
   }
 
-  /** The import id to adopt an existing (project-scoped) profile, or {@code ""} when none found. */
-  public String existingProfileId(String profileName, String incusProject) {
+  /** The import id to adopt an existing (project-scoped) profile, or empty when none found. */
+  public Optional<String> existingProfileId(String profileName, String incusProject) {
     log.accept("incus lookup getProfile: start name=" + profileName + " project=" + incusProject);
     try {
       final var profile =
@@ -89,18 +89,17 @@ public final class IncusImportLookup {
               .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
               .join();
       if (profile == null) {
-        return "";
+        return Optional.empty();
       }
-      final String providerId = normalizeImportId(profile.id());
-      return providerId.isBlank() ? normalizeImportId(profile.name()) : providerId;
+      return normalizeImportId(profile.id()).or(() -> normalizeImportId(profile.name()));
     } catch (Exception ex) {
       log.accept("incus lookup getProfile: failed (" + summarizeLookupFailure(ex) + ")");
-      return "";
+      return Optional.empty();
     }
   }
 
-  /** The import id to adopt an existing network, or {@code ""} when none is found. */
-  public String existingNetworkId(String networkName, String incusProject) {
+  /** The import id to adopt an existing network, or empty when none is found. */
+  public Optional<String> existingNetworkId(String networkName, String incusProject) {
     final LookupResult projectScoped =
         resolveNetworkImportId(
             GetNetworkPlainArgs.builder().name(networkName).project(incusProject).build());
@@ -108,13 +107,13 @@ public final class IncusImportLookup {
       return projectScoped.importId();
     }
     if (projectScoped.state() == LookupState.FAILED) {
-      final String fallbackImportId = normalizeImportId(networkName);
+      final Optional<String> fallbackImportId = normalizeImportId(networkName);
       log.accept(
           "incus lookup getNetwork: deterministic fallback import id after scoped lookup failure"
               + " (name="
               + networkName
               + ", fallbackImportId="
-              + fallbackImportId
+              + fallbackImportId.orElse("")
               + ")");
       return fallbackImportId;
     }
@@ -141,12 +140,12 @@ public final class IncusImportLookup {
     return false;
   }
 
-  public String normalizeImportId(@Nullable String value) {
+  private Optional<String> normalizeImportId(@Nullable String value) {
     if (value == null) {
-      return "";
+      return Optional.empty();
     }
     final String trimmed = value.trim();
-    return trimmed.isBlank() ? "" : trimmed;
+    return trimmed.isBlank() ? Optional.empty() : Optional.of(trimmed);
   }
 
   private long invokeTimeoutSeconds() {
@@ -169,11 +168,9 @@ public final class IncusImportLookup {
       if (network == null) {
         return LookupResult.notFound();
       }
-      final String providerId = normalizeImportId(network.id());
       final Boolean managed = network.managed();
-      return providerId.isBlank()
-          ? LookupResult.found(normalizeImportId(network.name()), managed)
-          : LookupResult.found(providerId, managed);
+      return LookupResult.found(
+          normalizeImportId(network.id()).or(() -> normalizeImportId(network.name())), managed);
     } catch (Exception ex) {
       final String summary = summarizeLookupFailure(ex);
       if (isNotFoundFailure(summary)) {

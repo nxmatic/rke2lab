@@ -222,25 +222,28 @@ public class ManifestSynthesisScenario
     private Path outdir() {
       if (outdir == null) {
         // The SOIL amendment: when the host amended the plot to materialise into, synthesise there
-        // (the real provisioning tree). Blank soil = a survey / bare probe — materialise into a
+        // (the real provisioning tree). An empty soil = a survey / bare probe — materialise into a
         // temp dir so the run stays inert against the host FS. Mode-blind: the SOIL amendment alone
         // carries the live target; whether this run is a survey is the frontier's business, not the
         // scenario's, so there is no mode-tinted temp prefix.
-        final String soil = facet.materializationRoot();
-        if (!soil.isBlank()) {
-          outdir = Path.of(soil).toAbsolutePath().normalize();
-        } else {
-          try {
-            outdir = Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
-          } catch (IOException ex) {
-            throw new UncheckedIOException("cannot create the synthesis outdir", ex);
-          }
-        }
+        outdir =
+            facet
+                .materializationRoot()
+                .map(soil -> Path.of(soil).toAbsolutePath().normalize())
+                .orElseGet(this::freshTempDir);
         // Expose the resolved replica root so the Then checksums it and publishes the
         // host-manifest.
         this.stagingRoot = outdir;
       }
       return outdir;
+    }
+
+    private Path freshTempDir() {
+      try {
+        return Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
+      } catch (IOException ex) {
+        throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+      }
     }
   }
 

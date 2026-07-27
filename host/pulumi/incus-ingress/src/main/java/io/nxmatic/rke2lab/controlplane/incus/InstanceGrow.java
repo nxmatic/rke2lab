@@ -66,14 +66,9 @@ public final class InstanceGrow {
   }
 
   private Project ensureProject() {
-    final String existingProjectId =
-        importLookup.normalizeImportId(importLookup.existingProjectId(config.incusProject()));
-
     final CustomResourceOptions.Builder options =
         CustomResourceOptions.builder().provider(providerContext.provider()).retainOnDelete(true);
-    if (!existingProjectId.isBlank()) {
-      options.importId(existingProjectId);
-    }
+    importLookup.existingProjectId(config.incusProject()).ifPresent(options::importId);
 
     return new Project(
         "seed-project",
@@ -107,10 +102,8 @@ public final class InstanceGrow {
       log.accept("incus network ensure: skipping unmanaged bridge (" + networkName + ")");
       return;
     }
-    final String existingNetworkId =
-        importLookup.normalizeImportId(importLookup.existingNetworkId(networkName, networkProject));
     // An already-existing vmnet bridge is adopted, not re-declared (its config is host-owned).
-    if (!existingNetworkId.isBlank()) {
+    if (importLookup.existingNetworkId(networkName, networkProject).isPresent()) {
       return;
     }
 
@@ -139,10 +132,7 @@ public final class InstanceGrow {
     // incus reads a profile's project back as null, and project is ForceNew, so an imported profile
     // is perpetually flagged for a replacement the import declaration then forbids. Only a virgin
     // host (no such profile) gets a fresh Pulumi-managed one.
-    final String existingProfileId =
-        importLookup.normalizeImportId(
-            importLookup.existingProfileId(config.profileName(), config.incusProject()));
-    if (!existingProfileId.isBlank()) {
+    if (importLookup.existingProfileId(config.profileName(), config.incusProject()).isPresent()) {
       return Output.of(config.profileName());
     }
 

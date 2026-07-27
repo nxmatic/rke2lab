@@ -45,7 +45,7 @@ public final class ScenarioCellar implements TransactionalCellar {
 
   private final Supplier<ReportModel> model;
   private final Supplier<Cellar> durableReads;
-  private final String txId;
+  private final Optional<String> txId;
   private final SeedCodec codec = new SeedCodec();
   // The mono clean/smudge filter (§ cellar-secrets). A SEALED store is sealed HERE, so its sealed
   // payload is what rides the run's write-set tag across the graft and drains to the durable
@@ -57,17 +57,17 @@ public final class ScenarioCellar implements TransactionalCellar {
    * @param model the run's {@link ReportModel} (read lazily, but live already when the extension
    *     constructs this — jGiven binds it before the body)
    * @param durableReads the durable read side, resolved on first fetch
-   * @param txId the run's transaction id, or empty for a run outside a transaction — the cellar is
-   *     its lifecycle-mate, so it POSTS the tx-id tag here (the sole writer of a tag on the model),
-   *     and a scion sowing a sub-scion reads it back via {@link #transactionId()}
+   * @param txId the run's transaction id, or {@link Optional#empty()} for a run outside a
+   *     transaction — the cellar is its lifecycle-mate, so it POSTS the tx-id tag here (the sole
+   *     writer of a tag on the model), and a scion sowing a sub-scion reads it back via {@link
+   *     #transactionId()}
    */
-  public ScenarioCellar(Supplier<ReportModel> model, Supplier<Cellar> durableReads, String txId) {
+  public ScenarioCellar(
+      Supplier<ReportModel> model, Supplier<Cellar> durableReads, Optional<String> txId) {
     this.model = model;
     this.durableReads = durableReads;
     this.txId = txId;
-    if (!txId.isEmpty()) {
-      model.get().addTag(Tag.TRANSACTION.of(txId));
-    }
+    txId.ifPresent(id -> model.get().addTag(Tag.TRANSACTION.of(id)));
   }
 
   /**
@@ -79,7 +79,7 @@ public final class ScenarioCellar implements TransactionalCellar {
    */
   @Override
   public Optional<String> transactionId() {
-    return txId.isEmpty() ? Optional.empty() : Optional.of(txId);
+    return txId;
   }
 
   /**

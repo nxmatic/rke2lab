@@ -190,7 +190,7 @@ public class IncusProvisionScenario
     // it
     // read (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE —
     // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
-    final Resolved resolved = Resolved.from(input.facet(), worktreeRoot, cellar, parcel);
+    final Optional<Resolved> resolved = Resolved.from(input.facet(), worktreeRoot, cellar, parcel);
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -212,7 +212,7 @@ public class IncusProvisionScenario
         .and()
         .prepared_through(observations)
         .and()
-        .consulting_manifests_through(resolved.soil(), cellar);
+        .consulting_manifests_through(resolved.map(Resolved::soil), cellar);
     when()
         .the_image_is_built(imageRequest(worktreeRoot, input.facet(), input.image()))
         .and()
@@ -226,7 +226,7 @@ public class IncusProvisionScenario
     then()
         .the_instance_is_prepared()
         .and()
-        .the_prep_is_stored(resolved.soil(), cellar, parcel)
+        .the_prep_is_stored(resolved.map(Resolved::soil).orElse(""), cellar, parcel)
         .and()
         .the_staging_is_published(resolved, cellar, parcel)
         .and()
@@ -236,9 +236,7 @@ public class IncusProvisionScenario
     // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
     // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
     // on the model BEFORE it is stashed, so it rides the serialised runbook across the realm.
-    if (resolved.isAmended()) {
-      getScenario().getModel().addTag(GraftTag.LIVE_ROOT.of(resolved.liveRoot()));
-    }
+    resolved.ifPresent(r -> getScenario().getModel().addTag(GraftTag.LIVE_ROOT.of(r.liveRoot())));
     this.consultations = consultOnFailure(observations);
   }
 
@@ -316,8 +314,10 @@ public class IncusProvisionScenario
    * slot is chosen ONCE here (a second {@code nextStaging()} after manifests materialised the slot
    * would see it and pick a different N). {@code stagingRoot} is the slot the assets land in;
    * {@code soil} the manifests plot forwarded to the manifests scion; {@code liveRoot} where the
-   * host renders the runbook; {@code worktreeRoot} the base for the git provenance. All blank/empty
-   * for an unamended survey (a bare {@code shape} probe), so manifests falls back to a temp dir.
+   * host renders the runbook; {@code worktreeRoot} the base for the git provenance. {@link
+   * #from(Optional, Optional, Cellar, Parcel)} returns EMPTY for an unamended survey (a bare {@code
+   * shape} probe) — absence is an empty {@link Optional}, never a record carried with blank fields;
+   * a present {@code Resolved} always holds a real topology.
    */
   private record Resolved(
       String stagingRoot,
@@ -331,13 +331,10 @@ public class IncusProvisionScenario
       boolean nfsAutomount,
       String netPrefix) {
 
-    static final Resolved UNAMENDED =
-        new Resolved("", "", "", Path.of(""), Path.of(""), Path.of(""), "", "", false, "");
-
-    static Resolved from(
+    static Optional<Resolved> from(
         Optional<Facet> maybeFacet, Optional<Path> worktreeRoot, Cellar cellar, Parcel parcel) {
       if (maybeFacet.isEmpty()) {
-        return UNAMENDED;
+        return Optional.empty();
       }
       final Facet facet = maybeFacet.orElseThrow();
       final Path root = worktreeRoot.orElseThrow();
@@ -345,21 +342,18 @@ public class IncusProvisionScenario
           BootstrapPaths.fromLocalWorktree(root, facet.clusterName(), facet.nodeName());
       final Path slot = new HostSlotSelector(local.clusterNodeRoot(), cellar, parcel).nextStaging();
       final BootstrapPaths staging = local.asStagingView(slot);
-      return new Resolved(
-          slot.toString(),
-          staging.manifestsRoot().toString(),
-          local.liveRoot().toString(),
-          root,
-          staging.cloudSeedRoot(),
-          staging.secretsFile(),
-          facet.clusterName(),
-          facet.nodeName(),
-          facet.nfsAutomount(),
-          facet.netPrefix());
-    }
-
-    boolean isAmended() {
-      return !stagingRoot.isBlank();
+      return Optional.of(
+          new Resolved(
+              slot.toString(),
+              staging.manifestsRoot().toString(),
+              local.liveRoot().toString(),
+              root,
+              staging.cloudSeedRoot(),
+              staging.secretsFile(),
+              facet.clusterName(),
+              facet.nodeName(),
+              facet.nfsAutomount(),
+              facet.netPrefix()));
     }
   }
 
@@ -367,7 +361,7 @@ public class IncusProvisionScenario
   static class Given extends Stage<Given> {
 
     @ProvidedScenarioState List<ObservationWire> observations;
-    @ProvidedScenarioState String soil;
+    @ProvidedScenarioState Optional<String> soil;
     // This scion's working cellar (the seam type Cellar here), carried on to the manifests sub-sow
     // so it inherits the same tx (txId + in-flight entries). Resolved by TYPE — the only Cellar in
     // stage state.
@@ -384,7 +378,7 @@ public class IncusProvisionScenario
     }
 
     @Hidden
-    public Given consulting_manifests_through(String soil, Cellar cellar) {
+    public Given consulting_manifests_through(Optional<String> soil, Cellar cellar) {
       this.soil = soil;
       this.cellar = cellar;
       return self();
@@ -410,7 +404,7 @@ public class IncusProvisionScenario
   static class When extends Stage<When> {
 
     @ExpectedScenarioState List<ObservationWire> observations;
-    @ExpectedScenarioState String soil;
+    @ExpectedScenarioState Optional<String> soil;
     @ExpectedScenarioState Cellar cellar;
 
     // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
@@ -463,7 +457,7 @@ public class IncusProvisionScenario
       // onto ManifestsRunbookInput and returns the reconciled input, still under the runbook
       // coordinate.
       final ObjectNode roleValues = JsonNodeFactory.instance.objectNode();
-      roleValues.put(Amendment.SOIL, soil);
+      soil.ifPresent(s -> roleValues.put(Amendment.SOIL, s));
       // Forward the cluster/node identity as the manifests WORKTREE amendment — the SAME neutral
       // provisioning identity this scion reads from its own FACET. The manifests synthesis derives
       // addressing for THIS cluster from the handed-over name (no hardcoded literal); the extra
@@ -507,10 +501,12 @@ public class IncusProvisionScenario
      * (like the manifests synthesis) — only the promotion into {@code host.live.d} is gated.
      * Skipped for an unamended survey (no slot materialised).
      */
-    public When the_host_assets_are_materialized(@Hidden Resolved resolved) throws IOException {
-      if (!resolved.isAmended()) {
+    public When the_host_assets_are_materialized(@Hidden Optional<Resolved> maybeResolved)
+        throws IOException {
+      if (maybeResolved.isEmpty()) {
         return self();
       }
+      final Resolved resolved = maybeResolved.orElseThrow();
       final BootstrapPaths staging =
           BootstrapPaths.fromLocalWorktree(
                   resolved.worktreeRoot(), resolved.clusterName(), resolved.nodeName())
@@ -529,10 +525,11 @@ public class IncusProvisionScenario
      * the writer falls back to the environment; the step renders PENDING via E9. Skipped only for
      * an unamended survey (no worktree {@code .secrets} to upsert).
      */
-    public When the_secrets_are_written(@Hidden Resolved resolved) {
-      if (!resolved.isAmended()) {
+    public When the_secrets_are_written(@Hidden Optional<Resolved> maybeResolved) {
+      if (maybeResolved.isEmpty()) {
         return self();
       }
+      final Resolved resolved = maybeResolved.orElseThrow();
       new LaunchSecretsWriter(authToken).ensureTokensPresent(resolved.secretsFile());
       return self();
     }
@@ -545,10 +542,11 @@ public class IncusProvisionScenario
      * NetplanSynthesisService}, no edge contacted — inert at preview like the manifests synthesis.
      * Skipped for an unamended survey (no cluster to resolve).
      */
-    public When the_network_is_resolved(@Hidden Resolved resolved) {
-      if (!resolved.isAmended()) {
+    public When the_network_is_resolved(@Hidden Optional<Resolved> maybeResolved) {
+      if (maybeResolved.isEmpty()) {
         return self();
       }
+      final Resolved resolved = maybeResolved.orElseThrow();
       this.networkView =
           new GrowNetworkResolver(netplan.orElseThrow())
               .resolve(resolved.clusterName(), resolved.nodeName());
@@ -621,10 +619,11 @@ public class IncusProvisionScenario
      * its staging entry (only the promotion's live entry is gated, at reconcile).
      */
     public Then the_staging_is_published(
-        @Hidden Resolved resolved, @Hidden Cellar cellar, @Hidden Parcel parcel) {
-      if (!resolved.isAmended()) {
+        @Hidden Optional<Resolved> maybeResolved, @Hidden Cellar cellar, @Hidden Parcel parcel) {
+      if (maybeResolved.isEmpty()) {
         return self();
       }
+      final Resolved resolved = maybeResolved.orElseThrow();
       final Path stagingRoot = Path.of(resolved.stagingRoot());
       // The worktree provenance (HEAD sha + dirty) — TAKEN from the harvested WorktreeFacts in the
       // cellar (the soil's first-crossing snapshot), the source breadcrumb this staging was
@@ -658,13 +657,14 @@ public class IncusProvisionScenario
      * run still records the plan.
      */
     public Then the_instance_grow_plan_is_published(
-        @Hidden Resolved resolved,
+        @Hidden Optional<Resolved> maybeResolved,
         @Hidden Image image,
         @Hidden Cellar cellar,
         @Hidden Parcel parcel) {
-      if (!resolved.isAmended() || networkView == null) {
+      if (maybeResolved.isEmpty() || networkView == null) {
         return self();
       }
+      final Resolved resolved = maybeResolved.orElseThrow();
       // The 13 disk mounts resolved OSGi-side: the LIVE tree (host.live.d) the instance mounts,
       // rebased onto the NFS-automount view the remote NixOS host reads through — the same chain
       // the

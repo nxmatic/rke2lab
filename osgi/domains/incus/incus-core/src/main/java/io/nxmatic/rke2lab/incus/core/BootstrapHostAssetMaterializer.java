@@ -75,7 +75,7 @@ public final class BootstrapHostAssetMaterializer {
           case CONFIGMAP_FILES ->
               configMapFiles(contribution.entries(), root, contribution.executable());
           case SHELL_ENV_FILE ->
-              shellEnvFile(contribution.entries(), root, contribution.targetFile());
+              shellEnvFile(contribution.entries(), root, contribution.targetFile().orElseThrow());
         }
       }
     }

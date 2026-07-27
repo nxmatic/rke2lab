@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -98,7 +99,7 @@ class HostAssetProviderContributionTest {
     final HostAssetContribution env = contributions.get(0);
     assertEquals(HostAssetSlot.ENV_CONFIG, env.slot());
     assertEquals(HostAssetDeliveryKind.SHELL_ENV_FILE, env.deliveryKind());
-    assertEquals(EnvConfigHostAssetProvider.ENV_FILE, env.targetFile());
+    assertEquals(Optional.of(EnvConfigHostAssetProvider.ENV_FILE), env.targetFile());
     assertEquals(2, env.entries().size(), "both hidden section dotfiles rode across");
   }
 

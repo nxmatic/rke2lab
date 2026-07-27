@@ -198,7 +198,8 @@ public class IncusReconcileScenarioInContainerTest {
    * flip, empty on a no-op / preview.
    */
   private static Optional<String> committedLive(ReportModel runbook) {
-    final ScenarioCellar cellar = new ScenarioCellar(() -> runbook, StubCellar::empty, "");
+    final ScenarioCellar cellar =
+        new ScenarioCellar(() -> runbook, StubCellar::empty, Optional.empty());
     return cellar
         .fetch(PARCEL, IncusCoordinate.HOST_LIVE, HostLiveEntry.class)
         .map(HostLiveEntry::syncedFrom);

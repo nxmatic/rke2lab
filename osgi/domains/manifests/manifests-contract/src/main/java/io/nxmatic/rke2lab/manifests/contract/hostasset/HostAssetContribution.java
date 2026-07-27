@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.manifests.contract.hostasset;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A provider's offer of host assets: the entries, the logical slot they target, the delivery kind
@@ -11,7 +12,7 @@ import java.util.Objects;
  *
  * <p>{@code targetFile} names the ONE output artifact a fan-in kind writes ({@link
  * HostAssetDeliveryKind#SHELL_ENV_FILE}); the fan-out kinds ({@code SEED_DIR}, {@code
- * CONFIGMAP_FILES}) derive their outputs from the entries and leave it blank.
+ * CONFIGMAP_FILES}) derive their outputs from the entries and leave it {@link Optional#empty()}.
  *
  * <p>{@code executable} is declared BY THE CONTRIBUTION (the domain knows a systemd script must be
  * runnable, a unit file must not), not inferred by incus from the slot — so incus stays agnostic of
@@ -22,20 +23,23 @@ public record HostAssetContribution(
     HostAssetSlot slot,
     HostAssetDeliveryKind deliveryKind,
     List<HostAssetEntry> entries,
-    String targetFile,
+    Optional<String> targetFile,
     boolean executable) {
 
   public HostAssetContribution {
     slot = Objects.requireNonNull(slot, "slot");
     deliveryKind = Objects.requireNonNull(deliveryKind, "deliveryKind");
     entries = List.copyOf(entries);
-    targetFile = targetFile == null ? "" : targetFile.trim();
-    if (deliveryKind == HostAssetDeliveryKind.SHELL_ENV_FILE && targetFile.isBlank()) {
+    targetFile =
+        Objects.requireNonNull(targetFile, "targetFile")
+            .map(String::trim)
+            .filter(t -> !t.isBlank());
+    if (deliveryKind == HostAssetDeliveryKind.SHELL_ENV_FILE && targetFile.isEmpty()) {
       throw new IllegalArgumentException("SHELL_ENV_FILE contribution requires a targetFile");
     }
-    if (deliveryKind != HostAssetDeliveryKind.SHELL_ENV_FILE && !targetFile.isBlank()) {
+    if (deliveryKind != HostAssetDeliveryKind.SHELL_ENV_FILE && targetFile.isPresent()) {
       throw new IllegalArgumentException(
-          deliveryKind + " does not use a targetFile: " + targetFile);
+          deliveryKind + " does not use a targetFile: " + targetFile.orElseThrow());
     }
     if (executable && deliveryKind != HostAssetDeliveryKind.CONFIGMAP_FILES) {
       throw new IllegalArgumentException(
@@ -46,7 +50,7 @@ public record HostAssetContribution(
   /** A fan-out contribution (SEED_DIR / CONFIGMAP_FILES) whose files are NOT executable. */
   public static HostAssetContribution fanOut(
       HostAssetSlot slot, HostAssetDeliveryKind deliveryKind, List<HostAssetEntry> entries) {
-    return new HostAssetContribution(slot, deliveryKind, entries, "", false);
+    return new HostAssetContribution(slot, deliveryKind, entries, Optional.empty(), false);
   }
 
   /**
@@ -56,13 +60,13 @@ public record HostAssetContribution(
   public static HostAssetContribution executableFiles(
       HostAssetSlot slot, List<HostAssetEntry> entries) {
     return new HostAssetContribution(
-        slot, HostAssetDeliveryKind.CONFIGMAP_FILES, entries, "", true);
+        slot, HostAssetDeliveryKind.CONFIGMAP_FILES, entries, Optional.empty(), true);
   }
 
   /** A SHELL_ENV_FILE contribution: the entries fan into the single {@code targetFile}. */
   public static HostAssetContribution shellEnvFile(
       HostAssetSlot slot, List<HostAssetEntry> entries, String targetFile) {
     return new HostAssetContribution(
-        slot, HostAssetDeliveryKind.SHELL_ENV_FILE, entries, targetFile, false);
+        slot, HostAssetDeliveryKind.SHELL_ENV_FILE, entries, Optional.of(targetFile), false);
   }
 }
