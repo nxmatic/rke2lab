@@ -24,8 +24,8 @@ public record ManifestSynthesisRequest(
     BootstrapIdentity bootstrapIdentity,
     NetworkTopology networkTopology,
     ComponentVersions componentVersions,
-    ImageState imageState,
-    IncusIdentityMaterial incusIdentity)
+    Optional<ImageState> imageState,
+    Optional<IncusIdentityMaterial> incusIdentity)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rke2lab.manifests.policy.enabledDomains";
@@ -51,8 +51,8 @@ public record ManifestSynthesisRequest(
     componentVersions =
         Objects.requireNonNull(
             componentVersions, "componentVersions is required (no blank-version default)");
-    imageState = imageState == null ? ImageState.unknown() : imageState;
-    incusIdentity = incusIdentity == null ? IncusIdentityMaterial.unknown() : incusIdentity;
+    imageState = imageState == null ? Optional.empty() : imageState;
+    incusIdentity = incusIdentity == null ? Optional.empty() : incusIdentity;
   }
 
   public static Builder builder(Path synthOutdir, Path synthManifestFile) {
@@ -95,11 +95,11 @@ public record ManifestSynthesisRequest(
   }
 
   public ManifestSynthesisRequest withImageState(ImageState state) {
-    return toBuilder().imageState(state).build();
+    return toBuilder().imageState(Optional.of(state)).build();
   }
 
   public ManifestSynthesisRequest withIncusIdentity(IncusIdentityMaterial material) {
-    return toBuilder().incusIdentity(material).build();
+    return toBuilder().incusIdentity(Optional.of(material)).build();
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -162,8 +162,8 @@ public record ManifestSynthesisRequest(
     private BootstrapIdentity bootstrapIdentity = BootstrapIdentity.unknown();
     private NetworkTopology networkTopology = NetworkTopology.empty();
     private ComponentVersions componentVersions = ComponentVersions.defaults();
-    private ImageState imageState = ImageState.unknown();
-    private IncusIdentityMaterial incusIdentity = IncusIdentityMaterial.unknown();
+    private Optional<ImageState> imageState = Optional.empty();
+    private Optional<IncusIdentityMaterial> incusIdentity = Optional.empty();
 
     private Builder(Path synthOutdir, Path synthManifestFile) {
       this.synthOutdir = synthOutdir;
@@ -195,12 +195,12 @@ public record ManifestSynthesisRequest(
       return this;
     }
 
-    public Builder imageState(final ImageState v) {
+    public Builder imageState(final Optional<ImageState> v) {
       this.imageState = v;
       return this;
     }
 
-    public Builder incusIdentity(final IncusIdentityMaterial v) {
+    public Builder incusIdentity(final Optional<IncusIdentityMaterial> v) {
       this.incusIdentity = v;
       return this;
     }

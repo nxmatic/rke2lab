@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -43,13 +44,15 @@ public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUni
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String clusterName = ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
-    final IncusIdentityMaterial material = ManifestSynthesisContext.current().incusIdentity();
+    final Optional<IncusIdentityMaterial> maybeMaterial =
+        ManifestSynthesisContext.current().incusIdentity();
 
     // Skip in ephemeral/test mode: no real identity (no cluster, or seed-master supplied no
     // material).
-    if (BootstrapIdentity.UNKNOWN.equals(clusterName) || material.isUnknown()) {
+    if (BootstrapIdentity.UNKNOWN.equals(clusterName) || maybeMaterial.isEmpty()) {
       return;
     }
+    final IncusIdentityMaterial material = maybeMaterial.orElseThrow();
 
     final ApiObject secret =
         new ApiObject(

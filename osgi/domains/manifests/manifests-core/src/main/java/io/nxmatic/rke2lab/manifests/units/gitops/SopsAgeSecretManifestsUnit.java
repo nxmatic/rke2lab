@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -51,13 +52,15 @@ public final class SopsAgeSecretManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final SopsAgeMaterial material = ManifestSynthesisContext.current().sopsAgeMaterial();
+    final Optional<SopsAgeMaterial> maybeMaterial =
+        ManifestSynthesisContext.current().sopsAgeMaterial();
 
     // Skip in ephemeral/test mode: no SSH key-store was present, so the pre-synthesis step supplied
     // no real age key.
-    if (material.isUnknown()) {
+    if (maybeMaterial.isEmpty()) {
       return;
     }
+    final SopsAgeMaterial material = maybeMaterial.orElseThrow();
 
     final ApiObject secret =
         new ApiObject(

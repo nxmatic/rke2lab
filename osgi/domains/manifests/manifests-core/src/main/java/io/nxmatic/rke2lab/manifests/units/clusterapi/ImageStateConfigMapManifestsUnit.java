@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -76,13 +77,14 @@ public final class ImageStateConfigMapManifestsUnit extends AbstractManifestsUni
       return;
     }
 
-    final ImageState state = ManifestSynthesisContext.current().imageState();
+    final Optional<ImageState> maybeState = ManifestSynthesisContext.current().imageState();
 
     // Skip when seed-master supplied no real image identity (ephemeral/test synth): an
     // all-placeholder ConfigMap would mislead Stage B into pinning a non-existent image.
-    if (state.isUnknown()) {
+    if (maybeState.isEmpty()) {
       return;
     }
+    final ImageState state = maybeState.orElseThrow();
 
     final Map<String, String> data =
         Map.of(

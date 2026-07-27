@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Synthesis-scoped context exposing per-synth policies and identity data to layer code. The
@@ -50,16 +51,16 @@ public final class ManifestSynthesisContext {
    * The age key, resolved by the synthesis service's pre-synthesis step (read the SSH key, convert
    * it via the {@code SshToAgeConverter} edge) and bound here. Unlike the request-borne profiles,
    * this is NOT supplied by the host across the frontier — it is derived inside the OSGi world, so
-   * it is a context field of its own, defaulting to {@link SopsAgeMaterial#unknown()}.
+   * it is a context field of its own, {@link Optional#empty()} when no key-store was present.
    */
-  private final SopsAgeMaterial sopsAgeMaterial;
+  private final Optional<SopsAgeMaterial> sopsAgeMaterial;
 
   private ManifestSynthesisContext(ManifestSynthesisRequest request) {
-    this(request, SopsAgeMaterial.unknown());
+    this(request, Optional.empty());
   }
 
   private ManifestSynthesisContext(
-      ManifestSynthesisRequest request, SopsAgeMaterial sopsAgeMaterial) {
+      ManifestSynthesisRequest request, Optional<SopsAgeMaterial> sopsAgeMaterial) {
     this.request = Objects.requireNonNull(request, "request");
     this.sopsAgeMaterial = Objects.requireNonNull(sopsAgeMaterial, "sopsAgeMaterial");
   }
@@ -70,7 +71,7 @@ public final class ManifestSynthesisContext {
 
   /** Context carrying the pre-synthesis-resolved age key alongside the request. */
   public static ManifestSynthesisContext of(
-      ManifestSynthesisRequest request, SopsAgeMaterial sopsAgeMaterial) {
+      ManifestSynthesisRequest request, Optional<SopsAgeMaterial> sopsAgeMaterial) {
     return new ManifestSynthesisContext(request, sopsAgeMaterial);
   }
 
@@ -107,15 +108,15 @@ public final class ManifestSynthesisContext {
     return request.componentVersions();
   }
 
-  public ImageState imageState() {
+  public Optional<ImageState> imageState() {
     return request.imageState();
   }
 
-  public IncusIdentityMaterial incusIdentity() {
+  public Optional<IncusIdentityMaterial> incusIdentity() {
     return request.incusIdentity();
   }
 
-  public SopsAgeMaterial sopsAgeMaterial() {
+  public Optional<SopsAgeMaterial> sopsAgeMaterial() {
     return sopsAgeMaterial;
   }
 

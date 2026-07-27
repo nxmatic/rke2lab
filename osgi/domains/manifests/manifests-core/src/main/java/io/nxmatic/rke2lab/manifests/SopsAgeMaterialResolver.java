@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,8 +20,8 @@ import org.slf4j.LoggerFactory;
  * registry-bound edge), never reached statically.
  *
  * <p>Fail-soft on absence, fail-fast on malformation: no key-store present ⟹ {@link
- * SopsAgeMaterial#unknown()} and the converter is NOT called (ephemeral / test runs, where the unit
- * then skips). A present-but-malformed key-store raises — a defect to surface, not a silent skip.
+ * Optional#empty()} and the converter is NOT called (ephemeral / test runs, where the unit then
+ * skips). A present-but-malformed key-store raises — a defect to surface, not a silent skip.
  */
 final class SopsAgeMaterialResolver {
 
@@ -39,14 +40,14 @@ final class SopsAgeMaterialResolver {
     this.converter = converter;
   }
 
-  SopsAgeMaterial resolve() {
+  Optional<SopsAgeMaterial> resolve() {
     if (!Files.isReadable(KEYS_YAML)) {
       LOG.debug("No SSH key-store at {} — sops-age Secret will be skipped", KEYS_YAML);
-      return SopsAgeMaterial.unknown();
+      return Optional.empty();
     }
     final String sshPrivateKey = readRke2ClusterPrivateKey();
     final String ageKey = converter.toAgeKey(sshPrivateKey);
-    return new SopsAgeMaterial(ageKey);
+    return Optional.of(new SopsAgeMaterial(ageKey));
   }
 
   private String readRke2ClusterPrivateKey() {

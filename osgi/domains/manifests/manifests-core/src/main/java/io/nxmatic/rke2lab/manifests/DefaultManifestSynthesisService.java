@@ -116,7 +116,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // Pre-synthesis step: resolve the age key (read the SSH key from the key-store, convert it via
     // the ssh-to-age edge) BEFORE binding the context, so units only render — synthesis takes its
     // prerequisites, it does not fetch them.
-    final SopsAgeMaterial sopsAgeMaterial =
+    final Optional<SopsAgeMaterial> sopsAgeMaterial =
         new SopsAgeMaterialResolver(sshToAgeConverter).resolve();
 
     final var contextScope = ManifestSynthesisContext.of(request, sopsAgeMaterial).bind();

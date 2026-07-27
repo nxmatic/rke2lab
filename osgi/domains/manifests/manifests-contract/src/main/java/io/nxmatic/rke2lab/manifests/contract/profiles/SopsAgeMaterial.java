@@ -1,6 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.contract.profiles;
 
+import java.util.Objects;
+
 /**
  * The age private key published to synth-time layers via {@link
  * io.nxmatic.rke2lab.manifests.ManifestSynthesisContext}. Backs the {@code sops-age} Secret (see
@@ -14,32 +16,13 @@ package io.nxmatic.rke2lab.manifests.contract.profiles;
  * is RAW (the age key text) — base64 is a Kubernetes Secret encoding concern, applied by the unit
  * at render time, not baked into this port type.
  *
- * <p>The default instance backs unit tests and ephemeral synth runs where no SSH key-store is
- * present; {@link #isUnknown()} lets the unit skip rendering when no real key was supplied.
+ * <p>Absence — no SSH key-store present (unit tests, ephemeral synth) — is carried as an empty
+ * {@code Optional<SopsAgeMaterial>} on the context, never a placeholder instance: a present
+ * material always holds a real age key, so the unit renders the Secret unconditionally.
  */
 public record SopsAgeMaterial(String ageKey) {
 
-  /** Sentinel used when no SSH key-store was available to derive the age key (tests, ephemeral). */
-  public static final String UNKNOWN = "unknown";
-
-  private static final SopsAgeMaterial DEFAULT = new SopsAgeMaterial(UNKNOWN);
-
   public SopsAgeMaterial {
-    ageKey = (ageKey == null || ageKey.isBlank()) ? UNKNOWN : ageKey;
-  }
-
-  /**
-   * Default instance used by {@link
-   * io.nxmatic.rke2lab.manifests.ManifestSynthesisContext#current()} when nothing was bound — and
-   * by the pre-synthesis step itself when no SSH key-store is present (it does not call the
-   * converter).
-   */
-  public static SopsAgeMaterial unknown() {
-    return DEFAULT;
-  }
-
-  /** True when no real age key was supplied — the unit skips rendering the Secret. */
-  public boolean isUnknown() {
-    return UNKNOWN.equals(ageKey);
+    ageKey = Objects.requireNonNull(ageKey, "ageKey");
   }
 }
