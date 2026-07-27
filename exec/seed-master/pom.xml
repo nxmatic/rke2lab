@@ -194,14 +194,32 @@
       <artifactId>netplan-core</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- worktree-core: the @Component JgitWorktree publishing the Worktree service. The worktree
+         SOIL (worktree-bdd) resolves it via @OsgiService (require) and compiles only against the
+         worktree CONTRACT, so — exactly like netplan-core — the impl bundle is NOT transitive and
+         must be staged here; without it the registry holds only the worktree contract and the soil's
+         before-phase fails ("no Worktree in the registry for @OsgiService field 'worktree'").
+         runtime scope; embedded INTACT under META-INF/bundles, its SCR component publishing the
+         service. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>worktree-core</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The domain SCION bundles (*-bdd): each carries the @Component SeedHandler that GROWS its
-         runbook coordinate — BboxRunbookHandler serves RunbookCoordinate("bbox"), and so on for
-         incus (provision + reconcile), manifests (sub-sown by incus), systemd, cluster. The broker
+         runbook coordinate — WorktreeRunbookHandler serves RunbookCoordinate("worktree") (the first
+         crossing), BboxRunbookHandler serves RunbookCoordinate("bbox"), and so on for incus
+         (provision + reconcile), manifests (sub-sown by incus), systemd, cluster. The broker
          resolves a grower by coordinate from the registry when the root sows a crossing; without the
          scion bundle staged + its SCR component active, DefaultSeedBroker.sow throws "no SeedHandler
          serves coordinate". runtime scope — seed-master never compiles against a scion; it speaks
          only the neutral RunbookCoordinate through the broker membrane. embed;type=model, so each is
          staged INTACT under META-INF/bundles like the edges. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>worktree-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bbox-bdd</artifactId>
