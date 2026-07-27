@@ -160,7 +160,7 @@ SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-contain
     AND the_staging_is_published — HostStagingEntry (checksums + git provenance) published                    [CODED]
     AND the_instance_grow_plan_is_published — assemble ONE immutable InstanceGrowPlan {network view, image
         view (imageAlias, artifact paths, buildChecksum computed OSGi-side), cloudInitChecksum} and store
-        it at INSTANCE_GROW_PLAN — the single record the host GROW fetches (incus-contract-host library)  [VISION]
+        it at INSTANCE_GROW_PLAN — the single record the host GROW fetches (incus-ingress-contract library)  [VISION]
     AND a build/graft failure surfaces, optionally consulting the doctor                  [CODED]
     AND the instance is NOT started here — GROW is the separate, later pure-host beat
 
@@ -212,7 +212,7 @@ THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed s
 + `the_instance_grow_plan_is_published` (THEN) — the scion resolves `NetplanSynthesisService`, computes
 `buildChecksum` OSGi-side, and assembles ONE immutable `InstanceGrowPlan` (network view + image view +
 cloudInitChecksum) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=dual-realm`
-dual-realm module `incus-contract-host` (the host face of the incus contract — flat value records only,
+dual-realm module `incus-ingress-contract` (the host face of the incus contract — flat value records only,
 no logic; the first `type=dual-realm` of a domain). The GROW between reconcile and verify is pure-host
 (`com.pulumi` + provider invokes only — it fetches the plan and actualises, computes nothing of the
 domain), NOT a scion; the import-lookup it keeps is a provider invoke, not ssh. The probe pulls out to a

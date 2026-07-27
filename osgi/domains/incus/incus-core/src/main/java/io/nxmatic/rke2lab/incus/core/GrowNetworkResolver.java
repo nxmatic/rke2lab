@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.incus.core;
 
-import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
+import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisService;

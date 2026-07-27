@@ -32,7 +32,7 @@
          views the host GROW consumes) and stores it at INSTANCE_GROW_PLAN. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>incus-contract-host</artifactId>
+      <artifactId>incus-ingress-contract</artifactId>
     </dependency>
     <!-- The incus domain's host-tree logic: BootstrapPaths (the scion reconstructs the provisioning
          topology from the worktree scalars) + HostSlotSelector (it picks its own rotation slot) +

@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.incus.core;
 
-import io.nxmatic.rke2lab.incus.contract.host.GrowImageView;
-import io.nxmatic.rke2lab.incus.contract.host.GrowMountView;
-import io.nxmatic.rke2lab.incus.contract.host.GrowNetworkView;
-import io.nxmatic.rke2lab.incus.contract.host.InstanceGrowPlan;
+import io.nxmatic.rke2lab.incus.ingress.GrowImageView;
+import io.nxmatic.rke2lab.incus.ingress.GrowMountView;
+import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
+import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;

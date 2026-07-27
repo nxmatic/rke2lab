@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
+import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
 import io.nxmatic.rke2lab.manifests.contract.hostasset.HostAssetProvider;
 import java.io.IOException;
 import java.nio.file.Files;

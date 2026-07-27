@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.incus.contract.host;
+package io.nxmatic.rke2lab.incus.ingress;
 
 import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
 import java.util.List;

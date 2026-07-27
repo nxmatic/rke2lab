@@ -1,7 +1,7 @@
 -include: ../../../bundle-parent/annotations.bnd
 Import-Package: ${annotation-noimports}, *
-Bundle-SymbolicName: io.nxmatic.rke2lab.incus.contract.host
-Export-Package: io.nxmatic.rke2lab.incus.contract.host
+Bundle-SymbolicName: io.nxmatic.rke2lab.incus.ingress
+Export-Package: io.nxmatic.rke2lab.incus.ingress
 # type=dual-realm — the incus domain's dual-realm host face: what BOTH realms genuinely consume. The
 # flat value views the pure-host GROW fetches (InstanceGrowPlan + its sub-views), AND the pure path
 # logic both realms share (BootstrapPaths: the provisioning topology the scion materialises into and

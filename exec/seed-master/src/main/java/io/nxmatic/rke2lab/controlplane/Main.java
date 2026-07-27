@@ -10,7 +10,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.SeedRun;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
-import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
+import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
 import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.LogLevelSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.GraftTag;

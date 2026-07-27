@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.incus.contract.host;
+package io.nxmatic.rke2lab.incus.ingress;
 
 import java.nio.file.Path;
 import java.util.List;

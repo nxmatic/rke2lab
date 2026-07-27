@@ -35,7 +35,7 @@
     <!-- The flat grow views the scion projects (GrowNetworkView): GrowNetworkResolver assembles it. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>incus-contract-host</artifactId>
+      <artifactId>incus-ingress-contract</artifactId>
     </dependency>
     <!-- The netplan blueprint + synthesis service GrowNetworkResolver reads to project the NIC hwaddrs
          and the dnsmasq config the per-cluster bridge carries. -->

@@ -10,8 +10,8 @@
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>incus-contract-host</artifactId>
-  <name>osgi/domains/incus/incus-contract-host</name>
+  <artifactId>incus-ingress-contract</artifactId>
+  <name>osgi/domains/incus/incus-ingress-contract</name>
   <description>The HOST face of the incus contract — what BOTH realms genuinely consume. The GROW
     runs host-flat (outside Felix, com.pulumi lives there) yet is still the incus domain talking to
     itself across the realm boundary com.pulumi imposes: the scion (OSGi) PROJECTS an InstanceGrowPlan

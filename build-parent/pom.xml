@@ -272,7 +272,7 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>incus-contract-host</artifactId>
+        <artifactId>incus-ingress-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>

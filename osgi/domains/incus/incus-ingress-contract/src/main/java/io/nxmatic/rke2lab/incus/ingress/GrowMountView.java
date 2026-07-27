@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.incus.contract.host;
+package io.nxmatic.rke2lab.incus.ingress;
 
 /**
  * One flat DISK mount the GROW poses on the Pulumi graph — the {@code source} the NixOS host mounts

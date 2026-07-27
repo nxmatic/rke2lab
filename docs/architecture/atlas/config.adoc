@@ -234,7 +234,7 @@ halves are playable on the OSGi bench; the value channel is narrated.
 .. GIVEN `NodeEnvContext` once exposed every path, node, cluster and network accessor at once
 .. WHEN it is segregated into three view records (identity / topology / paths) it composes
 .. THEN each consumer reads only the view it needs (interface segregation) — AND the per-context path
-   adaptation stays the shipped `incus-contract-host` `BootstrapPaths.asHostView`, ungeneralised (YAGNI).
+   adaptation stays the shipped `incus-ingress-contract` `BootstrapPaths.asHostView`, ungeneralised (YAGNI).
    (commit `75627e53`)
 
 . *One NodeEnvContext projection replaces the hardcoded identity* — `[shipped]` green +

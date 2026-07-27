@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.incus.contract.host;
+package io.nxmatic.rke2lab.incus.ingress;
 
 /**
  * The flat IMAGE view the GROW poses on the Pulumi graph — the alias the reuse-lookup keys on, the

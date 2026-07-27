@@ -39,7 +39,7 @@
          the scion projected and actualises it on the Pulumi graph (type=dual-realm, flat host-side). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>incus-contract-host</artifactId>
+      <artifactId>incus-ingress-contract</artifactId>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

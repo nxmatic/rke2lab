@@ -623,7 +623,7 @@ InstanceGrowPlan(
     List<GrowMountView> mounts)     // the 13 resolved disk mounts: deviceName, source, target
 ----
 
-*It lives in a NEW module `incus-contract-host` — the HOST FACE of the incus contract, `type=dual-realm`
+*It lives in a NEW module `incus-ingress-contract` — the HOST FACE of the incus contract, `type=dual-realm`
 dual-realm.* Its coordinate `IncusGrowCoordinate.INSTANCE_GROW_PLAN` lives here too (NOT in the OSGi-only
 `IncusCoordinate`: the pure-host GROW cannot compile against `incus-contract`, and a slug spelled
 host-side is the magic-string anti-pattern). Its rationale: `incus-contract` is `type=contract`

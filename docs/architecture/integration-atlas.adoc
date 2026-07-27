@@ -66,7 +66,7 @@ the host uber-jar — TWO copies, each bound to its realm — because it carries
 values cross, each realm holds its own copy. `seed-broker-codec` is the founding case (a foundation:
 serves all domains, both worlds).
 
-`incus-contract-host` (2026-07-17) is the first `type=dual-realm` of a DOMAIN, and it refines the rule:
+`incus-ingress-contract` (2026-07-17) is the first `type=dual-realm` of a DOMAIN, and it refines the rule:
 the dual-realm here is *intra-domain*. incus must run part of its logic host-flat — the GROW beat,
 because `com.pulumi` cannot enter Felix — so the incus SCION (OSGi) and the incus GROW (host) are two
 halves of ONE domain that need to share flat value records (the `InstanceGrowPlan`) ACROSS the realm

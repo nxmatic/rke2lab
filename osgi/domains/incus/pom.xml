@@ -25,7 +25,7 @@
 
   <modules>
     <module>incus-contract</module>
-    <module>incus-contract-host</module>
+    <module>incus-ingress-contract</module>
     <module>incus-core</module>
     <module>incus-core-test</module>
     <module>incus-edge</module>

@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.incus.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.nxmatic.rke2lab.incus.contract.host.BootstrapPaths;
+import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
 import io.nxmatic.rke2lab.manifests.contract.hostasset.HostAssetContribution;
 import io.nxmatic.rke2lab.manifests.contract.hostasset.HostAssetEntry;
 import io.nxmatic.rke2lab.manifests.contract.hostasset.HostAssetProvider;

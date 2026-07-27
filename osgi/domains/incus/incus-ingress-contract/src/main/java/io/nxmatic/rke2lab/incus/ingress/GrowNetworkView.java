@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.incus.contract.host;
+package io.nxmatic.rke2lab.incus.ingress;
 
 import java.util.Map;
 import java.util.TreeMap;

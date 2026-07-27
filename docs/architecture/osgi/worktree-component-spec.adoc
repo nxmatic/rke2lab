@@ -126,7 +126,7 @@ sources, an incus dual-realm type), never as a worktree type.
 === The principle it rests on
 
 *A domain needs a dual-realm `-host` library iff the host ACTUALISES its harvest.* `incus` is
-host-actualised (the host runs `pulumi up` to create the instance), so `incus-contract-host` is
+host-actualised (the host runs `pulumi up` to create the instance), so `incus-ingress-contract` is
 legitimately dual-realm. The worktree is *not* actualised by the host — the worktree already exists;
 the domain only reads facts off it. So once nothing host-side consumes those facts, the worktree
 contract is OSGi-only, and `worktree-contract-host` folds into `worktree-contract`.
@@ -135,7 +135,7 @@ contract is OSGi-only, and `worktree-contract-host` folds into `worktree-contrac
 
 Two changes removed both host-side reads, and with them the reason for the dual-realm face:
 
-. **The grow plan became self-contained (Q1 — ✅).** The `InstanceGrowPlan` (`incus-contract-host`)
+. **The grow plan became self-contained (Q1 — ✅).** The `InstanceGrowPlan` (`incus-ingress-contract`)
   now carries the resolved disk mounts as `GrowMountView`s: the incus scion (which `@Reference`s
   `Worktree`) computes the live + automount `BootstrapPaths` view OSGi-side and projects the 13
   source↔target pairs into the plan, so the host GROW actualises the plan ALONE — no separate
