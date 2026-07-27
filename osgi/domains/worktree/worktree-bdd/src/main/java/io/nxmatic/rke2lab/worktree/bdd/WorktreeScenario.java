@@ -13,7 +13,9 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.nxmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.CellarCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.worktree.GatePolicy;
 import io.nxmatic.rke2lab.worktree.WorkingState;
@@ -132,15 +134,28 @@ public class WorktreeScenario
   }
 
   /**
-   * Then: file the harvest at {@link WorktreeCoordinate#FACTS} under the current parcel (THEN
-   * seals). The store is unconditional on the gate — the cellar routes conserve vs pre-reserve
-   * itself — so a preview run still records the facts the host reads back for the grow projection.
+   * Then: plant the run's fil d'Ariane root, then file the harvest at {@link
+   * WorktreeCoordinate#FACTS} under the current parcel (THEN seals). As the FIRST crossing, the
+   * worktree soil projects its git HEAD provenance into a foundation {@link Breadcrumb} filed at
+   * {@link CellarCoordinate#RUN_PROVENANCE} — the root every later value's {@link
+   * io.nxmatic.rke2lab.seed.broker.port.Trail} descends from (it reaches sibling crossings by the
+   * ordinary transactional inheritance). The store is unconditional on the gate — the cellar routes
+   * conserve vs pre-reserve itself — so a preview run still records the facts the host reads back
+   * for the grow projection.
    */
   public static class Then extends Stage<Then> {
 
     @ExpectedScenarioState WorktreeFacts facts;
 
     public Then the_facts_are_harvested(@Hidden Cellar cellar, @Hidden Parcel parcel) {
+      cellar.store(
+          parcel,
+          CellarCoordinate.RUN_PROVENANCE,
+          new Breadcrumb(
+              WorktreeCoordinate.FACTS.domain(),
+              WorktreeCoordinate.FACTS.slug(),
+              facts.provenance().sha(),
+              facts.provenance().dirty()));
       cellar.store(parcel, WorktreeCoordinate.FACTS, facts);
       return self();
     }

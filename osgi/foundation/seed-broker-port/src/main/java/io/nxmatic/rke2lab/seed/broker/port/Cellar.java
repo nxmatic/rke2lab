@@ -68,4 +68,17 @@ public interface Cellar {
    * also the opaque one. Delegated verbatim to the underlying {@link OpaqueCellar}.
    */
   List<Parcel> neighbours(Parcel parcel);
+
+  /**
+   * The provenance {@link Trail} (fil d'Ariane) of the current value at {@code coordinate} — its
+   * lineage back to the git commit it was cultivated from, readable WITHOUT decoding the (possibly
+   * SEALED) payload, since the trail rides CLEAR on the {@link SeedEnvelope}. Empty when the case
+   * is empty OR when this cellar tracks no trail (the default): only the transactional cellar
+   * stamps and reads it within a run; the durable edge does not yet carry it (§ fil-d-ariane, the
+   * durable extension is a handoff item). A capability, not a core verb — hence a default, not an
+   * abstract method every {@code Cellar} must realise.
+   */
+  default Optional<Trail> trailOf(Parcel parcel, SeedCoordinate coordinate) {
+    return Optional.empty();
+  }
 }

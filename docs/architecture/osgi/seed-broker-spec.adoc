@@ -1162,6 +1162,8 @@ SeedCoordinate            (interface — the concept: slug() + domain(); OPEN ro
  ├── ValueCoordinate      (sealed — the gardener's vocabulary, routed by equals)
  │    ├── SplitCoordinate(domain)      slug "split"
  │    └── RunbookCoordinate(domain)    slug "runbook"
+ ├── CellarCoordinate     (foundation infra enum — the cellar's OWN keys, owned by no domain)
+ │    └── RUN_PROVENANCE               slug "run-provenance"  (the fil d'Ariane root)
  └── <domain enums>       (DoctorCoordinate.…, routed by identity — the domain's vocabulary)
 ----
 
@@ -1290,11 +1292,12 @@ envelope is a SEED again — `sow → plant → (stored in the stack) → seed`,
 This is the SAME "ask the broker for the slot names, transport the payload opaque" mechanism, seen from
 the storage axis: the frontier does CRUD on envelopes it never opens.
 
-The precision that keeps it opaque — a `SeedEnvelope(domain, coordinate, payload)` has two parts, and
-CRUD touches only ONE. The SHELL (`domain`, `coordinate` — neutral `String`s) is what the frontier
-addresses BY; the PAYLOAD is sealed, never read. Today's leak is that storage addresses by a DOMAIN FIELD
-name (`consultationReport`, via `outputsNamed(key)`); the cure is that the storage key becomes the
-COORDINATE (the shell), so the frontier files and finds by shell, never by field.
+The precision that keeps it opaque — a `SeedEnvelope(domain, coordinate, payload, trail)` has a SEALED
+part and CLEAR parts, and CRUD touches only the clear ones. The SHELL (`domain`, `coordinate` — neutral
+`String`s) is what the frontier addresses BY; the `trail` (its fil d'Ariane, see <<fil-d-ariane>>) is a
+CLEAR sibling of the shell; the PAYLOAD is sealed, never read. Today's leak is that storage addresses by
+a DOMAIN FIELD name (`consultationReport`, via `outputsNamed(key)`); the cure is that the storage key
+becomes the COORDINATE (the shell), so the frontier files and finds by shell, never by field.
 
 [mermaid]
 ....
@@ -1326,6 +1329,47 @@ makes CRUD opaque is that `StackSnapshot.outputsNamed` stops being keyed on a do
 being keyed on a coordinate slug — that single reshape kills both leak names (`SeedBrokerCatalog.FIELD_*`,
 the `OUTPUT_KEY` constants). The stored unit is the sealed payload `String` under a slot name the broker
 supplied: store the sealed String, return the sealed String, the name comes from the plant.
+
+[[fil-d-ariane]]
+==== The fil d'Ariane — a value's lineage rides CLEAR on the envelope
+
+A stored value should be traceable back to the git commit it was cultivated from — and for a SEALED
+value, traceable WITHOUT the passphrase (the whole point of secured-value traceability: you audit
+*where a secret came from* without reading the secret). So the lineage cannot ride inside the sealed
+payload; it rides as a CLEAR sibling on the shell.
+
+*The types (all `seed-broker-port`, seam-owned, flat-composed — no bundle type leaks).*
+
+* `Breadcrumb(String domain, String coordinate, String sha, boolean dirty)` — ONE self-describing
+  source coordinate: the cellar coordinate a value was filed under, and the git source it was cultivated
+  from. The git fields are RAW strings, deliberately NOT a domain `Provenance` (the seam depends on no
+  domain); the worktree soil projects its `Provenance` into a `Breadcrumb` at the seam.
+* `Trail(List<Breadcrumb> breadcrumbs)` — the fil d'Ariane, root-first; immutable (`push` returns a new
+  trail). It is the fourth field of `SeedEnvelope`, CLEAR, outside the sealed payload.
+
+*The accumulation — ambient tx-snapshot, realised by the EXISTING transactional inheritance.* The run's
+git provenance is its ROOT, filed ONCE by the first crossing (the worktree soil) as a `Breadcrumb` under
+the foundation coordinate `CellarCoordinate.RUN_PROVENANCE`. `ScenarioCellar.store` reads that root back
+from its own overlay and stamps every value's trail `[root, here]` — `here` carrying the same git source
+under this coordinate, so each link is a complete source coordinate. The root reaches sibling crossings
+for free: it folds up into the trunk at the graft and descends to the next crossing as an *inherited*
+entry (§ the transactional cellar) — no new seed, no extension change, no ctor change. A store filed
+before the root exists (the seed root's GIVEN) gets a lone self-link with an empty sha, a legitimate
+pre-provenance root; the `RUN_PROVENANCE` declaration itself carries no lineage (it IS the root).
+
+*Reading it.* `Cellar.trailOf(Parcel, SeedCoordinate)` returns the current value's `Trail` off the
+envelope — no decode, no reveal, so a SEALED value's lineage reads without the passphrase. A default
+(empty) on `Cellar`, overridden only by `ScenarioCellar` (the overlay); it is a capability, not a core
+verb.
+
+*Boundary (v1) + handoff.* The fil d'Ariane is realised at the TRANSACTIONAL (within-run) layer — the
+`Entry` tags on the `ReportModel` carry the full envelope (trail included), inheritance propagates it.
+The DURABLE edge (`PulumiCellar`) does NOT yet carry it: its Pulumi shell persists only
+`(coordinate → payload)` and rebuilds `new SeedEnvelope("", coordinate, payload)` on fetch — dropping the
+`domain` AND the `trail`. Extending the durable edge to carry a richer envelope characterisation (its
+`domain`, its `trail`, its withdrawn/tombstone status) is a HANDOFF item for the integration session — it
+pairs with the durable-sealing (cellar-secrets) work, and that characterisation is future material for
+building the CONTEXT of a system error and its resolution.
 
 [[the-cellar-is-a-fridge]]
 ==== The cellar is a FRIDGE (put / peek / take), not an append-only journal (correction)

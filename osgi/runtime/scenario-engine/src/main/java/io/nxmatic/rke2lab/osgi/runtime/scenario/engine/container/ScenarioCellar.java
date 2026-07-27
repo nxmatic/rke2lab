@@ -3,12 +3,15 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.nxmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.CellarCipher;
+import io.nxmatic.rke2lab.seed.broker.port.CellarCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.nxmatic.rke2lab.seed.broker.port.Trail;
 import io.nxmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -213,7 +216,48 @@ public final class ScenarioCellar implements TransactionalCellar {
       Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {
     final String encoded = codec.encode(value);
     final String payload = sensitivity == Sensitivity.SEALED ? cipher.seal(encoded) : encoded;
-    append(new Entry(parcel, SeedEnvelope.of(coordinate, payload), false, false));
+    final SeedEnvelope envelope =
+        SeedEnvelope.of(coordinate, payload).withTrail(trailFor(parcel, coordinate));
+    append(new Entry(parcel, envelope, false, false));
+  }
+
+  /**
+   * Stamp the value's fil d'Ariane at {@code coordinate}: the run's git root breadcrumb — read back
+   * from {@link CellarCoordinate#RUN_PROVENANCE}, present once the worktree crossing has harvested
+   * HEAD and descended to sibling crossings by the ordinary transactional inheritance — followed by
+   * THIS coordinate's link (carrying the same git source, so each link is self-describing). The
+   * root declaration itself carries no lineage (it IS the root). A store filed before any
+   * provenance is known yields a lone self-link with an empty sha — a legitimate pre-provenance
+   * root.
+   */
+  private Trail trailFor(Parcel parcel, SeedCoordinate coordinate) {
+    if (isRunProvenance(coordinate)) {
+      return Trail.empty();
+    }
+    final Optional<Breadcrumb> root = runProvenance(parcel);
+    final Breadcrumb here =
+        new Breadcrumb(
+            coordinate.domain(),
+            coordinate.slug(),
+            root.map(Breadcrumb::sha).orElse(""),
+            root.map(Breadcrumb::dirty).orElse(false));
+    return root.map(r -> new Trail(List.of(r)).push(here)).orElse(new Trail(List.of(here)));
+  }
+
+  /**
+   * The run's git root breadcrumb from the OVERLAY only (the run's own store or a crossing it
+   * inherited), never the durable fallback — a prior run's durable provenance must not root THIS
+   * run's stores. Empty until the first crossing harvests HEAD.
+   */
+  private Optional<Breadcrumb> runProvenance(Parcel parcel) {
+    return latestSetEntry(parcel, CellarCoordinate.RUN_PROVENANCE)
+        .filter(entry -> !entry.tombstone())
+        .map(entry -> codec.decode(cipher.reveal(entry.envelope().payload()), Breadcrumb.class));
+  }
+
+  private boolean isRunProvenance(SeedCoordinate coordinate) {
+    return coordinate.domain().equals(CellarCoordinate.RUN_PROVENANCE.domain())
+        && coordinate.slug().equals(CellarCoordinate.RUN_PROVENANCE.slug());
   }
 
   /** Append one operation to the read-write set — a new {@link Tag#ENTRY} tag, in store order. */
@@ -283,6 +327,21 @@ public final class ScenarioCellar implements TransactionalCellar {
   @Override
   public List<Parcel> neighbours(Parcel parcel) {
     return durableReads.get().neighbours(parcel);
+  }
+
+  /**
+   * The current value's fil d'Ariane at {@code coordinate}, from the OVERLAY: the trail stamped on
+   * the last {@link Entry} filed there (a tombstoned case has none). Reads the CLEAR trail off the
+   * envelope — no decode, no reveal — so a SEALED value's lineage is traceable without the
+   * passphrase. Empty when the run's write set is silent on this case; the durable edge does not
+   * yet carry the trail (§ fil-d-ariane, a handoff item), so there is no durable fallback to
+   * consult.
+   */
+  @Override
+  public Optional<Trail> trailOf(Parcel parcel, SeedCoordinate coordinate) {
+    return latestSetEntry(parcel, coordinate)
+        .filter(entry -> !entry.tombstone())
+        .map(entry -> entry.envelope().trail());
   }
 
   /**
