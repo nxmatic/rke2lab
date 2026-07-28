@@ -634,5 +634,31 @@
         <rke2lab.staging.skip>true</rke2lab.staging.skip>
       </properties>
     </profile>
+    <!-- The OSGi bench proofs are a precondition of THIS integration: seed-master's whole runtime
+         rides the same embedded-Felix seams the bench exercises (SCR activation, extender resolve,
+         fragment contribution, start-level order, the multi-recipient cellar). Depending on
+         bench-tests pulls it into every `-pl :seed-master -am` reactor, so a bench regression fails
+         a feature integration here instead of rotting silently until someone runs the bench by hand
+         — the debt that let the jspecify/@NullMarked gap slip through.
+
+         Activation is by the ABSENCE of skipBench, NOT <activeByDefault>: an activeByDefault profile
+         is silently switched off as soon as any -P is passed, and this project always builds with
+         -Pall-worlds,claude. The property-negation form stays on regardless of -P; opt out with
+         -DskipBench. -->
+    <profile>
+      <id>bench</id>
+      <activation>
+        <property>
+          <name>!skipBench</name>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>io.nxmatic.rke2lab</groupId>
+          <artifactId>bench-tests</artifactId>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
   </profiles>
 </project>

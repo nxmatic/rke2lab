@@ -100,6 +100,20 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     if (exports.stream().noneMatch(p -> p.startsWith("org.slf4j;") || p.equals("org.slf4j"))) {
       exports.add("org.slf4j;version=2.0.0");
     }
+    // org.jspecify.annotations is universal too: the repo is @NullMarked everywhere, so bnd
+    // computes
+    // a mandatory Import-Package for it on every fixture (jspecify is RUNTIME-retained), and no
+    // provider is staged in-container. Same treatment as slf4j — system-exported by default from
+    // the
+    // test classpath, unless the test already declared it (a second version would split the
+    // package).
+    if (exports.stream()
+        .noneMatch(
+            p ->
+                p.startsWith("org.jspecify.annotations;")
+                    || p.equals("org.jspecify.annotations"))) {
+      exports.add("org.jspecify.annotations;version=1.0.0");
+    }
     for (String symbolicName : builder.exportImportsOf) {
       exports.addAll(classpath.exportsForImportsOf(symbolicName));
     }

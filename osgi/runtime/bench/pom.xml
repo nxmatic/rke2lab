@@ -26,6 +26,12 @@
     <module>bench-startlevel-api</module>
     <module>bench-startlevel-grower</module>
     <module>bench-startlevel-contributor</module>
+    <module>bench-cellar-api</module>
+    <module>bench-cellar-recipient</module>
+    <module>bench-cellar-recipient-late</module>
+    <module>bench-cellar-clean</module>
+    <module>bench-cellar-clean-static</module>
+    <module>bench-cellar-smudge</module>
     <module>bench-tests</module>
   </modules>
 </project>

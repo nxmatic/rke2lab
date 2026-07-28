@@ -56,6 +56,105 @@ fed by *many* contributors. The naive shapes rot:
   is handed the view its parent adapted from the parent's OWN view — never the raw service.
 |===
 
+== Contributor resolution — STATIC snapshot vs DYNAMIC roster
+
+Every collector aggregates its contributors through an OSGi Declarative Services `@Reference`, and
+that reference has THREE independent axes. Getting them right is what decides whether a contributor
+registered *after the collector activates* is seen or silently dropped.
+
+[cols="1,3",options="header"]
+|===
+| Axis | What it governs
+
+| `cardinality`
+| How many, and whether required: `MANDATORY` (1..1), `OPTIONAL` (0..1), `MULTIPLE` (0..n),
+  `AT_LEAST_ONE` (1..n). A roster is `MULTIPLE`. Governs component satisfaction (activation).
+
+| `policy`
+| What happens when the matching set CHANGES while the collector is active. `STATIC` (default) freezes
+  the bindings at activation (constructor/field injection); to change them SCR must DEACTIVATE and
+  reactivate. `DYNAMIC` lets bindings change live via `bind`/`unbind` (or a `volatile` collection
+  field), no reactivation.
+
+| `policyOption`
+| When a NEW bindable service appears while the reference is already satisfied: `RELUCTANT` (default)
+  leaves the collector undisturbed; `GREEDY` takes it (rebind if dynamic, *reactivate* if static).
+|===
+
+*The decisive rule.* A collector that must accept contributors registered at *runtime* (after it has
+activated) needs `policy = DYNAMIC`. A `STATIC` collector snapshots its roster at activation and — with
+the default `RELUCTANT` option — never sees a later contributor. And `policyOption` is a *no-op on a
+`MULTIPLE`/`DYNAMIC` reference* (a dynamic multiple already tracks the whole set live); it bites only on
+STATIC references (where `GREEDY` forces a reactivation to rebuild the set) and on unary references
+(where `GREEDY` switches to a higher-`service.ranking` provider). So "add `GREEDY` to make a roster
+dynamic" is a category error: the tool for live reactivity is `DYNAMIC`, not `GREEDY`.
+
+This is proven executably, not just asserted, by the `bench-cellar` theses (`osgi/runtime/bench`): the
+*additivity* thesis shows a `MULTIPLE`/`DYNAMIC` roster binds a recipient installed at runtime with the
+default RELUCTANT option (GREEDY unnecessary), and the *resolution-mode* thesis contrasts a dynamic and
+a static clean in one world — the dynamic one seals for the late recipient, the static one stays frozen
+on its activation snapshot.
+
+[mermaid]
+....
+sequenceDiagram
+    participant Boot as Boot roster alice bob
+    participant Dyn as Dynamic collector
+    participant Sta as Static collector
+    participant Late as Contributor carol
+
+    Boot->>Dyn: bind live at boot
+    Boot->>Sta: snapshot at activation
+    Note over Dyn,Sta: both rosters equal alice bob
+    Late->>Dyn: registerService at runtime
+    Dyn->>Dyn: bind carol live
+    Note over Dyn: roster equals alice bob carol
+    Note over Sta: no rebind, roster stays alice bob
+....
+
+.Where each production collector stands
+[cols="2,1,3",options="header"]
+|===
+| Collector | Mode | Late-arrival behaviour
+
+| `DefaultAmendmentAssembler` (contributors + grower refs)
+| `MULTIPLE`/`DYNAMIC`
+| Correct for its stated need — host-side `AmendmentContributor`s are `registerService`'d after boot,
+  and DYNAMIC binds them live. RELUCTANT here is fine (no-op).
+
+| `DefaultHealthSystem` (`Specialist`) +
+`DefaultSeedBroker` (`SeedHandler`) +
+`NodeEnvContributorRegistry` (`NodeEnvContributor`) +
+`DefaultManifestSynthesisService` (`ManifestsDomainRegistrar`)
+| `MULTIPLE`/`STATIC`/RELUCTANT
+| Snapshot at activation. Safe TODAY only because every contributor is a DS bundle component present
+  before the collector's first use (boot ordering, not an enforced start-level). A contributor that
+  ever registers late would be silently missed.
+
+| `BootstrapHostAssetMaterializer` (`HostAssetProvider`)
+| `MULTIPLE`/`STATIC`/**GREEDY**
+| The deliberate exception: STATIC + GREEDY, so SCR *reactivates* it to pick up a late provider —
+  accepting reactivation churn to stay complete.
+|===
+
+[mermaid]
+....
+flowchart TD
+    Q{"Contributors appear at runtime?"}
+    Q -->|no| S["STATIC snapshot at activation"]
+    Q -->|yes| D["DYNAMIC live bind and unbind"]
+    S --> SN["safe under boot ordering today"]
+    D --> DN["RELUCTANT suffices, policyOption is a no-op"]
+    SN -->|a contributor becomes late| D
+....
+
+*Migration guidance.* Do NOT blanket-flip the STATIC rosters to GREEDY: on a central collector (the
+broker, the health system) a reactivation mid-flight is heavier and riskier than the gap it closes, and
+it does not make the collector's code (a constructor snapshot) dynamic-aware. When a contributor
+genuinely becomes late-arriving, convert THAT collector to `DYNAMIC` (snapshot → live re-read + a
+concurrent collection + `bind`/`unbind`) and earn it a late-arrival test modelled on the bench-cellar
+additivity thesis — per real need, never speculatively.
+
 === Inversion — the dependency runs one way
 
 [mermaid]

@@ -140,6 +140,36 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-cellar-api</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-cellar-recipient</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-cellar-recipient-late</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-cellar-clean</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-cellar-clean-static</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-cellar-smudge</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>bench-config</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -181,6 +211,11 @@
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>bench-startlevel-contributor</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bench-tests</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>

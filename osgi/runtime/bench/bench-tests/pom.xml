@@ -79,6 +79,39 @@
       <artifactId>bench-startlevel-contributor</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- the multi-recipient cellar proof: the api is a test dep so its package is system-exported
+         (typed awaitService + shared SealedBlob); the recipient/clean/smudge bundles are located by
+         their embed capability (suite=cellar) and installed by the test. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-cellar-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-cellar-recipient</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-cellar-recipient-late</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-cellar-clean</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-cellar-clean-static</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-cellar-smudge</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
