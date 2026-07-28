@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.nxmatic.rke2lab.seed.broker.port.Trail;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -82,6 +83,18 @@ public final class CodecCellar implements Cellar {
   @Override
   public List<Parcel> neighbours(Parcel parcel) {
     return opaque.neighbours(parcel);
+  }
+
+  /**
+   * The current value's fil d'Ariane at {@code coordinate} — read CLEAR off the opaque envelope the
+   * backend hands back, WITHOUT revealing the (possibly SEALED) payload. This is the DURABLE read
+   * path the {@code ScenarioCellar} default cannot serve: the durable edge now carries the trail in
+   * its coquille (§ fil-d-ariane, the durable extension), so a value sealed in one run exposes its
+   * lineage in a later run without the passphrase. Empty when the case is empty.
+   */
+  @Override
+  public Optional<Trail> trailOf(Parcel parcel, SeedCoordinate coordinate) {
+    return opaque.fetch(parcel, coordinate).map(SeedEnvelope::trail);
   }
 
   /**

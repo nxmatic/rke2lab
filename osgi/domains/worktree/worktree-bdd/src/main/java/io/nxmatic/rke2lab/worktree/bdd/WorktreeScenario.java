@@ -17,12 +17,14 @@ import io.nxmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.CellarCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.Trail;
 import io.nxmatic.rke2lab.worktree.GatePolicy;
 import io.nxmatic.rke2lab.worktree.WorkingState;
 import io.nxmatic.rke2lab.worktree.Worktree;
 import io.nxmatic.rke2lab.worktree.WorktreeCoordinate;
 import io.nxmatic.rke2lab.worktree.WorktreeFacts;
 import io.nxmatic.rke2lab.worktree.WorktreeRunbookInput;
+import java.util.List;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
@@ -148,14 +150,22 @@ public class WorktreeScenario
     @ExpectedScenarioState WorktreeFacts facts;
 
     public Then the_facts_are_harvested(@Hidden Cellar cellar, @Hidden Parcel parcel) {
+      // Plant the run's provenance PATH with its ROOT crumb — the git HEAD source. It is a
+      // one-crumb
+      // Trail, not a bare Breadcrumb: each crossing sown below appends its own crumb as the path
+      // descends (§ fil-d-ariane, the crossing path), so every later value's Trail is the full
+      // route
+      // root → … → here.
       cellar.store(
           parcel,
           CellarCoordinate.RUN_PROVENANCE,
-          new Breadcrumb(
-              WorktreeCoordinate.FACTS.domain(),
-              WorktreeCoordinate.FACTS.slug(),
-              facts.provenance().sha(),
-              facts.provenance().dirty()));
+          new Trail(
+              List.of(
+                  new Breadcrumb(
+                      WorktreeCoordinate.FACTS.domain(),
+                      WorktreeCoordinate.FACTS.slug(),
+                      facts.provenance().sha(),
+                      facts.provenance().dirty()))));
       cellar.store(parcel, WorktreeCoordinate.FACTS, facts);
       return self();
     }

@@ -17,10 +17,11 @@ import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
  * ScenarioCellar.inheritEntries}) so the scion reads its parent's in-flight stores as its own
  * overlay (read-your-parent's-writes).
  *
- * <p>What crosses is FLAT: the entries are {@code ScenarioCellar.entriesEncodedOf(trunk)} — a
- * {@code List<String>} of already-encoded entries — serialised to ONE JSON String (the isolation
- * guard-rail: no live {@code ScenarioCellar}/{@code Entry} crosses the dual-realm membrane, only
- * strings). Absent (a run with no parent transaction) ⇒ empty list: nothing inherited.
+ * <p>What crosses is FLAT: the entries are {@code ScenarioCellar.entriesEncoded(sownChild)} — a
+ * {@code List<String>} of already-encoded entries, the run-provenance path among them extended with
+ * the sown child's crossing crumb — serialised to ONE JSON String (the isolation guard-rail: no
+ * live {@code ScenarioCellar}/{@code Entry} crosses the dual-realm membrane, only strings). Absent
+ * (a run with no parent transaction) ⇒ empty list: nothing inherited.
  */
 public final class CellarEntriesSeed {
 

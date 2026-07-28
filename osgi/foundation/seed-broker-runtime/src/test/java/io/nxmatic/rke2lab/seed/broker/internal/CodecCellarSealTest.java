@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.nxmatic.rke2lab.seed.broker.port.Trail;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,27 @@ class CodecCellarSealTest {
         new Secret("reservations-summary"),
         cellar.fetch(PARCEL, Coord.SECRET, Secret.class).orElseThrow(),
         "a PLAIN value round-trips untouched (reveal is a no-op on a non-sealed payload)");
+  }
+
+  @Test
+  void trailOfReadsThePersistedTrailOffTheOpaqueEnvelope() {
+    // The durable read path: the typed cellar exposes a value's fil d'Ariane by reading the CLEAR
+    // trail off the envelope the opaque backend hands back — no decode, no reveal, so a SEALED
+    // value's lineage is traceable without the passphrase (§ fil-d-ariane, the durable extension).
+    final CapturingOpaque backend = new CapturingOpaque();
+    final CodecCellar cellar = new CodecCellar(backend);
+    final Trail trail =
+        new Trail(
+            List.of(
+                new Breadcrumb("worktree", "run-provenance", "abc123", true),
+                new Breadcrumb("test", "test-secret", "abc123", true)));
+    backend.store(
+        PARCEL, new SeedEnvelope("test", "test-secret", "cellar:sealed:v1:blob").withTrail(trail));
+
+    assertEquals(
+        Optional.of(trail),
+        cellar.trailOf(PARCEL, Coord.SECRET),
+        "trailOf returns the persisted trail on the durable read path");
   }
 
   /** Minimal in-memory backend: last-wins per coordinate, keeping the last stored envelope. */

@@ -83,15 +83,51 @@ public final class ScenarioCellar implements TransactionalCellar {
   }
 
   /**
-   * This run's entries as flat encoded strings — the instance view of {@link
-   * #entriesEncodedOf(ReportModel)} over this cellar's own model. A {@code *RunbookHandler} reads
-   * it to hand DOWN the transaction's in-flight stores when it launches a sub-scion (the ALLER
-   * sense, § seed-broker-spec, the entries descend); the sub-scion's extension re-posts them via
-   * {@link #inheritEntries}. Flat by construction, so nothing live crosses the launcher membrane.
+   * This run's entries as flat encoded strings, handed DOWN to the {@code sownChild} sub-scion so
+   * it inherits the transaction's in-flight stores (the ALLER sense, § seed-broker-spec, the
+   * entries descend); the sub-scion's extension re-posts them via {@link #inheritEntries}. As they
+   * descend, the run's provenance PATH — the {@link Trail} carried by the {@link
+   * CellarCoordinate#RUN_PROVENANCE} entry — is EXTENDED with {@code sownChild}'s crossing crumb,
+   * so a value the child stores carries the full route {@code root → … → child → here}, not just
+   * {@code [root, here]}. The cellar is the sole reader/writer of its {@link Entry} format, so the
+   * rewrite lives here. Flat by construction, so nothing live crosses the launcher membrane.
    */
   @Override
-  public List<String> entriesEncoded() {
-    return entriesEncodedOf(model.get());
+  public List<String> entriesEncoded(SeedCoordinate sownChild) {
+    return entriesOf(model.get()).stream()
+        .map(entry -> isRunProvenanceEntry(entry) ? extendPath(entry, sownChild) : entry)
+        .map(codec::encode)
+        .toList();
+  }
+
+  /** Whether {@code entry} carries the run's provenance path (the {@link Trail}-bearing root). */
+  private boolean isRunProvenanceEntry(Entry entry) {
+    return entry.envelope().domain().equals(CellarCoordinate.RUN_PROVENANCE.domain())
+        && entry.envelope().coordinate().equals(CellarCoordinate.RUN_PROVENANCE.slug());
+  }
+
+  /**
+   * Extend the provenance-path entry with a crossing crumb for the {@code sownChild} being
+   * launched: a {@link Breadcrumb} under the sown coordinate, carrying the run's git source (the
+   * path root's {@code sha}/{@code dirty}) so each link stays a complete source coordinate. The
+   * child inherits this longer path and stamps its own stores {@code path.push(here)} — the
+   * accumulation IS the route. RUN_PROVENANCE is never sealed, so its payload decodes straight to a
+   * {@link Trail}.
+   */
+  private Entry extendPath(Entry entry, SeedCoordinate sownChild) {
+    final Trail path = codec.decode(entry.envelope().payload(), Trail.class);
+    final Breadcrumb root = path.breadcrumbs().isEmpty() ? null : path.breadcrumbs().get(0);
+    final Breadcrumb crossing =
+        new Breadcrumb(
+            sownChild.domain(),
+            sownChild.slug(),
+            root == null ? "" : root.sha(),
+            root != null && root.dirty());
+    final SeedEnvelope env = entry.envelope();
+    final SeedEnvelope extended =
+        new SeedEnvelope(
+            env.domain(), env.coordinate(), codec.encode(path.push(crossing)), env.trail());
+    return new Entry(entry.parcel(), extended, entry.tombstone(), entry.inherited());
   }
 
   /**
@@ -131,21 +167,6 @@ public final class ScenarioCellar implements TransactionalCellar {
         .filter(tag -> Tag.ENTRY.type().equals(tag.getType()))
         .flatMap(tag -> tag.getValues().stream())
         .map(value -> codec.decode(value, Entry.class))
-        .toList();
-  }
-
-  /**
-   * The run's entries as they ride the model — the ENCODED {@link Entry} strings (the raw {@link
-   * Tag#ENTRY} tag values), in store order. This is a VIEW on the caller's {@link ReportModel}, the
-   * ALLER-sense twin of the runbook JSON the graft carries the other way: the host reads it off the
-   * trunk at a {@code sow}, hands it down (§ seed-broker-spec, the entries descend), and the
-   * child's extension re-posts it via {@link #inheritEntries}. Encoded (not decoded) because it
-   * only needs to cross flat and be re-posted verbatim, never inspected host-side.
-   */
-  public static List<String> entriesEncodedOf(ReportModel model) {
-    return model.getTagMap().values().stream()
-        .filter(tag -> Tag.ENTRY.type().equals(tag.getType()))
-        .flatMap(tag -> tag.getValues().stream())
         .toList();
   }
 
@@ -222,37 +243,43 @@ public final class ScenarioCellar implements TransactionalCellar {
   }
 
   /**
-   * Stamp the value's fil d'Ariane at {@code coordinate}: the run's git root breadcrumb — read back
-   * from {@link CellarCoordinate#RUN_PROVENANCE}, present once the worktree crossing has harvested
-   * HEAD and descended to sibling crossings by the ordinary transactional inheritance — followed by
-   * THIS coordinate's link (carrying the same git source, so each link is self-describing). The
-   * root declaration itself carries no lineage (it IS the root). A store filed before any
-   * provenance is known yields a lone self-link with an empty sha — a legitimate pre-provenance
-   * root.
+   * Stamp the value's fil d'Ariane at {@code coordinate}: the run's provenance PATH — read back
+   * from {@link CellarCoordinate#RUN_PROVENANCE} — followed by THIS coordinate's link. The path is
+   * the full route the transaction took to reach here: the git root (filed by the worktree
+   * crossing) and a crossing crumb per sow above this store ({@code root → … → here}), each
+   * crossing appended as the entries descended (see {@link #entriesEncoded}); it reaches this
+   * crossing by the ordinary transactional inheritance. {@code here} carries the same git source
+   * (the path root's), so each link is a complete source coordinate. The {@code RUN_PROVENANCE}
+   * declaration itself carries no lineage (it IS the root). A store filed before any provenance is
+   * known yields a lone self-link with an empty sha — a legitimate pre-provenance root.
    */
   private Trail trailFor(Parcel parcel, SeedCoordinate coordinate) {
     if (isRunProvenance(coordinate)) {
       return Trail.empty();
     }
-    final Optional<Breadcrumb> root = runProvenance(parcel);
+    final Trail path = runProvenance(parcel);
+    final Optional<Breadcrumb> root = path.breadcrumbs().stream().findFirst();
     final Breadcrumb here =
         new Breadcrumb(
             coordinate.domain(),
             coordinate.slug(),
             root.map(Breadcrumb::sha).orElse(""),
             root.map(Breadcrumb::dirty).orElse(false));
-    return root.map(r -> new Trail(List.of(r)).push(here)).orElse(new Trail(List.of(here)));
+    return path.push(here);
   }
 
   /**
-   * The run's git root breadcrumb from the OVERLAY only (the run's own store or a crossing it
+   * The run's provenance PATH from the OVERLAY only (the run's own store or a crossing it
    * inherited), never the durable fallback — a prior run's durable provenance must not root THIS
-   * run's stores. Empty until the first crossing harvests HEAD.
+   * run's stores. The {@link Trail} the {@code RUN_PROVENANCE} entry carries: the git root plus a
+   * crumb per crossing sown above the reader (§ fil-d-ariane, the crossing path). Empty until the
+   * first crossing harvests HEAD. RUN_PROVENANCE is never sealed — the reveal is a defensive no-op.
    */
-  private Optional<Breadcrumb> runProvenance(Parcel parcel) {
+  private Trail runProvenance(Parcel parcel) {
     return latestSetEntry(parcel, CellarCoordinate.RUN_PROVENANCE)
         .filter(entry -> !entry.tombstone())
-        .map(entry -> codec.decode(cipher.reveal(entry.envelope().payload()), Breadcrumb.class));
+        .map(entry -> codec.decode(cipher.reveal(entry.envelope().payload()), Trail.class))
+        .orElse(Trail.empty());
   }
 
   private boolean isRunProvenance(SeedCoordinate coordinate) {
@@ -330,18 +357,22 @@ public final class ScenarioCellar implements TransactionalCellar {
   }
 
   /**
-   * The current value's fil d'Ariane at {@code coordinate}, from the OVERLAY: the trail stamped on
-   * the last {@link Entry} filed there (a tombstoned case has none). Reads the CLEAR trail off the
+   * The current value's fil d'Ariane at {@code coordinate} — the OVERLAY of the run's write set
+   * over the durable edge, the same precedence as {@link #fetch(Parcel, SeedCoordinate, Class)}:
+   * the trail stamped on the last {@link Entry} filed there wins; a tombstoned case reads empty and
+   * does NOT fall back (the withdraw's intent is "gone for this run"); a case the write set is
+   * silent on falls through to the durable {@link Cellar#trailOf}. Reads the CLEAR trail off the
    * envelope — no decode, no reveal — so a SEALED value's lineage is traceable without the
-   * passphrase. Empty when the run's write set is silent on this case; the durable edge does not
-   * yet carry the trail (§ fil-d-ariane, a handoff item), so there is no durable fallback to
-   * consult.
+   * passphrase, whether it was sealed THIS run (the overlay) or a PRIOR one (the durable coquille
+   * now carries it, § fil-d-ariane).
    */
   @Override
   public Optional<Trail> trailOf(Parcel parcel, SeedCoordinate coordinate) {
-    return latestSetEntry(parcel, coordinate)
-        .filter(entry -> !entry.tombstone())
-        .map(entry -> entry.envelope().trail());
+    final Optional<Entry> latest = latestSetEntry(parcel, coordinate);
+    if (latest.isEmpty()) {
+      return durableReads.get().trailOf(parcel, coordinate);
+    }
+    return latest.filter(entry -> !entry.tombstone()).map(entry -> entry.envelope().trail());
   }
 
   /**

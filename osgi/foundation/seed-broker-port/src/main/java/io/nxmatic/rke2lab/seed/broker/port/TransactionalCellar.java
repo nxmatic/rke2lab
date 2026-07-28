@@ -30,9 +30,11 @@ public interface TransactionalCellar extends Cellar {
   Optional<String> transactionId();
 
   /**
-   * This run's entries as flat encoded strings — handed DOWN to a sowed sub-scion so it inherits
-   * the transaction's in-flight stores. Flat by construction, so nothing live crosses the launcher
-   * membrane.
+   * This run's entries as flat encoded strings — handed DOWN to the {@code sownChild} sub-scion so
+   * it inherits the transaction's in-flight stores. The child's crossing crumb is appended to the
+   * run's provenance path (the {@code RUN_PROVENANCE} entry's {@link Trail}) as it descends, so a
+   * value the child stores carries the full route {@code root → … → child → here} (§ fil-d-ariane,
+   * the crossing path). Flat by construction, so nothing live crosses the launcher membrane.
    */
-  List<String> entriesEncoded();
+  List<String> entriesEncoded(SeedCoordinate sownChild);
 }

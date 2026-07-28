@@ -1347,29 +1347,66 @@ payload; it rides as a CLEAR sibling on the shell.
 * `Trail(List<Breadcrumb> breadcrumbs)` — the fil d'Ariane, root-first; immutable (`push` returns a new
   trail). It is the fourth field of `SeedEnvelope`, CLEAR, outside the sealed payload.
 
-*The accumulation — ambient tx-snapshot, realised by the EXISTING transactional inheritance.* The run's
-git provenance is its ROOT, filed ONCE by the first crossing (the worktree soil) as a `Breadcrumb` under
-the foundation coordinate `CellarCoordinate.RUN_PROVENANCE`. `ScenarioCellar.store` reads that root back
-from its own overlay and stamps every value's trail `[root, here]` — `here` carrying the same git source
-under this coordinate, so each link is a complete source coordinate. The root reaches sibling crossings
-for free: it folds up into the trunk at the graft and descends to the next crossing as an *inherited*
-entry (§ the transactional cellar) — no new seed, no extension change, no ctor change. A store filed
-before the root exists (the seed root's GIVEN) gets a lone self-link with an empty sha, a legitimate
-pre-provenance root; the `RUN_PROVENANCE` declaration itself carries no lineage (it IS the root).
+*The accumulation — the crossing PATH, realised by the EXISTING transactional inheritance.* The
+`RUN_PROVENANCE` foundation coordinate carries a `Trail` — the run's provenance PATH — not a lone
+`Breadcrumb`. The first crossing (the worktree soil) plants its ROOT: a one-crumb `Trail([git-head])`.
+`ScenarioCellar.store` reads that path back from its own overlay and stamps every value's trail
+`path.push(here)` — `here` carrying the same git source, so each link is a complete source coordinate.
+The path GROWS per crossing: when a scion is sown, `ScenarioCellar.entriesEncoded(sownChild)` appends the
+child's crossing crumb (`Breadcrumb(childDomain, "runbook", rootSha, rootDirty)`) to the `RUN_PROVENANCE`
+entry as it descends — so a value stored one sow deep carries the FULL route `root → parent → … → here`,
+not just `[root, here]`. This rides the EXISTING descent (the entries fold up at the graft and descend to
+the next crossing as *inherited* entries) and the SINGLE generic choke-point (`GenericRunbookHandler`,
+which knows the sown `coordinate()`), so no per-domain handler changes. A store filed before the root
+exists gets a lone self-link with an empty sha, a legitimate pre-provenance root; the `RUN_PROVENANCE`
+declaration itself carries no lineage (it IS the root — its path lives in its PAYLOAD, its own trail is
+empty).
 
 *Reading it.* `Cellar.trailOf(Parcel, SeedCoordinate)` returns the current value's `Trail` off the
 envelope — no decode, no reveal, so a SEALED value's lineage reads without the passphrase. A default
-(empty) on `Cellar`, overridden only by `ScenarioCellar` (the overlay); it is a capability, not a core
-verb.
+(empty) on `Cellar`, overridden by `ScenarioCellar` (the overlay, with a DURABLE fallback when the
+run's write set is silent on the case) and by `CodecCellar` (the durable read path, reading the trail
+off the opaque envelope the backend hands back). It is a capability, not a core verb.
 
-*Boundary (v1) + handoff.* The fil d'Ariane is realised at the TRANSACTIONAL (within-run) layer — the
-`Entry` tags on the `ReportModel` carry the full envelope (trail included), inheritance propagates it.
-The DURABLE edge (`PulumiCellar`) does NOT yet carry it: its Pulumi shell persists only
-`(coordinate → payload)` and rebuilds `new SeedEnvelope("", coordinate, payload)` on fetch — dropping the
-`domain` AND the `trail`. Extending the durable edge to carry a richer envelope characterisation (its
-`domain`, its `trail`, its withdrawn/tombstone status) is a HANDOFF item for the integration session — it
-pairs with the durable-sealing (cellar-secrets) work, and that characterisation is future material for
-building the CONTEXT of a system error and its resolution.
+[[durable-coquille]]
+*The durable coquille (integration session, DONE).* The fil d'Ariane is realised at the TRANSACTIONAL
+layer (the `Entry` tags carry the full envelope, inheritance propagates it) AND now survives the DURABLE
+round-trip. The `PulumiCellar` shell was `(coordinate → payload)`, rebuilding `new SeedEnvelope("",
+coordinate, payload)` on fetch — dropping `domain` AND `trail`, and unable to hold a SEALED payload at
+all (a `cellar:sealed:v1:…` string is not the JSON `Map` the store parsed). It is now a **five-field
+coquille**, a CLEAR shell around the opaque payload:
+
+`{domain, trail[clear], tombstone[clear], mac[clear], payload[sealable]}`
+
+* `domain` + `trail` restore the envelope characterisation the old shell dropped — the fil d'Ariane
+  survives the durable round-trip, readable clear.
+* `payload` rides as a STRING field, so a SEALED value is just a field value — this dissolves the
+  "deserialize expects a Map" blocker and makes durable sealing possible in the same gesture.
+* `tombstone` is a first-class shell flag (the withdraw take), replacing the in-band `__cellar_withdrawn__`
+  payload marker — the fold reads the state without opening the payload.
+* `mac` is an HMAC over the clear characterisation `(domain, coordinate, tombstone, trail, payload)`,
+  keyed by the cellar's own passphrase.
+
+*The general MAC (decision A).* Trail (clear) and payload (sealed) are two UNBOUND layers: swap the
+payload under the same trail, or edit the trail, and a reveal notices nothing. The `mac` is sops's move
+— it BINDS the clear shell to the payload, so any tamper of either fails closed at fetch. It is a
+property of the **cellar**, not the seal: present on EVERY coquille (sealed or clear), keyed by the
+existing cellar passphrase, so the doctor can trust ANY value's lineage without a per-seal key, and a
+seeded side can trust everything it receives (travel-proof). It is cipher-agnostic (a proper MAC, not
+AES-GCM's AAD), so it works identically for the passphrase (mono) and the future age (multi) seal. The
+host never opens the payload — it MACs and carries the opaque bytes — so the `OpaqueCellar` contract
+("never opens a payload") still holds literally. This self-characterised envelope (origin domain, fil
+d'Ariane, withdrawn status, integrity binding) is the material for building the CONTEXT of a system
+error and aiding its resolution.
+
+NOTE: The trail is the CROSSING path, not a data-flow taint. `path.push(here)` records the route of
+SOWS from the root down to the storing crossing — one crumb per crossing traversed (slug {@code
+runbook}), the "how did control reach here" a debugger wants. It does NOT track which fetched VALUES fed
+a given store (a taint analysis the cellar has no hook for). The rule: the worktree soil (which plants
+the root) stamps `[git-root, here]`; a sown crossing X stamps `[git-root, X-crossing, here]`; a scion Y
+sub-sown by X stamps `[git-root, X-crossing, Y-crossing, here]`. So a depth-1 store (bbox/incus) already
+reads three crumbs (git-root, its own crossing hop, the value), and the incus→manifests sub-sow would
+extend to `[git-root, incus, manifests, here]` were manifests ever to store.
 
 [[the-cellar-is-a-fridge]]
 ==== The cellar is a FRIDGE (put / peek / take), not an append-only journal (correction)

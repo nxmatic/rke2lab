@@ -48,7 +48,7 @@ public abstract class GenericRunbookHandler implements SeedHandler, ScenarioStra
               scenarioClass(),
               seedFrom(trigger)
                   .andThen(transaction.transactionId().map(TxIdSeed::into).orElse(store -> {}))
-                  .andThen(CellarEntriesSeed.into(transaction.entriesEncoded())));
+                  .andThen(CellarEntriesSeed.into(transaction.entriesEncoded(coordinate()))));
       final String runbook = new ScenarioJsonWriter(outcome.runbook()).toString();
       return SeedEnvelope.of(
           coordinate(), codec.encode(new RunbookEnvelope(runbook, outcome.consultations())));
