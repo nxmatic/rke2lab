@@ -30,4 +30,13 @@ public interface SeedBroker {
    * play). A {@code *RunbookHandler} flattens it at the launcher boundary; a reflector ignores it.
    */
   SeedEnvelope sow(SeedCoordinate wanted, Cellar cellar, SeedEnvelope seed);
+
+  /**
+   * Whether a {@link SeedHandler} serves {@code wanted} — the non-throwing companion of {@link
+   * #sow}. A caller that would otherwise have to sow-and-catch to discover a door uses this to
+   * decide UP FRONT: the open gardening opens a domain's AMEND door on an unamended crossing only
+   * when a reflector serves it (so the reflector's defaults + ambient gather run), and skips it for
+   * a soil with no amend grower (where a sow would throw). Pure query, no side effect.
+   */
+  boolean serves(SeedCoordinate wanted);
 }

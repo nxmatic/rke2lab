@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.controlplane.config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Shared test DSL for operator configuration: the single builder of config inputs and their
@@ -24,7 +23,8 @@ public final class OperatorConfiguration {
 
   /** The loader adapter shared by every config test: a section lookup over a plain section map. */
   public static ConfigLoader loaderOf(Map<String, Map<String, Object>> sections) {
-    return ConfigLoader.of(section -> Optional.ofNullable(sections.get(section)));
+    final Map<String, Object> root = new LinkedHashMap<>(sections);
+    return ConfigLoader.ofNestedRoot(root);
   }
 
   /** No sections at all — every mandatory input absent (the missing-inputs starting point). */

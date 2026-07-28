@@ -398,6 +398,11 @@ public class IncusProvisionScenarioInContainerTest {
       }
       return seed;
     }
+
+    @Override
+    public boolean serves(SeedCoordinate wanted) {
+      return true;
+    }
   }
 
   /**

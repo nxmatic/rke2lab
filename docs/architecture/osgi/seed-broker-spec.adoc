@@ -403,10 +403,16 @@ metier scion→scion) holds a plot under role `soil` and sows `AmendCoordinate("
 enriches with the ambient `FACET` it does not. The reconciliation lives at the door, not in the manifests
 runbook handler (which receives an already-filled input). The scion input wire-records
 carry these amendments: `ManifestsRunbookInput` (its `@Amendment(SOIL) materializationRoot`),
-`IncusRunbookInput` (incus's own SOIL, forwarded to manifests). A scion's conserved harvest is a wire-record
-too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the scion harvests and stores) and
-`IncusHarvest` (the prep intention incus stores — the image recipe digest + the soil the tree was cultivated
-under — that the host fetches to grow the instance, Shape C).
+`IncusRunbookInput` (incus's own SOIL, forwarded to manifests), and `BboxRunbookInput` (its
+`@Amendment(FACET) Router` — the `{uri, password}` router contact the host joins from `.secrets:lan.bbox`
+via `ConfigLoader`'s `secret:` meta and contributes AMBIENT, like the manifests FACET; `BboxAmendReflector`
+serves `BboxCoordinate.AMEND` and gathers it at the door onto the input's defaults, so the scion logs into
+the Bbox with the real password instead of a hardcoded marker — see cellar-secrets.adoc § bbox transport).
+Because bbox carries no per-consult amendment, its crossing opens the amend door via the broker's `serves`
+query rather than a non-empty trigger (see § the amend door below). A scion's conserved
+harvest is a wire-record too — `BboxHarvest` (the reservation summary bbox stores at the cellar, § the scion
+harvests and stores) and `IncusHarvest` (the prep intention incus stores — the image recipe digest + the soil
+the tree was cultivated under — that the host fetches to grow the instance, Shape C).
 
 ==== Amend integrity — the orphan seam, the loud guard, the phase boundary
 
@@ -436,6 +442,11 @@ the enum holds differs structurally — the coordinate-ownership taxonomy (the t
   owns the cellar documents it stores — `BBOX_RESERVATIONS`, `INCUS_PREP` — all the SAME kind, differing
   only by slug, and it controls both ends (it serves AND stores them, in-domain). One enum implementing
   `SeedCoordinate`, values by slug, `DOMAIN` private (encapsulated in the values). No magic string.
+  A domain that ALSO receives an amended runbook input is a HYBRID: `BboxCoordinate` keeps its
+  `BBOX_RESERVATIONS` value AND holds the meta-coordinate CONSTANTS `AMEND` / `RUNBOOK` (below) as
+  static fields keyed off the same `DOMAIN` — the reflector serves `AMEND`, the runbook handler serves
+  `RUNBOOK`, so the OSGi-side growers never spell the `"bbox"` literal (only the FLAT-realm host does,
+  guarded by BETA).
 * *EMPTY enum with META-coordinate CONSTANTS — heterogeneous* (manifests). A domain that
   SYNTHESISES-and-GRAFTS — materialises into the soil, stores no harvest (its conservation is delegated
   to the consulter's plot) — owns no value-coordinate, so its enum enumerates NOTHING. It is addressed
@@ -452,6 +463,15 @@ The alignment is at the PRINCIPLE (single-source, declare-and-use-in-one-place) 
 only what the enum carries differs. ALPHA is a readability win; BETA is the load-bearing guarantee. (When
 the unitrepo thesis makes manifest units first-class grown artifacts, manifests gains real
 value-coordinates and its enum grows values.)
+
+*Opening the amend door on an unamended crossing.* A scion whose FACET is contributed AMBIENT (bbox's
+router, the entry gate) carries NO per-consult amendment, so the host crossing sows an empty trigger.
+`Gardening.sow` must still open that scion's AMEND door — else the reflector never runs (no defaults, no
+gather) and the runbook decodes from `"{}"`. It decides with `SeedBroker.serves(AmendCoordinate(soil))`:
+open the door when the host holds amendments OR a reflector serves the soil; skip it for a soil with no
+amend grower (worktree-less domains — a sow there would throw, since `sow` is loud on an unserved
+coordinate). This is why `SeedBroker` carries a non-throwing `serves` companion to `sow`: the caller
+needs to KNOW a door exists without provoking the throw.
 
 *The phase boundary BETA rests on.* The orphan-check is race-free only if every grower (amend
 reflector) is ACTIVE before any contributor binds — so it runs at the GATHER (the consult), not at the

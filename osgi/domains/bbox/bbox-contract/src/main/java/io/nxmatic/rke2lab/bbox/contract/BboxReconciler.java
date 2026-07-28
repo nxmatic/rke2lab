@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.bbox.contract;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The bbox domain's contact: reconcile a set of desired DHCP reservations against the Bouygues Bbox
@@ -29,7 +30,11 @@ public interface BboxReconciler {
    * adminPassword}. Returns one {@link BboxRowOutcome} per request. Throws only on a session-level
    * failure (cannot open, auth rejected); per-row failures surface as {@link BboxAction#FAILED}
    * outcomes, not exceptions.
+   *
+   * <p>The {@code adminPassword} is an {@link Optional}: the cultivating impl REQUIRES it (it opens
+   * a session) and fails loud when absent; the surveying impl ignores it (it contacts the router
+   * zero times). EMPTY = unamended (a survey / the mock edge) — never a blank string.
    */
   List<BboxRowOutcome> reconcile(
-      URI baseUri, String adminPassword, List<BboxReservationRequest> requests);
+      URI baseUri, Optional<String> adminPassword, List<BboxReservationRequest> requests);
 }

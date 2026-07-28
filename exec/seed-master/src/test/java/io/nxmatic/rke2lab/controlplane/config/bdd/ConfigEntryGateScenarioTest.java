@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.controlplane.config.bdd;
 import com.tngtech.jgiven.junit5.ScenarioTest;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,7 +17,8 @@ class ConfigEntryGateScenarioTest
     extends ScenarioTest<ConfigEntryGate.Given, ConfigEntryGate.When, ConfigEntryGate.Then> {
 
   private static ConfigLoader loaderOf(Map<String, Map<String, Object>> sections) {
-    return ConfigLoader.of(section -> Optional.ofNullable(sections.get(section)));
+    final Map<String, Object> root = new LinkedHashMap<>(sections);
+    return ConfigLoader.ofNestedRoot(root);
   }
 
   private static Map<String, Map<String, Object>> completeConfiguration() {

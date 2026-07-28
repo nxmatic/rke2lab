@@ -261,7 +261,20 @@ public class ClusterSeedScenario
           .context()
           .registerService(
               AmendmentContributor.class,
-              new FacetContributor(new AmendCoordinate("manifests"), run.manifestsFacet()),
+              new FacetContributor(new AmendCoordinate("manifests"), run.facet("manifests")),
+              new Hashtable<>());
+      // The bbox FACET — the router contact (uri + password) the root read from .secrets:lan.bbox
+      // (joined into rke2lab:bbox by ConfigLoader's `secret:` meta), published ambient like the
+      // manifests FACET. Bbox carries no per-consult amendment, so its crossing sows an empty
+      // trigger; the open gardening still opens the amend door (a reflector serves it), where
+      // BboxAmendReflector gathers THIS contributor and binds it onto the runbook input. BETA
+      // guards the seam: this coordinate must equal the reflector's served AmendCoordinate("bbox").
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              AmendmentContributor.class,
+              new FacetContributor(new AmendCoordinate("bbox"), run.facet("bbox")),
               new Hashtable<>());
       // The incus FACET — the stable provisioning identity (cluster/node, NFS automount, netPrefix)
       // the scion combines with the worktree root it reads from its Worktree component. A FACET,
@@ -358,6 +371,11 @@ public class ClusterSeedScenario
     @As("the network reservations are settled")
     public When the_network_reservations_are_settled(
         @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // No per-consult amendment: the router FACET (uri + password) is contributed AMBIENT at the
+      // GIVEN. The crossing sows an empty trigger; the open gardening opens the bbox amend door
+      // anyway (a reflector serves it), where BboxAmendReflector gathers the ambient FACET and
+      // binds
+      // it onto the runbook input's defaults.
       sowAndGraft
           .sowing("bbox", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the network reservations are settled");

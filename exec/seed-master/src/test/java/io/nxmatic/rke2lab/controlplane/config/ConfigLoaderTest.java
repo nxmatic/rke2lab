@@ -59,4 +59,52 @@ class ConfigLoaderTest {
         ConfigLoader.ofNestedRoot(Map.of("manifests", Map.of("publish", Map.of("gitops", "true"))));
     assertEquals(Optional.of(true), loader.optionalBoolean("manifests.publish", "gitops"));
   }
+
+  // --- two-file join: a coordinate's `secret:` meta pulls the named .secrets subtree in ---
+
+  @Test
+  void secret_meta_merges_named_secrets_subtree_and_strips_the_meta() {
+    final ConfigLoader loader =
+        ConfigLoader.ofNestedRoots(
+            Map.of(
+                "bbox",
+                Map.of(
+                    "reconcile",
+                    Map.of("failOnError", "true"),
+                    "secret",
+                    Map.of("from", "lan.bbox", "role", "FACET"))),
+            Map.of(
+                "lan",
+                Map.of("bbox", Map.of("uri", "https://mabbox.bytel.fr", "password", "s3cr3t"))));
+    // The named .secrets subtree is joined into the coordinate...
+    assertEquals(Optional.of("https://mabbox.bytel.fr"), loader.optional("bbox", "uri"));
+    assertEquals(Optional.of("s3cr3t"), loader.optional("bbox", "password"));
+    // ...the pre-existing config leaf survives...
+    assertEquals(Optional.of(true), loader.optionalBoolean("bbox.reconcile", "failOnError"));
+    // ...and the join instruction itself is stripped from the merged view.
+    assertTrue(loader.optional("bbox", "secret").isEmpty());
+    assertTrue(loader.subtreeJson("bbox").contains("password"));
+    assertTrue(!loader.subtreeJson("bbox").contains("\"from\""));
+  }
+
+  @Test
+  void secret_leaf_wins_on_collision_with_config() {
+    final ConfigLoader loader =
+        ConfigLoader.ofNestedRoots(
+            Map.of(
+                "bbox", Map.of("uri", "https://placeholder", "secret", Map.of("from", "lan.bbox"))),
+            Map.of("lan", Map.of("bbox", Map.of("uri", "https://mabbox.bytel.fr"))));
+    assertEquals(Optional.of("https://mabbox.bytel.fr"), loader.optional("bbox", "uri"));
+  }
+
+  @Test
+  void a_coordinate_without_a_secret_meta_is_untouched() {
+    final ConfigLoader loader =
+        ConfigLoader.ofNestedRoots(
+            Map.of("manifests", Map.of("publish", Map.of("gitops", "true"))),
+            Map.of("lan", Map.of("bbox", Map.of("password", "s3cr3t"))));
+    assertEquals(Optional.of(true), loader.optionalBoolean("manifests.publish", "gitops"));
+    // No secret: meta on manifests → the secrets document contributes nothing to it.
+    assertTrue(loader.optional("manifests", "password").isEmpty());
+  }
 }

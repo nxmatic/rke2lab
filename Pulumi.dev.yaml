@@ -1,31 +1,26 @@
 encryptionsalt: v1:egSmVjEn+Rc=:v1:tDy9P3PFPKGpSmW7:ohDWaFDPxvO+kWbTRVEh6BJCDHHuag==
 config:
   rke2lab:cluster:
-    name: bioskop
+    name: nikopol
   rke2lab:node:
     name: master
   rke2lab:profile:
     name: rke2lab
   rke2lab:logging:
-    level: warn
+    # level: warn
+    level: debug
   rke2lab:incus:
     project: rke2lab
-    defaultRemote: bioskop-nixos
-    remoteAddress: https://bioskop-nixos:8443
     configDir: /Users/nxmatic/.config/incus
   rke2lab:image:
     alias: control-node
-    builderHost: bioskop-nixos
     sharedFolder: .local.d/images/distrobuilder
   rke2lab:network:
     lanBridgeParent: lan-br
     vmnetNetworkName: vmnet-br
   rke2lab:api:
     endpoint: https://10.66.106.10:6443
-  rke2lab:worktree:
-    dir: /private/var/lib/git/nxmatic/rke2lab.d/main
   rke2lab:systemd:
-    dbusHost: bioskop-master
     dbusPort: "12434"
   rke2lab:manifests:
     # Which domain manifest layers the master publishes (stows via symlink) into RKE2's
@@ -73,5 +68,11 @@ config:
   rke2lab:bbox:
     reconcile:
       failOnError: "true"
+    # Join the router contact from .secrets:lan.bbox ({uri, password}) into this coordinate's FACET.
+    # ConfigLoader deep-merges the named .secrets subtree here (secret leaves win) and strips this
+    # meta; the bbox scion reads uri + password from the FACET (see BboxRunbookInput).
+    secret:
+      from: lan.bbox
+      role: FACET
   rke2lab:hostAsset:
     rotationRetentionCount: "3"

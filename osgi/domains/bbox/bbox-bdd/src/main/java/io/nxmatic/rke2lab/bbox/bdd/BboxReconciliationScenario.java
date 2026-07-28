@@ -13,6 +13,7 @@ import io.nxmatic.rke2lab.bbox.contract.BboxHarvest;
 import io.nxmatic.rke2lab.bbox.contract.BboxReconciler;
 import io.nxmatic.rke2lab.bbox.contract.BboxReservationRequest;
 import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
+import io.nxmatic.rke2lab.bbox.contract.BboxRunbookInput;
 import io.nxmatic.rke2lab.bbox.core.BlueprintRowEnumerator;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -22,7 +23,9 @@ import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -33,10 +36,12 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The bbox reservation-reconciliation scenario, a production jGiven scenario told in the BBOX
@@ -60,18 +65,28 @@ public class BboxReconciliationScenario
         BboxReconciliationScenario.Given,
         BboxReconciliationScenario.When,
         BboxReconciliationScenario.Then>
-    implements CellarReceiver<Cellar>, ConsultationSource, ScenarioPlayer.Playable {
+    implements CellarReceiver<Cellar>,
+        ConsultationSource,
+        InputReceiver<BboxRunbookInput>,
+        ScenarioPlayer.Playable {
 
-  // The router base-URI the scion reconciles against; the mock edge ignores it. HTTPS is mandatory:
-  // the Bbox 302-redirects http→https, and a POST following that redirect is downgraded to GET,
-  // which the POST-only /api/v1/login answers 404 — the cause of the reconcile's "404 Operation not
-  // found". The cert is a public DigiCert for mabbox.bytel.fr, so no trust override is needed.
-  private static final URI ROUTER = URI.create("https://mabbox.bytel.fr");
-
-  /** The bbox admin secret; the mock edge ignores it, a fixed marker suffices in the scenario. */
-  private static final String ADMIN_PASSWORD = "admin";
+  /**
+   * The inbound channel the runbook handler ({@code BboxRunbookHandler.seedFrom}) seeds the {@link
+   * BboxRunbookInput} router contact through and this scenario receives it from (via {@link
+   * InputReceiver}). Single-sourced here — the receiver owns the key + type — and referenced by the
+   * handler for the seeding end ({@code INPUT.into(input)}). Registered as a {@link
+   * RegisterExtension} so its post-processor fires before the body reads {@link #input}.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<BboxRunbookInput> INPUT =
+      new ScenarioInputSeed<>(BboxRunbookInput.class, "bbox-runbook-input");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The router contact the front-door seeds before the body (InputReceiver) — the uri + the live
+  // password the host amended from .secrets (empty on a survey/mock, which ignores it). The WHEN
+  // reconciles against it. @MonotonicNonNull: null until receiveInput sets it (before the body).
+  @MonotonicNonNull private BboxRunbookInput input;
 
   // The transactional cellar the extension injects before the body (store→tag, not
   // registry-resolved).
@@ -108,18 +123,30 @@ public class BboxReconciliationScenario
   }
 
   @Override
+  public void receiveInput(BboxRunbookInput input) {
+    this.input = input;
+  }
+
+  @Override
   public List<SeedEnvelope> consultations() {
     return consultations;
   }
 
   @Test
   void the_reservations_are_reconciled() {
+    final BboxRunbookInput.Router router =
+        Objects.requireNonNull(input, "the router contact was not seeded before the body").router();
     final List<BboxReservationRequest> desired = new BlueprintRowEnumerator().rows();
     // The @Test body OWNS the outcome sink (the same discipline as cluster's observations map): the
     // When fills it, and the consult below reads THIS reference — independent of jGiven's stage
     // state after a fail-fast step, so a refused row still reaches the consult.
     final List<BboxRowOutcome> outcomes = new ArrayList<>();
-    given().the_desired_reservations(desired.size()).and().reconciled_through(outcomes);
+    given()
+        .the_desired_reservations(desired.size())
+        .and()
+        .the_router_contact(router)
+        .and()
+        .reconciled_through(outcomes);
     when().the_reservations_are_reconciled_against_the_router();
     then()
         .every_row_has_an_outcome()
@@ -176,14 +203,21 @@ public class BboxReconciliationScenario
     return SeedEnvelope.of(DoctorCoordinate.READINESS_CHECKPOINT, codec.encode(checkpoint));
   }
 
-  /** Given: the desired reservations, the reconciler contact, and the outcome sink. */
+  /** Given: the desired reservations, the router contact, and the outcome sink. */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState int desiredCount;
+    @ProvidedScenarioState BboxRunbookInput.Router router;
     @ProvidedScenarioState List<BboxRowOutcome> outcomes;
 
     public Given the_desired_reservations(@Quoted int count) {
       this.desiredCount = count;
+      return self();
+    }
+
+    @Hidden
+    public Given the_router_contact(BboxRunbookInput.Router router) {
+      this.router = router;
       return self();
     }
 
@@ -202,6 +236,7 @@ public class BboxReconciliationScenario
    */
   public static class When extends Stage<When> {
 
+    @ExpectedScenarioState BboxRunbookInput.Router router;
     @ExpectedScenarioState List<BboxRowOutcome> outcomes;
 
     // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
@@ -210,11 +245,15 @@ public class BboxReconciliationScenario
 
     public When the_reservations_are_reconciled_against_the_router() {
       // Fill the @Test-owned sink (not a fresh field) so the consult reads the outcomes even after
-      // the Then's fail-fast on a refused row.
+      // the Then's fail-fast on a refused row. The reconciler is mode-blind: the cultivating impl
+      // requires the amended password, the surveying/mock one ignores it (the empty Optional).
       outcomes.addAll(
           contact
               .orElseThrow()
-              .reconcile(ROUTER, ADMIN_PASSWORD, new BlueprintRowEnumerator().rows()));
+              .reconcile(
+                  URI.create(router.uri()),
+                  router.password(),
+                  new BlueprintRowEnumerator().rows()));
       return self();
     }
   }

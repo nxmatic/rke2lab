@@ -13,6 +13,7 @@ import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -32,9 +33,15 @@ public final class CultivatingBboxReconciler implements BboxReconciler {
 
   @Override
   public List<BboxRowOutcome> reconcile(
-      URI baseUri, String adminPassword, List<BboxReservationRequest> requests) {
+      URI baseUri, Optional<String> adminPassword, List<BboxReservationRequest> requests) {
     final List<BboxRowOutcome> outcomes = new ArrayList<>(requests.size());
-    try (BboxApiClient client = openClient(baseUri, adminPassword)) {
+    final String password =
+        adminPassword.orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "live bbox reconcile needs the router password — the host FACET amendment was"
+                        + " empty; check .secrets:lan.bbox.password reached the seed"));
+    try (BboxApiClient client = openClient(baseUri, password)) {
       final ReservationReconciler reconciler = new ReservationReconciler(client);
       for (BboxReservationRequest request : requests) {
         final RowOutcome outcome =

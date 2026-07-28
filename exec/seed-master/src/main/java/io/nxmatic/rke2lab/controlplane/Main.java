@@ -66,7 +66,13 @@ public final class Main {
     Pulumi.run(
         context -> {
           final RunMode runMode = RunMode.detect(true);
-          final ConfigLoader loader = ConfigLoader.of(context.config());
+          // Two-document view: the Pulumi stack config joined with the worktree's smudged .secrets,
+          // so a coordinate's `secret:` meta pulls its provider subtree in (the bbox router uri +
+          // password from lan.bbox). `.secrets` sits at the worktree root, which IS the CWD `pulumi
+          // up` runs from — the worktree root is harvested OSGi-side, never derived here (see
+          // below).
+          final ConfigLoader loader =
+              ConfigLoader.of(context.config(), Path.of(".secrets").toAbsolutePath().normalize());
           final Rke2labConfig config = Rke2labConfig.from(loader);
           // worktree.dir is NOT config and NOT derived here: the worktree soil (OSGi-side, played
           // as
@@ -76,17 +82,21 @@ public final class Main {
           final BootstrapConfig bootstrap = BootstrapConfig.from(config);
           final Parcel parcel = new Parcel(context.projectName(), context.stackName());
           final SeedRun run =
-              new SeedRun(
-                  runMode,
-                  parcel,
-                  bootstrap,
-                  config.entryGate().cleanWorktreeRequired().orElse(false),
-                  config.entryGate().toleratedPaths(),
-                  config.entryGate().flakeLockRequired().orElse(false),
-                  UUID.randomUUID().toString(),
-                  // The manifests FACET, read verbatim from Pulumi config here (the only place the
-                  // envelope's Config is reachable) and carried for the GIVEN to publish.
-                  loader.subtreeJson("manifests"));
+              SeedRun.builder()
+                  .runMode(runMode)
+                  .parcel(parcel)
+                  .config(bootstrap)
+                  .cleanWorktreeRequired(config.entryGate().cleanWorktreeRequired().orElse(false))
+                  .toleratedWorktreePaths(config.entryGate().toleratedPaths())
+                  .flakeLockRequired(config.entryGate().flakeLockRequired().orElse(false))
+                  .txId(UUID.randomUUID().toString())
+                  // The FACET subtrees, read verbatim from Pulumi config here (the only place the
+                  // envelope's Config is reachable) and carried for the GIVEN to publish per
+                  // coordinate. The bbox subtree is joined with .secrets:lan.bbox (router uri +
+                  // password) by ConfigLoader's `secret:` meta.
+                  .facet("manifests", loader.subtreeJson("manifests"))
+                  .facet("bbox", loader.subtreeJson("bbox"))
+                  .build();
 
           try {
             final ReportModel runbook =

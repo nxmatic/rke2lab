@@ -61,4 +61,9 @@ public final class DefaultSeedBroker implements SeedBroker {
     }
     return handler.handle(cellar, seed);
   }
+
+  @Override
+  public boolean serves(SeedCoordinate wanted) {
+    return handlers.containsKey(wanted);
+  }
 }

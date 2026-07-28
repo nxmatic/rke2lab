@@ -14,6 +14,7 @@ import io.nxmatic.rke2lab.bbox.contract.BboxHarvest;
 import io.nxmatic.rke2lab.bbox.contract.BboxReconciler;
 import io.nxmatic.rke2lab.bbox.contract.BboxReservationRequest;
 import io.nxmatic.rke2lab.bbox.contract.BboxRowOutcome;
+import io.nxmatic.rke2lab.bbox.contract.BboxRunbookInput;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -143,7 +144,10 @@ public class BboxReconciliationScenarioInContainerTest {
     registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
     try {
       final ScenarioOutcome outcome =
-          new ScenarioPlayer().play(BboxReconciliationScenario.class, store -> {});
+          new ScenarioPlayer()
+              .play(
+                  BboxReconciliationScenario.class,
+                  BboxReconciliationScenario.INPUT.into(BboxRunbookInput.defaults()));
       // TOUCH: the frontier resolved the surveying half, and only it.
       assertTrue(surveying.called, "the frontier handed the scion the surveying reconciler");
       assertTrue(
@@ -215,7 +219,10 @@ public class BboxReconciliationScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return new ScenarioPlayer().play(BboxReconciliationScenario.class, store -> {});
+      return new ScenarioPlayer()
+          .play(
+              BboxReconciliationScenario.class,
+              BboxReconciliationScenario.INPUT.into(BboxRunbookInput.defaults()));
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }
@@ -270,7 +277,7 @@ public class BboxReconciliationScenarioInContainerTest {
 
     @Override
     public List<BboxRowOutcome> reconcile(
-        URI baseUri, String adminPassword, List<BboxReservationRequest> requests) {
+        URI baseUri, Optional<String> adminPassword, List<BboxReservationRequest> requests) {
       this.called = true;
       return requests.stream().map(r -> outcome(r, action)).toList();
     }

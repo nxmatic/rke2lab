@@ -28,11 +28,11 @@ public final class SurveyingBboxReconciler implements BboxReconciler {
 
   @Override
   public List<BboxRowOutcome> reconcile(
-      URI baseUri, String adminPassword, List<BboxReservationRequest> requests) {
-    return requests.stream().map(SurveyingBboxReconciler::wouldCreate).toList();
+      URI baseUri, Optional<String> adminPassword, List<BboxReservationRequest> requests) {
+    return requests.stream().map(this::wouldCreate).toList();
   }
 
-  private static BboxRowOutcome wouldCreate(BboxReservationRequest request) {
+  private BboxRowOutcome wouldCreate(BboxReservationRequest request) {
     return new BboxRowOutcome(
         request.cluster(),
         request.node(),
