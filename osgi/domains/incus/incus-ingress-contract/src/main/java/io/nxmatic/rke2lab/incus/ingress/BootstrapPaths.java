@@ -1,8 +1,10 @@
 package io.nxmatic.rke2lab.incus.ingress;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -79,6 +81,49 @@ public record BootstrapPaths(
     /** The container path as a {@link Path}. */
     public Path asPath() {
       return Path.of(containerPath);
+    }
+  }
+
+  /**
+   * Mount point catalog — the 13 instance disk mounts with stable device names, targets, and source
+   * accessors.
+   */
+  public enum MountPoint {
+    WORKTREE("worktree.dir", HostPathCatalog.WORKTREE, BootstrapPaths::worktreeRoot),
+    RKE2LAB_ENVIRONMENT(
+        "rke2lab.environment.dir", HostPathCatalog.ENV, BootstrapPaths::runtimeEnvConfigRoot),
+    RKE2LAB_SCRIPTS("rke2lab.scripts.dir", HostPathCatalog.SCRIPTS, BootstrapPaths::scriptsRoot),
+    GIT("git.dir", HostPathCatalog.GIT_WORKTREE, BootstrapPaths::gitRoot),
+    RKE2LAB_SYSTEMD_LIBEXEC(
+        "rke2lab.systemd.libexec.dir",
+        HostPathCatalog.SYSTEMD_LIBEXEC,
+        BootstrapPaths::systemdLibexecRoot),
+    RKE2LAB_SYSTEM(
+        "rke2lab.system.dir", HostPathCatalog.SYSTEMD_UNITS, BootstrapPaths::systemdRoot),
+    MANIFESTS("manifests.dir", HostPathCatalog.MANIFESTS, BootstrapPaths::manifestsRoot),
+    RKE2_CONFIG(
+        "rke2.config.dir", HostPathCatalog.RKE2_CONFIG, BootstrapPaths::runtimeRke2ConfigRoot),
+    CLOUDCONFIG_NOCLOUD(
+        "cloudconfig.nocloud.dir",
+        HostPathCatalog.CLOUDCONFIG_NOCLOUD,
+        BootstrapPaths::runtimeCloudConfigRoot),
+    SHARED("shared.dir", HostPathCatalog.SHARE, BootstrapPaths::shareRoot),
+    DAEMONSET("daemonset.dir", HostPathCatalog.DAEMONSET, BootstrapPaths::daemonsetRoot),
+    KUBECONFIG("kubeconfig.dir", HostPathCatalog.KUBECONFIG, BootstrapPaths::kubeconfigRoot),
+    NOCLOUD("nocloud.dir", HostPathCatalog.NOCLOUD_SEED, BootstrapPaths::cloudSeedRoot);
+
+    private final String deviceName;
+    private final HostPathCatalog target;
+    private final Function<BootstrapPaths, Path> source;
+
+    MountPoint(String deviceName, HostPathCatalog target, Function<BootstrapPaths, Path> source) {
+      this.deviceName = deviceName;
+      this.target = target;
+      this.source = source;
+    }
+
+    public GrowMountView view(BootstrapPaths paths) {
+      return new GrowMountView(deviceName, source.apply(paths).toString(), target.path());
     }
   }
 
@@ -219,19 +264,6 @@ public record BootstrapPaths(
   }
 
   /**
-   * Rebase one absolute path onto the NFS automount view — the pure translation formerly {@code
-   * BootstrapConfig.pathOn}. With automount off (or a path already under {@code /net/}) the path is
-   * returned unchanged; a {@code /private/...} path gets {@code netPrefix} prepended, any other
-   * absolute path gets {@code netPrefix + /private} prepended (the automount root the NIXOS host
-   * exports the Mac's {@code /private} tree under).
-   *
-   * <p>TODO(nikopol): the {@code /private} prepend assumes the worktree lives under the Mac's
-   * {@code /private} tree (the bioskop layout, {@code /private/var/lib/git/...}). nikopol's
-   * worktree is under {@code /Volumes/git-worktree-store/...}, which the Mac exports directly (no
-   * {@code /private} segment), so that branch mis-maps it. Reconcile against the settled
-   * nix-darwin-home export layout (real-path resolution rather than a {@code /private} heuristic).
-   */
-  /**
    * The 13 instance disk mounts derived from THIS view — each materialisation root becomes a mount
    * SOURCE, paired with its {@link HostPathCatalog} guest TARGET, under a stable device name. Call
    * it on the live + automount view ({@code asLiveView().asAutomountView(...)}): the scion projects
@@ -240,38 +272,16 @@ public record BootstrapPaths(
    * owner).
    */
   public List<GrowMountView> instanceMounts() {
-    return List.of(
-        new GrowMountView("worktree.dir", worktreeRoot.toString(), HostPathCatalog.WORKTREE.path()),
-        new GrowMountView(
-            "rke2lab.environment.dir", runtimeEnvConfigRoot.toString(), HostPathCatalog.ENV.path()),
-        new GrowMountView(
-            "rke2lab.scripts.dir", scriptsRoot.toString(), HostPathCatalog.SCRIPTS.path()),
-        new GrowMountView("git.dir", gitRoot.toString(), HostPathCatalog.GIT_WORKTREE.path()),
-        new GrowMountView(
-            "rke2lab.systemd.libexec.dir",
-            systemdLibexecRoot.toString(),
-            HostPathCatalog.SYSTEMD_LIBEXEC.path()),
-        new GrowMountView(
-            "rke2lab.system.dir", systemdRoot.toString(), HostPathCatalog.SYSTEMD_UNITS.path()),
-        new GrowMountView(
-            "manifests.dir", manifestsRoot.toString(), HostPathCatalog.MANIFESTS.path()),
-        new GrowMountView(
-            "rke2.config.dir",
-            runtimeRke2ConfigRoot.toString(),
-            HostPathCatalog.RKE2_CONFIG.path()),
-        new GrowMountView(
-            "cloudconfig.nocloud.dir",
-            runtimeCloudConfigRoot.toString(),
-            HostPathCatalog.CLOUDCONFIG_NOCLOUD.path()),
-        new GrowMountView("shared.dir", shareRoot.toString(), HostPathCatalog.SHARE.path()),
-        new GrowMountView(
-            "daemonset.dir", daemonsetRoot.toString(), HostPathCatalog.DAEMONSET.path()),
-        new GrowMountView(
-            "kubeconfig.dir", kubeconfigRoot.toString(), HostPathCatalog.KUBECONFIG.path()),
-        new GrowMountView(
-            "nocloud.dir", cloudSeedRoot.toString(), HostPathCatalog.NOCLOUD_SEED.path()));
+    return Arrays.stream(MountPoint.values()).map(mp -> mp.view(this)).toList();
   }
 
+  /**
+   * Rebase one absolute path onto the NFS automount view — the pure translation formerly {@code
+   * BootstrapConfig.pathOn}. With automount off (or a path already under {@code /net/}) the path is
+   * returned unchanged; any absolute path is rebased under {@code netPrefix} (host-agnostic, the
+   * input root is already canonicalised at the source via {@link
+   * io.nxmatic.rke2lab.worktree.Worktree}).
+   */
   static Path automountPath(Path rawPath, boolean nfsAutomount, String netPrefix) {
     final Path normalized = rawPath.toAbsolutePath().normalize();
     if (!nfsAutomount) {
@@ -281,13 +291,7 @@ public record BootstrapPaths(
     if (path.startsWith("/net/")) {
       return normalized;
     }
-    if (path.startsWith("/private/")) {
-      return Path.of(netPrefix + path).normalize();
-    }
-    if (path.startsWith("/")) {
-      return Path.of(netPrefix + "/private" + path).normalize();
-    }
-    return Path.of(netPrefix + "/private/" + path).normalize();
+    return Path.of(netPrefix + path).normalize();
   }
 
   private static final class Builder {

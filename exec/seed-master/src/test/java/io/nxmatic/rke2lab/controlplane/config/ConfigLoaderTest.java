@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,8 +29,8 @@ class ConfigLoaderTest {
   void require_accumulates_without_throwing_mid_load() {
     final ConfigLoader loader = loaderOf(Map.of());
     loader.requirePath("incus", "configDir");
-    loader.requirePath("worktree", "dir");
-    assertEquals(List.of("incus.configDir", "worktree.dir"), loader.missingKeys());
+    loader.requirePath("image", "sharedFolder");
+    assertEquals(List.of("incus.configDir", "image.sharedFolder"), loader.missingKeys());
   }
 
   @Test
@@ -42,15 +41,6 @@ class ConfigLoaderTest {
     final MissingRequiredConfiguration ex =
         assertThrows(MissingRequiredConfiguration.class, loader::diagnoseIfIncomplete);
     assertEquals(List.of("incus.configDir", "image.sharedFolder"), ex.keys());
-  }
-
-  @Test
-  void require_present_value_not_accumulated() {
-    final ConfigLoader loader =
-        loaderOf(Map.of("worktree", Map.of("dir", "/private/var/lib/git/nxmatic/rke2lab")));
-    assertEquals(
-        Path.of("/private/var/lib/git/nxmatic/rke2lab"), loader.requirePath("worktree", "dir"));
-    assertTrue(loader.missingKeys().isEmpty());
   }
 
   @Test

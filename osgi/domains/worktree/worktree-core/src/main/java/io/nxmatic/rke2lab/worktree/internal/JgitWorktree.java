@@ -41,7 +41,11 @@ public final class JgitWorktree implements Worktree {
 
   @Activate
   public JgitWorktree() {
-    this.root = locateFrom(Path.of("").toAbsolutePath());
+    try {
+      this.root = locateFrom(Path.of("").toAbsolutePath()).toRealPath();
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot canonicalise the worktree root", ex);
+    }
   }
 
   @Override
