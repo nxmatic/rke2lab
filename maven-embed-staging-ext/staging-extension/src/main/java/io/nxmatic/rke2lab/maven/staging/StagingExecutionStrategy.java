@@ -200,16 +200,11 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       // package that loads flat (our flat packages + the seam exports); a forbidden (bundle-only)
       // package referenced from here cannot be loaded by the flat host classloader at runtime.
       final Set<String> flatVisible = new java.util.LinkedHashSet<>();
-      final List<ResolvedBundle.ClassEntry> flatClasses = new ArrayList<>();
-      final java.nio.file.Path ownClasses =
-          java.nio.file.Path.of(session.getCurrentProject().getBuild().getOutputDirectory());
-      flatClasses.addAll(ResolvedBundle.classEntriesOf(ownClasses));
+      final List<ResolvedBundle.ClassEntry> flatClasses = flatRealmClasses(session, resolved);
       for (ResolvedBundle b : resolved) {
-        if (b.launcher() || isBundleSide(b)) {
-          continue; // the framework, and bundle-side carriers (domain + contract), are not flat.
+        if (!b.launcher() && !isBundleSide(b)) {
+          flatVisible.addAll(b.ourExportedPackages()); // seams included — they are flat too.
         }
-        flatVisible.addAll(b.ourExportedPackages());
-        flatClasses.addAll(b.classEntries()); // includes the seams (type=seam) — they are flat too.
       }
       final RealmBoundary flat = new RealmBoundary("flat", forbidden, flatVisible);
       final List<String> flatViolations = new ArrayList<>();
@@ -293,6 +288,28 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         "staged bundles export packages that ALSO live flat in this assembly (one class in two"
             + " realms → LinkageError)");
 
+    // ---- DUAL_REALM_JUSTIFIED: a type=dual-realm carrier must be USED by the flat/host realm ----
+    // A dual-realm library is staged AND kept flat — a deliberate second copy, justified only when
+    // the host actually references it. Count (statically, so unexercised references still count)
+    // the
+    // flat-realm classes that reference the carrier's exports; zero → the flat copy is dead weight,
+    // fold it OSGi-only. Attributed to the carrier (its own package-info governs it), like the
+    // other
+    // per-bundle laws. The host-import count is the RIGHT signal — a genuine both-realm library HAS
+    // host importers, so it never false-flags (unlike the earlier flat∩export attempt).
+    final DualRealmJustified dualRealmJustified =
+        new DualRealmJustified(flatRealmClasses(session, resolved));
+    for (ResolvedBundle b : resolved) {
+      if (b.embed().map(EmbedCapability::isDualRealm).orElse(false)) {
+        report.record(
+            StagingGate.DUAL_REALM_JUSTIFIED,
+            b.governance().levels(),
+            b,
+            dualRealmJustified.violations(b),
+            "type=dual-realm but no flat/host class references its exports (fold OSGi-only)");
+      }
+    }
+
     // ---- SYNTHESIS_PATTERN: a synthesis phase implements Phase.Execution and pushes via its Sink.
     // Phases live in the manifests-core bundle (its internal.synthesis *Phase classes); the scan
     // still spans the exec's target/classes too (the dual-surface scan REALM_BOUNDARY also uses),
@@ -357,6 +374,28 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
    */
   private static boolean isBundleSide(ResolvedBundle b) {
     return b.embed().map(e -> e.isDomain() || e.isContract()).orElse(false);
+  }
+
+  /**
+   * The flat/host realm's compiled classes: the exec's own {@code target/classes} PLUS every
+   * non-launcher, non-bundle-side dependency's classes (the flat tail + the seams). The set a
+   * host/seam leak is scanned in ({@code REALM_BOUNDARY}), and the set whose references JUSTIFY a
+   * {@code type=dual-realm} library's flat copy ({@code DUAL_REALM_JUSTIFIED}).
+   */
+  private static List<ResolvedBundle.ClassEntry> flatRealmClasses(
+      MavenSession session, List<ResolvedBundle> resolved) {
+    final List<ResolvedBundle.ClassEntry> flat =
+        new ArrayList<>(
+            ResolvedBundle.classEntriesOf(
+                java.nio.file.Path.of(
+                    session.getCurrentProject().getBuild().getOutputDirectory())));
+    for (ResolvedBundle b : resolved) {
+      if (b.launcher() || isBundleSide(b)) {
+        continue; // the framework, and bundle-side carriers (domain + contract), are not flat.
+      }
+      flat.addAll(b.classEntries());
+    }
+    return flat;
   }
 
   /**

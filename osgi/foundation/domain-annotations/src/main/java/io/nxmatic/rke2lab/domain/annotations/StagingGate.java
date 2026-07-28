@@ -22,6 +22,11 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       package a staged bundle exports must not ALSO be present flat in the assembled host. Two
  *       copies of a class — one loaded flat, one by a bundle classloader — is the loader-constraint
  *       collision that surfaces as a {@code LinkageError} when an instance crosses the seam.
+ *   <li>{@link #DUAL_REALM_JUSTIFIED} — a {@code type=dual-realm} carrier (staged as a bundle AND
+ *       kept flat host-side) is warranted only when the flat/host realm actually references it. If
+ *       zero flat-realm classes reference any package it exports, the flat copy is dead weight →
+ *       fold OSGi-only (drop the {@code type=dual-realm} marker). A static host-import count (sees
+ *       unexercised references), the library analogue of the {@code -port} host-import rule.
  *   <li>{@link #REALM_WIRING_INTEGRITY} — the assembled uber-jar actually BOOTS: an embedded
  *       framework over the exec's own {@code -exec.jar} resolves every staged bundle, and the flat
  *       (system-bundle) and installed-bundle export-sets stay disjoint. Observed against the real
@@ -41,6 +46,7 @@ public enum StagingGate {
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
   DUPLICATE_REALM_CLASS,
+  DUAL_REALM_JUSTIFIED,
   REALM_WIRING_INTEGRITY,
   SYNTHESIS_PATTERN
 }
