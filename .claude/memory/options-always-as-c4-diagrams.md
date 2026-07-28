@@ -22,7 +22,8 @@ into the `.adoc` specs.
 - Prefer true C4 structure (containers/components/relationships) over ad-hoc flowcharts when the
   options are about where things live or how they relate. Code snippets MAY accompany but do not
   REPLACE the diagram.
-- The whiteboard `.claude/claude-preview.adoc` is the place; the chosen option then graduates into the
-  permanent spec.
+- The whiteboard is a **Claude artifact** now (default — self-contained HTML + mermaid, per
+  [[diagram-preview-file]]; `.claude/claude-preview.adoc` + kroki is the offline fallback); the chosen
+  option then graduates into the permanent spec.
 - Pair with [[specs-current-at-brainstorm-end]] (the diagrams end up in the specs) and the brainstorm
   ritual.
