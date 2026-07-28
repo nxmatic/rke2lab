@@ -5,6 +5,27 @@ metadata:
   type: project
 ---
 
+## STATUS 2026-07-28 (verified against the tree)
+
+The static gate is COMMITTED and live — `maven-embed-staging-ext/staging-extension/.../DuplicateRealmClass.java`
++ `DuplicateRealmClassTest`, wired into `StagingExecutionStrategy`, `DUPLICATE_REALM_CLASS` in both
+`StagingGate` enums. So the "## The prototype (PARKED, not committed)" section at the bottom is
+HISTORICAL — it no longer describes reality (nothing is stashed at `7389e973` / `/tmp`). The
+`type=library → type=dual-realm` capability rename also shipped (commit `ebc8e19e`).
+
+STILL OPEN — the **governance chantier**, now DISENTANGLED into two DISTINCT static laws (the boot
+experiment settled it — see `.claude/governance-realm-gate-handoff.md`):
+(1) **duplication** stays the STATIC `DUPLICATE_REALM_CLASS` — its `seamSurface` filter IS the
+precision. The booted-framework "faithful successor" idea (observe `BundleWiring` to detect duplication)
+was tried and DROPPED: the boot only proves a resolution/disjointness invariant (`system ∩ installed ==
+{}`), it does NOT buy duplication precision (`flat ∩ export` over-flags every staged lib). That boot is
+salvaged as a SEPARATE smoke-test law, `REALM_WIRING_INTEGRITY` (Law A, built green).
+(2) the real chantier — the **static host-import-count rule**: flag a `type=dual-realm` `-contract-host`
+module that ZERO host files reference, so it folds OSGi-only (worktree was folded by hand this round;
+`incus-ingress-contract` must NOT flag — the pulumi edge imports it). The original "false-flagged
+genuine both-realm bundles" came from the wrong signal (`flat ∩ export`); the host-import count is the
+right one, and needs no boot (it must see unexercised imports a runtime cannot).
+
 ## OUTCOME (2026-06-29) — static gate SHIPPED, in-container successor DESIGNED
 
 The brainstorm converged. Two results:
@@ -83,7 +104,7 @@ plan was a `SEAM_PURITY` staging gate to freeze the invariant. The design evolve
   which a static `flat ∩ staged-export` test only approximates. This is the core doubt — exactly what
   the user's boot-the-framework idea would resolve (observe the real resolution, not infer it).
 
-## The prototype (PARKED, not committed)
+## The prototype (historical — SUPERSEDED, now committed; see STATUS 2026-07-28 above)
 
 - Built: `DuplicateRealmClass.java` (the gate logic, intersection flat ∩ staged-export, with an
   ALLOWED_SHARED_ROOTS exemption for org.slf4j — the R1 pax scar), wired into
