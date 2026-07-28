@@ -258,7 +258,7 @@ pointer — see link:../osgi/engine-lifecycle-spec.adoc[engine-lifecycle-spec] f
 its increment boundary. The vertical shipped: `PendingMarkingScenarioExecutor` (preview-as-render, E9)
 and the cross-world `ScenarioModel` graft (`ScenarioGraft`, driving every `ClusterSeedScenario`
 crossing) are both productionised. One mechanism remains: the `SCENARIO_STATE_DAG` gate (the closing
-task — a sixth `StagingGate` on the existing ASM+`@GovernedBy` mould). The bench code survives at tag
+task — a further `StagingGate` on the existing ASM+`@GovernedBy` mould). The bench code survives at tag
 `spike/bdd-pipeline-poc`; the module is out of the default build.
 
 [NOTE]
@@ -268,16 +268,21 @@ The host doesn't only orchestrate at runtime; it is also where the build-time go
 because `seed-master` is the module that shades+stages the exec-jar and its dependency closure. Two
 sibling enforcement families, cross-cutting rather than subsystems of their own:
 
-*Staging-extension laws (six `StagingGate`s, ASM over staged bytecode, committed `0299913a`+):* each is
-an instance reached from `ResolvedBundle`, governable per-package via `@GovernedBy(StagingGate, level)`
-(default ERROR) with single-element `@Exempt`. `RECORD_PURITY` (a `type=record` bundle exports only
-records/enums/sealed ADTs — ERROR); `SPEC_COVERAGE` (every exported type is named in a `docs/` spec or
+*Staging-extension laws (eight `StagingGate`s, ASM over staged bytecode, committed `0299913a`+):* each
+is an instance reached from `ResolvedBundle`, governable per-package via `@GovernedBy(StagingGate,
+level)` (default ERROR) with single-element `@Exempt`. `CONTRACT_PURITY` (a `type=contract` bundle
+exports records/enums/sealed ADTs + service interfaces but no concrete impl — ERROR; widened from the
+former `RECORD_PURITY`); `SPEC_COVERAGE` (every exported type is named in a `docs/` spec or
 `@Transitional` — WARN, paid down domain by domain — this IS the law enforcing the very atlas-coverage
 discipline this view is written under); `INSTANCE_DISCIPLINE` (no exported `public static` behaviour
 helper — ERROR, debt cleared); `REALM_BOUNDARY` (a class stays in its host/OSGi realm — ERROR, locked
-by 2C); `DUPLICATE_REALM_CLASS` (no class duplicated across realms — the jackson bug; exemptions
-derived from the seam surface); `SCHEMA_CONCORD` (records-as-contract: every `Coordinate` has a
-`@DocumentContract` wire-record whose schema is generated + checked — ERROR, locked by 2D). See
+by 2C); `DUPLICATE_REALM_CLASS` (no class *accidentally* duplicated across realms — the jackson bug;
+exemptions derived from the seam surface); `DUAL_REALM_JUSTIFIED` (a *deliberately* dual-realm carrier
+must be referenced flat host-side, else fold OSGi-only — the library analogue of the `-port`
+host-import rule, static count via `ReferencedTypes`); `REALM_WIRING_INTEGRITY` (the assembled
+`seed-master` `-exec.jar` boots in-JVM — every staged bundle resolves, flat + bundle exports disjoint —
+the only *runtime* law, an embedded-boot smoke test); `SYNTHESIS_PATTERN` (a manifests synthesis phase
+`implements Phase.Execution` and pushes through its `Sink`). See
 link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance].
 
 *Null-safety (2G, a javac gate — NOT a staging law):* JSpecify `@NullMarked` now covers doctor,

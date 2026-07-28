@@ -11,7 +11,7 @@ project's answer to a recurring problem: a discipline asked for at review time s
 reviews. A *gate* is seen at every build (impossible to forget) and, once a bundle's debt is cleared,
 its default level locks the rule so the anti-pattern can never silently reappear.
 
-This document specifies the six gates and the single annotation that governs how each reports.
+This document specifies the eight gates and the single annotation that governs how each reports.
 
 [NOTE]
 ====
@@ -23,15 +23,18 @@ collides with the project's two *runtime* gate senses (readiness gates like
 (it reads the annotation via ASM and cannot link the module — see "Reader side").
 ====
 
-=== The six gates
+=== The eight gates
 
 [cols="1,3",options="header"]
 |===
 | StagingGate | Law
 
-| `RECORD_PURITY`
-| A `type=record` bundle may export only records, enums, and sealed ADT roots — a pure-data bundle,
-  never behaviour. (Read by `RecordPurity`.)
+| `CONTRACT_PURITY`
+| A `type=contract` bundle may export records, enums, sealed ADT roots, AND service interfaces, but
+  NO concrete class — a domain's data vocabulary plus consumer-side contract, never an implementation
+  (the SCR-requiring live impl stays in the domain's `-core`). Widened from the former `RECORD_PURITY`
+  (records/enums/sealed only): a contract is a record bundle that may ALSO carry the interfaces a
+  consumer resolves, so the two categories fused into one. (Read by `ContractPurity`.)
 
 | `SPEC_COVERAGE`
 | Every type a bundle exports must be named in a `docs/` architecture spec, or carry
@@ -62,15 +65,33 @@ collides with the project's two *runtime* gate senses (readiness gates like
   linkage failure (the jackson `JavaTimeModule not a subtype` regression): a class loaded by two
   classloaders is two distinct types, and passing an instance across the seam throws. Legitimate
   dual-realm cases (a flat realm-library nested into a bundle, e.g. the cdk8s carrier or the document
-  codec) are EXEMPT — the exemption is *derived from the seam surface*, not a hand-list. (Read by the
-  duplicate-realm scan.)
+  codec) are EXEMPT — the exemption is *derived from the seam surface*, not a hand-list. (Read by
+  `DuplicateRealmClass`.)
 
-| `SCHEMA_CONCORD`
-| Under records-as-contract: every `Coordinate` (the closed set of document types the world gateway
-  crosses) must have a `@DocumentContract` wire-record whose JSON Schema is *generated from the
-  record* and checked for concord at build — a coordinate with no wire-record, or a schema that
-  drifts from the record, fails. Locked at ERROR by the 2D increment. (Read by `SchemaConcord` /
-  `DocumentContractScan` / `RecordSchemaProjector`.)
+| `DUAL_REALM_JUSTIFIED`
+| A `type=dual-realm` carrier (staged as a bundle AND kept flat host-side — a deliberate second copy)
+  is warranted ONLY when the flat/host realm actually references it. If zero flat-realm classes
+  reference any package it exports, the flat copy is dead weight → fold OSGi-only (drop the
+  `type=dual-realm` marker). A STATIC host-import count (via `ReferencedTypes`, so it sees an
+  unexercised reference a booted test could not), the library analogue of the `-port` host-import
+  rule. Distinct from `DUPLICATE_REALM_CLASS`: that one forbids an *unmarked* package living in two
+  realms; this one checks a *deliberately* dual-realm carrier earns its second copy. (Read by
+  `DualRealmJustified`.)
+
+| `REALM_WIRING_INTEGRITY`
+| The assembled uber-jar actually BOOTS: an embedded framework over the exec module's own `-exec.jar`
+  resolves every staged bundle, and the flat (system-bundle) and installed-bundle export-sets stay
+  disjoint. Observed against the real Felix resolver *in-JVM* (a child classloader over the exec jar
+  — not a fork, not a static re-implementation of the wiring), so it catches an unsatisfied import,
+  an unattachable fragment, or a split package a static manifest scan cannot — the embedded-boot
+  smoke test. Orthogonal to `DUPLICATE_REALM_CLASS`: it proves the assembly is wireable, not that no
+  class is duplicated. (Read by `BootedRealmDiagnostic`.)
+
+| `SYNTHESIS_PATTERN`
+| A manifests synthesis phase follows the documented shape: it `implements Phase.Execution` and
+  pushes its output through its `Sink`. The read-face invariant (a phase reads a produced slot
+  through a `Supplier`, never a copied reference) is a later increment of this gate. (Read by
+  `ManifestsSynthesisPattern`.)
 |===
 
 ==== `REALM_BOUNDARY` — the two-realm model, in detail
@@ -102,6 +123,60 @@ classes (`BootstrapConfig`, the host stages) — which live in the current proje
 `target/classes`, NOT in any resolved dependency jar. The other gates only ever read resolved
 dependency jars; `REALM_BOUNDARY`'s flat scan additionally reads the current project's build output
 directory.
+
+==== `DUAL_REALM_JUSTIFIED` — earning the second copy
+
+`DUPLICATE_REALM_CLASS` forbids a package from *accidentally* living in two realms;
+`DUAL_REALM_JUSTIFIED` audits the *deliberate* case. A `Provide-Capability:
+io.nxmatic.rke2lab.embed; type=dual-realm` carrier is staged as a bundle AND kept flat host-side on
+purpose — its export legitimately lives in both realms (so `DUPLICATE_REALM_CLASS` exempts it). But
+a second copy earns its keep only if the flat/host realm actually *uses* it. The law reads every
+flat-realm class (the exec's own `target/classes` + the flat dependency tail, the same input
+`REALM_BOUNDARY` scans), skips the carrier's own classes (a package references itself trivially),
+and asks whether any remaining flat class references a package the carrier exports. Zero references
+⇒ the flat copy is dead weight and the split is a lie: the module should fold OSGi-only.
+
+This is the *library analogue of the `-port` host-import rule* (a `-port` stops being `type=seam`
+once no host file imports it). The count is a STATIC bytecode reference count (via
+`ReferencedTypes`), deliberately — a booted test would miss an unexercised reference, so a
+genuinely both-realm carrier with only conditionally-taken host call-sites would false-flag. An
+earlier flat∩export attempt over-reported; the host-import count is the right signal — a genuinely
+both-realm carrier HAS host importers, so a correct count never flags it. The two current carriers
+(`seed-broker-codec`, the `incus-ingress-contract` incus host face) are both used flat, so both
+come back clean.
+
+==== `REALM_WIRING_INTEGRITY` — the embedded-boot smoke test
+
+Every other gate is a *static* scan of bytecode; this one is the only law that *runs* the assembly.
+After shade, the exec module's own `-exec.jar` already contains the whole boot classpath (Felix +
+pax + every staged bundle under `META-INF/bundles`). The extension boots it *in its own JVM* through
+a child `URLClassLoader` over that jar — parent set to the platform classloader, so the booted
+framework is isolated from Maven's own realm — and reflectively invokes
+`FrameworkLaunch.embedded().launch()` (`BootedRealmDiagnostic`). It is NOT a fork (no second process)
+and NOT a re-implementation of the wiring (we run the real launcher the host runs). Results cross
+back as plain JDK collections.
+
+Two assertions run against the live `BootedFramework`:
+
+* *every staged bundle resolves* — `unresolvedBundles()` returns any bundle still at
+  `Bundle.INSTALLED` (never resolved). A missing import, an unattachable fragment, or a split
+  package that a static manifest scan cannot see surfaces here as a real resolver failure.
+* *the two export-sets stay disjoint* — `realmDuplications()` intersects the system bundle's exports
+  (the flat realm, `system.packages.extra` via `deriveSystemExports`, which mirrors-then-removes so
+  the sets are meant to be disjoint) with each installed bundle's `PACKAGE_NAMESPACE` capabilities;
+  a non-empty intersection is a flat/bundle co-export.
+
+If the framework fails to boot at all, that itself is the violation ("the assembled framework failed
+to boot: …"). Scope: only the `seed-master` exec is booted — the other exec modules are not yet
+migrated. The gate is orthogonal to `DUPLICATE_REALM_CLASS`: that proves no class is *duplicated*
+statically; this proves the assembly is *wireable* at runtime.
+
+*A closure precondition it exposed.* A host slf4j→JUL binding (`slf4j-jdk14`) staged as a bundle is
+unresolvable (it binds only to the boot stack pax already owns in-framework, so it would be a second
+provider by ROLE). `StagingClosure.bindsOnlyToBootStack` keeps such a pure framework-binding leaf
+flat-only — a candidate whose every mandatory import ⊆ the boot-stack exports never stages as a
+bundle. The signal is import-based and stable (it does not depend on which extenders happen to be
+present).
 
 == Governance — `@GovernedBy(StagingGate, EnforcementLevel)`
 
@@ -174,7 +249,7 @@ flowchart TB
   subgraph anns["osgi/domain-annotations (dependency-free)"]
     gb["@GovernedBy(StagingGate, EnforcementLevel) @Repeatable"]
     en["EnforcementLevel {IGNORE,WARN,ERROR}"]
-    ga["StagingGate {SPEC_COVERAGE,RECORD_PURITY,INSTANCE_DISCIPLINE,REALM_BOUNDARY}"]
+    ga["StagingGate {CONTRACT_PURITY,SPEC_COVERAGE,INSTANCE_DISCIPLINE,<br/>REALM_BOUNDARY,DUPLICATE_REALM_CLASS,DUAL_REALM_JUSTIFIED,<br/>REALM_WIRING_INTEGRITY,SYNTHESIS_PATTERN}"]
     ex["@Exempt(StagingGate, reason) @Repeatable<br/>TYPE / METHOD / FIELD"]
     tr["@Transitional(to, spec)"]
   end
@@ -184,7 +259,7 @@ flowchart TB
   end
   subgraph ext["staging-extension (installed BEFORE the reactor)"]
     gr["GovernanceReader (ASM)<br/>to Map&lt;StagingGate, EnforcementLevel&gt;"]
-    rp["RecordPurity"]
+    rp["ContractPurity"]
     sc["SpecCoverage"]
     id["InstanceDiscipline<br/>(skips @Exempt elements)"]
     rb["RealmBoundary<br/>(reads method bodies + exec target/classes)"]
