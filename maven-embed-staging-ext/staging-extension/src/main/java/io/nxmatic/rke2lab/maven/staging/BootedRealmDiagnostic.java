@@ -65,20 +65,33 @@ final class BootedRealmDiagnostic {
         final Map<String, List<String>> duplications =
             (Map<String, List<String>>)
                 booted.getClass().getMethod("realmDuplications").invoke(booted);
-
-        final List<String> violations = new ArrayList<>();
-        for (String bsn : unresolved) {
-          violations.add("bundle " + bsn + " did not resolve");
-        }
-        duplications.forEach(
-            (bsn, packages) ->
-                violations.add(bsn + " co-exports with the system bundle: " + packages));
-        return violations;
+        return new Report(unresolved, duplications).violations();
       } finally {
         booted.getClass().getMethod("close").invoke(booted);
       }
     } finally {
       Thread.currentThread().setContextClassLoader(previous);
+    }
+  }
+
+  /**
+   * The realm facts a booted framework reports back — the bundles that never resolved, and per
+   * installed bundle the packages it co-exports with the system bundle. It derives its OWN
+   * wiring-integrity violation lines: one per unresolved bundle, THEN one per co-export. Modelling
+   * the report as a value that owns its {@link #violations()} keeps the translation an instance
+   * behaviour (unit-testable on its own, no static helper) while the live boot in {@link
+   * #observe()} — exercised by the build's own {@code REALM_WIRING_INTEGRITY} run — merely feeds
+   * it. An empty result is a clean, wireable assembly.
+   */
+  record Report(List<String> unresolvedBundles, Map<String, List<String>> realmDuplications) {
+    List<String> violations() {
+      final List<String> lines = new ArrayList<>();
+      for (String bsn : unresolvedBundles) {
+        lines.add("bundle " + bsn + " did not resolve");
+      }
+      realmDuplications.forEach(
+          (bsn, packages) -> lines.add(bsn + " co-exports with the system bundle: " + packages));
+      return lines;
     }
   }
 }
