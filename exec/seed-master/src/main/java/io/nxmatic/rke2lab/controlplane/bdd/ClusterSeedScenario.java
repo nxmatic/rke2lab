@@ -53,9 +53,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * The ClusterSeed root scenario — the host runbook, spoken in the gardening register, composed on
  * the common {@code seed-bdd} stages (link:docs/architecture/osgi/seed-bdd-module-spec.adoc). It is
  * the concrete instance of link:docs/architecture/bdd/bdd.adoc#clusterseed-scenario-map[the
- * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the seven WHENs —
- * preflight → {@code Cellar.fetch} → four sow-and-graft callers (bbox · incus · systemd · cluster)
- * → {@code Cellar.store}.
+ * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the eight WHENs — the
+ * worktree survey (harvest + entry gate) → {@code Cellar.fetch} → five sow-and-graft callers (bbox
+ * · incus-provision · incus-reconcile · systemd · cluster) + the host GROW — closed by the {@code
+ * Cellar.store} THEN.
  *
  * <p>The amorce is two-layered (§ the amorce): {@code Main} — inside {@code Pulumi.run} — captures
  * the {@link RunMode} (the one fact only it can know) and seeds it through the launcher session
@@ -304,7 +305,11 @@ public class ClusterSeedScenario
     }
   }
 
-  /** The seven WHENs — preflight, the cellar bookends, and the four sow-and-graft crossings. */
+  /**
+   * The eight WHENs — the worktree survey (harvest + entry gate), the {@code Cellar.fetch} bookend,
+   * the five sow-and-graft crossings (bbox · incus-provision · incus-reconcile · systemd ·
+   * cluster), and the host GROW. The closing {@code Cellar.store} is the THEN, not a WHEN.
+   */
   public static class When extends Stage<When> {
 
     @ScenarioStage CellarStage cellar;

@@ -237,7 +237,8 @@ host-side boot are gone — the grammar engine dissolved into manifests-core's i
 boot into `FrameworkLaunch`; the `SCENARIO_STATE_DAG` gate (still to build) is the value-DAG's
 build-time safety. It rests on four invariants (above). The orchestration substrate SHIPPED (increment
 1, `osgi/runtime/scenario-engine`, green) and the ClusterSeed vertical is wired onto it:
-`ClusterSeedScenario` is the live seed runbook (GIVEN + seven WHENs), `PendingMarkingScenarioExecutor`
+`ClusterSeedScenario` is the live seed runbook (GIVEN + eight WHENs, closed by the harvest-store
+THEN), `PendingMarkingScenarioExecutor`
 renders preview, and every domain has its scenario (bbox, incus, systemd, cluster, manifests). No
 pipeline remains on the former Topic/State model — it is deleted from the codebase, not coexisting. The
 one orphaned leftover is `netplan-cli` (still referencing the deleted `FrameworkLaunchPipeline` +
@@ -315,7 +316,7 @@ sequenceDiagram
   L->>S: play — a post-processor sets SeedRun before GIVEN
   Note over S: GIVEN bootstraps (narrated) — consumes the connection, does NOT open it
   S->>S: registerService(RunGate/OpaqueCellar/Parcel) — the RUN layer, from SeedRun
-  Note over S: WHEN — worktree(survey→facts, entry gate enforced here) · fetch · bbox · incus-prepare · incus-RECONCILE · systemd · cluster · store→tag [+VISION: host GROW + verify]
+  Note over S: WHEN — worktree(survey→facts, entry gate enforced here) · fetch · bbox · incus-prepare · incus-RECONCILE · host GROW (gated on a live deployment) · systemd · cluster — THEN store→tag [+VISION: post-GROW verify]
   S->>Sc: broker.sow(RunbookCoordinate(soil), txId + writeSetOf(trunk)) — the ALLER sense
   Note over Sc: scion CE poses the write-set as Entry(inherited=true), scion reads own>inherited>durable
   Sc->>Sc: scion CE AfterTestExecution — STRIP the inherited before the front-door serializes
@@ -328,7 +329,7 @@ sequenceDiagram
 graph cannot enter Felix and `isDryRun()` is only knowable there. Layer 2 (the GIVEN) bootstraps the
 gardening as narration. Only the `RunMode` crosses, through the launcher's designed inbound channel — NOT
 the former `HostSeeder` (one value set, none of the executor-swap / model-injection / probe-fan-out
-machinery). Opening the gardening is the GIVEN, never a WHEN; the seven WHENs are the map's runbook.
+machinery). Opening the gardening is the GIVEN, never a WHEN; the eight WHENs are the map's runbook.
 
 *The transaction crosses BOTH ways.* The RETURN sense (a scion's tags fold UP into the trunk, the root
 drains) was the original design; the ALLER sense (the root hands DOWN the in-flight write-set so a
