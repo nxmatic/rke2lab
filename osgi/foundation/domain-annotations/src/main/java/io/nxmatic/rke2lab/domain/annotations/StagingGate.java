@@ -22,6 +22,13 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       package a staged bundle exports must not ALSO be present flat in the assembled host. Two
  *       copies of a class — one loaded flat, one by a bundle classloader — is the loader-constraint
  *       collision that surfaces as a {@code LinkageError} when an instance crosses the seam.
+ *   <li>{@link #REALM_WIRING_INTEGRITY} — the assembled uber-jar actually BOOTS: an embedded
+ *       framework over the exec's own {@code -exec.jar} resolves every staged bundle, and the flat
+ *       (system-bundle) and installed-bundle export-sets stay disjoint. Observed against the real
+ *       resolver, so it catches an unsatisfied import, an unattachable fragment, or a split package
+ *       that a static manifest scan cannot — the embedded-boot smoke test. Orthogonal to {@link
+ *       #DUPLICATE_REALM_CLASS}: it proves the assembly is wireable, not that no class is
+ *       duplicated.
  *   <li>{@link #SYNTHESIS_PATTERN} — a manifests synthesis phase follows the documented shape: it
  *       {@code implements Phase.Execution} and pushes its output through its {@code Sink}. The
  *       read-face invariant (a phase reads a produced slot through a {@code Supplier}, never a
@@ -34,5 +41,6 @@ public enum StagingGate {
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
   DUPLICATE_REALM_CLASS,
+  REALM_WIRING_INTEGRITY,
   SYNTHESIS_PATTERN
 }

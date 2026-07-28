@@ -318,6 +318,33 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
           "synthesis phases that implement Phase without a nature (Execution)");
     }
 
+    // ---- REALM_WIRING_INTEGRITY: the assembled uber-jar actually boots and fully resolves ----
+    // The embedded-boot smoke test: boot the exec's own -exec.jar in an isolated child classloader
+    // and observe the REAL resolver — every staged bundle must resolve, and the flat
+    // (system-bundle)
+    // and installed-bundle export sets must stay disjoint. A static manifest scan cannot see an
+    // unsatisfied import, an unattachable fragment, or a split package that slipped past
+    // deriveSystemExports; only the live resolver can. Attributed to the EXEC (a wireability
+    // property
+    // of THIS assembly), governed by its package-info like the other exec-level laws. A missing
+    // -exec.jar is not a violation: booting is skipped, not failed.
+    final java.io.File uber = execUberJar(session);
+    final List<String> wiringViolations = new ArrayList<>();
+    if (uber != null && uber.isFile()) {
+      try {
+        wiringViolations.addAll(new BootedRealmDiagnostic(uber.toPath()).observe());
+      } catch (Exception ex) {
+        wiringViolations.add("the assembled framework failed to boot: " + ex);
+      }
+    }
+    report.record(
+        StagingGate.REALM_WIRING_INTEGRITY,
+        execGovernance(session),
+        execPseudoBundle(session),
+        wiringViolations,
+        "the assembled uber-jar must boot with every bundle resolved and the flat/bundle export sets"
+            + " disjoint");
+
     report.flush();
   }
 
@@ -441,6 +468,27 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   private ResolvedBundle execPseudoBundle(MavenSession session) {
     final MavenProject p = session.getCurrentProject();
     return ResolvedBundle.read(p.getGroupId(), p.getArtifactId(), p.getVersion(), null);
+  }
+
+  /**
+   * The assembled, self-contained uber-jar of the exec — the shade {@code exec}-classified
+   * artifact, carrying the flat host classes + Felix + SCR + slf4j PLUS the bundles under {@code
+   * META-INF/bundles}. This is the ONLY jar a child classloader can boot to observe the real
+   * wiring; the plain main artifact is the un-shaded module jar and holds no launcher. Read from
+   * the attached artifacts (classifier {@code exec}), falling back to the conventional {@code
+   * <finalName>-exec.jar} on disk.
+   */
+  private static java.io.File execUberJar(MavenSession session) {
+    final MavenProject project = session.getCurrentProject();
+    for (org.apache.maven.artifact.Artifact attached : project.getAttachedArtifacts()) {
+      if ("exec".equals(attached.getClassifier()) && attached.getFile() != null) {
+        return attached.getFile();
+      }
+    }
+    final java.io.File byPath =
+        new java.io.File(
+            project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-exec.jar");
+    return byPath.isFile() ? byPath : null;
   }
 
   /**

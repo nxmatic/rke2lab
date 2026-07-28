@@ -267,6 +267,22 @@ public record StagingClosure(
       if (b.exports().names().stream().anyMatch(bootStackExports::contains)) {
         return false;
       }
+      // A pure framework-binding leaf — every mandatory package it imports is one the
+      // boot-stack already serves in-framework (e.g. slf4j-jdk14 imports
+      // org.slf4j/.spi/.helpers/.event, all from pax-logging-api), and it exports nothing a
+      // domain wires to. Such a bundle is a HOST binding onto the framework's provider: the
+      // dev declares it direct to keep it flat, where slf4j routes onto the JDK JUL bus. The
+      // boot-stack (pax-logging) ALREADY owns the slf4j provider in-framework, so staging
+      // slf4j-jdk14 too would add a SECOND in-framework provider — wrong by ROLE, not merely
+      // because it fails to resolve today. (It also happens not to resolve now — it requires
+      // the osgi.serviceloader.registrar extender the boot-stack lacks — but that is
+      // incidental: once that extender is integrated it COULD resolve, and it must STILL stay
+      // flat-only. Resolving is not the same as belonging in-framework.) Symmetric to the
+      // export guard above: that catches a provider the boot-stack duplicates by EXPORT; this
+      // catches one that only binds onto it by IMPORT.
+      if (bindsOnlyToBootStack(b, bootStackExports)) {
+        return false;
+      }
       if (b.directlyDeclared()) {
         return true;
       }
@@ -276,6 +292,26 @@ public record StagingClosure(
         }
       }
       return false;
+    }
+
+    /**
+     * Whether {@code b} is a pure framework-binding leaf: it has at least one mandatory import and
+     * ALL of them are served in-framework by the boot-stack. Such a bundle (an slf4j backend
+     * binding) only makes sense flat host-side onto the framework's provider — never staged as its
+     * own bundle.
+     */
+    private static boolean bindsOnlyToBootStack(ResolvedBundle b, Set<String> bootStackExports) {
+      boolean anyMandatory = false;
+      for (Clause imported : b.imports().clauses()) {
+        if (isOptional(imported)) {
+          continue;
+        }
+        anyMandatory = true;
+        if (!bootStackExports.contains(imported.name())) {
+          return false;
+        }
+      }
+      return anyMandatory;
     }
 
     /** Close over MANDATORY, host-uncovered Import-Package until no new bundle is pulled in. */
