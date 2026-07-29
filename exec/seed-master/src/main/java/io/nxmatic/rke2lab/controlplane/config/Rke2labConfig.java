@@ -1,11 +1,14 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
-import com.pulumi.Config;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import org.osgi.service.log.LogLevel;
 
@@ -27,11 +30,8 @@ public record Rke2labConfig(
     ReadinessConfig readiness,
     EntryGateConfig entryGate,
     BboxConfig bbox,
+    ManifestsConfig manifests,
     LoggingConfig logging) {
-
-  public static Rke2labConfig from(Config config) {
-    return from(ConfigLoader.of(config));
-  }
 
   /**
    * Parse the {@code logging:level} knob into the OSGi {@link LogLevel} — the SAME enum the
@@ -86,7 +86,8 @@ public record Rke2labConfig(
                 loader.optionalBoolean("entryGate.cleanWorktree", "required"),
                 loader.stringList("entryGate.cleanWorktree", "tolerated"),
                 loader.optionalBoolean("entryGate.flakeLock", "required")),
-            new BboxConfig(loader.optionalBoolean("bbox.reconcile", "failOnError")),
+            loader.bind(BboxConfig.class, "bbox"),
+            loader.bind(ManifestsConfig.class, "manifests"),
             new LoggingConfig(
                 loader.optional("logging", "level").map(Rke2labConfig::parseLogLevel)));
 
@@ -171,7 +172,65 @@ public record Rke2labConfig(
       List<String> toleratedPaths,
       Optional<Boolean> flakeLockRequired) {}
 
-  public record BboxConfig(Optional<Boolean> failOnError) {}
+  /**
+   * The bbox coordinate — bound from {@code rke2lab:bbox} deep-merged with {@code
+   * .secrets:lan.bbox} (its {@link SecretJoin}). Its ONE typed input is {@link #reconcile} (a host
+   * policy); the router contact the host owns — {@code uri + password} from sops — lands in {@link
+   * #rest}, the {@code @JsonAnySetter} remainder the host NEVER names (the scion decodes {@code
+   * Router{uri, password}} from the facet; see {@code
+   * io.nxmatic.rke2lab.bbox.contract.BboxRunbookInput}). {@link #facetJson()} re-serialises the
+   * whole thing — {@code reconcile} rides along, the tolerant codec ignores it.
+   */
+  @SecretJoin(from = "lan.bbox")
+  public record BboxConfig(ReconcileConfig reconcile, @JsonAnySetter Map<String, Object> rest)
+      implements Facet {
+
+    public BboxConfig {
+      reconcile = reconcile == null ? new ReconcileConfig(Optional.empty()) : reconcile;
+      rest = rest == null ? Map.of() : rest;
+    }
+
+    /** The reconcile policy — a host input, not part of the router contact. */
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public record ReconcileConfig(Optional<Boolean> failOnError) {}
+
+    @JsonAnyGetter
+    public Map<String, Object> rest() {
+      return rest;
+    }
+
+    @Override
+    public String facetJson() {
+      return reconcile.failOnError().isEmpty() && rest.isEmpty()
+          ? ""
+          : ConfigLoader.writeJson(this);
+    }
+  }
+
+  /**
+   * The manifests coordinate — the operator's {@code rke2lab:manifests:} concern ({@code {publish,
+   * debug}}) the host contributes BLIND. It has NO typed input and NO {@link SecretJoin}: the WHOLE
+   * subtree lands in {@link #rest}, so the host names no manifests vocabulary (the publish flags,
+   * the debug nesting) — ALL the domain knowledge lives in the scion (see {@code
+   * io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput}). {@link #facetJson()}
+   * re-serialises the remainder verbatim.
+   */
+  public record ManifestsConfig(@JsonAnySetter Map<String, Object> rest) implements Facet {
+
+    public ManifestsConfig {
+      rest = rest == null ? Map.of() : rest;
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> rest() {
+      return rest;
+    }
+
+    @Override
+    public String facetJson() {
+      return rest.isEmpty() ? "" : ConfigLoader.writeJson(this);
+    }
+  }
 
   /**
    * The framework log-level knob ({@code logging:level}). Empty ⇒ no override: the boot keeps the

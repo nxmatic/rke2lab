@@ -50,51 +50,50 @@ class ConfigLoaderTest {
     assertEquals(Optional.of(true), loader.optionalBoolean("manifests.publish", "gitops"));
   }
 
-  // --- two-file join: a coordinate's `secret:` meta pulls the named .secrets subtree in ---
+  // --- bind(): a record's @SecretJoin deep-merges the named .secrets subtree before mapping ---
 
   @Test
-  void secret_meta_merges_named_secrets_subtree_and_strips_the_meta() {
+  void bind_merges_the_secret_subtree_named_by_the_records_secret_join() {
     final ConfigLoader loader =
         ConfigLoader.ofNestedRoots(
-            Map.of(
-                "bbox",
-                Map.of(
-                    "reconcile",
-                    Map.of("failOnError", "true"),
-                    "secret",
-                    Map.of("from", "lan.bbox", "role", "FACET"))),
+            Map.of("bbox", Map.of("reconcile", Map.of("failOnError", "true"))),
             Map.of(
                 "lan",
                 Map.of("bbox", Map.of("uri", "https://mabbox.bytel.fr", "password", "s3cr3t"))));
-    // The named .secrets subtree is joined into the coordinate...
-    assertEquals(Optional.of("https://mabbox.bytel.fr"), loader.optional("bbox", "uri"));
-    assertEquals(Optional.of("s3cr3t"), loader.optional("bbox", "password"));
-    // ...the pre-existing config leaf survives...
-    assertEquals(Optional.of(true), loader.optionalBoolean("bbox.reconcile", "failOnError"));
-    // ...and the join instruction itself is stripped from the merged view.
-    assertTrue(loader.optional("bbox", "secret").isEmpty());
-    assertTrue(loader.subtreeJson("bbox").contains("password"));
-    assertTrue(!loader.subtreeJson("bbox").contains("\"from\""));
+    final Rke2labConfig.BboxConfig bbox = loader.bind(Rke2labConfig.BboxConfig.class, "bbox");
+    // The typed input is mapped...
+    assertEquals(Optional.of(true), bbox.reconcile().failOnError());
+    // ...the router contact the host owns lands blind in the remainder (never named as fields)...
+    assertEquals("https://mabbox.bytel.fr", bbox.rest().get("uri"));
+    assertEquals("s3cr3t", bbox.rest().get("password"));
+    // ...and the facet re-serialises the whole payload (reconcile rides along, no join meta).
+    final String facet = bbox.facetJson();
+    assertTrue(facet.contains("password"));
+    assertTrue(facet.contains("reconcile"));
+    assertTrue(!facet.contains("\"from\""));
   }
 
   @Test
-  void secret_leaf_wins_on_collision_with_config() {
+  void bind_secret_leaf_wins_on_collision_with_config() {
     final ConfigLoader loader =
         ConfigLoader.ofNestedRoots(
-            Map.of(
-                "bbox", Map.of("uri", "https://placeholder", "secret", Map.of("from", "lan.bbox"))),
+            Map.of("bbox", Map.of("uri", "https://placeholder")),
             Map.of("lan", Map.of("bbox", Map.of("uri", "https://mabbox.bytel.fr"))));
-    assertEquals(Optional.of("https://mabbox.bytel.fr"), loader.optional("bbox", "uri"));
+    final Rke2labConfig.BboxConfig bbox = loader.bind(Rke2labConfig.BboxConfig.class, "bbox");
+    assertEquals("https://mabbox.bytel.fr", bbox.rest().get("uri"));
   }
 
   @Test
-  void a_coordinate_without_a_secret_meta_is_untouched() {
+  void bind_pulls_no_secret_for_a_record_without_a_secret_join() {
     final ConfigLoader loader =
         ConfigLoader.ofNestedRoots(
             Map.of("manifests", Map.of("publish", Map.of("gitops", "true"))),
             Map.of("lan", Map.of("bbox", Map.of("password", "s3cr3t"))));
-    assertEquals(Optional.of(true), loader.optionalBoolean("manifests.publish", "gitops"));
-    // No secret: meta on manifests → the secrets document contributes nothing to it.
-    assertTrue(loader.optional("manifests", "password").isEmpty());
+    final Rke2labConfig.ManifestsConfig manifests =
+        loader.bind(Rke2labConfig.ManifestsConfig.class, "manifests");
+    // The manifests subtree is carried blind...
+    assertTrue(manifests.rest().containsKey("publish"));
+    // ...and with no @SecretJoin the secrets document contributes nothing.
+    assertTrue(!manifests.facetJson().contains("password"));
   }
 }

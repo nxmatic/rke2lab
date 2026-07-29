@@ -1,8 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.pulumi.Config;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,11 +28,15 @@ import java.util.Optional;
  * placeholder, so the caller throws once via {@link #diagnoseIfIncomplete()}. Dotted section names
  * ({@code "manifests.publish"}) walk into sub-objects.
  *
- * <p>Each source is a small single-role {@link SectionReader}, composed as a DAG by the {@code
- * of(…)} factories: {@link PulumiSections} (the Pulumi stack config), {@link NestedDocument} (an
- * in-memory or parsed-YAML document), and {@link SecretJoinedSections} (the two-file join of a
- * config with {@code .secrets}). Every source speaks {@link JsonNode}, so navigation is type-safe —
- * no raw-map casts, no {@code @SuppressWarnings}.
+ * <p>Each source is a small single-role {@link SectionReader}, composed by the {@code of(…)}
+ * factories: {@link PulumiSections} (the Pulumi stack config) and {@link NestedDocument} (an
+ * in-memory or parsed-YAML document, also the {@code .secrets} side). Every source speaks {@link
+ * JsonNode}, so navigation is type-safe — no raw-map casts, no {@code @SuppressWarnings}.
+ *
+ * <p>The typed {@code optional*}/{@code require*} accessors serve records still read
+ * field-by-field; {@link #bind(Class, String)} is the deterministic {@code json → record} path
+ * (Jackson) for the records that have migrated to schema-as-record, {@code .secrets} joined per
+ * {@link SecretJoin}.
  */
 public final class ConfigLoader {
 
@@ -36,53 +45,106 @@ public final class ConfigLoader {
     Optional<JsonNode> read(String section);
   }
 
+  /**
+   * The record-mapping mapper — the {@code json → record} half of the deterministic bind (its
+   * inverse is {@link Facet#facetJson()}). {@link Jdk8Module} decodes {@code Optional}; unknown
+   * keys are tolerated (they land in a record's {@code @JsonAnySetter} remainder, the blind part of
+   * a facet). Empty-{@code Optional} omission on the way back out is a per-record
+   * {@code @JsonInclude}.
+   */
+  static final ObjectMapper JSON =
+      JsonMapper.builder()
+          .addModule(new Jdk8Module())
+          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .build();
+
   private final SectionReader sectionReader;
+  private final NestedDocument secrets;
   private final List<String> missingKeys = new ArrayList<>();
 
-  private ConfigLoader(SectionReader sectionReader) {
+  private ConfigLoader(SectionReader sectionReader, NestedDocument secrets) {
     this.sectionReader = sectionReader;
+    this.secrets = secrets;
   }
 
   public static ConfigLoader of(SectionReader sectionReader) {
-    return new ConfigLoader(sectionReader);
-  }
-
-  /** Live: read top-level sections from the Pulumi stack config, walking dotted names. */
-  public static ConfigLoader of(Config config) {
-    return new ConfigLoader(new PulumiSections(config));
+    return new ConfigLoader(sectionReader, NestedDocument.empty());
   }
 
   /**
-   * Live over TWO documents: the Pulumi stack config AND the smudged {@code .secrets} file. A
-   * coordinate section may carry a {@code secret:} JOIN meta ({@code {from: <dotted .secrets path>,
-   * role: …}}) declaring which {@code .secrets} subtree feeds it; {@link SecretJoinedSections}
-   * deep-merges that subtree into the section ({@code secret} LEAVES WIN — sops is the authority)
-   * and strips the meta, so a consumer reads one uniform subtree, sourced identically to a
-   * pure-config coordinate. Only what a {@code secret:} meta explicitly names is pulled — the other
-   * {@code .secrets} subtrees (launch tokens, k8s-replicated creds) never enter the merged view. A
-   * missing/unreadable {@code .secrets} yields an empty secret side (a survey without secrets falls
-   * to defaults).
+   * Live over TWO documents: the Pulumi stack config AND the smudged {@code .secrets} file. The
+   * config is read plainly; the {@code .secrets} document is held for {@link #bind(Class, String)}
+   * to deep-merge on demand, directed by a bound record's {@link SecretJoin}. A missing/unreadable
+   * {@code .secrets} yields an empty secret side (a survey without secrets falls to defaults).
    */
   public static ConfigLoader of(Config config, Path secretsFile) {
-    return new ConfigLoader(
-        new SecretJoinedSections(new PulumiSections(config), NestedDocument.ofYaml(secretsFile)));
+    return new ConfigLoader(new PulumiSections(config), NestedDocument.ofYaml(secretsFile));
   }
 
   /** Offline/test: a root map keyed by top-level section; dotted names walk into sub-maps. */
   public static ConfigLoader ofNestedRoot(Map<String, Object> root) {
-    return new ConfigLoader(NestedDocument.ofRoot(root));
+    return new ConfigLoader(NestedDocument.ofRoot(root), NestedDocument.empty());
   }
 
   /**
    * Offline/test twin of {@link #of(Config, Path)}: TWO nested roots — config keyed by coordinate +
-   * secrets keyed by provider — joined by the per-coordinate {@code secret:} meta exactly as the
-   * live reader joins the Pulumi config with {@code .secrets}.
+   * secrets keyed by provider. The secret side is joined per {@link SecretJoin} at {@link
+   * #bind(Class, String)}, exactly as the live reader joins the Pulumi config with {@code
+   * .secrets}.
    */
   public static ConfigLoader ofNestedRoots(
       Map<String, Object> configRoot, Map<String, Object> secretsRoot) {
-    return new ConfigLoader(
-        new SecretJoinedSections(
-            NestedDocument.ofRoot(configRoot), NestedDocument.ofRoot(secretsRoot)));
+    return new ConfigLoader(NestedDocument.ofRoot(configRoot), NestedDocument.ofRoot(secretsRoot));
+  }
+
+  /**
+   * Deterministic bind — the role split {@code config loader → json → mapper → record}. Read {@code
+   * section}'s config subtree, deep-merge the {@code .secrets} subtree the bound type's {@link
+   * SecretJoin} names (if any), then Jackson-map the result onto {@code type}. The record IS the
+   * schema: its typed components are the host's inputs, and a {@code @JsonAnySetter} remainder map
+   * carries the blind part of a facet (the host names no domain vocabulary). Its exact inverse is
+   * {@link Facet#facetJson()} ({@code record → json}).
+   */
+  public <T> T bind(Class<T> type, String section) {
+    final ObjectNode merged =
+        sectionReader
+            .read(section)
+            .map(node -> (ObjectNode) node.deepCopy())
+            .orElseGet(JSON::createObjectNode);
+    final SecretJoin join = type.getAnnotation(SecretJoin.class);
+    if (join != null) {
+      secrets.read(join.from()).ifPresent(secret -> deepMerge(merged, secret));
+    }
+    return JSON.convertValue(merged, type);
+  }
+
+  /**
+   * The {@code record → json} half of the bind — the inverse of {@link #bind(Class, String)}, used
+   * by a {@link Facet} to re-serialise itself into the payload it contributes. Shares the one
+   * mapper so the round-trip is symmetric.
+   */
+  static String writeJson(Object value) {
+    try {
+      return JSON.writeValueAsString(value);
+    } catch (JsonProcessingException ex) {
+      throw new IllegalStateException("failed to serialise a config facet: " + value, ex);
+    }
+  }
+
+  /** Deep-merge {@code overlay} into {@code base}; overlay leaves win (sops is the authority). */
+  private static void deepMerge(ObjectNode base, JsonNode overlay) {
+    overlay
+        .properties()
+        .forEach(
+            entry -> {
+              final JsonNode existing = base.get(entry.getKey());
+              if (existing instanceof ObjectNode existingObject
+                  && entry.getValue() instanceof ObjectNode) {
+                deepMerge(existingObject, entry.getValue());
+              } else {
+                base.set(entry.getKey(), entry.getValue());
+              }
+            });
   }
 
   // --- optional* : empty when absent/blank, no defaults here ---
@@ -139,17 +201,6 @@ public final class ConfigLoader {
     final List<String> result = new ArrayList<>();
     node.get().forEach(element -> result.add(element.asText()));
     return result;
-  }
-
-  /**
-   * The raw nested subtree at {@code section}, serialized verbatim as a JSON {@code String} — the
-   * blind copy a host {@code AmendmentContributor} forwards by role (the {@code manifests} / {@code
-   * bbox} FACET), naming no domain vocabulary: jackson coerces the yaml's string scalars into the
-   * wire-record OSGi-side. Empty string when the section is absent, so the amendment falls to its
-   * defaults.
-   */
-  public String subtreeJson(String section) {
-    return sectionReader.read(section).map(JsonNode::toString).orElse("");
   }
 
   // --- require* : accumulate on absence, return placeholder ---
@@ -226,6 +277,11 @@ public final class ConfigLoader {
       return new NestedDocument(MAPPER.valueToTree(root));
     }
 
+    /** An empty document — the secret side of a loader built with no {@code .secrets}. */
+    static NestedDocument empty() {
+      return new NestedDocument(MAPPER.createObjectNode());
+    }
+
     /** Wrap one named section's raw content (a Pulumi {@code getObject} result) as a document. */
     static NestedDocument ofSection(String name, Object content) {
       final ObjectNode root = MAPPER.createObjectNode();
@@ -255,56 +311,6 @@ public final class ConfigLoader {
       return config
           .getObject(top, Object.class)
           .flatMap(content -> NestedDocument.ofSection(top, content).read(section));
-    }
-  }
-
-  /**
-   * Decorates a config {@link SectionReader}, joining a section's {@code secret:} meta with the
-   * named subtree of a secrets {@link NestedDocument} — the two-file reconciliation. {@code secret}
-   * leaves win on a collision (sops is the authority) and the join instruction is stripped, so the
-   * consumer reads one uniform subtree. The {@code role} is read OSGi-side (the amendment role the
-   * whole joined subtree is contributed under), so only the {@code secret} join instruction itself
-   * is removed.
-   */
-  private record SecretJoinedSections(SectionReader config, NestedDocument secrets)
-      implements SectionReader {
-
-    private static final String SECRET_META = "secret";
-
-    @Override
-    public Optional<JsonNode> read(String section) {
-      return config.read(section).map(this::join);
-    }
-
-    private JsonNode join(JsonNode subtree) {
-      final JsonNode meta = subtree.path(SECRET_META);
-      if (!meta.isObject()) {
-        return subtree;
-      }
-      final String from = meta.path("from").asText("");
-      if (from.isBlank()) {
-        throw new IllegalStateException(
-            "a 'secret:' join must name a non-blank 'from' .secrets path, got: " + meta);
-      }
-      final ObjectNode joined = ((ObjectNode) subtree).deepCopy();
-      joined.remove(SECRET_META);
-      secrets.read(from).ifPresent(secret -> merge(joined, secret));
-      return joined;
-    }
-
-    private void merge(ObjectNode base, JsonNode overlay) {
-      overlay
-          .properties()
-          .forEach(
-              entry -> {
-                final JsonNode existing = base.get(entry.getKey());
-                if (existing instanceof ObjectNode existingObject
-                    && entry.getValue() instanceof ObjectNode) {
-                  merge(existingObject, entry.getValue());
-                } else {
-                  base.set(entry.getKey(), entry.getValue());
-                }
-              });
     }
   }
 }

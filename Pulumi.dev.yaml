@@ -66,13 +66,10 @@ config:
     cleanWorktree:
       required: "false"
   rke2lab:bbox:
+    # The router contact (uri + password) is joined from .secrets:lan.bbox by BboxConfig's
+    # @SecretJoin — the merge directive lives on the record, not here. This section carries only
+    # the reconcile policy; ConfigLoader deep-merges the secret subtree at bind time.
     reconcile:
       failOnError: "true"
-    # Join the router contact from .secrets:lan.bbox ({uri, password}) into this coordinate's FACET.
-    # ConfigLoader deep-merges the named .secrets subtree here (secret leaves win) and strips this
-    # meta; the bbox scion reads uri + password from the FACET (see BboxRunbookInput).
-    secret:
-      from: lan.bbox
-      role: FACET
   rke2lab:hostAsset:
     rotationRetentionCount: "3"

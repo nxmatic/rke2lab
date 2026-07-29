@@ -90,12 +90,12 @@ public final class Main {
                   .toleratedWorktreePaths(config.entryGate().toleratedPaths())
                   .flakeLockRequired(config.entryGate().flakeLockRequired().orElse(false))
                   .txId(UUID.randomUUID().toString())
-                  // The FACET subtrees, read verbatim from Pulumi config here (the only place the
-                  // envelope's Config is reachable) and carried for the GIVEN to publish per
-                  // coordinate. The bbox subtree is joined with .secrets:lan.bbox (router uri +
-                  // password) by ConfigLoader's `secret:` meta.
-                  .facet("manifests", loader.subtreeJson("manifests"))
-                  .facet("bbox", loader.subtreeJson("bbox"))
+                  // The FACET payloads sourced from the config DTO (the single source of truth): a
+                  // Facet re-serialises its bound schema back to the JSON the host contributes
+                  // verbatim. bbox carries the router uri + password joined from .secrets:lan.bbox;
+                  // both are contributed blind — the scion owns the decode.
+                  .facet("manifests", config.manifests().facetJson())
+                  .facet("bbox", config.bbox().facetJson())
                   .build();
 
           try {
