@@ -115,9 +115,6 @@ public record BootstrapConfig(
   }
 
   public String netPrefix() {
-    // The autofs -hosts root the NIXOS host mounts the Mac's NFS exports under: /net/<host>. The
-    // host is the tailscale MagicDNS FQDN <cluster>.<tailnet> so the automount routes over the
-    // tailscale overlay (stable, reachable) rather than the physical LAN's mDNS <cluster>.local.
-    return "/net/" + clusterName + "." + tailnet;
+    return "/net/" + clusterName + ".local";
   }
 }

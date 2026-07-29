@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -eu
+set -euxo pipefail
 
 if [ "$#" -ne 4 ]; then
     echo "usage: $0 <workspace> <config-path> <artifact-dir> <builder-binary>" >&2

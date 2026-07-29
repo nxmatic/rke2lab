@@ -282,7 +282,7 @@ public record BootstrapPaths(
    * input root is already canonicalised at the source via {@link
    * io.nxmatic.rke2lab.worktree.Worktree}).
    */
-  static Path automountPath(Path rawPath, boolean nfsAutomount, String netPrefix) {
+  Path automountPath(Path rawPath, boolean nfsAutomount, String netPrefix) {
     final Path normalized = rawPath.toAbsolutePath().normalize();
     if (!nfsAutomount) {
       return normalized;

@@ -7,46 +7,67 @@ import org.junit.jupiter.api.Test;
 
 class BootstrapPathsTest {
 
+  private final BootstrapPaths bootstrapPaths =
+      BootstrapPaths.fromLocalWorktree(Path.of("/tmp/worktree"), "test-cluster", "test-node");
+
+  // --- automountPath: rebase an absolute path under the NFS automount prefix (host-agnostic) ---
+
   @Test
-  void automountPath_bioskop_layout_with_private_segment() {
+  void automountPath_rebases_the_bioskop_private_layout_under_the_prefix() {
     final Path bioskopRoot = Path.of("/private/var/lib/git/nxmatic/rke2lab");
-    final Path result = BootstrapPaths.automountPath(bioskopRoot, true, "/net/bioskop.local");
-    assertEquals(Path.of("/net/bioskop.local/private/var/lib/git/nxmatic/rke2lab"), result);
+    assertEquals(
+        Path.of("/net/bioskop.local/private/var/lib/git/nxmatic/rke2lab"),
+        bootstrapPaths.automountPath(bioskopRoot, true, "/net/bioskop.local"));
   }
 
   @Test
-  void automountPath_nikopol_layout_without_private_segment() {
+  void automountPath_rebases_the_nikopol_volumes_layout_under_the_prefix() {
     final Path nikopolRoot = Path.of("/Volumes/git-worktree-store/nxmatic/rke2lab");
-    final Path result = BootstrapPaths.automountPath(nikopolRoot, true, "/net/nikopol.local");
-    assertEquals(Path.of("/net/nikopol.local/Volumes/git-worktree-store/nxmatic/rke2lab"), result);
+    assertEquals(
+        Path.of("/net/nikopol.local/Volumes/git-worktree-store/nxmatic/rke2lab"),
+        bootstrapPaths.automountPath(nikopolRoot, true, "/net/nikopol.local"));
   }
 
   @Test
-  void automountPath_preserves_path_when_automount_disabled() {
+  void automountPath_preserves_the_path_when_automount_is_disabled() {
     final Path path = Path.of("/private/var/lib/git/nxmatic/rke2lab");
-    final Path result = BootstrapPaths.automountPath(path, false, "/net/bioskop.local");
-    assertEquals(path.toAbsolutePath().normalize(), result);
+    assertEquals(
+        path.toAbsolutePath().normalize(),
+        bootstrapPaths.automountPath(path, false, "/net/bioskop.local"));
   }
 
   @Test
-  void automountPath_skips_translation_for_net_paths() {
-    final Path netPath = Path.of("/net/bioskop.local/private/var/lib/git/nxmatic/rke2lab");
-    final Path result = BootstrapPaths.automountPath(netPath, true, "/net/other.local");
-    assertEquals(netPath, result);
+  void automountPath_is_idempotent_for_paths_already_under_net() {
+    final Path netPath = Path.of("/net/nikopol.local/Volumes/git-worktree-store/nxmatic/rke2lab");
+    assertEquals(netPath, bootstrapPaths.automountPath(netPath, true, "/net/nikopol.local"));
   }
+
+  // --- asAutomountView: every root rebased under the prefix (or left as-is when disabled) ---
+
+  @Test
+  void asAutomountView_rebases_every_root_under_the_prefix() {
+    final BootstrapPaths view = bootstrapPaths.asAutomountView(true, "/net/nikopol.local");
+    assertEquals(Path.of("/net/nikopol.local/tmp/worktree"), view.worktreeRoot());
+    assertEquals(Path.of("/net/nikopol.local/tmp/worktree/.secrets"), view.secretsFile());
+  }
+
+  @Test
+  void asAutomountView_leaves_roots_untouched_when_automount_is_disabled() {
+    final BootstrapPaths view = bootstrapPaths.asAutomountView(false, "/net/nikopol.local");
+    assertEquals(bootstrapPaths.worktreeRoot(), view.worktreeRoot());
+  }
+
+  // --- instanceMounts: the 13 disk mounts, stable device names paired with their catalog target
+  // ---
 
   @Test
   void instanceMounts_yields_thirteen_mounts() {
-    final BootstrapPaths paths =
-        BootstrapPaths.fromLocalWorktree(Path.of("/tmp/worktree"), "test-cluster", "test-node");
-    assertEquals(13, paths.instanceMounts().size());
+    assertEquals(13, bootstrapPaths.instanceMounts().size());
   }
 
   @Test
   void instanceMounts_maintains_device_names_and_targets() {
-    final BootstrapPaths paths =
-        BootstrapPaths.fromLocalWorktree(Path.of("/tmp/worktree"), "test-cluster", "test-node");
-    final var mounts = paths.instanceMounts();
+    final var mounts = bootstrapPaths.instanceMounts();
 
     assertEquals("worktree.dir", mounts.get(0).deviceName());
     assertEquals(BootstrapPaths.HostPathCatalog.WORKTREE.path(), mounts.get(0).target());
