@@ -11,7 +11,9 @@ config:
     level: debug
   rke2lab:incus:
     project: rke2lab
-    configDir: /Users/nxmatic/.config/incus
+    # ~ expands to the operator's home at load time, so the same value resolves
+    # per-host (/Users/<user> on bioskop, /Volumes/user-home on nikopol).
+    configDir: ~/.config/incus
   rke2lab:image:
     alias: control-node
     sharedFolder: .local.d/images/distrobuilder

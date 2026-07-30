@@ -154,7 +154,29 @@ public final class ConfigLoader {
   }
 
   public Optional<Path> optionalPath(String section, String key) {
-    return optional(section, key).map(value -> Path.of(value).toAbsolutePath().normalize());
+    return optional(section, key)
+        .map(ConfigLoader::expandHome)
+        .map(value -> Path.of(value).toAbsolutePath().normalize());
+  }
+
+  // Expand a leading ~ or $HOME/${HOME} to the operator's home so path config
+  // (e.g. incus.configDir) stays portable across hosts whose home lives at a
+  // different absolute root (/Users/<user> on one Mac, /Volumes/user-home on
+  // another). Absolute and relative values pass through untouched.
+  private static String expandHome(String value) {
+    final String home = System.getProperty("user.home");
+    if (home == null || home.isBlank()) {
+      return value;
+    }
+    if (value.equals("~") || value.startsWith("~/")) {
+      return home + value.substring(1);
+    }
+    for (final String prefix : new String[] {"${HOME}", "$HOME"}) {
+      if (value.startsWith(prefix)) {
+        return home + value.substring(prefix.length());
+      }
+    }
+    return value;
   }
 
   public Optional<URI> optionalUri(String section, String key) {
