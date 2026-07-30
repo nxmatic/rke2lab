@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -euxo pipefail
+set -euo pipefail
 
 if [ "$#" -ne 4 ]; then
     echo "usage: $0 <workspace> <config-path> <artifact-dir> <builder-binary>" >&2
@@ -73,12 +73,18 @@ if [ "$build_fs_type" != "tmpfs" ]; then
     exit 4
 fi
 
-if command -v flox >/dev/null 2>&1; then
-    if [ "$(id -u)" = 0 ]; then
-        flox activate -- "$binary" build-incus "$remote_config_path" "$build_tmpfs_dir"
-    else
-        flox activate -- "$SUDO_BIN" -n "$binary" build-incus "$remote_config_path" "$build_tmpfs_dir"
-    fi
+# Resolve the builder binary from the workspace flake (a pinned, cached package
+# output — the #distrobuilder mirror of #incus-client) rather than `flox activate`.
+# Activating the whole rke2lab dev env just to put distrobuilder on PATH drags its
+# k8s include in, which on the builder means a from-source ceph-client build that
+# stalls the image build for a long time. `nix build` pulls ONLY distrobuilder +
+# its closure from the cache; we realise it as the invoking user, then run just the
+# resulting binary as root (distrobuilder's build-incus needs root for the rootfs).
+if command -v nix >/dev/null 2>&1; then
+    builder_bin="$(nix build --no-link --print-out-paths \
+        --extra-experimental-features 'nix-command flakes' \
+        "$remote_workspace#$binary")/bin/$binary"
+    run_as_root "$builder_bin" build-incus "$remote_config_path" "$build_tmpfs_dir"
 else
     run_as_root "$binary" build-incus "$remote_config_path" "$build_tmpfs_dir"
 fi

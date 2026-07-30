@@ -103254,11 +103254,11 @@
         ]
       },
       "locked": {
-        "path": "./manifests/src/main/resources/runtime/flox",
+        "path": "./osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox",
         "type": "path"
       },
       "original": {
-        "path": "./manifests/src/main/resources/runtime/flox",
+        "path": "./osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox",
         "type": "path"
       },
       "parent": []
