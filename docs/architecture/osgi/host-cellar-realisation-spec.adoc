@@ -52,9 +52,20 @@ Two facts the reading settled, both load-bearing and both places I had it wrong 
   gardening = one cellar; the végétal is opaque, addressed by a neutral `Parcel`, never read. What THIS
   realisation adds — the *how* over the Pulumi backend:
   ** the verbs are pure Pulumi-backend gestures: `store`/`fetch` = write/read a `végétal` as a stack
-     OUTPUT keyed by coordinate slug (`createOrSelectStack(project, stack)`), `withdraw` = drop that
-     output from the current state (§ the fridge), `neighbours` = enumerate the sibling stacks under the
-     same soil. `Parcel(project, stack)` IS a Pulumi stack reference said in gardening words.
+     OUTPUT keyed by coordinate slug, `withdraw` = drop that output from the current state (§ the fridge),
+     `neighbours` = enumerate the sibling stacks under the same soil. `Parcel(project, stack)` IS a Pulumi
+     stack reference said in gardening words.
+  ** *Two soils, one verb (§ one-history).* A `Parcel` is either the RUN's OWN stack — the live Pulumi
+     deployment installed on this thread targets it (`PulumiDeploymentSeed.targets`) — or a SIDE stack (the
+     doctor's ledger, its own project `intervention-ledger`, no live deployment). The run's own stack CANNOT
+     take a separate `createOrSelectStack(...).up()`: that stack is the very one the outer `pulumi up` is
+     running, so a nested `up` deadlocks on its lock AND is clobbered by the outer program (one `up` is
+     authoritative over the whole resource set). So the run's cellar STAGES its stores and, at the drain,
+     `conserve` re-declares the whole live set as `rke2lab:cellar:Entry` resources INTO that same running
+     deployment — the harvest folds into the ONE history beside the infra (incus, cluster). A side stack has
+     no live deployment, so it keeps the eager out-of-run `up()` (a stable resource name per coordinate makes
+     each append a history entry). `fetch` is FILTERED to the `rke2lab:cellar:Entry` type so the resources the
+     run's stack co-hosts (the incus provider, the root `Stack`) are never mistaken for coquilles.
   ** the INTERFACE (`Cellar`, `Parcel`) is homed in `seed-broker-port` (the neutral fondation seam)
      because its face must speak gardening; the IMPL is a host object in `pulumi-edge`, laid into Felix at
      boot by `registerService` (§ open question #4, resolved) — because THIS system realises the gardener

@@ -56,33 +56,44 @@ import org.jspecify.annotations.Nullable;
  * and carries the opaque bytes — so the {@link OpaqueCellar} contract ("never opens a payload")
  * holds literally.
  *
- * <p><b>store</b> — files a coquille append-only, its mode routed by the injected {@link RunGate}
- * (the cellar consults the gate, the scion never picks the mode — its {@code store} is one neutral
- * verb): cultivating → an out-of-run {@code up()} CONSERVES it; a stable resource name per
- * coordinate makes each append a new history entry (the fold), not a churned resource. Surveying →
- * a {@code preview()} PRE-RESERVES it: the plan is computed against the same inert program but the
- * state is NOT touched (no history entry), so a dry-run neither loses the harvest nor lies it into
- * the conserved timeline.
+ * <p><b>Two soils, one verb.</b> The cellar detects whether a {@link Parcel} is the RUN's OWN stack
+ * — the live Pulumi deployment installed on this thread targets that project/stack (§ {@link
+ * PulumiDeploymentSeed#targets}). That discriminant routes {@code store} / {@code fetch} / {@code
+ * withdraw} down one of two paths; the scion never picks — each verb stays neutral.
  *
- * <p><b>fetch</b> — walks the parcel's stack history and, for each entry, VERIFIES the coquille's
- * MAC then rebuilds one {@link SeedEnvelope} per stored output from the shell's own {@code domain}
- * + {@code trail} + opaque {@code payload}, keyed by the output's NATIVE name (the coordinate). The
- * typed overloads ({@code fetch(parcel, type)}, {@code fetch(parcel, coordinate, type)}) DELEGATE
- * the decode to the {@link SeedCodec}, which reflects on the {@code Class} passed — the host
- * decodes any type ITS classpath holds; a type it lacks (a bundle type) is the codec's throw, not a
- * cellar rule.
+ * <p><b>store</b> — the RUN's own stack STAGES the coquille and {@link #conserve} re-declares the
+ * whole live set as {@code CellarEntry} resources INTO the run's single deployment: the harvest
+ * folds into the ONE history alongside the infra (incus, cluster), with no nested {@code up} and no
+ * lock contention (the fatal collision of the old separate-{@code up} design). A SIDE stack (the
+ * doctor's ledger, its own project) has no live deployment, so it files EAGERLY: an out-of-run
+ * {@code up()} routed by the injected {@link RunGate} CONSERVES it (a stable resource name per
+ * coordinate makes each append a history entry); a {@code preview()} PRE-RESERVES it, touching no
+ * state.
  *
- * <p><b>withdraw</b> — the fridge take: over an append-only backend it files a TOMBSTONE coquille
- * ({@code tombstone=true}, a first-class CLEAR shell flag — no in-band payload marker) so the
- * current-state fold ({@code fetch(parcel, coordinate)}, last-wins) reads the case as empty. The
- * history keeps the trace (the audit does not lie); only the current state is emptied. This serves
- * the ring rotation (the sole {@code withdraw} usage); the doctor's journal never takes.
+ * <p><b>fetch</b> — rebuilds one {@link SeedEnvelope} per stored coquille, VERIFYING its MAC and
+ * restoring {@code domain} + {@code trail} + opaque {@code payload}, keyed by the output's NATIVE
+ * name (the coordinate). The read is FILTERED to the {@code rke2lab:cellar:Entry} type, so the
+ * resources the run's own stack co-hosts (the incus provider, the root Stack) are ignored rather
+ * than mistaken for malformed coquilles. The run's stack reads its CURRENT state (every live
+ * coquille sits in the one checkpoint); a side stack walks its history append-log. The typed
+ * overloads ({@code fetch(parcel, type)}, {@code fetch(parcel, coordinate, type)}) DELEGATE the
+ * decode to the {@link SeedCodec} — the host decodes any type ITS classpath holds; a type it lacks
+ * (a bundle type) is the codec's throw, not a cellar rule.
+ *
+ * <p><b>withdraw</b> — the RUN's own stack STAGES a removal: the coordinate is simply not
+ * re-declared by {@code conserve}, so the run's authoritative {@code up} reaps it — no in-band
+ * tombstone. A side stack files a TOMBSTONE coquille ({@code tombstone=true}, a first-class CLEAR
+ * shell flag) so the current-state fold reads the case empty while history keeps the trace.
+ *
+ * <p><b>conserve</b> — the end-of-drain flush for the run's own stack: desired = the live coquilles
+ * carried forward (re-declared so the authoritative {@code up} does not reap them) merged with this
+ * run's staged changes. A no-op for the eager side-stack path (already committed per store).
  *
  * <p><b>neighbours</b> — the sibling parcels under the same backend soil (the parcel's own first).
  *
  * <p>An absent file backend yields an empty neighbourhood (just the parcel) and empty fetches; a
- * present-but-unreadable history propagates (corruption is not absence); a coquille whose MAC does
- * not verify is tamper, and fails closed rather than degrading to a skip.
+ * present-but-unreadable state or history propagates (corruption is not absence); a coquille whose
+ * MAC does not verify is tamper, and fails closed rather than degrading to a skip.
  */
 public final class PulumiCellar implements OpaqueCellar {
 
@@ -116,6 +127,13 @@ public final class PulumiCellar implements OpaqueCellar {
   private final RunGate gate;
   private final Consumer<String> logger;
 
+  // Per-parcel staged current-state for the RUN's own stack (the "one history" path): a store
+  // stages its shell, a withdraw stages an empty (an omission). Flushed by conserve() at the drain,
+  // where the full live set is re-declared into the run's single deployment. Empty for the eager
+  // side-stack path (the doctor's ledger), which files each store as its own out-of-run up.
+  private final Map<Parcel, Map<String, Optional<Map<String, Object>>>> stagedByParcel =
+      new LinkedHashMap<>();
+
   public PulumiCellar(Optional<Path> backendDir, RunGate gate, Consumer<String> logger) {
     this.backendDir = backendDir;
     this.gate = gate;
@@ -139,13 +157,29 @@ public final class PulumiCellar implements OpaqueCellar {
 
   @Override
   public void store(Parcel parcel, SeedEnvelope vegetal) {
-    // A live store files a self-characterising coquille: the CLEAR shell (domain, trail, tombstone)
+    // A store files a self-characterising coquille: the CLEAR shell (domain, trail, tombstone)
     // around the OPAQUE payload, MAC-bound so a later fetch can trust the whole. tombstone is false
-    // — a store fills the case; withdraw is the sole writer of a tombstone coquille.
-    writeShell(
-        parcel,
-        vegetal.coordinate(),
-        shell(vegetal.domain(), vegetal.coordinate(), vegetal.trail(), false, vegetal.payload()));
+    // — a store fills the case; a withdrawal empties it.
+    final Map<String, Object> shell =
+        shell(vegetal.domain(), vegetal.coordinate(), vegetal.trail(), false, vegetal.payload());
+    if (isRunStack(parcel)) {
+      // The run's OWN stack: stage the shell; conserve() re-declares the full live set into the
+      // run's single deployment (one history, no nested up, no lock).
+      stage(parcel, vegetal.coordinate(), Optional.of(shell));
+    } else {
+      // A side stack (the doctor's ledger): file it eagerly as its own out-of-run up.
+      writeShell(parcel, vegetal.coordinate(), shell);
+    }
+  }
+
+  /** Whether {@code parcel} is the RUN's own stack — the live deployment targets it. */
+  private boolean isRunStack(Parcel parcel) {
+    return PulumiDeploymentSeed.targets(parcel.project(), parcel.stack());
+  }
+
+  /** Stage one run-stack op: a present shell (a store) or an empty (a withdrawal). */
+  private void stage(Parcel parcel, String coordinate, Optional<Map<String, Object>> op) {
+    stagedByParcel.computeIfAbsent(parcel, p -> new LinkedHashMap<>()).put(coordinate, op);
   }
 
   /**
@@ -238,7 +272,26 @@ public final class PulumiCellar implements OpaqueCellar {
     }
     final Path root = backendDir.orElseThrow();
     final StackHandle handle = StackHandle.forBackend(root, parcel.project(), parcel.stack());
+    final List<Shelved> reaped = new ArrayList<>();
 
+    if (isRunStack(parcel)) {
+      // The run's OWN stack holds EVERY live coquille as a resource in ONE current state (conserve
+      // re-declares them each up). Read that current state, filtered to our own CellarEntry type so
+      // co-resident resources (the incus provider, the root Stack) are ignored rather than mistaken
+      // for malformed coquilles.
+      final Optional<StackSnapshot> snapshot;
+      try {
+        snapshot = handle.currentSnapshot();
+      } catch (StackException e) {
+        // A present-but-unreadable state is corruption, not absence: propagate rather than mask.
+        throw new RuntimeException("cellar state present but unreadable under " + root, e);
+      }
+      snapshot.ifPresent(s -> collectEntry(s, reaped));
+      return reaped;
+    }
+
+    // An eager side stack (the doctor's ledger): each store is its own up, so the append-log lives
+    // in the stack HISTORY — walk it, oldest first.
     final List<StackHistory.Entry> entries;
     try {
       entries = handle.history().entries();
@@ -247,8 +300,6 @@ public final class PulumiCellar implements OpaqueCellar {
       // empty store (the dishonesty the ledger exists to kill).
       throw new RuntimeException("cellar history present but unreadable under " + root, e);
     }
-
-    final List<Shelved> reaped = new ArrayList<>();
     for (StackHistory.Entry entry : entries) {
       try {
         collectEntry(handle.snapshotOf(entry), reaped);
@@ -280,15 +331,52 @@ public final class PulumiCellar implements OpaqueCellar {
 
   @Override
   public Optional<SeedEnvelope> withdraw(Parcel parcel, SeedCoordinate coordinate) {
-    // Take the case out OPAQUE: hand back its current envelope, then file a TOMBSTONE coquille
-    // (tombstone=true, first-class — no in-band payload marker) so a later fold reads the case
-    // empty.
-    // The removal is of the CURRENT state (the fold); history keeps the trace.
+    // Take the case out OPAQUE: hand back its current envelope, then empty the case.
     final Optional<SeedEnvelope> current = fetch(parcel, coordinate);
-    if (current.isPresent()) {
+    if (isRunStack(parcel)) {
+      // The run's OWN stack: stage a removal. The coordinate is simply not re-declared in
+      // conserve(), so the run's authoritative up reaps it — no in-band tombstone shell needed.
+      stage(parcel, coordinate.slug(), Optional.empty());
+    } else if (current.isPresent()) {
+      // Eager side stack: file a first-class TOMBSTONE coquille (tombstone=true) so a later
+      // history fold reads the case empty. History keeps the trace (the audit does not lie).
       writeShell(parcel, coordinate.slug(), shell("", coordinate.slug(), Trail.empty(), true, ""));
     }
     return current;
+  }
+
+  @Override
+  public void conserve(Parcel parcel) {
+    // Flush the staged current-state. Only the run's OWN stack stages (the eager side-stack path
+    // already committed each store via its own up). The desired live set = the coquilles carried
+    // forward from the current state (re-declared so Pulumi's one authoritative up does NOT reap
+    // them) merged with this run's staged changes (a store overrides, a withdrawal omits). Each
+    // shell is rebuilt from its read-back envelope — deterministic, same MAC. Then one CellarEntry
+    // per coordinate is registered into the run's live deployment: stable-named, so the single up
+    // folds the whole harvest into ONE history alongside the infra.
+    final Map<String, Optional<Map<String, Object>>> ops = stagedByParcel.remove(parcel);
+    if (!isRunStack(parcel)) {
+      return;
+    }
+    final Map<String, Map<String, Object>> desired = new LinkedHashMap<>();
+    for (Shelved shelved : reap(parcel)) {
+      if (!shelved.tombstone()) {
+        final SeedEnvelope e = shelved.envelope();
+        desired.put(
+            e.coordinate(), shell(e.domain(), e.coordinate(), e.trail(), false, e.payload()));
+      }
+    }
+    if (ops != null) {
+      ops.forEach(
+          (coordinate, op) -> {
+            if (op.isPresent()) {
+              desired.put(coordinate, op.get());
+            } else {
+              desired.remove(coordinate);
+            }
+          });
+    }
+    desired.forEach((coordinate, shell) -> new CellarEntry(coordinate, shell));
   }
 
   /**
@@ -347,7 +435,7 @@ public final class PulumiCellar implements OpaqueCellar {
    */
   private void collectEntry(StackSnapshot snapshot, List<Shelved> into) {
     snapshot
-        .allOutputs()
+        .outputsOfType(CellarEntry.TYPE_TOKEN)
         .forEach(
             (coordinate, values) ->
                 values.forEach(value -> into.add(unshell(coordinate, asShell(value)))));

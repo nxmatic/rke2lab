@@ -63,4 +63,16 @@ public interface OpaqueCellar {
    * just the parcel itself.
    */
   List<Parcel> neighbours(Parcel parcel);
+
+  /**
+   * Commit the parcel's staged current-state to the soil — the end-of-drain flush. A backend that
+   * files each {@link #store} / {@link #withdraw} eagerly (a separate-run {@code up}, a git commit)
+   * has nothing to flush and keeps the default no-op. The backend that shares the RUN's own stack
+   * cannot file eagerly — its coquilles are resources of the run's single deployment, and Pulumi
+   * makes one {@code up} authoritative over the whole desired set — so it STAGES store/withdraw
+   * and, here, re-declares the full live set at once (carry-forward + this run's changes), a
+   * coordinate absent from the set being naturally reaped. Idempotent, and a no-op when nothing was
+   * staged for this parcel.
+   */
+  default void conserve(Parcel parcel) {}
 }

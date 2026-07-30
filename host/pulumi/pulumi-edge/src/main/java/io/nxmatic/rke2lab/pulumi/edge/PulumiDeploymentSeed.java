@@ -56,4 +56,17 @@ public final class PulumiDeploymentSeed implements BeforeEachCallback {
   public static boolean isDeploymentPresent() {
     return DeploymentInstanceHolder.getInstanceOptional().isPresent();
   }
+
+  /**
+   * Whether the live deployment on THIS thread targets {@code project/stack} — the discriminant the
+   * cellar uses to tell its OWN run stack (which it must write INTO this one deployment, the "one
+   * history" path) from a side stack like the doctor's ledger (a separate out-of-run {@code up}).
+   * Keeps the {@code com.pulumi.deployment.internal} coupling confined to this seed, the one class
+   * that already owns the deployment handle. False when no deployment is installed.
+   */
+  public static boolean targets(String project, String stack) {
+    return DeploymentInstanceHolder.getInstanceOptional()
+        .map(d -> project.equals(d.getProjectName()) && stack.equals(d.getStackName()))
+        .orElse(false);
+  }
 }

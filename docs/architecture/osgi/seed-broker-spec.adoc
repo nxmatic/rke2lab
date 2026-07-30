@@ -1633,6 +1633,22 @@ turns; the debunked framings are recorded so they are not re-attempted:
   folds each scion's tags into the host trunk (`ScenarioGraft`, the `getTagMap` merge — already exists). At
   the boundary only the root drains — a single all-or-nothing flush. Isolation (A), not sub-transactions;
   the spec's atomicity, kept.
++
+--
+*How the root drains onto the RUN's own stack (§ one-history).* The drain replays the write-set onto the
+durable `OpaqueCellar` (`store`/`withdraw` per entry) then calls `conserve(parcel)` once per parcel. For a
+SIDE stack (the doctor's ledger) each `store` was an eager out-of-run `up`, and `conserve` is a no-op. For
+the RUN's OWN stack — the very stack the outer `pulumi up` is running — a separate nested `up` is impossible
+(it would deadlock on the run's lock and be clobbered, since one `up` is authoritative over the whole
+resource set). So the run's cellar STAGES each store/withdraw and `conserve` re-declares the full live set
+(the coquilles carried forward from the current state, merged with this run's changes) as
+`rke2lab:cellar:Entry` resources INTO the running deployment — the harvest folds into the ONE history beside
+the infra. Atomicity is then the outer `up` itself (commit all-or-nothing); the drain runs in
+`afterTestExecution`, on the worker where the deployment is installed and BEFORE the program returns, so the
+registrations are part of that single `up`. This replaces the old separate-`up`-per-entry design, whose
+collision with the run's own stack (lock + reading the co-resident incus provider's non-shell outputs) was
+the fatal bug (§ host-cellar-realisation-spec, one-history).
+--
 . *The root/fragment role comes from the LAUNCHER, not the type.* A given scenario is a FRAGMENT when
   sown by the host, a ROOT when played alone (`IncusProvisionScenario` in its own in-container test) — so
   the role is not a property of the type; whoever LAUNCHES knows it. A `RunRole` (ROOT|FRAGMENT) is seeded

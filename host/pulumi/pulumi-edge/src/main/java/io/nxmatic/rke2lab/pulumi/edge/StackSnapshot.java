@@ -84,14 +84,15 @@ public record StackSnapshot(StackDeployment wrapped) {
   }
 
   /**
-   * Collects EVERY output present in the deployment, keyed by its native output name, each value
-   * the list of that key's values across the resources that carry it (resource order preserved).
-   * This is the neutral, collect-all read the {@code Cellar} hands back: the frontier stamps no
-   * domain coordinate and hardcodes no case name — it returns what the soil holds, by the soil's
-   * own output names, and the capable (OSGi) side reads the cases it knows. Never throws; empty
-   * when the deployment is absent or malformed.
+   * Collects the outputs of every resource of the given Pulumi TYPE TOKEN, keyed by native output
+   * name, each value the list of that key's values across the matching resources (resource order
+   * preserved). The type filter is what lets the {@code Cellar} read ONLY its own {@code
+   * rke2lab:cellar:Entry} coquilles and ignore the resources it shares the run's one stack with
+   * (the incus provider, the root Stack) — whose outputs are not shells and would otherwise be
+   * mistaken for malformed coquilles. Never throws; empty when the deployment is absent, malformed,
+   * or holds no resource of that type.
    */
-  public Map<String, List<Object>> allOutputs() {
+  public Map<String, List<Object>> outputsOfType(String type) {
     Map<String, List<Object>> byName = new LinkedHashMap<>();
 
     Optional<Map<String, Object>> deploymentOpt = deployment();
@@ -114,6 +115,10 @@ public record StackSnapshot(StackDeployment wrapped) {
 
       @SuppressWarnings("unchecked")
       Map<String, Object> resource = (Map<String, Object>) resourceObj;
+
+      if (!type.equals(resource.get("type"))) {
+        continue;
+      }
 
       Object outputsObj = resource.get("outputs");
       if (!(outputsObj instanceof Map)) {

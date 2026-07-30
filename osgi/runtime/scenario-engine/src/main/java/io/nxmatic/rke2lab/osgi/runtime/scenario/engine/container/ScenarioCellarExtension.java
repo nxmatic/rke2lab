@@ -6,8 +6,10 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.BaseWorldExtension;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
@@ -88,13 +90,20 @@ public final class ScenarioCellarExtension
    * rode the model, not a collapsed final state.
    */
   private void drain(ReportModel model, OpaqueCellar durable) {
+    final LinkedHashSet<Parcel> parcels = new LinkedHashSet<>();
     for (ScenarioCellar.Entry entry : ScenarioCellar.entriesOf(model)) {
+      parcels.add(entry.parcel());
       if (entry.tombstone()) {
         durable.withdraw(entry.parcel(), coordinateOf(entry.envelope()));
       } else {
         durable.store(entry.parcel(), entry.envelope());
       }
     }
+    // Flush the staged current-state: a no-op for eager backends (the doctor's ledger already
+    // committed each store via its own up); the run's OWN stack re-declares its full live set into
+    // the run's single up HERE — before the program returns — so the harvest lands in the one
+    // history alongside the infra, with no nested up and no lock contention.
+    parcels.forEach(durable::conserve);
   }
 
   /**
