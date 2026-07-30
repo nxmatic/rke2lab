@@ -19,6 +19,14 @@
       "cdk8s-cli": {
         "pkg-path": "cdk8s-cli"
       },
+      "ceph-client": {
+        "pkg-path": "ceph-client",
+        "pkg-group": "k8s-kubectl-tools",
+        "systems": [
+          "aarch64-linux"
+        ],
+        "outputs": "all"
+      },
       "cilium-cli": {
         "pkg-path": "cilium-cli",
         "pkg-group": "k8s-kubectl-tools",
@@ -161,9 +169,6 @@
       "maven": {
         "flake": "github:nxmatic/rke2lab#maven"
       },
-      "moreutils": {
-        "pkg-path": "moreutils"
-      },
       "openssh": {
         "pkg-path": "openssh",
         "pkg-group": "keyhole",
@@ -192,17 +197,11 @@
       "pulumictl": {
         "pkg-path": "pulumictl"
       },
-      "screen": {
-        "pkg-path": "screen"
-      },
       "shellcheck": {
         "flake": "github:nxmatic/rke2lab#shellcheck"
       },
       "shfmt": {
         "flake": "github:nxmatic/rke2lab#shfmt"
-      },
-      "socat": {
-        "pkg-path": "socat"
       },
       "sops": {
         "pkg-path": "sops",
@@ -239,7 +238,7 @@
       "on-activate": "    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n      if [ -n \"${remote}\" ]; then\n        remote_host=\"github.com\"\n        case \"${remote}\" in\n          git@*:* )\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'@' -f 2 | cut -d':' -f 1)\n            ;;\n          http://*|https://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3)\n            ;;\n          ssh://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3 | cut -d':' -f 1)\n            ;;\n        esac\n    \n        if [ -n \"${GH_TOKEN:-}\" ] && ! gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          echo \"Detected GH_TOKEN, logging in gh for ${remote_host}...\" >&2\n          printf '%s' \"${GH_TOKEN}\" | gh auth login --with-token --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n    \n        if gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          gh auth setup-git --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n      fi\n    fi\n  \n    mkdir -p \"$PULUMI_HOME\"\n  \n  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p \"${FLOX_ENV_PROJECT}/.pulumi-state\"\n  if command -v javac >/dev/null 2>&1; then\n    export JAVA_HOME=\"$(dirname \"$(dirname \"$(command -v javac)\")\")\"\n  fi\n  if command -v gh >/dev/null 2>&1 && [ -z \"${GH_TOKEN:-}\" ]; then\n    GH_TOKEN=\"$(gh auth token 2>/dev/null)\" && export GH_TOKEN\n  fi\n"
     },
     "profile": {
-      "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.ssh/keys.d/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  \n    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      gh_login=\"\"\n      if [ -n \"${GH_TOKEN:-}\" ]; then\n        gh_login=$(gh api user --jq '.login' 2>/dev/null || true)\n      elif command -v pass >/dev/null 2>&1; then\n        gh_secret=$(pass show coding/github@work 2>/dev/null | head -n 1 || true)\n        if [ -n \"${gh_secret}\" ]; then\n          gh_login=$(env GH_TOKEN=\"${gh_secret}\" gh api user --jq '.login' 2>/dev/null || true)\n        fi\n      fi\n      if [ -n \"${gh_login}\" ]; then\n        remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n        if [ -n \"${remote}\" ]; then\n          owner=$(printf '%s' \"${remote}\" | cut -d'/' -f 4)\n          repo_name=$(printf '%s' \"${remote}\" | cut -d'/' -f 5 | cut -d'.' -f 1)\n          export GITHUB_LOGIN=\"${gh_login}\"\n          export GITHUB_OWNER=\"${owner}\"\n          export GITHUB_REPOSITORY=\"${owner}/${repo_name}\"\n        fi\n      fi\n    fi\n  \n    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.ssh/keys.d/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  "
+      "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.local/share/ndh/ssh-keys/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  \n    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      gh_login=\"\"\n      if [ -n \"${GH_TOKEN:-}\" ]; then\n        gh_login=$(gh api user --jq '.login' 2>/dev/null || true)\n      elif command -v pass >/dev/null 2>&1; then\n        gh_secret=$(pass show coding/github@work 2>/dev/null | head -n 1 || true)\n        if [ -n \"${gh_secret}\" ]; then\n          gh_login=$(env GH_TOKEN=\"${gh_secret}\" gh api user --jq '.login' 2>/dev/null || true)\n        fi\n      fi\n      if [ -n \"${gh_login}\" ]; then\n        remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n        if [ -n \"${remote}\" ]; then\n          owner=$(printf '%s' \"${remote}\" | cut -d'/' -f 4)\n          repo_name=$(printf '%s' \"${remote}\" | cut -d'/' -f 5 | cut -d'.' -f 1)\n          export GITHUB_LOGIN=\"${gh_login}\"\n          export GITHUB_OWNER=\"${owner}\"\n          export GITHUB_REPOSITORY=\"${owner}/${repo_name}\"\n        fi\n      fi\n    fi\n  \n    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.local/share/ndh/ssh-keys/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  "
     },
     "options": {
       "systems": [
@@ -1127,6 +1126,42 @@
       "priority": 5
     },
     {
+      "attr_path": "ceph-client",
+      "broken": false,
+      "derivation": "/nix/store/j15lpvr89g4lz6p9p2jyfy4iardjxqpl-ceph-20.2.2.drv",
+      "description": "Distributed storage system",
+      "install_id": "ceph-client",
+      "license": "[ LGPL-2.1, GPL-2.0-only, BSD-3-Clause, MIT, Public Domain ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=241313f4e8e508cb9b13278c2b0fa25b9ca27163",
+      "name": "ceph-20.2.2",
+      "pname": "ceph-client",
+      "rev": "241313f4e8e508cb9b13278c2b0fa25b9ca27163",
+      "rev_count": 1037713,
+      "rev_date": "2026-07-19T21:52:44Z",
+      "scrape_date": "2026-07-21T05:24:20.294823Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "20.2.2",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "client": "/nix/store/iidnss3z2vw94s0sz3ixqrsva3xlplb4-ceph-20.2.2-client",
+        "dev": "/nix/store/lljqc9gq97wddxn2cd6dbn30fknzyqkx-ceph-20.2.2-dev",
+        "doc": "/nix/store/6i374laj4rc9dig3d2y11ddv3yialmfc-ceph-20.2.2-doc",
+        "lib": "/nix/store/vppk2qbm359hcq6fj4a792k7l4likgzr-ceph-20.2.2-lib",
+        "man": "/nix/store/9bjpzshdvz90im3x6kxfx97sav4ahamg-ceph-20.2.2-man",
+        "out": "/nix/store/4cr4mp9r5d16m8dnrfifiilfir47n70j-ceph-20.2.2"
+      },
+      "system": "aarch64-linux",
+      "group": "k8s-kubectl-tools",
+      "priority": 5
+    },
+    {
       "attr_path": "cilium-cli",
       "broken": false,
       "derivation": "/nix/store/2l7pn6m9f3icldl3x69bpmkmrk4y8q8c-cilium-cli-0.19.6.drv",
@@ -1141,6 +1176,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:53:56.051273Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1170,6 +1206,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:24:20.452718Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1199,6 +1236,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:53:56.832977Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1228,6 +1266,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:24:21.551483Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1257,6 +1296,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:54:12.393560Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1286,6 +1326,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:24:41.027455Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1315,6 +1356,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:54:14.774292Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1344,6 +1386,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:24:45.529273Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1373,6 +1416,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:54:14.817448Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1405,6 +1449,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:24:45.612285Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1437,6 +1482,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:54:14.871348Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1466,6 +1512,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:24:45.679341Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1495,6 +1542,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T04:56:22.372808Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1524,6 +1572,7 @@
       "rev_date": "2026-07-19T21:52:44Z",
       "scrape_date": "2026-07-21T05:27:44.889689Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2484,64 +2533,6 @@
       "priority": 5
     },
     {
-      "attr_path": "moreutils",
-      "broken": false,
-      "derivation": "/nix/store/c3fzwq6ggzpmk82j6gl1pwrcwa1jbgh6-moreutils-0.70.drv",
-      "description": "Growing collection of the unix tools that nobody thought to write long ago when unix was young",
-      "install_id": "moreutils",
-      "license": "GPL-2.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "moreutils-0.70",
-      "pname": "moreutils",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:42:26.174888Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "0.70",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/xh01gzaar4mkpqahyzdbfl1www9b6rnl-moreutils-0.70"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "moreutils",
-      "broken": false,
-      "derivation": "/nix/store/gg1z9ikw5vfn8i8xns4k72ax5ay3fg3b-moreutils-0.70.drv",
-      "description": "Growing collection of the unix tools that nobody thought to write long ago when unix was young",
-      "install_id": "moreutils",
-      "license": "GPL-2.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "moreutils-0.70",
-      "pname": "moreutils",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:15:16.157402Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "0.70",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/prjv3nagmjqnns2nimn5fw1ahxs3sy93-moreutils-0.70"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
       "attr_path": "pstree",
       "broken": false,
       "derivation": "/nix/store/h6rk2knq4w1pdygflxj3pn2shcv10zrj-pstree-2.39.drv",
@@ -2710,129 +2701,6 @@
       ],
       "outputs": {
         "out": "/nix/store/r8hsk6pgzlwh8m89prhyndcx9li69akc-pulumictl-0.0.50"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "screen",
-      "broken": false,
-      "derivation": "/nix/store/xsjsr7y3yf6sfmbpzchpb4pahrw7srz0-screen-5.0.1.drv",
-      "description": "Window manager that multiplexes a physical terminal",
-      "install_id": "screen",
-      "license": "GPL-3.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "screen-5.0.1",
-      "pname": "screen",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:43:49.665166Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "5.0.1",
-      "outputs_to_install": [
-        "man",
-        "out"
-      ],
-      "outputs": {
-        "info": "/nix/store/m9n26x3bznrdadrf4jvsa9cbhkmkfv7a-screen-5.0.1-info",
-        "man": "/nix/store/aqd3k8hpqj1c1b0985jibzjnsyfj9gna-screen-5.0.1-man",
-        "out": "/nix/store/i2n1rhjx5g9231dgk8vqh66ym9k7ldl7-screen-5.0.1"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "screen",
-      "broken": false,
-      "derivation": "/nix/store/lv90583p4pch0xx7il6lnsbcq7b8ii7y-screen-5.0.1.drv",
-      "description": "Window manager that multiplexes a physical terminal",
-      "install_id": "screen",
-      "license": "GPL-3.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "screen-5.0.1",
-      "pname": "screen",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:17:08.999257Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "5.0.1",
-      "outputs_to_install": [
-        "man",
-        "out"
-      ],
-      "outputs": {
-        "info": "/nix/store/ji2zqs72g67z97rpypff2rdfp4c6qy7l-screen-5.0.1-info",
-        "man": "/nix/store/gw6rvjc8nfv3028b66nzjq6ylkks9vz8-screen-5.0.1-man",
-        "out": "/nix/store/jvmffdl6hxnb47nyr011rafxdj4b7p11-screen-5.0.1"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "socat",
-      "broken": false,
-      "derivation": "/nix/store/7diabxg5nw9f68agjv8z0mhgh39f3daz-socat-1.8.1.0.drv",
-      "description": "Utility for bidirectional data transfer between two independent data channels",
-      "install_id": "socat",
-      "license": "[ GPL-2.0-only ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "socat-1.8.1.0",
-      "pname": "socat",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:43:51.248630Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "1.8.1.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/8r963pw2crzva75hlcgk2f2z09jkqjvq-socat-1.8.1.0"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "socat",
-      "broken": false,
-      "derivation": "/nix/store/d5zci3x70in5vkgbkfwqpg3kh23fkrcc-socat-1.8.1.0.drv",
-      "description": "Utility for bidirectional data transfer between two independent data channels",
-      "install_id": "socat",
-      "license": "[ GPL-2.0-only ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "socat-1.8.1.0",
-      "pname": "socat",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:17:11.573237Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "1.8.1.0",
-      "outputs_to_install": [
-        "out",
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/abfalbis8ppi4w9id1i3h80mzhbxq0kc-socat-1.8.1.0"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -3410,7 +3278,7 @@
             "on-activate": "    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n      if [ -n \"${remote}\" ]; then\n        remote_host=\"github.com\"\n        case \"${remote}\" in\n          git@*:* )\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'@' -f 2 | cut -d':' -f 1)\n            ;;\n          http://*|https://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3)\n            ;;\n          ssh://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3 | cut -d':' -f 1)\n            ;;\n        esac\n    \n        if [ -n \"${GH_TOKEN:-}\" ] && ! gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          echo \"Detected GH_TOKEN, logging in gh for ${remote_host}...\" >&2\n          printf '%s' \"${GH_TOKEN}\" | gh auth login --with-token --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n    \n        if gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          gh auth setup-git --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n      fi\n    fi\n  "
           },
           "profile": {
-            "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.ssh/keys.d/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  \n    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      gh_login=\"\"\n      if [ -n \"${GH_TOKEN:-}\" ]; then\n        gh_login=$(gh api user --jq '.login' 2>/dev/null || true)\n      elif command -v pass >/dev/null 2>&1; then\n        gh_secret=$(pass show coding/github@work 2>/dev/null | head -n 1 || true)\n        if [ -n \"${gh_secret}\" ]; then\n          gh_login=$(env GH_TOKEN=\"${gh_secret}\" gh api user --jq '.login' 2>/dev/null || true)\n        fi\n      fi\n      if [ -n \"${gh_login}\" ]; then\n        remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n        if [ -n \"${remote}\" ]; then\n          owner=$(printf '%s' \"${remote}\" | cut -d'/' -f 4)\n          repo_name=$(printf '%s' \"${remote}\" | cut -d'/' -f 5 | cut -d'.' -f 1)\n          export GITHUB_LOGIN=\"${gh_login}\"\n          export GITHUB_OWNER=\"${owner}\"\n          export GITHUB_REPOSITORY=\"${owner}/${repo_name}\"\n        fi\n      fi\n    fi\n  "
+            "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.local/share/ndh/ssh-keys/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  \n    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      gh_login=\"\"\n      if [ -n \"${GH_TOKEN:-}\" ]; then\n        gh_login=$(gh api user --jq '.login' 2>/dev/null || true)\n      elif command -v pass >/dev/null 2>&1; then\n        gh_secret=$(pass show coding/github@work 2>/dev/null | head -n 1 || true)\n        if [ -n \"${gh_secret}\" ]; then\n          gh_login=$(env GH_TOKEN=\"${gh_secret}\" gh api user --jq '.login' 2>/dev/null || true)\n        fi\n      fi\n      if [ -n \"${gh_login}\" ]; then\n        remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n        if [ -n \"${remote}\" ]; then\n          owner=$(printf '%s' \"${remote}\" | cut -d'/' -f 4)\n          repo_name=$(printf '%s' \"${remote}\" | cut -d'/' -f 5 | cut -d'.' -f 1)\n          export GITHUB_LOGIN=\"${gh_login}\"\n          export GITHUB_OWNER=\"${owner}\"\n          export GITHUB_REPOSITORY=\"${owner}/${repo_name}\"\n        fi\n      fi\n    fi\n  "
           },
           "options": {}
         },
@@ -3423,6 +3291,14 @@
         "manifest": {
           "schema-version": "1.10.0",
           "install": {
+            "ceph-client": {
+              "pkg-path": "ceph-client",
+              "pkg-group": "k8s-kubectl-tools",
+              "systems": [
+                "aarch64-linux"
+              ],
+              "outputs": "all"
+            },
             "cilium-cli": {
               "pkg-path": "cilium-cli",
               "pkg-group": "k8s-kubectl-tools",
@@ -3544,43 +3420,51 @@
       },
       {
         "manifest": {
-          "version": 1,
+          "schema-version": "1.12.0",
           "install": {
             "age": {
               "pkg-path": "age",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "gnupg": {
               "pkg-path": "gnupg",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "keychain": {
               "pkg-path": "keychain",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "openssh": {
               "pkg-path": "openssh",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "openssl": {
               "pkg-path": "openssl",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "pass": {
               "pkg-path": "pass",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "sops": {
               "pkg-path": "sops",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             },
             "ssh-to-age": {
               "pkg-path": "ssh-to-age",
-              "pkg-group": "keyhole"
+              "pkg-group": "keyhole",
+              "outputs": "all"
             }
           },
           "profile": {
-            "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.ssh/keys.d/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  "
+            "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.local/share/ndh/ssh-keys/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  "
           },
           "options": {}
         },
@@ -3623,14 +3507,8 @@
               "pkg-path": "bash",
               "outputs": "all"
             },
-            "moreutils": {
-              "pkg-path": "moreutils"
-            },
             "pstree": {
               "pkg-path": "pstree"
-            },
-            "screen": {
-              "pkg-path": "screen"
             },
             "shellcheck": {
               "pkg-path": "shellcheck",
@@ -3638,9 +3516,6 @@
             },
             "shfmt": {
               "pkg-path": "shfmt"
-            },
-            "socat": {
-              "pkg-path": "socat"
             },
             "zsh": {
               "pkg-path": "zsh",
