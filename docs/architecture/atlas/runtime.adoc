@@ -55,6 +55,9 @@ flowchart TB
 The packaging split (5 embedded bundles vs the flat host world), the boot sequence, and the logging
 chain each have their own C4 figure in the R4 spec —
 `wip/specs/2026-06-20-osgi-runtime-r4-boot-seam-design.adoc` (§3, §4, §7) — not duplicated here.
+The logging chain's CURRENT realisation — the one logback context configured in Java via the
+`pax-logback-config` fragment, and how each exec keeps its stdout the product — is detailed in
+link:../osgi/runtime-logging-and-clean-output.adoc[Runtime logging & clean exec output].
 
 === The model
 
