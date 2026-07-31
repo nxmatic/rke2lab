@@ -142,7 +142,7 @@ class BootstrapHostAssetMaterializerTest {
     final BootstrapPaths paths = pathsUnder(tempDir);
     final HostAssetEntry entry =
         HostAssetEntry.file(
-            ".configmap-env-section.yml",
+            ".configmap-env-section-core.yml",
             configMap(
                 "rke2lab-env",
                 """

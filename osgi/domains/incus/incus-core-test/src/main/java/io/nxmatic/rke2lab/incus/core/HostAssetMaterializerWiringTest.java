@@ -78,8 +78,13 @@ class HostAssetMaterializerWiringTest {
               networkData: |
                 version: 2
             """));
+    // A hidden env-section dotfile named exactly as the provider discovers them
+    // (.configmap-env-section-<name>.yml — the trailing hyphen distinguishes a section from the
+    // sibling .configmap-*.group.yml inventory marker), mirroring the synthesis and
+    // manifests-core's own HostAssetProviderContributionTest. A name without the hyphen is NOT an
+    // env section, so the provider would contribute nothing and no shell file would land.
     write(
-        synth.resolve("runtime/env-config/.configmap-env-section.yml"),
+        synth.resolve("runtime/env-config/.configmap-env-section-core.yml"),
         configMap(
             "rke2lab-env",
             """
