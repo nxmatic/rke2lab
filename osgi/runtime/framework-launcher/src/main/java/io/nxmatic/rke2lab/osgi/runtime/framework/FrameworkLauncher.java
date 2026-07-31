@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.osgi.boot.discovery.BundleInstaller;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.logging.FelixJulLogger;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -88,6 +89,9 @@ public final class FrameworkLauncher {
       if (assertScr) {
         assertScrActive(framework);
       }
+      if (plan.paxPresent()) {
+        applyPaxLogbackPolicy(framework);
+      }
       LOG.info(
           "OSGi runtime booted: {} bundle(s) installed and started", plan.installables().size());
       return new BootedFramework(framework);
@@ -136,12 +140,13 @@ public final class FrameworkLauncher {
     if (plan.paxPresent()) {
       // pax-logging-logback is the single sink (it drains the JDK JUL bus via its JdkHandler).
       // Point
-      // it at a console-free FILE-only logback config — GENERATED here, not a checked-in resource —
-      // via StaticLogbackFile, so pax configures from it instead of its BasicConfigurator default
-      // (a
-      // ConsoleAppender whose native stdout write wedges the boot under a remote debugger). And
-      // drain
-      // framework/bundle/service events at WARN into the LogService.
+      // it at a MINIMAL, console-free FILE-only bootstrap config via StaticLogbackFile, so pax
+      // configures from it — the FILE appender + root only — instead of its BasicConfigurator
+      // default (a ConsoleAppender whose native stdout write wedges the boot under a remote
+      // debugger). The noise-suppression POLICY (the per-tree levels) is applied AFTER start by the
+      // pax-logback-config fragment's PaxLogbackConfigurer, in Java — see applyPaxLogbackPolicy.
+      // And
+      // drain framework/bundle/service events at WARN into the LogService.
       config.put("org.ops4j.pax.logging.StaticLogbackFile", writePaxLogbackConfig().toString());
       config.put("org.ops4j.pax.logging.service.frameworkEventsLogLevel", "WARN");
       // pax's fallback logger (used before Config Admin — which we do not install — and while it
@@ -164,11 +169,45 @@ public final class FrameworkLauncher {
   }
 
   /**
-   * Generate the console-free, FILE-only logback config pax-logging-logback loads via {@code
-   * StaticLogbackFile}, and write it to a temp file (pax's only external-config channel is {@code
-   * JoranConfigurator.doConfigure(File)} — it takes a file, not an object). The config is
-   * hard-coded HERE, not a checked-in {@code logback.xml}, so there is one source and nothing to
-   * misplace. The file and root level come from {@link LaunchConfig} FIELDS ({@link
+   * Hand pax-logging-logback's live logback context the Java-coded policy carried by the {@code
+   * pax-logback-config} FRAGMENT (its {@code PaxLogbackConfigurer}). The flat host cannot reach
+   * logback — pax embeds it and exports no package — so we cross the realm seam the only way there
+   * is: load the fragment's configurer THROUGH the pax bundle's own classloader (where it resolves
+   * against pax's embedded logback) and invoke it reflectively. Runs after {@code
+   * framework.start()} returns: pax is ACTIVE and its minimal bootstrap XML already applied, so
+   * this policy is the last word on the context. A failure here must not fell the boot — it
+   * degrades to a WARN, leaving pax's bootstrap config in force.
+   */
+  private void applyPaxLogbackPolicy(Framework framework) {
+    final String rootLevel =
+        config().frameworkLogLevel().map(LaunchConfig::logbackLevelOf).orElse("INFO");
+    for (Bundle bundle : framework.getBundleContext().getBundles()) {
+      if (!BootStackJar.PAX_LOGGING_LOGBACK.symbolicName().equals(bundle.getSymbolicName())) {
+        continue;
+      }
+      try {
+        bundle
+            .loadClass("io.nxmatic.rke2lab.osgi.runtime.logback.PaxLogbackConfigurer")
+            .getMethod("configure", Bundle.class, String.class)
+            .invoke(null, bundle, rootLevel);
+      } catch (InvocationTargetException ex) {
+        LOG.warn("pax logback policy not applied", ex.getCause());
+      } catch (ReflectiveOperationException | LinkageError ex) {
+        LOG.warn("pax logback policy not applied", ex);
+      }
+      return;
+    }
+    LOG.warn("pax-logging-logback not found among installed bundles; logback policy not applied");
+  }
+
+  /**
+   * Write the MINIMAL console-free bootstrap logback config pax-logging-logback loads via {@code
+   * StaticLogbackFile} (pax's only external-config channel is {@code
+   * JoranConfigurator.doConfigure(File)} — it takes a file, not an object). Deliberately just the
+   * FILE appender + root: it exists only to keep pax off its ConsoleAppender default during boot
+   * (before {@link #applyPaxLogbackPolicy} runs); the per-tree noise-suppression policy lives in
+   * Java, in the {@code pax-logback-config} fragment's {@code PaxLogbackConfigurer}, applied right
+   * after start. The file and root level come from {@link LaunchConfig} FIELDS ({@link
    * LaunchConfig#logFile} and {@link LaunchConfig#frameworkLogLevel} — the same knob that drives
    * {@code felix.log.level}, Plane A), baked straight in: no system property, and the launcher
    * stays ignorant of the host/Pulumi. This is the ONE logback in the process: it drains the JDK
@@ -189,12 +228,6 @@ public final class FrameworkLauncher {
               <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
             </encoder>
           </appender>
-          <logger name="io.netty" level="ERROR"/>
-          <logger name="io.grpc.netty" level="ERROR"/>
-          <logger name="io.netty.util.internal" level="ERROR"/>
-          <logger name="io.netty.buffer" level="ERROR"/>
-          <logger name="org.apache.http" level="WARN"/>
-          <logger name="org.apache.http.wire" level="ERROR"/>
           <root level="__ROOT_LEVEL__">
             <appender-ref ref="FILE"/>
           </root>

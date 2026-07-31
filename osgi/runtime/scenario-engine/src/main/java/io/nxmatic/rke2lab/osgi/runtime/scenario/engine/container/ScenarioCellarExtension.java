@@ -32,7 +32,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * its own bundle registry ({@code ScenarioRegistry}) — the route it used before the cellar was
  * injected.
  */
-public final class ScenarioCellarExtension
+public class ScenarioCellarExtension
     implements BeforeTestExecutionCallback, AfterTestExecutionCallback {
 
   /** How long the drain waits for the durable cellar to be resolvable in the registry. */

@@ -297,6 +297,14 @@
       <artifactId>seed-broker-runtime</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The pax-logging-logback fragment (embed type=model) carrying the logback policy in Java. On
+         the graph so the staging closure stages it under META-INF/bundles; at boot it attaches to
+         pax-logging-logback and the launcher invokes its PaxLogbackConfigurer reflectively. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pax-logback-config</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>com.google.code.findbugs</groupId>
       <artifactId>jsr305</artifactId>

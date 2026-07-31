@@ -63,8 +63,8 @@ import org.osgi.framework.ServiceRegistration;
  *
  * <p>No seam, no system-export: because the fragment shares the bundle's classloader, the mock this
  * passenger registers is the same {@code Class} the scenario reads. The {@code
- * BboxReconciliationScenarioInContainerTest} shape applied to the incus scenario play — it reads
- * the LIVE outcome (same in-container worker), no JSON round-trip.
+ * BboxReconciationScenarioInContainerTest} shape applied to the incus scenario play — it reads the
+ * LIVE outcome (same in-container worker), no JSON round-trip.
  */
 public class IncusProvisionScenarioInContainerTest {
 
