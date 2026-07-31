@@ -6,6 +6,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.cli.bdd.ManifestsCliRun;
 import io.nxmatic.rke2lab.manifests.cli.bdd.ManifestsCliScenario;
 import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.LogFileSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRoleSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
@@ -202,7 +203,8 @@ public final class Main {
                     ManifestsCliScenario.SEED
                         .into(run)
                         .andThen(RunRoleSeed.into(RunRole.ROOT))
-                        .andThen(TxIdSeed.into(txId)));
+                        .andThen(TxIdSeed.into(txId))
+                        .andThen(LogFileSeed.into(".local.d/manifests-cli.log")));
         final List<?> broken =
             runbook.getScenariosWithStatus(ExecutionStatus.FAILED, ExecutionStatus.ABORTED);
         if (!broken.isEmpty()) {

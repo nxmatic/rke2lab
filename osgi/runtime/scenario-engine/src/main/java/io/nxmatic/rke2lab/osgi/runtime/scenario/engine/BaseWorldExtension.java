@@ -45,10 +45,9 @@ public abstract class BaseWorldExtension
 
     OsgiConnection connection = store.get(CONNECTION, OsgiConnection.class);
     if (connection == null) {
-      connection =
-          LogLevelSeed.read(context)
-              .map(OsgiConnection::embedded)
-              .orElseGet(OsgiConnection::embedded);
+      // The two boot knobs the launcher may have seeded: the framework log LEVEL and its FILE. Both
+      // absent (the socle's own tests, an operator who set neither) ⇒ the Felix defaults.
+      connection = OsgiConnection.embedded(LogLevelSeed.read(context), LogFileSeed.read(context));
       store.put(CONNECTION, connection);
     }
 

@@ -125,13 +125,20 @@ public interface OsgiConnection extends AutoCloseable {
   }
 
   /**
-   * As {@link #embedded()}, but raise the framework's own log verbosity to {@code
-   * frameworkLogLevel} — the operator's {@code logging:level} knob threaded to the live boot so a
-   * failed resolve explains WHICH requirement could not be wired (the only place it does). Empty
-   * knob ⇒ callers use the no-arg form and get the Felix default.
+   * As {@link #embedded()}, but with the boot's two operator knobs threaded from the launcher: the
+   * framework's own log verbosity ({@code level} — the {@code logging:level} knob, so a failed
+   * resolve explains WHICH requirement could not be wired) and the boot log's file ({@code logFile}
+   * — so each exec keeps its own trace instead of a shared {@code seed-master.log}). Either empty ⇒
+   * the Felix default for that knob. The one entry point {@code BaseWorldExtension} boots through.
    */
-  static OsgiConnection embedded(LogLevel frameworkLogLevel) {
-    final BootedFramework booted = FrameworkLaunch.embedded(frameworkLogLevel).launch();
+  static OsgiConnection embedded(Optional<LogLevel> level, Optional<String> logFile) {
+    final FrameworkLaunch.Embedded preset =
+        level.isPresent()
+            ? logFile
+                .map(file -> FrameworkLaunch.embedded(level.get(), file))
+                .orElseGet(() -> FrameworkLaunch.embedded(level.get()))
+            : logFile.map(FrameworkLaunch::embedded).orElseGet(FrameworkLaunch::embedded);
+    final BootedFramework booted = preset.launch();
     return over(booted.context(), true, booted::close);
   }
 

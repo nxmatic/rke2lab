@@ -36,7 +36,7 @@ public final class FrameworkLaunch {
    * (a packaging defect, not a degraded run mode). The shape every entrypoint uses.
    */
   public static Embedded embedded() {
-    return new Embedded(Optional.empty());
+    return new Embedded(Optional.empty(), Optional.empty());
   }
 
   /**
@@ -46,16 +46,33 @@ public final class FrameworkLaunch {
    * #embedded()}).
    */
   public static Embedded embedded(LogLevel frameworkLogLevel) {
-    return new Embedded(Optional.of(frameworkLogLevel));
+    return new Embedded(Optional.of(frameworkLogLevel), Optional.empty());
+  }
+
+  /**
+   * The prod preset writing the framework log to {@code logFile} instead of the shared {@link
+   * LaunchConfig#DEFAULT_LOG_FILE} — so each exec-jar keeps its own boot trace ({@code
+   * manifests-cli.log}, {@code netplan-cli.log}), never a single {@code seed-master.log} they all
+   * clobber. The name is the whole relative path the caller chooses.
+   */
+  public static Embedded embedded(String logFile) {
+    return new Embedded(Optional.empty(), Optional.of(logFile));
+  }
+
+  /** The prod preset with BOTH a chosen framework {@link LogLevel} and its own {@code logFile}. */
+  public static Embedded embedded(LogLevel frameworkLogLevel, String logFile) {
+    return new Embedded(Optional.of(frameworkLogLevel), Optional.of(logFile));
   }
 
   /** The boot preset over the fixed embedded topology; {@link #launch()} hands the world out. */
   public static final class Embedded {
 
     private final Optional<LogLevel> frameworkLogLevel;
+    private final Optional<String> logFile;
 
-    private Embedded(Optional<LogLevel> frameworkLogLevel) {
+    private Embedded(Optional<LogLevel> frameworkLogLevel, Optional<String> logFile) {
       this.frameworkLogLevel = frameworkLogLevel;
+      this.logFile = logFile;
     }
 
     /**
@@ -83,6 +100,9 @@ public final class FrameworkLaunch {
           LaunchConfig.defaults().withBootDelegation(LaunchConfig.SCENARIO_PLAY_BOOT_DELEGATION);
       if (frameworkLogLevel.isPresent()) {
         config = config.withFrameworkLogLevel(frameworkLogLevel.get());
+      }
+      if (logFile.isPresent()) {
+        config = config.withLogFile(logFile.get());
       }
       return new FrameworkLauncher(config).launch(plan, true);
     }
