@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.netplan.cli;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import inet.ipaddr.IPAddressString;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -52,13 +53,28 @@ public class BlueprintExportCommand implements NetplanCli.Command {
 
   record NodeMacs(String lan, String wan, String lanBridge) {}
 
-  record NodeIPs(String lanHost, String nodeHost, String lanGateway, String nodeGateway) {}
+  record NodeIPs(
+      String lanHost,
+      String nodeHost,
+      String lanGateway,
+      String nodeGateway,
+      String lanHost6,
+      String nodeHost6,
+      String lanGateway6,
+      String nodeGateway6,
+      String lanCidr6,
+      String nodeCidr6) {}
 
   record NodeLeases(LanLease lan, WanLease wan) {}
 
   record LanLease(String mac, String ip, String cidr) {}
 
   record WanLease(String mac, String dhcpRange) {}
+
+  /** Format a v6 address in IPv4-embedded mixed notation (fd..:CCRR::a.b.c.d) for readability. */
+  private static String mixed(java.net.InetAddress v6) {
+    return new IPAddressString(v6.getHostAddress()).getAddress().toIPv6().toMixedString();
+  }
 
   @Override
   public void execute(String[] args) throws Exception {
@@ -107,13 +123,19 @@ public class BlueprintExportCommand implements NetplanCli.Command {
                 bp.wan().hostMacaddr().value(),
                 bp.lan().bridgeMacaddr().value());
 
-        // IPs
+        // IPs (v4 + the ULA v6 mirror, hosts in IPv4-embedded mixed notation)
         NodeIPs ips =
             new NodeIPs(
                 bp.lan().hostInetaddr().getHostAddress(),
                 bp.nodeNetwork().nodeHostInetaddr().getHostAddress(),
                 bp.lan().gatewayInetaddr().getHostAddress(),
-                bp.nodeNetwork().nodeGatewayInetaddr().getHostAddress());
+                bp.nodeNetwork().nodeGatewayInetaddr().getHostAddress(),
+                mixed(bp.lan().hostInetaddr6()),
+                mixed(bp.nodeNetwork().nodeHostInetaddr6()),
+                mixed(bp.lan().gatewayInetaddr6()),
+                mixed(bp.nodeNetwork().nodeGatewayInetaddr6()),
+                bp.lan().nodeCidr6().toString(),
+                bp.nodeNetwork().nodeCidr6().toString());
 
         // Leases (MAC → IP mappings for DHCP)
         LanLease lanLease =

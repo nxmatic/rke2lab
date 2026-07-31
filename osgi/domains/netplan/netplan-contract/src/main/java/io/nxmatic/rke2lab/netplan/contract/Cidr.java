@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.netplan.contract;
 
+import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
-import inet.ipaddr.ipv4.IPv4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
@@ -24,18 +24,15 @@ public record Cidr(InetAddress networkAddress, int prefixLength) {
       throw new IllegalArgumentException("CIDR prefix is required: " + value);
     }
 
-    if (!addressString.getAddress().isIPv4()) {
+    final IPAddress address = addressString.getAddress();
+    final Integer prefix = address.getNetworkPrefixLength();
+    final int maxPrefix = address.isIPv4() ? 32 : 128;
+    if (prefix == null || prefix < 0 || prefix > maxPrefix) {
       throw new IllegalArgumentException(
-          "Only IPv4 CIDRs are supported for netplan stage: " + value);
+          "CIDR prefix out of range (0.." + maxPrefix + "): " + value);
     }
 
-    final IPv4Address ipv4Address = addressString.getAddress().toIPv4();
-    final Integer prefix = ipv4Address.getNetworkPrefixLength();
-    if (prefix == null || prefix < 0 || prefix > 32) {
-      throw new IllegalArgumentException("CIDR prefix out of range (0..32): " + value);
-    }
-
-    return new Cidr(ipv4Address.toInetAddress(), prefix);
+    return new Cidr(address.toInetAddress(), prefix);
   }
 
   /**
@@ -47,7 +44,6 @@ public record Cidr(InetAddress networkAddress, int prefixLength) {
   public InetAddress host(int offset) {
     return new IPAddressString(networkAddress.getHostAddress())
         .getAddress()
-        .toIPv4()
         .increment(offset)
         .toInetAddress();
   }
