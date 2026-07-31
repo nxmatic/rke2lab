@@ -13,10 +13,12 @@
   <artifactId>netplan-cli</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <name>exec/netplan-cli</name>
-  <description>Netplan CLI: the executable north-adapter that drives the netplan core
-    (osgi/netplan/netplan-core). The synthesis command boots an embedded Felix from the bundles
-    staged in its -exec jar (the same boot seam as seed-master + manifests-cli) and reads
-    NetplanSynthesisService from the registry; the build-time blueprint export runs flat.</description>
+  <description>Netplan CLI: the executable north-adapter for the blueprint export. The yamlExport
+    verb drives NetplanCliScenario on the embedded JUnit launcher (the same BDD-as-engine machinery
+    seed-master + manifests-cli use), sowing the `netplan` coordinate through the broker; that grows
+    NetplanBlueprintScenario in-container (where ClusterNetworkBlueprint, a type=contract bundle
+    record, is reachable) which writes blueprint.json into a SOIL temp dir. The CLI reads that
+    host-neutral JSON back and converts it to YAML — no contract type crosses to the flat host.</description>
 
   <dependencies>
     <!-- The host-world boot infrastructure: OsgiRuntime + (transitively) the whole boot stack
@@ -27,25 +29,93 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
-    <!-- The seam contract the CLI compiles against, kept flat on the host classpath as the SINGLE
-         exporter of io.nxmatic.rke2lab.netplan.contract (netplan-core imports but does not export it);
-         OsgiRuntime mirrors it onto the system bundle so the embedded netplan-core resolves against
-         this one copy — typed access across the seam. -->
+
+    <!-- BDD-as-engine: the CLI drives NetplanCliScenario on the embedded JUnit launcher, sowing the
+         `netplan` coordinate through the broker instead of referencing a type=contract bundle record
+         flat host-side. Mirrors the manifests-cli dep set. -->
+    <!-- The launcher engine + OSGi connection contract: the host scenario reaches
+         OsgiConnection/SeedRuntime/ScenarioCellar/RunRole/TxIdSeed/LogFileSeed/ScenarioOutcomeSeed. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-contract</artifactId>
+      <artifactId>scenario-engine</artifactId>
     </dependency>
-    <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
-         installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade). runtime
-         scope MACHINE-ENFORCES path 2: the CLI compiles only against -contract + OsgiRuntime, never
-         against a netplan-core impl type — the compiler now forbids the host→impl leak. -->
+    <!-- The neutral launcher core (JUnitLauncherCore) NetplanCli names directly. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-core</artifactId>
+      <artifactId>junit-launcher</artifactId>
+    </dependency>
+    <!-- The common gardening spine consumed FLAT (SeedReceiver, SessionSeed, Gardening.sow,
+         EphemeralCellar). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-bdd</artifactId>
+    </dependency>
+    <!-- The broker seam the host speaks (Amendment roles + Cellar); the ONE host<->OSGi membrane. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <!-- The broker mechanism (embed type=runtime): DefaultSeedBroker + DefaultAmendmentAssembler,
+         staged under META-INF/bundles + published by SCR so the sow resolves the netplan door. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-runtime</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- BlueprintExportCommand serializes the blueprint POJOs to YAML at build time, flat (no Felix):
-         jackson stays a flat host dep, the same as seed-master flattens its non-bundle libs. -->
+    <!-- The netplan SCION bundle (embed type=model): NetplanRunbookHandler + NetplanAmendReflector
+         serve the `netplan` coordinates and grow NetplanBlueprintScenario in-container. Staged INTACT;
+         it pulls netplan-contract into the staged world via its import closure (no flat host copy). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- jGiven-in-OSGi wrap, dual-realm (staged as a bundle AND kept host-flat): the host root
+         scenario is a jGiven ScenarioTest, so jgiven runs FLAT for it and as a BUNDLE for the scion. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>jgiven-wrap</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- jGiven the host scenario compiles against (ScenarioTestBase, Stage, annotations) + its
+         JUnit5 extension + the ReportModel/ExecutionStatus NetplanCli reads the run verdict from. -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+    </dependency>
+    <!-- The Jupiter API + engine are runtime code here: the CLI hands JupiterTestEngine.class to
+         JUnitLauncherCore to play the scenario, and the scenario declares @Test/@RegisterExtension. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
+    <!-- JUnit Platform artifacts the CLI imports DIRECTLY: DiscoverySelectors (platform-engine) to
+         select the scenario, SummaryGeneratingListener (platform-launcher) to read the verdict. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+    </dependency>
+    <!-- junit-jupiter-params staged as a bundle (runtime): jgiven-junit5 imports the params packages
+         MANDATORY in its bytecode, so the wire must resolve in-framework. Same as seed-master. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- The scenario builds the SOIL amendment as a JsonNode, and NetplanCli parses blueprint.json
+         then re-emits it as YAML — jackson-databind + jackson-dataformat-yaml are compile deps. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
@@ -54,6 +124,14 @@
       <groupId>com.fasterxml.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-yaml</artifactId>
     </dependency>
+    <!-- The org.osgi.service.log API (LogLevel): scenario-engine's OsgiConnection exposes it as the
+         framework log-level knob's currency, so the host flat classpath must carry it or the boot
+         hits NoClassDefFoundError. The SLIM spec artifact. Same declaration seed-master carries. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.log</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>

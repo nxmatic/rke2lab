@@ -21,5 +21,6 @@
   <modules>
     <module>netplan-contract</module>
     <module>netplan-core</module>
+    <module>netplan-bdd</module>
   </modules>
 </project>

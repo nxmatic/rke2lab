@@ -23,6 +23,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <!-- The seed-broker seam: NetplanRunbookInput carries @SeedContract("runbook") + @Amendment(SOIL)
+         and NetplanCoordinate holds the Amend/Shape/Runbook meta-coordinates. Like manifests-contract. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.github.seancfoley</groupId>
       <artifactId>ipaddress</artifactId>

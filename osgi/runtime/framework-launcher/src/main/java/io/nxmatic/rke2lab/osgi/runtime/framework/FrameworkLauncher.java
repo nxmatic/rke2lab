@@ -144,6 +144,12 @@ public final class FrameworkLauncher {
       // framework/bundle/service events at WARN into the LogService.
       config.put("org.ops4j.pax.logging.StaticLogbackFile", writePaxLogbackConfig().toString());
       config.put("org.ops4j.pax.logging.service.frameworkEventsLogLevel", "WARN");
+      // pax's fallback logger (used before Config Admin — which we do not install — and while it
+      // applies StaticLogbackFile) echoes logback's Joran config status to the console at INFO
+      // ("Initializing Logback…", "Setting level of logger…"). That noise corrupts a CLI whose
+      // stdout IS the product (netplan-cli's blueprint YAML). Raise the fallback threshold to ERROR
+      // so only genuine boot failures reach the console; the file appender still carries INFO.
+      config.put("org.ops4j.pax.logging.DefaultServiceLog.level", "ERROR");
     }
     // Felix accepts a Map<String,Object> (the logger is an instance); the launch API is
     // String-keyed

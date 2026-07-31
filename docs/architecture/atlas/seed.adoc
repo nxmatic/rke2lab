@@ -240,10 +240,12 @@ build-time safety. It rests on four invariants (above). The orchestration substr
 `ClusterSeedScenario` is the live seed runbook (GIVEN + eight WHENs, closed by the harvest-store
 THEN), `PendingMarkingScenarioExecutor`
 renders preview, and every domain has its scenario (bbox, incus, systemd, cluster, manifests). No
-pipeline remains on the former Topic/State model — it is deleted from the codebase, not coexisting. The
-one orphaned leftover is `netplan-cli` (still referencing the deleted `FrameworkLaunchPipeline` +
-stale `netplan.api`/`netplan.port` packages), a compile-broken exec module to realign onto
-`FrameworkLaunch`, not a live pipeline.
+pipeline remains on the former Topic/State model — it is deleted from the codebase, not coexisting.
+`netplan-cli` was the last orphaned leftover; it is now migrated to the scion model: its blueprint
+export runs in-container as the netplan scion (`netplan-bdd`) and the CLI drives it through the broker
+(see link:../osgi/netplan-bdd-spec.adoc[netplan-bdd-spec]). Both CLI execs (manifests-cli, netplan-cli)
+now DRIVE a host-flat jGiven scenario that sows through the broker — the same BDD-as-engine machinery
+seed-master uses — never a host-resolved typed domain service.
 
 === The go/no-go gate — closed; the socle shipped
 
