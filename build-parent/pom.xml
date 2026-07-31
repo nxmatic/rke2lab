@@ -5,7 +5,8 @@
 
   <groupId>io.nxmatic.rke2lab</groupId>
   <artifactId>build-parent</artifactId>
-  <!-- 0.0.0: a deliberate "release that does not exist" sentinel — a fixed RELEASE coordinate (not a
+  <!-- 0.0.0: a deliberate "release that does not exist" sentinel — a fixed RELEASE coordinate (not
+  a
        SNAPSHOT) so a release child like maven-embed-staging-ext can parent it past the
        no-snapshot-install guard, while the number signals it is never a real published release. -->
   <version>0.0.0</version>
@@ -53,7 +54,8 @@
          single default so no exec module needs a local =false (a child plain property would shadow a
          parent profile, defeating -Pfix-fqn); the m2e/fix-fqn profiles override it. -->
     <rke2lab.staging.skip>false</rke2lab.staging.skip>
-    <!-- NullAway static null-analysis via error-prone (the -Pnullaway opt-in profile below reads the
+    <!-- NullAway static null-analysis via error-prone (the -Pnullaway opt-in profile below reads
+    the
          @NullMarked packages). Confirmed to run on the JDK 25 toolchain with the full javac module
          export/open set the profile passes. -->
     <errorprone.version>2.50.0</errorprone.version>
@@ -104,6 +106,28 @@
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>seed-master</artifactId>
+        <version>${rke2lab.version}</version>
+        <classifier>exec</classifier>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests-cli</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests-cli</artifactId>
+        <version>${rke2lab.version}</version>
+        <classifier>exec</classifier>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>netplan-cli</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>netplan-cli</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
@@ -751,7 +775,8 @@
             <activeRecipes>
               <recipe>org.openrewrite.java.ShortenFullyQualifiedTypeReferences</recipe>
             </activeRecipes>
-            <!-- The Pulumi SDKs are generated code — not ours to govern (their java.lang.String FQNs
+            <!-- The Pulumi SDKs are generated code — not ours to govern (their java.lang.String
+            FQNs
                  are the generator's, not a style slip). package-info.java is excluded too: its
                  @org.jspecify.annotations.NullMarked / @org.osgi…Version FQNs are the DELIBERATE
                  idiom (fully-qualified precisely to avoid an import in an otherwise-empty file), and
@@ -811,7 +836,8 @@
               </rules>
             </configuration>
           </execution>
-          <!-- Reactor jars resolve sibling-to-sibling from target/ via -am; a SNAPSHOT installed into
+          <!-- Reactor jars resolve sibling-to-sibling from target/ via -am; a SNAPSHOT installed
+          into
                ~/.m2 would let a build silently resolve a stale frozen sibling and mask workspace
                incoherence. The install phase is reached only by `mvn install`/`deploy`, never by
                `package`, so this guard is silent on the normal build and fails loudly on a SNAPSHOT
@@ -825,7 +851,9 @@
             <configuration>
               <rules>
                 <requireReleaseVersion>
-                  <message>Reactor SNAPSHOTs must not be installed to ~/.m2 — siblings resolve through the reactor via -am. Only a deliberate RELEASE-versioned baseline jar may be installed.</message>
+                  <message>Reactor SNAPSHOTs must not be installed to ~/.m2 — siblings resolve
+                    through the reactor via -am. Only a deliberate RELEASE-versioned baseline jar
+                    may be installed.</message>
                 </requireReleaseVersion>
               </rules>
             </configuration>
@@ -847,7 +875,10 @@
                   <excludes>
                     <exclude>org.osgi:osgi.cmpn</exclude>
                   </excludes>
-                  <message>org.osgi:osgi.cmpn (the OSGi compendium aggregate) must not reach the dependency graph — it splits the staged DS-API packages. It is excluded from pax-logging in the BOM; if it reappeared, a new transitive path introduced it. Add the matching &lt;exclusion&gt; in bom/pom.xml.</message>
+                  <message>org.osgi:osgi.cmpn (the OSGi compendium aggregate) must not reach the
+                    dependency graph — it splits the staged DS-API packages. It is excluded from
+                    pax-logging in the BOM; if it reappeared, a new transitive path introduced it.
+                    Add the matching &lt;exclusion&gt; in bom/pom.xml.</message>
                 </bannedDependencies>
               </rules>
             </configuration>
@@ -1003,7 +1034,12 @@
                 <arg>-Xlint:-processing</arg>
                 <arg>-XDcompilePolicy=simple</arg>
                 <arg>-XDshould-stop.ifError=FLOW</arg>
-                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -XepExcludedPaths:(.*/src/test/.*)|(.*-test/src/.*)|(.*-testkit/src/.*) -Xep:NullAway:${nullaway.severity} -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:ExcludedFieldAnnotations=com.tngtech.jgiven.annotation.ProvidedScenarioState,com.tngtech.jgiven.annotation.ExpectedScenarioState,com.tngtech.jgiven.annotation.ScenarioState,com.tngtech.jgiven.annotation.ScenarioStage,org.mockito.Mock,org.mockito.InjectMocks,org.mockito.Captor,org.osgi.service.component.annotations.Reference</arg>
+                <!-- Error Prone/NullAway flags live in .mvn/errorprone.flags (@argfile), referenced
+                     absolutely via the reactor root. Keeps this arg a single token: maven-compiler-plugin
+                     3.15.0 splits a multi-line <arg> on newlines, which would orphan the -Xep* flags into
+                     standalone javac args ("invalid flag"). The severity stays inline so Maven can
+                     interpolate -Dnullaway.severity. -->
+                <arg>-Xplugin:ErrorProne @${maven.multiModuleProjectDirectory}/.mvn/errorprone.flags -Xep:NullAway:${nullaway.severity}</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
