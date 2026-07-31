@@ -126,12 +126,20 @@ participate in eval.
 
 == Design: the flake runs the jar (IFD), exposes a flat lib
 
-The blueprint is a *pure output* of the Java: `BlueprintExportCommand` generates
-it from hardcoded cluster/node maps and reads no input file. So there is no
-chicken-and-egg — the jar takes no blueprint in, it emits one. rke2lab's flake
-already builds the jar and runs `yamlExport` to produce the blueprint
-(`networkBlueprintYaml` -> `networkBlueprintData`); we keep that and expose
-`lib.networkBlueprint` for nix-darwin-home to consume.
+The blueprint is a *pure output* of the Java: it is derived from hardcoded
+cluster/node maps and reads no input file. So there is no chicken-and-egg — the jar
+takes no blueprint in, it emits one. rke2lab's flake already builds the jar and runs
+`yamlExport` to produce the blueprint (`networkBlueprintYaml` -> `networkBlueprintData`);
+we keep that and expose `lib.networkBlueprint` for nix-darwin-home to consume.
+
+The generation moved IN-CONTAINER: `ClusterNetworkBlueprint` is a `type=contract`
+bundle record that the flat host cannot reference, so `netplan-cli`'s `yamlExport`
+drives `NetplanCliScenario`, which sows the `netplan` coordinate through the broker
+and grows the `netplan-bdd` scion `NetplanBlueprintScenario` where the blueprint type
+is reachable. The scion writes the metadata as JSON; the CLI reads that host-neutral
+JSON back and renders it to YAML flat. The command (`netplan.jar yamlExport`) and the
+YAML shape are unchanged — only host-neutral JSON crosses the realm boundary (the flat
+`BlueprintExportCommand` was retired; see link:../osgi/netplan-bdd-spec.adoc[netplan-bdd-spec]).
 
 [cols="1,3",options="header"]
 |===
@@ -144,7 +152,7 @@ already builds the jar and runs `yamlExport` to produce the blueprint
 | nix-darwin-home flake input `rke2lab` | consumes `rke2lab.lib.networkBlueprint.deriveMacs`
 |===
 
-The YAML carries the full contract (from `BlueprintExportCommand`): `clusters`,
+The YAML carries the full contract (from `NetplanBlueprintScenario`): `clusters`,
 `nodes`, `macPatterns`, `nodeTypes`, and per-node `addressing` (macs/ips/leases).
 `deriveMacs cluster node` resolves a `{lan, wan}` pair from the cluster/node IDs.
 
@@ -241,5 +249,5 @@ parsed MAC strings, not a darwin derivation.
 
 * link:flake-build-entry-point.adoc[Flake as Build Entry Point] — the broader
   move to store-built, flake-sourced artifacts this complements.
-* link:../netplan/src/main/java/io/nxmatic/rke2lab/netplan/ClusterNetworkBlueprint.java[ClusterNetworkBlueprint.java] — the Java source of truth.
-* link:../netplan/src/main/java/io/nxmatic/rke2lab/netplan/BlueprintExportCommand.java[BlueprintExportCommand.java] — the `yamlExport` generator and the YAML schema.
+* link:../../../osgi/domains/netplan/netplan-contract/src/main/java/io/nxmatic/rke2lab/netplan/contract/ClusterNetworkBlueprint.java[ClusterNetworkBlueprint.java] — the Java source of truth (a `type=contract` bundle record).
+* link:../osgi/netplan-bdd-spec.adoc[netplan-bdd-spec] — the in-container `NetplanBlueprintScenario` that derives the blueprint and the JSON→YAML crossing `netplan-cli`'s `yamlExport` performs.

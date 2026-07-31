@@ -68,12 +68,15 @@ services from the SCR registry. The pieces:
 * *API-extraction* — the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the
   DOMAIN, not the adapter); the host compiles against the port and fails fast at build; each port
   carries its own `@Version`, imported versioned.
-* *The boot seam* — Felix is embedded in the Pulumi callback; the host seam reads services from the
-  registry via `awaitService` (single path, fail-fast); the self-contained exec-jar embeds its bundles
-  intact (the model core + felix.scr/resolver + pax-logging). Proven by `pulumi preview` (full pipeline
-  under Felix, no live deploy). Generalised across all three entrypoints — the two CLIs
-  (`manifests-cli`, `netplan-cli`) boot Felix the same way, and all three demote the model `-core` to
-  `runtime` scope. `netplan.api` moved into `netplan-contract` so the consumed contract is single-exported.
+* *The boot seam* — Felix is embedded in the Pulumi callback; the self-contained exec-jar embeds its
+  bundles intact (the model core + felix.scr/resolver + pax-logging). Proven by `pulumi preview` (full
+  pipeline under Felix, no live deploy). All three entrypoints boot Felix the same way and demote the
+  model `-core` to `runtime` scope. The host↔OSGi seam is `seed.broker.port` alone: every entrypoint
+  (seed-master + both CLIs) DRIVES a jGiven scenario that sows a coordinate through the broker,
+  speaking only JSON — never `awaitService` on a typed domain service (a `type=contract` service
+  registers with the bundle's class copy, so a flat host copy never matches). `netplan.api` moved into
+  `netplan-contract` (single-exported); `netplan-cli`'s `yamlExport` sows `netplan` and grows the
+  `netplan-bdd` scion. See link:seed.adoc[the seed atlas] and link:../osgi/netplan-bdd-spec.adoc[netplan-bdd-spec].
 * *The synthesis grammar + the boot decomposition* — the fluent-pipeline engine was once duplicated as
   seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, briefly unified into a shared
   `pipeline-port` seam, then DISSOLVED: with the boot de-grammatised and the seed's own chains the last
@@ -324,8 +327,10 @@ AND its additivity.
 . *Every entrypoint boots under Felix, the CLIs included* — `[playable]` blue +
 .. GIVEN the two CLIs still flat on `ServiceLoader`
 .. WHEN the CLI alignment generalises the boot seam (manifests-cli + netplan-cli)
-.. THEN every `main()` entrypoint boots embedded Felix and reads its `-port` from the registry — AND
-   `netplan.api` moves into `netplan-contract` so the consumed contract is single-exported.
+.. THEN every `main()` entrypoint boots embedded Felix and DRIVES a jGiven scenario that sows its
+   coordinate through `seed.broker.port` (JSON only, never a typed `awaitService`) — AND `netplan.api`
+   moves into `netplan-contract` so the consumed contract is single-exported, `netplan-cli` growing
+   the `netplan-bdd` scion.
 
 . *One synthesis grammar, internal to manifests-core* — `[playable]` blue +
 .. GIVEN the grammar duplicated as `TopicRunner` + `SynthesisTopicRunner`, briefly shared as `pipeline-port`
