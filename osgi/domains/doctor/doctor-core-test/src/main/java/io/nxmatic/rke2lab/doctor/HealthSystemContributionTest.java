@@ -19,10 +19,10 @@ import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.diagnostic.ScrDiagnostics;
-import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
-import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +35,7 @@ import org.osgi.framework.ServiceReference;
 /**
  * The load-bearing proof of the specialist-distribution increment, run IN-CONTAINER (where the
  * records natively live, so nothing crosses to the host JVM): the test INJECTS a tier-tagged {@link
- * io.nxmatic.rke2lab.doctor.spi.Specialist} + an empty {@link Cellar} into the registry, SCR
+ * io.nxmatic.rke2lab.doctor.spi.Specialist} + an empty {@link OpaqueCellar} into the registry, SCR
  * collects the specialist into {@code DefaultHealthSystem}'s tier-scoped {@code @Reference} roster,
  * the two Cellar-backed frontier registries activate (satisfying the institution's EHR + ledger
  * references), and an admitted doctor routes a consult to the contributed specialist.
@@ -68,7 +68,7 @@ class HealthSystemContributionTest {
     tierProps.put(ClinicianProperties.ROLE, ClinicianProperties.ROLE_DIAGNOSTICIAN);
     tierProps.put(ClinicianProperties.TIER, ClinicianProperties.TIER_DOMAIN);
     context.registerService(Specialist.class, new RoutingDiagnostician(), tierProps);
-    context.registerService(Cellar.class, emptyCellar(), new Hashtable<>());
+    context.registerService(OpaqueCellar.class, emptyCellar(), new Hashtable<>());
 
     // The institution activates only once SCR binds the tier-scoped roster (← the injected
     // RoutingDiagnostician) + the two Cellar-backed registries. A published HealthSystem service IS
@@ -153,28 +153,28 @@ class HealthSystemContributionTest {
   }
 
   /**
-   * An empty {@link Cellar} — the seam collaborator the test injects so the two frontier registries
-   * activate. Yields no stored SeedEnvelopes, stores nowhere, has only itself as a neighbour: this
-   * test proves the contribution + admission + routing, not the record/ledger fold.
+   * An empty {@link OpaqueCellar} — the raw fridge the two frontier registries {@code @Reference}
+   * (they fold its sealed envelopes into records/ledger). Yields no stored envelopes, stores
+   * nowhere, has only itself as a neighbour: this test proves the contribution + admission +
+   * routing, not the record/ledger fold, so the injected fridge stays empty.
    */
-  private static Cellar emptyCellar() {
-    return new Cellar() {
+  private static OpaqueCellar emptyCellar() {
+    return new OpaqueCellar() {
       @Override
-      public <T> void store(
-          Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {}
+      public void store(Parcel parcel, SeedEnvelope vegetal) {}
 
       @Override
-      public <T> List<T> fetch(Parcel parcel, Class<T> type) {
+      public List<SeedEnvelope> fetch(Parcel parcel) {
         return List.of();
       }
 
       @Override
-      public <T> Optional<T> fetch(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+      public Optional<SeedEnvelope> fetch(Parcel parcel, SeedCoordinate coordinate) {
         return Optional.empty();
       }
 
       @Override
-      public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
+      public Optional<SeedEnvelope> withdraw(Parcel parcel, SeedCoordinate coordinate) {
         return Optional.empty();
       }
 
