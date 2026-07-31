@@ -59,6 +59,110 @@
       <artifactId>ssh-to-age-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
+
+    <!-- BDD-as-engine: the CLI drives ManifestsCliScenario on the embedded JUnit launcher (the same
+         machinery seed-master uses), sowing the `manifests` coordinate through the broker instead of
+         resolving a typed domain service host-side. -->
+    <!-- The launcher engine + OSGi connection contract (JUnitLauncherCore transits via this): the
+         host scenario reaches OsgiConnection/SeedRuntime/ScenarioCellar/RunRole/TxIdSeed here. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+    </dependency>
+    <!-- The neutral launcher core (JUnitLauncherCore) the CLI hands the engine to; a DIRECT import
+         (Main names it), never leaned on transitively through scenario-engine. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+    </dependency>
+    <!-- The common gardening spine consumed FLAT (SeedReceiver, SessionSeed, Gardening.sow). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-bdd</artifactId>
+    </dependency>
+    <!-- The broker seam the host speaks (Amendment roles + Cellar); the ONE host<->OSGi membrane. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <!-- The broker mechanism (embed type=runtime): DefaultSeedBroker + DefaultAmendmentAssembler,
+         staged under META-INF/bundles and published by SCR so the sow resolves the manifests door.
+         Without it the registry holds only the broker CONTRACT and Gardening.open() finds no
+         gardener. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-runtime</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- The manifests SCION bundle (embed type=model): ManifestsRunbookHandler serves the `manifests`
+         coordinate and grows ManifestSynthesisScenario in-container. Staged INTACT like the edges. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- jGiven-in-OSGi wrap, dual-realm (staged as a bundle AND kept host-flat): the host root
+         scenario is a jGiven ScenarioTest, so jgiven runs FLAT for it and as a BUNDLE for the
+         in-container scion. Directly declared = the realm-library signal (StagingClosure). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>jgiven-wrap</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- jGiven the host scenario compiles against (ScenarioTestBase, Stage, annotations) + its
+         JUnit5 extension (@SeedScenario wears JGivenExtension) — runtime code here, not test-only. -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+    </dependency>
+    <!-- The Jupiter API + engine are runtime code here: the CLI hands JupiterTestEngine.class to
+         JUnitLauncherCore to play the scenario, and the scenario declares @Test/@RegisterExtension. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
+    <!-- JUnit Platform artifacts the CLI imports DIRECTLY (never via junit-launcher's transitive
+         graph): DiscoverySelectors (platform-engine) to select the scenario, and
+         SummaryGeneratingListener (platform-launcher) to read the run verdict. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+    </dependency>
+    <!-- junit-jupiter-params staged as a bundle (runtime): jgiven-junit5 imports the params packages
+         MANDATORY in its bytecode, so the wire must resolve in-framework though we run no
+         @ParameterizedTest. Same treatment as seed-master. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- The scenario builds the SOIL amendment as a JsonNode; jackson-databind is a compile dep. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!-- The org.osgi.service.log API (LogLevel): scenario-engine's OsgiConnection exposes it as the
+         framework log-level knob's currency, so the host flat classpath must carry it or the boot
+         hits NoClassDefFoundError. The SLIM spec artifact (log packages ALONE — no
+         org.osgi.framework.*), so it cannot shadow the framework classes felix.framework provides.
+         Same declaration seed-master carries. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.log</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
