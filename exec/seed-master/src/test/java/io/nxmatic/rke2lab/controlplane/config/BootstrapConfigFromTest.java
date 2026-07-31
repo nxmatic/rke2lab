@@ -23,9 +23,9 @@ class BootstrapConfigFromTest {
     assertEquals("master", boot.nodeName());
     assertEquals("rke2lab", boot.incusProject());
     assertEquals("bioskop-nixos", boot.incusDefaultRemote());
-    assertEquals(URI.create("https://bioskop-nixos.local:8443"), boot.incusRemoteAddress());
+    assertEquals(URI.create("https://bioskop-nixos:8443"), boot.incusRemoteAddress());
     assertEquals("control-node", boot.imageAlias());
-    assertEquals("bioskop-nixos.local", boot.imageBuilderHost());
+    assertEquals("bioskop-nixos", boot.imageBuilderHost());
     assertEquals("rke2lab", boot.profileName());
     assertEquals("lan-br", boot.lanBridgeParent());
     assertEquals("vmnet-br", boot.vmnetNetworkName());

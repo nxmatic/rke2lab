@@ -112,6 +112,6 @@ public class Utilities {
             // Package version
             getVersion(),
             // Parameter
-            "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL2x4Yy9pbmN1cyIsInZlcnNpb24iOiIxLjAuMiJ9fQ==");
+            "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL2x4Yy9pbmN1cyIsInZlcnNpb24iOiIxLjEuMSJ9fQ==");
   }
 }

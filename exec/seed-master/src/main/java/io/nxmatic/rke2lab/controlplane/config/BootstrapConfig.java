@@ -84,10 +84,10 @@ public record BootstrapConfig(
         config
             .incus()
             .remoteAddress()
-            .orElseGet(() -> URI.create("https://" + nixosHost + ".local:8443")),
+            .orElseGet(() -> URI.create("https://" + nixosHost + ":8443")),
         config.incus().configDir(),
         config.image().alias().orElse(DEFAULT_IMAGE_ALIAS),
-        config.image().builderHost().orElseGet(() -> nixosHost + ".local"),
+        config.image().builderHost().orElseGet(() -> nixosHost),
         config.image().sharedFolder(),
         config.profile().name().orElse(DEFAULT_PROFILE_NAME),
         config.network().lanBridgeParent().orElse(DEFAULT_LAN_BRIDGE_PARENT),
