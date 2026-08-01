@@ -1,0 +1,393 @@
+= NixOS node substrate — target vision
+:toc: left
+:toclevels: 3
+:kroki-server-url: https://kroki.io
+
+[NOTE]
+====
+This is a *vision* document — the target shape of the system, not a migration plan.
+It keeps only the converged end-state; the alternatives explored and discarded on the
+way (Talos as node OS, running master bare on the NixOS host, per-node hand-rolled
+cloud-init) are deliberately absent. A migration plan will be fitted into this vision
+as a second step.
+====
+
+== The vision in one paragraph
+
+Every RKE2 node runs the *same NixOS substrate*, delivered as an immutable Incus image
+built by `nixos-generators` and published to the Incus image store. A node's *role* is
+config, not OS: control-plane vs worker is an RKE2 setting, master vs peer is a
+bootstrap-order handled by CAPRKE2 — none of it forks the OS. The imperative
+`cloud-init`/`distrobuilder` provisioning collapses: everything a node needs *before it
+joins* is baked declaratively into the image; everything *after it joins* leaves the host
+— cluster-level delivery (manifests, secrets, ordering) becomes Flux GitOps, and the
+residual host-mutating work (the flox containerd runtime, day-2 reconfiguration) is a
+DaemonSet today and a Kubernetes controller (Go) tomorrow. Workloads run on the *flox
+containerd runtime*, baked into the base image as a nix derivation. `nikopol-nixos` is the
+Incus hypervisor host; master is seeded imperatively (Pulumi); peers and workers are grown
+by CAPI/CAPN from the same images. Each concern sits in its own realm — *chacun son rôle*.
+
+== Founding principle — chacun son rôle
+
+The whole design is one separation of concerns. Every provisioning responsibility has
+exactly one home, chosen by *when* it must happen and *what* it mutates.
+
+[cols="1,2,2",options="header"]
+|===
+| Realm | Owns | Nature
+
+| *OS image* (NixOS, `nixos-generators` → Incus)
+| the immutable homogeneous substrate + everything needed *before cluster join*
+| declarative, baked, reproducible
+
+| *Bootstrap config* (CAPRKE2 for peers/workers; seed for master)
+| RKE2 role (server/agent), cluster-init vs join, per-node identity, join token, labels/taints
+| per-node, generated at provisioning
+
+| *Cluster delivery* (Flux GitOps — already in the stack)
+| manifests, secrets, readiness/ordering gates, layer activation
+| post-join, cluster-only, no host mutation
+
+| *Host mutation* (DaemonSet → Go controller)
+| flox containerd runtime shim, day-2 host reconfiguration
+| post-join, mutates the node host
+
+| *Provisioning engine* (Pulumi + Incus provider, host-side)
+| the VM/instance graph: Project·Network·Profile·Image·Instance for master; CAPN for the rest
+| imperative for master, declarative CAPI for peers/workers
+|===
+
+The rule that decides the boundary: *a responsibility that must exist before the kubelet
+runs cannot live in Kubernetes* — it belongs to the image. A responsibility that only
+mutates cluster objects belongs to Flux. A responsibility that mutates the host *after*
+the node has joined belongs to the DaemonSet/controller.
+
+== The node model — three types, two roles, one substrate
+
+There are three node *types* but they collapse onto two differentiation axes, and only one
+of those axes touches the OS.
+
+[cols="1,2,2",options="header"]
+|===
+| Axis | master vs peers | control-plane vs workers
+
+| Nature
+| same role (control-plane); master is the *first* node (cluster-init), peers *join*
+| RKE2 `role`: *server* vs *agent*
+
+| Level
+| bootstrap-order — CAPRKE2 handles it (first replica inits, others join)
+| config — `services.rke2.role` + taints/labels
+
+| Impact on OS image
+| *none* — master ≡ peer at the OS level
+| *the only real functional split*
+|===
+
+Consequences:
+
+* *master and peers are the same OS.* What makes master "master" — being first, hosting the
+  CAPI operators and Flux — is bootstrap-order and cluster-level (pods), never the image.
+* the image split follows the *RKE2 role* (server/agent), not the master/peer distinction.
+
+=== Image factoring
+
+* `rke2lab-node-base` — a NixOS *module* (not an image): the shared substrate — Nix, Flox,
+  ZFS, containerd + the flox runtime, networking, the `systemd.services.*` that replace the
+  old materialised units.
+* `rke2lab-control-node` — image = base + control-plane module (RKE2 server, kube-vip, etcd).
+  Run by *both* master and peers.
+* `rke2lab-worker-node` — image = base + worker module (RKE2 agent).
+* future specialised workers — `rke2lab-worker-gpu-node`, `rke2lab-worker-storage-node`, … —
+  each = base + its specialisation module. Homogeneity lives at the *base*; specialisation is
+  *additive*.
+
+Because NixOS shares the store across closures (cachix dedup), a derived image is only a thin
+delta over the base — "based on the base" literally, and cheap.
+
+[mermaid]
+----
+flowchart TB
+  base["rke2lab-node-base<br/>(shared module: nix, flox, zfs,<br/>containerd + flox runtime, networking)"]
+  ctrl["rke2lab-control-node<br/>(+ rke2 server, kube-vip, etcd)"]
+  work["rke2lab-worker-node<br/>(+ rke2 agent)"]
+  gpu["rke2lab-worker-gpu-node<br/>(+ drivers, accel shim)"]
+  base --> ctrl
+  base --> work
+  work --> gpu
+  ctrl -. "master (seed) + peers (CAPN)" .-> use1["instances"]
+  work -. "workers (CAPN)" .-> use1
+----
+
+== The provisioning topology
+
+[mermaid]
+----
+flowchart TB
+  op["Operator"]
+  subgraph build["Build — Mac linux-builder + cachix"]
+    gen["nixos-generators lxc/incus"]
+    imgstore["Incus image store<br/>control-node · worker-node"]
+    gen --> imgstore
+  end
+  subgraph host["nikopol-nixos — Incus hypervisor"]
+    daemon["Incus daemon<br/>HTTPS 8443 · ZFS pool"]
+  end
+  seed["master<br/>seeded by Pulumi · hosts CAPI + Flux"]
+  capn["peers + workers<br/>grown by CAPN"]
+
+  op --> gen
+  imgstore --> seed
+  imgstore --> capn
+  seed -->|"CAPN drives Incus via identity secret"| daemon
+  capn --> daemon
+  daemon --> seed
+  daemon --> capn
+  seed -->|"join kube-vip endpoint"| capn
+
+  classDef new fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef keep fill:#eef,stroke:#446,stroke-width:1px;
+  class gen,imgstore,daemon new;
+  class seed,capn keep;
+----
+
+* *master* is the bootstrap/management node: seeded imperatively (the Pulumi Incus graph
+  stays host-side), references `rke2lab-control-node`. It hosts CAPI/CAPN/CAPRKE2 and Flux.
+* *peers* (control-plane HA) and *workers* are grown by CAPN, which *consumes* the published
+  images (it never builds them) via its `IncusMachineTemplate`, and joins them to master's
+  kube-vip-fronted endpoint.
+* the image reference is exactly the kind of import-lookup the Incus provider already does
+  (`IncusImportLookup`); CAPN differentiates control vs worker by pointing its templates at
+  the two images.
+
+The NixOS host already declares the Incus server + the Pulumi-provider trust path — see
+`incus.nix` (server, `core.https_address`, ZFS pool) and `incus-remote.nix` (the operator
+`~/.config/incus` the seed-master provider rides).
+
+== Where each concern lives (the payoff of the systemd-scripts review)
+
+The old chain — `distrobuilder` image, `cloud-init` user-data, ~28 host systemd scripts
+materialised onto `/srv/host` then stowed into `/etc/systemd/system` — redistributes cleanly.
+The delivery *mechanism itself* (`rke2lab-systemd-link` + `rke2lab-activate`) dissolves into
+NixOS `systemd.services.*`.
+
+[cols="2,2,1",options="header"]
+|===
+| Old responsibility | New home | Already exists in the flake?
+
+| Nix / Flox install (`nix-install`, `flox-install`)
+| native NixOS + `flox` input
+| `nix-settings.nix`, `flox-direnv.nix`
+
+| Cachix store watch (`cachix-watch-store`)
+| declarative module
+| `cachix-watch-store.nix` (1:1)
+
+| Network config / wait / route-cleanup / debug
+| declarative networkd + resolved
+| `resolved-lan.nix`, `lima-network-interfaces.nix`
+
+| containerd ZFS snapshotter, NRI/SystemdCgroup, registries
+| `virtualisation.containerd` / `services.rke2`
+| `zfs.nix`, `nix-snapshotter.nix`
+
+| RKE2 install (`install`)
+| `services.rke2` (upstream nixpkgs)
+| to wire
+
+| unit materialisation + stow + activate (`systemd-link`, `activate`)
+| `systemd.services.*` — the mechanism *disappears*
+| —
+
+| secrets (`.secrets` everywhere)
+| sops-nix
+| `sops.nix`
+
+| flox containerd runtime shim (built at runtime on host)
+| nix derivation baked into `rke2lab-node-base`
+| `nix-snapshotter.nix` (adjacent)
+
+| manifests install, layer/readiness gates, layer-secrets
+| *Flux GitOps* (cluster-only) — GitRepository + root Kustomization
+| in the CAPI stack
+
+| node labels, control-plane taints
+| CAPRKE2 (`node-labels`), bootstrap config
+| —
+
+| cilium-operator scaling, day-2 host reconfig
+| DaemonSet → Go controller
+| daemonset host-asset pattern exists
+|===
+
+Per-node residue (name/kind, join token, the per-node ZFS dataset, the
+`RKE2LAB_MANIFESTS_PUBLISH_*` activation flags) is *bootstrap config*: generated by CAPRKE2
+for peers/workers, a small seed for master — never a hand-script. The `PUBLISH_*` flags are
+re-plumbed from "host env → manifest symlinks" to "Flux Kustomizations enabled/disabled".
+
+== The flox containerd runtime
+
+Workloads run on the flox containerd runtime — the reason NixOS is coherent (nix-native).
+In the target it is a *nix derivation in the base closure*, not a runtime host build:
+
+* the current DaemonSet-trampolines-to-host + `nix flake build` is a *Debian-era workaround*
+  for a non-nix-native OS; on NixOS the shim is just part of the image, built on the existing
+  ARM64 build infra (`linux-builder.nix`, `remote-nix-store.nix`, cachix) at *image* time.
+* it belongs to `rke2lab-node-base` — every node that runs pods needs it — not to a
+  specialisation.
+* *dev vs prod*: during active shim development the runtime build (DaemonSet from the projected
+  worktree) keeps a fast loop; once stable, it bakes into the image. This is the general
+  "runtime now → harden later" trajectory the whole design follows.
+
+== The maturation arc
+
+The post-join host mutation follows one arc, deliberately staged:
+
+. *scripting via DaemonSet* (today) — host-asset materializer, shell.
+. *baked declaratively* where stable — into `rke2lab-node-base` (the flox runtime, the
+  networking, the containerd config).
+. *Go controller* for what stays dynamic — a reconciler over a CRD (the existing
+  `HostAssetDeliveryPolicy` Java model is the proto-contract to formalise), with a DaemonSet
+  agent as its hands. Replaces the residual scripting with typed, reconciled code.
+
+The controller never crosses the pre-join floor either: bootstrap-critical config is always
+the image.
+
+== Open refinements (not blockers)
+
+* *master OS delta — light or heavy?* If master's OS-level specifics are light (a
+  `hostname`-gated dbus-TCP drop-in, a few sysctls), they live as `lib.mkIf (hostName ==
+  "master")` inside `rke2lab-control-node` → *two images total*. Only a *heavy* OS delta
+  (daemons/packages the fleet must not carry) justifies a distinct `rke2lab-master-node` →
+  three images. To settle: inventory master's real OS delta.
+* *per-node injection mechanism.* hostname + RKE2 role + ZFS dataset must reach each instance
+  at boot (NoCloud metadata / Incus instance config / kernel cmdline) so one image serves many
+  nodes. Choose the channel.
+* *shim build locus.* runtime build during dev vs baked at image time when stable — the switch
+  point per shim.
+
+== C4 figures — before / after
+
+Each figure carries its own before/after in one frame (atlas convention). The red `BEFORE`
+block is the imperative materialisation apparatus the transition *deletes*; the green `AFTER`
+block is the declarative substrate that replaces it. The simplification of rke2lab is the red
+block collapsing into the green one.
+
+=== C1 — System context
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — multi-engine choreography, per node]
+    b1["seed-master<br/>Pulumi graph + OSGi materialisation scions<br/>+ promotion host.live.d + checksum glue"]
+    b2["distrobuilder Debian image<br/>+ cloud-init NoCloud, 28 host scripts"]
+    b3["master: /srv/host materialised tree<br/>stow into /etc/systemd/system, then rke2"]
+    b1 --> b2 --> b3
+  end
+  subgraph AFTER[After — build once, reference, split by realm]
+    a1["rke2lab flake<br/>nixos-generators, into Incus image store"]
+    a2["master seeded by Pulumi thin<br/>peers/workers grown by CAPN, same images"]
+    a3["Flux for the cluster · controller for host mutation<br/>flox runtime baked in the image"]
+    a1 --> a2 --> a3
+  end
+  BEFORE -.the layer underneath is removed.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== C2 — Container
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — a long materialisation pipe]
+    b1["OSGi synthesis<br/>SystemdChart + 4 phases + cloud-config"]
+    b2["host-asset materializer<br/>28 scripts into /srv/host + units.d"]
+    b3["promotion jsync into host.live.d<br/>+ checksum into replaceOnChanges"]
+    b4["on node: stow into /etc/systemd/system, then rke2"]
+    b1 --> b2 --> b3 --> b4
+  end
+  subgraph AFTER[After — the closure is the config]
+    a1["flake: node-base module<br/>+ control / worker modules"]
+    a2["nixos-generators, into image store"]
+    a3["node: declarative config at boot<br/>+ per-node seed: hostname·role·token·dataset"]
+    a4["Flux Kustomizations · Go controller + CRD"]
+    a1 --> a2 --> a3
+    a4 --> a3
+  end
+  BEFORE -.no tree, no stow, no promotion.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== C3 — Component
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — synthesis + scripts + materializer]
+    b1["SystemdChart + Network/Tools/Rke2Install/Storage phases<br/>to SystemdUnitSynthesizer"]
+    b2["CloudConfigManifestsUnit · HostAssetProviders<br/>· BootstrapHostAssetMaterializer"]
+    b3["rke2lab-systemd-link + rke2lab-activate<br/>+ 26 scripts: nix·flox·network·config·gates"]
+    b1 --> b3
+    b2 --> b3
+  end
+  subgraph AFTER[After — NixOS modules + Flux + controller]
+    a1["rke2lab-node-base<br/>nix-settings·resolved-lan·zfs·nix-snapshotter<br/>flox runtime · systemd.services.*"]
+    a2["control: rke2 server·kube-vip<br/>worker: rke2 agent"]
+    a3["Flux: manifests·secrets·gates<br/>HostAssetDelivery CRD + Go controller"]
+    a1 --> a2
+  end
+  BEFORE -.4 phases + 28 scripts collapse.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== What the transition deletes
+
+The simplification, stated as removals — each of these is a red box above that has no successor:
+
+[cols="2,1",options="header"]
+|===
+| Deleted apparatus | Replaced by
+
+| `distrobuilder` Debian image + its post-unpack/post-files actions
+| `nixos-generators` image build
+
+| `cloud-init` NoCloud seed (user-data + network-config)
+| baked NixOS config + per-node seed
+
+| the 28 host systemd scripts + the 4 synthesis phases
+| `systemd.services.*` + existing flake modules
+
+| `rke2lab-systemd-link` + `rke2lab-activate` (materialise → stow → activate)
+| the closure *is* the config; nothing to stow
+
+| `/srv/host` staging tree + `host.live.d` promotion (jsync)
+| no materialised tree — the image is the tree
+
+| `BootstrapHostAssetMaterializer` + `HostAssetProvider` fan-in
+| nix derivations in the base module
+
+| checksum → `replaceOnChanges` glue (nocloud drift → instance replace)
+| image digest *is* the identity; a new image is a new instance by construction
+
+| the runtime `nix flake build` of the flox shim on the host (DaemonSet trampoline)
+| the shim baked into the base image at build time
+|===
+
+What *survives*, unchanged in role: the Pulumi Incus graph for master (thin, host-side), and
+CAPN + CAPRKE2 + Flux for the fleet. The vision does not rebuild these — it *removes the layer
+underneath them*.
+
+== Related documentation
+
+* link:../bootstrap/provisioning-slice-architecture.adoc[Provisioning slice architecture] —
+  the current imperative seed this vision supersedes for the node OS
+* link:../patterns/daemonset-host-assets-architecture.adoc[Daemonset host-assets] — the
+  post-join host-mutation channel that survives (→ Go controller)
+* link:../cluster-api/cluster-api-bootstrap-requirements.adoc[CAPI bootstrap requirements] —
+  CAPN + CAPRKE2 + Flux, the declarative fleet path this vision leans on
