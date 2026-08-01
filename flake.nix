@@ -28,6 +28,10 @@
     # Follow flake-commons versions
     nixpkgs.follows = "flake-commons/nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
+    # flox baked into the NixOS node substrate (nixosConfigurations.rke2-node-base) as a nix
+    # derivation, replacing the Debian-era runtime installer. Same source the family already
+    # locks (github:flox/flox), via the aggregator so it stays in sync with nix-darwin-home.
+    flox.follows = "flake-commons/flox";
 
     # The flox runtime flake owns the NRI plugin + per-workload package
     # definitions. We re-export its outputs here so the deployable artifacts
@@ -40,7 +44,7 @@
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox, ... }:
     let
       # Enforce the INVARIANT above mechanically, not just by comment: fail eval
       # (any `nix build`/`nix eval` of this flake) with a printed diagnostic if
@@ -505,6 +509,21 @@
         };
       }
     )) // {
+      # The NixOS node substrate — the immutable Incus container image every RKE2 node
+      # boots from (docs/architecture/nixos-substrate/target-vision.adoc). System-pinned to
+      # aarch64-linux (Incus containers on the Apple-Silicon hypervisor); build via bioskop-nixos.
+      # Build the artifacts: `.config.system.build.{squashfs,metadata}`, then
+      # `incus image import <metadata>/tarball/*.tar.xz <squashfs> --alias rke2lab/node-base`.
+      # Per-node identity (node-ip, hostname, token) is injected at instance creation, not baked.
+      nixosConfigurations.rke2-node-base = nixpkgs.lib.nixosSystem {
+        system = "aarch64-linux";
+        specialArgs = { inherit flox; };
+        modules = [
+          "${nixpkgs}/nixos/modules/virtualisation/lxc-container.nix"
+          ./nixos/node-base.nix
+        ];
+      };
+
       # Flat, system-independent export consumed by nix-darwin-home as
       # `rke2lab.lib.networkBlueprint.deriveMacs` (no `lib.${system}` selector).
       # Built once on `blueprintSystem`; the data is the same everywhere.

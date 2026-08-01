@@ -282244,6 +282244,10 @@
           "flake-commons",
           "flake-utils"
         ],
+        "flox": [
+          "flake-commons",
+          "flox"
+        ],
         "flox-runtime": "flox-runtime",
         "nixpkgs": [
           "flake-commons",
