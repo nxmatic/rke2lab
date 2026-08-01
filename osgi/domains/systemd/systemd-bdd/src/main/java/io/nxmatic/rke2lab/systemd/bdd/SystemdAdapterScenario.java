@@ -12,21 +12,28 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SurveyInert;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest;
+import io.nxmatic.rke2lab.systemd.contract.SystemdRunbookInput;
 import io.nxmatic.rke2lab.systemd.contract.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.contract.SystemdStatusSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The systemd-adapter readiness checkpoint, a production jGiven scenario told in the SYSTEMD
@@ -45,17 +52,37 @@ import org.junit.jupiter.api.Test;
  * not-ready facet throws, jGiven marks it FAILED and skips the downstream chained assertions, so
  * the runbook shows exactly which systemd fact broke.
  *
- * <p>The endpoint the probe opens is described by a fixed {@link SystemdProbeRequest} marker (as
- * {@code ClusterReadinessScenario} uses a fixed kubeconfig path): the offline mock ignores it, and
- * the live endpoint-config plumbing is the same deferral the cluster twin makes.
+ * <p>The endpoint the probe opens is DERIVED, not deferred: the run's identity FACET (cluster/node,
+ * amended by the host) feeds the netplan {@code ClusterNetworkBlueprint} — a pure identity→topology
+ * function — for the node's mDNS FQDN and {@code <cluster>-nixos} host, paired with the systemd
+ * dbus port (a service constant) into a {@link SystemdProbeRequest}. An unamended (offline) play
+ * carries no identity, so it falls to a fixed marker the mock probe ignores.
  */
 @SeedScenario
 public class SystemdAdapterScenario
     extends ScenarioTestBase<
         SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then>
-    implements ConsultationSource, ScenarioPlayer.Playable, SurveyInert {
+    implements InputReceiver<SystemdRunbookInput>,
+        ConsultationSource,
+        ScenarioPlayer.Playable,
+        SurveyInert {
+
+  /**
+   * The inbound channel {@code SystemdRunbookHandler.seedFrom} seeds the {@link
+   * SystemdRunbookInput} through and this scenario receives (via {@link InputReceiver}) —
+   * single-sourced here, referenced by the handler for the seeding end ({@code INPUT.into(input)}).
+   * A {@link RegisterExtension} so its {@code TestInstancePostProcessor} fires before the body
+   * reads {@link #input}.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<SystemdRunbookInput> INPUT =
+      new ScenarioInputSeed<>(SystemdRunbookInput.class, "systemd-runbook-input");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The activation input the front-door seeds before the body (InputReceiver) — its FACET identity
+  // is what the probe endpoint derives from. @MonotonicNonNull: null until receiveInput sets it.
+  @MonotonicNonNull private SystemdRunbookInput input;
 
   // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The probe
   // moved to the When stage (@OsgiService there, filled by the stage creator); the doctor stays
@@ -74,6 +101,11 @@ public class SystemdAdapterScenario
   }
 
   @Override
+  public void receiveInput(SystemdRunbookInput input) {
+    this.input = input;
+  }
+
+  @Override
   public List<SeedEnvelope> consultations() {
     return consultations;
   }
@@ -81,7 +113,8 @@ public class SystemdAdapterScenario
   @Test
   void the_systemd_adapter_becomes_reachable() {
     final List<ObservationWire> observations = new ArrayList<>();
-    given().the_seed_node("seed").and().probed_through(observations);
+    final SystemdProbeRequest endpoint = endpointFrom(input);
+    given().the_seed_node(endpoint.nodeName()).and().probed_through(observations, endpoint);
     when()
         .the_systemd_endpoint_is_probed()
         .and()
@@ -128,12 +161,46 @@ public class SystemdAdapterScenario
   }
 
   /**
-   * The endpoint the probe opens. A fixed marker in the offline scenario (the mock ignores it); the
-   * live endpoint-config plumbing is deferred, exactly as the cluster twin defers its kubeconfig.
+   * The endpoint the probe opens — DERIVED from the run's identity FACET: the scenario feeds the
+   * cluster/node the host amended into {@code ClusterNetworkBlueprint} (a pure identity→topology
+   * function, consumed directly like manifests does) and pairs the node's mDNS FQDN with the
+   * systemd dbus port (a service constant, {@link SystemdEndpoints} — a port is not
+   * identity-derived, so it lives with the service, not in the blueprint). No identity (an offline
+   * play) falls to the fixed {@link #MARKER} the mock probe ignores. This is the live endpoint
+   * plumbing the marker stood in for — the seam {@code SystemdProbeRequest}'s javadoc always
+   * intended ("the flat host fills it").
    */
-  private static SystemdProbeRequest endpoint() {
-    return new SystemdProbeRequest("localhost", 0, "seed", "unknown");
+  private static SystemdProbeRequest endpointFrom(@Nullable SystemdRunbookInput input) {
+    if (input == null) {
+      return MARKER;
+    }
+    return input.identity().map(SystemdAdapterScenario::deriveEndpoint).orElse(MARKER);
   }
+
+  private static SystemdProbeRequest deriveEndpoint(SystemdRunbookInput.Identity identity) {
+    final ClusterNetworkBlueprint blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster(identity.clusterName())
+            .node(identity.nodeName())
+            .deriveRecipeModel()
+            .build();
+    return new SystemdProbeRequest(
+        blueprint.names().nodeMdnsFqdn(),
+        DBUS_TCP_PORT,
+        identity.nodeName(),
+        blueprint.names().nixosHost());
+  }
+
+  /**
+   * The systemd dbus-on-TCP adapter's fixed port — a SERVICE constant (identical on every cluster),
+   * so it lives with the domain that owns it, NOT in the identity-derived netplan blueprint. Paired
+   * with the blueprint's node mDNS FQDN to form the probe endpoint; mirrors the adapter script's
+   * own default.
+   */
+  private static final int DBUS_TCP_PORT = 12434;
+
+  private static final SystemdProbeRequest MARKER =
+      new SystemdProbeRequest("localhost", 0, "seed", "unknown");
 
   /** Given: the seed node to reach, the probe, and the shared observation buffer the When fills. */
   public static class Given extends Stage<Given> {
@@ -146,13 +213,17 @@ public class SystemdAdapterScenario
      */
     @ProvidedScenarioState List<ObservationWire> observations;
 
+    /** The endpoint the When probes — derived from the identity FACET (or the marker offline). */
+    @ProvidedScenarioState SystemdProbeRequest endpoint;
+
     public Given the_seed_node(String name) {
       return self();
     }
 
     @Hidden
-    public Given probed_through(List<ObservationWire> observations) {
+    public Given probed_through(List<ObservationWire> observations, SystemdProbeRequest endpoint) {
       this.observations = observations;
+      this.endpoint = endpoint;
       return self();
     }
   }
@@ -173,11 +244,13 @@ public class SystemdAdapterScenario
 
     @ExpectedScenarioState List<ObservationWire> observations;
 
+    @ExpectedScenarioState SystemdProbeRequest endpoint;
+
     @ProvidedScenarioState SystemdStatusSnapshot snapshot;
 
     public When the_systemd_endpoint_is_probed() {
       try {
-        this.snapshot = probe.orElseThrow().probe(endpoint());
+        this.snapshot = probe.orElseThrow().probe(endpoint);
       } catch (RuntimeException unreachable) {
         record("systemd endpoint", false, SymptomKind.CONNECTION_REFUSED);
         throw new AssertionError("systemd endpoint: " + unreachable.getMessage(), unreachable);

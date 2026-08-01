@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -euo pipefail
 
-if [ "$#" -ne 4 ]; then
-    echo "usage: $0 <workspace> <config-path> <artifact-dir> <builder-binary>" >&2
+if [ "$#" -ne 5 ]; then
+    echo "usage: $0 <workspace> <config-path> <artifact-dir> <builder-binary> <incus-project>" >&2
     exit 2
 fi
 
@@ -10,6 +10,7 @@ remote_workspace="$1"
 remote_config_path="$2"
 remote_artifact_dir="$3"
 binary="$4"
+incus_project="$5"
 
 export PATH="/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
@@ -104,3 +105,35 @@ fi
 cp -f "$build_metadata_path" "$remote_artifact_dir/$metadata_name"
 cp -f "$build_rootfs_path" "$remote_artifact_dir/$rootfs_name"
 chmod a+r "$remote_artifact_dir/$metadata_name" "$remote_artifact_dir/$rootfs_name"
+
+# Register the freshly-built image DIRECTLY in the local incus daemon (this builder host IS the
+# incus daemon host — bioskop-nixos), so the Pulumi client never re-uploads bytes the daemon can
+# already read locally. The image alias is the artifact dir's own leaf (the host lays artifacts out
+# as <sharedFolder>/<alias>). incus talks to the local daemon over its unix socket here (the same
+# daemon the Pulumi provider reaches over https), so the host GROW then ADOPTS this image by alias
+# instead of declaring an uploading `sourceFile`.
+image_alias="$(basename "$remote_artifact_dir")"
+
+# incus' split-image fingerprint is the SHA-256 of the metadata tarball — use it to detect an image
+# already present (a re-point without a rebuild) and skip a redundant import. Trust the fingerprint
+# incus actually reports over this guess when we do import.
+image_fingerprint="$(sha256sum "$remote_artifact_dir/$metadata_name" | awk '{print $1}')"
+if ! incus image info "$image_fingerprint" --project "$incus_project" >/dev/null 2>&1; then
+    import_out="$(incus image import \
+        "$remote_artifact_dir/$metadata_name" "$remote_artifact_dir/$rootfs_name" \
+        --project "$incus_project" 2>&1)" || {
+        # Tolerate an idempotent 'already exists' (the image is present); fail on anything else.
+        printf '%s\n' "$import_out" | grep -qi 'already exists' || {
+            echo "failed to import the built image into the local incus daemon" >&2
+            printf '%s\n' "$import_out" >&2
+            exit 5
+        }
+    }
+    imported_fp="$(printf '%s\n' "$import_out" | grep -oE '[0-9a-f]{64}' | head -n1)"
+    [ -n "$imported_fp" ] && image_fingerprint="$imported_fp"
+fi
+
+# (Re)point the alias at this fingerprint. Deleting/creating the ALIAS never touches the (possibly
+# in-use) image it pointed at, so this is safe while a prior instance still runs on the old image.
+incus image alias delete "$image_alias" --project "$incus_project" >/dev/null 2>&1 || true
+incus image alias create "$image_alias" "$image_fingerprint" --project "$incus_project"

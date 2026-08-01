@@ -171,7 +171,7 @@ Controller --> Caller : 200 + JSON snapshot
 
 Review question: what crosses the host↔OSGi frontier, and does it stay free of host types?
 
-The adapter's normalized surface is declared as two `systemd-contract` types (an installed bundle
+The adapter's normalized surface is declared as `systemd-contract` types (an installed bundle
 wired bundle-to-bundle inside the OSGi world, so neither side leaks its own config type across):
 
 [cols="2,3",options="header"]
@@ -179,11 +179,21 @@ wired bundle-to-bundle inside the OSGi world, so neither side leaks its own conf
 | Port type | Contract
 
 | `SystemdProbeRequest`
-| The pure input crossing the readiness seam: the host-side facts `SystemdRuntimeProbe` needs to
-  open dbus-on-TCP and stamp the connection context — `dbusHost`, `dbusPort`, `nodeName`,
-  `imageBuilderHost`. A record with a normalizing canonical constructor (blank/absent fields fall
-  back to `localhost` / `0` / `unknown`), so the flat host fills it from its `BootstrapConfig` and
-  the OSGi edge consumes it without the host's config type ever crossing the frontier.
+| The pure input crossing the readiness seam — `dbusHost`, `dbusPort`, `nodeName`, `imageBuilderHost`
+  — a record with a normalizing canonical constructor (blank/absent fields fall back to `localhost` /
+  `0` / `unknown`). It is COMPOSED OSGi-side by `SystemdAdapterScenario`, not filled by the flat host:
+  the node's mDNS FQDN (`<cluster>-<node>.local`) and the `<cluster>-nixos` host DERIVE from the
+  netplan `ClusterNetworkBlueprint` (a pure identity→topology function, the single source of network
+  names), while `dbusPort` is a fixed systemd SERVICE constant — a port is not identity-derived, so it
+  stays with the service, never in the blueprint. So no host config type crosses and no network host
+  is hard-coded. The former fixed `localhost:0` marker survives only for an offline play.
+
+| `SystemdRunbookInput`
+| The systemd runbook trigger's input — one `@Amendment(FACET)` role, the stable cluster/node
+  `Identity` the host contributes AMBIENT (mirroring the incus FACET). The scenario derives the
+  network blueprint from that identity to compose the `SystemdProbeRequest` above, so the host names
+  only the neutral identity (JSON on the FACET role), never a systemd or netplan type. `Optional` /
+  EMPTY is the honest model of an unamended (offline) play — the scenario then falls to the marker.
 |===
 
 == Review and evolution policy

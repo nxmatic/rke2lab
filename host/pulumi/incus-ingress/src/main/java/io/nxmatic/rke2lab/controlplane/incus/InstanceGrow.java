@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -163,12 +164,25 @@ public final class InstanceGrow {
   }
 
   /**
-   * Declare the seed image from the plan's artifact paths and return its fingerprint {@link Output}
-   * for the instance. The scion already built the artifacts (the edge {@code ImageBuilder}) and
-   * projected their readable paths + the alias; the host only schedules the {@code new Image} —
-   * {@code com.pulumi}, the one irreducibly-host gesture.
+   * Return the seed image's fingerprint {@link Output} for the instance. The edge {@code
+   * ImageBuilder} builds the artifacts AND registers the image directly in the daemon (the builder
+   * host IS the incus daemon host), so the GROW ADOPTS it by alias via a provider invoke — no
+   * {@code Image} resource, no client-side upload of bytes the daemon already holds. The {@code
+   * sourceFile} path survives ONLY as a fallback: when no daemon-side image exists (a local build
+   * with no reachable daemon), the host declares an {@code Image} that uploads the artifacts — the
+   * one case the client→daemon transfer is genuinely needed.
    */
   private Output<String> ensureImage(GrowImageView view, Resource projectDependency) {
+    final Optional<String> adopted =
+        importLookup.existingImageFingerprint(view.imageAlias(), config.incusProject());
+    if (adopted.isPresent()) {
+      return Output.of(adopted.get());
+    }
+
+    log.accept(
+        "incus image ensure: no daemon-side image for alias '"
+            + view.imageAlias()
+            + "', uploading from client artifacts");
     final Image image =
         new Image(
             "seed-image",

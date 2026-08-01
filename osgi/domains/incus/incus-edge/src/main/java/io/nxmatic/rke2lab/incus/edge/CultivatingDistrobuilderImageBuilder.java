@@ -102,7 +102,11 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
     runRemoteBootstrapOverSshOrThrow(
         Path.of(request.workspaceDir()),
         remoteHost,
-        List.of(request.remoteWorkspaceDir(), request.remoteArtifactDir(), binary),
+        List.of(
+            request.remoteWorkspaceDir(),
+            request.remoteArtifactDir(),
+            binary,
+            request.incusProject()),
         "Failed to build Incus image artifacts on remote builder host " + remoteHost);
   }
 
@@ -273,7 +277,8 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
    * throwaway temp dir, then runs the driver with the config it just wrote. base64 keeps the
    * heredoc delimiters collision-free (the payload can be any text/binary) and needs nothing beyond
    * coreutils. Positional args from {@code sh -s}: {@code $1}=remote workspace, {@code $2}=artifact
-   * dir, {@code $3}=builder binary; the config path is the temp file this bootstrap writes.
+   * dir, {@code $3}=builder binary, {@code $4}=incus project; the config path is the temp file this
+   * bootstrap writes.
    */
   private String remoteBootstrap() {
     final String scriptB64 =
@@ -295,6 +300,6 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
         "chmod 700 \"$tmp_dir/build.sh\"",
         "\"$tmp_dir/build.sh\" \"$1\" \"$tmp_dir/"
             + BuildRecipe.CONFIG_FILENAME
-            + "\" \"$2\" \"$3\"");
+            + "\" \"$2\" \"$3\" \"$4\"");
   }
 }

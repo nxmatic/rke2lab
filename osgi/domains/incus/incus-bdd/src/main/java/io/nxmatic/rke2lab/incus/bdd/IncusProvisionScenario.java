@@ -286,7 +286,7 @@ public class IncusProvisionScenario
       Optional<Path> worktreeRoot, Optional<Facet> maybeFacet, Optional<Image> maybeImage) {
     if (maybeFacet.isEmpty() || maybeImage.isEmpty()) {
       return new ImageBuildRequest(
-          "distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "");
+          "distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "", "");
     }
     final Facet facet = maybeFacet.orElseThrow();
     final Image image = maybeImage.orElseThrow();
@@ -305,7 +305,8 @@ public class IncusProvisionScenario
         localRoot.resolve(artifactUnderWorktree).toString(),
         image.builderHost(),
         remoteRoot.toString(),
-        artifactUnderWorktree.toString());
+        artifactUnderWorktree.toString(),
+        facet.incusProject());
   }
 
   /**

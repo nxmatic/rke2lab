@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.incus;
 
 import com.pulumi.deployment.Deployment;
 import com.pulumi.incus.IncusFunctions;
+import com.pulumi.incus.inputs.GetImagePlainArgs;
 import com.pulumi.incus.inputs.GetNetworkPlainArgs;
 import com.pulumi.incus.inputs.GetProfilePlainArgs;
 import com.pulumi.incus.inputs.GetProjectPlainArgs;
@@ -94,6 +95,31 @@ public final class IncusImportLookup {
       return normalizeImportId(profile.id()).or(() -> normalizeImportId(profile.name()));
     } catch (Exception ex) {
       log.accept("incus lookup getProfile: failed (" + summarizeLookupFailure(ex) + ")");
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * The fingerprint of the image the builder already registered daemon-side under this alias, or
+   * empty when none is found. The GROW adopts this fingerprint for the instance instead of
+   * declaring an {@code Image} that uploads the artifacts from the Pulumi client (the builder host
+   * IS the daemon host, so the image is already local to the daemon).
+   */
+  public Optional<String> existingImageFingerprint(String imageAlias, String incusProject) {
+    log.accept("incus lookup getImage: start alias=" + imageAlias + " project=" + incusProject);
+    try {
+      final var image =
+          IncusFunctions.getImagePlain(
+                  GetImagePlainArgs.builder().name(imageAlias).project(incusProject).build(),
+                  context.invokeOptions())
+              .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
+              .join();
+      if (image == null) {
+        return Optional.empty();
+      }
+      return normalizeImportId(image.fingerprint());
+    } catch (Exception ex) {
+      log.accept("incus lookup getImage: failed (" + summarizeLookupFailure(ex) + ")");
       return Optional.empty();
     }
   }

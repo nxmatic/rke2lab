@@ -46,12 +46,18 @@ public record IncusRunbookInput(
    * single-sourced on the host). The worktree ROOT is NOT here: the scion reads it from the {@code
    * Worktree} OSGi component. The scion feeds these to {@code
    * BootstrapPaths.fromLocalWorktree(root, cluster, node)} (the root from the component) and (for
-   * the mount sources) {@code asAutomountView(nfsAutomount, netPrefix)}. A sub-record filled blind
-   * by role, mirroring the {@code PublishFacet}/{@code DebugFacet} pattern — the host names no path
-   * vocabulary.
+   * the mount sources) {@code asAutomountView(nfsAutomount, netPrefix)}. The {@code incusProject}
+   * is the daemon project the built image is registered into and adopted from (part of the stable
+   * provisioning identity, not a build-recipe scalar — so it rides the FACET, not the IMAGE). A
+   * sub-record filled blind by role, mirroring the {@code PublishFacet}/{@code DebugFacet} pattern
+   * — the host names no path vocabulary.
    */
   public record Facet(
-      String clusterName, String nodeName, boolean nfsAutomount, String netPrefix) {}
+      String clusterName,
+      String nodeName,
+      boolean nfsAutomount,
+      String netPrefix,
+      String incusProject) {}
 
   /**
    * The flat seed-image build scalars the host fills from its {@code BootstrapConfig} — the image

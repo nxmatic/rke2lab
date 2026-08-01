@@ -16,6 +16,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.nxmatic.rke2lab.systemd.contract.SystemdRunbookInput;
 import io.nxmatic.rke2lab.systemd.contract.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.contract.SystemdStatusSnapshot;
 import java.util.ArrayList;
@@ -112,7 +113,10 @@ public class SystemdAdapterScenarioInContainerTest {
     registrations.add(context.registerService(SystemdRuntimeProbe.class, probe, new Hashtable<>()));
     try {
       final ScenarioOutcome outcome =
-          new ScenarioPlayer().play(SystemdAdapterScenario.class, store -> {});
+          new ScenarioPlayer()
+              .play(
+                  SystemdAdapterScenario.class,
+                  SystemdAdapterScenario.INPUT.into(SystemdRunbookInput.defaults()));
       assertTrue(!probe.probed, "a survey-inert probe never opens a dbus connection");
       assertEquals(
           ExecutionStatus.SCENARIO_PENDING,
@@ -139,7 +143,10 @@ public class SystemdAdapterScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return new ScenarioPlayer().play(SystemdAdapterScenario.class, store -> {});
+      return new ScenarioPlayer()
+          .play(
+              SystemdAdapterScenario.class,
+              SystemdAdapterScenario.INPUT.into(SystemdRunbookInput.defaults()));
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

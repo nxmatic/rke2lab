@@ -20,7 +20,8 @@ public record ClusterNetworkBlueprint(
     LanPlan lan,
     WanPlan wan,
     InterfacePlan interfaces,
-    VlanPlan vlan) {
+    VlanPlan vlan,
+    NamePlan names) {
 
   /**
    * The canonical node names of every cluster, in topology order (1 master + 3 peers + 2 workers).
@@ -178,7 +179,11 @@ public record ClusterNetworkBlueprint(
             lanTailscale6),
         new WanPlan(wanDhcpRange, wanHostMacaddr),
         new InterfacePlan(nodeName + "-lan0", nodeName + "-vmnet0", "vmnet0"),
-        new VlanPlan(100, "rke2-vlan"));
+        new VlanPlan(100, "rke2-vlan"),
+        new NamePlan(
+            clusterName + "-" + nodeName,
+            clusterName + "-" + nodeName + ".local",
+            clusterName + "-nixos"));
   }
 
   /** Stable ref/id for contract exports. */
@@ -329,6 +334,16 @@ public record ClusterNetworkBlueprint(
   public record InterfacePlan(String lanInterface, String wanInterface, String vipInterface) {}
 
   public record VlanPlan(int id, String name) {}
+
+  /**
+   * The identity-derived NAMES the cluster resolves nodes and infra hosts by — the single source
+   * for hostnames domains otherwise re-concatenate. {@code nodeHostname} is the bare {@code
+   * <cluster>-<node>}; {@code nodeMdnsFqdn} its mDNS name ({@code .local}, how a same-LAN host —
+   * e.g. the seed's systemd probe — reaches it); {@code nixosHost} the {@code <cluster>-nixos}
+   * builder/daemon host. Ports are NOT here: a port is a fixed service constant, not
+   * identity-derived — each domain pairs a name from here with its own port.
+   */
+  public record NamePlan(String nodeHostname, String nodeMdnsFqdn, String nixosHost) {}
 
   /**
    * Canonical cluster topology: 1 master, 3 control nodes (peers), 2 worker nodes.

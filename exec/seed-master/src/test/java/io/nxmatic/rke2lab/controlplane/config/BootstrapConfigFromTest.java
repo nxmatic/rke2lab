@@ -34,7 +34,9 @@ class BootstrapConfigFromTest {
     assertEquals("/net/bioskop.local", boot.netPrefix());
     assertEquals(URI.create("https://10.66.106.10:6443"), boot.apiEndpoint());
     assertEquals(true, boot.nfsAutomount());
-    assertEquals("bioskop-master", boot.systemdAdapterDbusHost());
+    // The master container is reached over mDNS (avahi/.local), not the tailnet — so the default
+    // dbus host carries the .local FQDN; a bare <cluster>-<node> would not resolve from the host.
+    assertEquals("bioskop-master.local", boot.systemdAdapterDbusHost());
     assertEquals(12434, boot.systemdAdapterDbusPort());
     assertEquals(3, boot.hostAssetRotationRetentionCount());
     assertEquals(Duration.ofMinutes(10), boot.readinessTimeout());

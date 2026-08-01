@@ -40,7 +40,8 @@ class IncusAmendReflectorTest {
 
   @Test
   void it_binds_the_ambient_facet_role_onto_the_facet_scalars() {
-    final Facet scalars = new Facet("bioskop", "bioskop-master", true, "/net/bioskop.local");
+    final Facet scalars =
+        new Facet("bioskop", "bioskop-master", true, "/net/bioskop.local", "rke2lab");
     final IncusAmendReflector reflector =
         new IncusAmendReflector(ambient(Map.of(Amendment.FACET, CODEC.encode(scalars))));
 

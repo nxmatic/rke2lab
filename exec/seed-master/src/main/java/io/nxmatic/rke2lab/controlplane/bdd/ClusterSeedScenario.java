@@ -289,12 +289,29 @@ public class ClusterSeedScenario
       incusFacet.put("nodeName", run.config().nodeName());
       incusFacet.put("nfsAutomount", run.config().nfsAutomount());
       incusFacet.put("netPrefix", run.config().netPrefix());
+      incusFacet.put("incusProject", run.config().incusProject());
       gardening
           .connection()
           .context()
           .registerService(
               AmendmentContributor.class,
               new FacetContributor(new AmendCoordinate("incus-provision"), incusFacet.toString()),
+              new Hashtable<>());
+
+      // The systemd FACET — the same stable cluster/node IDENTITY, contributed AMBIENT for the
+      // systemd crossing. The systemd scenario derives the network blueprint from it OSGi-side to
+      // compose its dbus-over-TCP probe endpoint (the node's mDNS FQDN paired with the systemd dbus
+      // port), so the host names no systemd endpoint — only the neutral identity, JSON on the FACET
+      // role.
+      final ObjectNode systemdFacet = JsonNodeFactory.instance.objectNode();
+      systemdFacet.put("clusterName", run.config().clusterName());
+      systemdFacet.put("nodeName", run.config().nodeName());
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              AmendmentContributor.class,
+              new FacetContributor(new AmendCoordinate("systemd"), systemdFacet.toString()),
               new Hashtable<>());
       // The entry-gate FACET — the run's GatePolicy (clean-worktree requirement + tolerated paths),
       // contributed AMBIENT the way the incus/manifests FACETs are. The worktree crossing (the

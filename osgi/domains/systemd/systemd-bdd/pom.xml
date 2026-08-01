@@ -28,6 +28,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-contract</artifactId>
     </dependency>
+    <!-- The netplan blueprint the scenario DERIVES the probe endpoint from (node mDNS FQDN + nixos
+         host) — a pure identity→topology function, consumed directly like manifests does. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-contract</artifactId>
+    </dependency>
     <!-- The doctor's consult seam: the scenario consults the doctor itself on a failing read (fork B
          — the checkpoint owns its consult, the same way cluster-bdd does). -->
     <dependency>

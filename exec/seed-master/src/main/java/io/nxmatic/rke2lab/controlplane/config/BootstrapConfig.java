@@ -62,10 +62,9 @@ public record BootstrapConfig(
     final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
     final String nodeName = config.node().name().orElse(DEFAULT_NODE_NAME);
     // The rke2lab host naming convention is derived from the cluster name — the infra is identical
-    // across clusters, only the prefix differs: the NixOS host is <cluster>-nixos. Its resolvable
-    // addresses (the incus remote URL, the image builder host) carry the .local FQDN so they
-    // resolve
-    // over mDNS; the incus remote LABEL (defaultRemote) and the dbus host stay bare. Deriving here
+    // across clusters, only the prefix differs: the NixOS host is <cluster>-nixos. It is on the
+    // tailnet, so its bare name resolves via MagicDNS (the incus remote URL + image builder host
+    // ride it bare); only the incus remote LABEL (defaultRemote) is a pure label. Deriving here
     // keeps the cluster name a single source in config.
     final String nixosHost = clusterName + "-nixos";
 
@@ -96,7 +95,11 @@ public record BootstrapConfig(
         config.api().endpoint().orElse(DEFAULT_API_ENDPOINT),
         kubeconfigRef,
         config.network().nfsAutomount().orElse(DEFAULT_NFS_AUTOMOUNT),
-        config.systemd().dbusHost().orElseGet(() -> clusterName + "-" + nodeName),
+        // The systemd adapter runs INSIDE the master container, whose dbus-over-TCP endpoint the
+        // host probes over mDNS (avahi on the LAN). The container is NOT on the tailnet, so a bare
+        // <cluster>-<node> does not resolve from the host (getaddrinfo fails before the port); the
+        // .local FQDN avahi advertises does. Default to it so the probe reaches a running adapter.
+        config.systemd().dbusHost().orElseGet(() -> clusterName + "-" + nodeName + ".local"),
         config.systemd().dbusPort().orElse(DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT),
         config
             .hostAsset()

@@ -17,6 +17,11 @@ package io.nxmatic.rke2lab.incus.contract;
  * single source of the recipe, folded into {@code recipeDigest()}), so it materialises the config
  * itself — locally to a temp file, remotely over the ssh channel. Only the artifact/workspace
  * placement crosses.
+ *
+ * <p>{@code incusProject} is the daemon project the remote build registers the finished image into
+ * ({@code incus image import … --project}): the builder host IS the incus daemon host, so it seeds
+ * the image locally and the host GROW adopts it by alias instead of re-uploading. Blank ⇒ the edge
+ * skips the daemon-side registration (a local build with no reachable daemon).
  */
 public record ImageBuildRequest(
     String builderBinary,
@@ -24,7 +29,8 @@ public record ImageBuildRequest(
     String localArtifactDir,
     String remoteHost,
     String remoteWorkspaceDir,
-    String remoteArtifactDir) {
+    String remoteArtifactDir,
+    String incusProject) {
 
   public ImageBuildRequest {
     builderBinary = normalize(builderBinary);
@@ -33,6 +39,7 @@ public record ImageBuildRequest(
     remoteHost = normalize(remoteHost);
     remoteWorkspaceDir = normalize(remoteWorkspaceDir);
     remoteArtifactDir = normalize(remoteArtifactDir);
+    incusProject = normalize(incusProject);
   }
 
   private static String normalize(String value) {
