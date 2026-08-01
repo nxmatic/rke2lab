@@ -323,6 +323,18 @@ files:
       DNSSEC=no
       # Apply to all domains
       Domains=~.
+  # Wire glibc to systemd-resolved's stub at EVERY boot. A build-time symlink cannot survive:
+  # distrobuilder restores /etc/resolv.conf to debootstrap's empty regular file on chroot teardown,
+  # and the systemd-resolved postinst only symlinks when the file is ABSENT (it is not). glibc's
+  # nsswitch 'dns' then reads that empty file and every name fails, though resolved resolves fine
+  # (networkd feeds it DNS). A tmpfiles.d L+ rule — a regular file that survives the build — has
+  # systemd-tmpfiles recreate the symlink each boot (dangling until resolved creates the stub, the
+  # standard arrangement), giving glibc split-DNS through resolved's 127.0.0.53 stub.
+  - name: resolv-conf-stub-symlink
+    generator: dump
+    path: /etc/tmpfiles.d/00-resolv-conf.conf
+    content: |
+      L+ /etc/resolv.conf - - - - /run/systemd/resolve/stub-resolv.conf
   # Disable IPv6 globally at kernel level (baked into image before first boot)
   # This prevents IPv6 Router Advertisements from assigning IPv6 addresses/DNS
   # before cloud-init can configure the system
