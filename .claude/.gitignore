@@ -26,6 +26,14 @@ claude-preview.adoc
 claude-brainstorm-*.adoc
 diag-*.svg
 
+# nixos-node-substrate migration working notes — living scratch, never committed
+# (unlike the finalized *-handoff.md notes at this level, which ARE tracked)
+nixos-*-handoff.md
+nixos-*-progress.md
+
+# Machine-local policy-limits snapshot — runtime state, never committed
+policy-limits.json
+
 # Per-conversation git worktrees (Workspace isolation rule) — never committed
 worktrees/
 
