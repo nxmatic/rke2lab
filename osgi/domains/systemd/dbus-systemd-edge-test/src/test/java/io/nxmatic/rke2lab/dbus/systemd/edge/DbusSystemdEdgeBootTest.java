@@ -46,8 +46,12 @@ class DbusSystemdEdgeBootTest {
   static final OutOfContainerFrameworkExtension felix =
       OutOfContainerFrameworkExtension.builder()
           // SCR (default) publishes the edge's @Component; org.slf4j (default export) satisfies its
-          // log import. NO domain systemPackages — systemd.contract is DE-SEAMED, pulled as an
-          // installed bundle by installImportClosureOf.
+          // log import. No domain systemPackages — systemd.contract is DE-SEAMED, pulled as an
+          // installed bundle by installImportClosureOf. But seed.broker.port is the one true
+          // host↔OSGi seam (published by the host in prod), so it must be system-exported here as
+          // in every other in-container test — systemd.contract imports it, and without the seam
+          // the contract (and the edge that imports it) stay UNRESOLVED.
+          .systemPackages("io.nxmatic.rke2lab.seed.broker.port;version=1.0.0")
           .withJUnitRunner()
           .build();
 
