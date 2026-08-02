@@ -91,6 +91,86 @@
       mavenToolchain = pkgs: { inherit (pkgs) jdk25 maven shfmt shellcheck which; };
       mavenBuildInputs = pkgs: builtins.attrValues (mavenToolchain pkgs);
 
+      # Host ~/.m2 reuse for the Maven-in-nix builds. These read the host env at eval
+      # time — they resolve ONLY when the eval is IMPURE. rke2lab as the top-level flake
+      # has `nixConfig.pure-eval = false`, but when nix-darwin-home consumes it as an
+      # input (building netplanJar via lib.networkBlueprint) that config is ignored and
+      # the eval is PURE → getEnv returns "" → hostM2Repo becomes "/.m2/repository" and
+      # hostGHToken "". So that path MUST be evaluated impurely: `darwin-rebuild … --impure`
+      # (or the equivalent on the consuming flake). Without it the seed below copies
+      # nothing and the build dies resolving staging-extension from central.
+      hostM2Repo = "${builtins.getEnv "M2_REPO"}";
+      hostGHToken = "${builtins.getEnv "GH_TOKEN"}";
+
+      # The io.nxmatic closure the `.mvn/extensions.xml` core extension needs at
+      # bootstrap: staging-extension + its bnd-read dep + the parent-POM chain
+      # (aggregator maven-embed-staging-ext → build-parent → root rke2lab). Model
+      # building resolves every link BEFORE any POM, by the BootstrapCoreExtensionManager
+      # — which does NOT consult maven.repo.local.tail (the tail is wired into the main
+      # build's resolver only). So the whole closure must be seeded into the PRIMARY,
+      # from the host ~/.m2 where it is `mvn install`ed.
+      stagingExtensionClosure = [
+        "io/nxmatic/rke2lab/staging-extension"
+        "io/nxmatic/rke2lab/bnd-read"
+        "io/nxmatic/rke2lab/maven-embed-staging-ext"
+        "io/nxmatic/rke2lab/build-parent"
+        "io/nxmatic/rke2lab/rke2lab"
+      ];
+
+      # Shared Maven-in-nix plumbing for both reactor derivations: a buildPhase prelude
+      # that sets up a writable $M2_REPO, SEEDS the staging-extension closure into it
+      # (mechanism 1 below), and defines `mvnHost` — an `mvn` wrapper pinning that primary
+      # + the host ~/.m2 as a READ-ONLY tail (mechanism 2), with GH_TOKEN. Each derivation
+      # opens its buildPhase with `${mavenHostPrelude}`, then calls `mvnHost <goals>`.
+      #
+      # (1) The CORE extension resolves at bootstrap from the seeded primary (the tail is
+      #     invisible to that early resolver — see stagingExtensionClosure).
+      # (2) The MAIN build's released private deps (java-bbox-api-client, java-systemd
+      #     3.0.0-rc.2) come from the host ~/.m2 as a read-only tail — the build user can't
+      #     WRITE the host repo (Maven tracking files → AccessDeniedException), so it's a
+      #     tail, not the primary; public deps download into the temp primary.
+      #
+      # Both mechanisms read host state (hostM2Repo) → the eval must be impure (see above).
+      # The seed guard turns an empty getEnv into a clear error instead of a cryptic
+      # "staging-extension not found in central" 200 lines later.
+      mavenHostPrelude = ''   
+        : "Point M2_REPO at the writable build dir so the JVM's user.home-derived default"
+        : "local repo ($HOME/.m2/repository\) IS the seeded primary — covers the bootstrap"
+        : "resolver whether it honors -Dmaven.repo.local or falls back to user.home. The"
+        : "tail path ($hostM2Repo) is baked at eval time, so this override doesn't touch it."
+        export HOME="$TMPDIR"
+        M2_REPO="$HOME/.m2/repository"
+        mkdir -p "$M2_REPO"
+
+        for a in ${builtins.concatStringsSep " " stagingExtensionClosure}; do
+          src=${hostM2Repo}/$a
+          if [ -d "$src" ]; then
+            mkdir -p "$M2_REPO/$(dirname "$a")"
+            cp -r "$src" "$M2_REPO/$a"
+            chmod -R u+w "$M2_REPO/$a"
+          fi
+        done
+
+        if [ ! -d "$M2_REPO/io/nxmatic/rke2lab/staging-extension" ]; then
+          cat <<EoE
+          FATAL: staging-extension not seeded from '${hostM2Repo}'." >&2
+          That path has no ~/.m2 artifacts. Either:
+            - pass your M2_REPO and GH_TOKEN through, e.g.:
+                 sudo env M2_REPO="\$HOME" GH_TOKEN="\$(gh auth token)"
+                   darwin-rebuild switch --impure --flake .#nikopol
+        EoE
+          exit 1
+        fi  
+
+        mvnHost() {
+          env GH_TOKEN="${hostGHToken}" mvn \
+            -Dmaven.repo.local="$M2_REPO" \
+            -Dmaven.repo.local.tail="${hostM2Repo}" \
+            -Dmaven.repo.local.tail.ignoreAvailability=true \
+            "$@"
+        }
+      '';
+
       # netplan JAR build, parameterized by pkgs so the per-system `packages`
       # output can build it locally while `lib` uses the pinned set.
       netplanJarFor = pkgs: pkgs.stdenv.mkDerivation {
@@ -100,18 +180,16 @@
         nativeBuildInputs = mavenBuildInputs pkgs;
 
         buildPhase = ''
-          # Maven needs a writable HOME for .m2/repository
-          mkdir -p $TMPDIR/.m2
+          ${mavenHostPrelude}
+
           # Install parent POM and BOM first, then build the netplan CLI module.
           # netplan-cli depends on the pure netplan core (osgi/netplan/netplan-core),
           # so it builds through the reactor (`-pl :netplan-cli -am`) rather than a
           # standalone `-f` — `-am` pulls the core sibling from source.
-          mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-            install:install-file -Dfile=pom.xml -DpomFile=pom.xml
-          mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-            -f bom/pom.xml install
-          mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-            -pl :netplan-cli -am \
+          mvnHost install:install-file -Dfile=pom.xml -DpomFile=pom.xml
+          mvnHost -f build-parent/pom.xml install
+          mvnHost -f bom/pom.xml install
+          mvnHost -pl :netplan-cli -am \
             -Dshfmt.version=${pkgs.shfmt.version} clean package -DskipTests
         '';
 
@@ -186,25 +264,10 @@
         # from the immutable store rather than a mutable target/. seed-master
         # depends on manifests, netplan, systemd-contract and sdks/incus, so the
         # whole reactor is built once from the parent pom. Mirrors netplanJar's
-        # Maven-in-nix pattern; the build runs with sandbox=false (per the host
-        # nix.conf) so Maven can resolve its dependency tree.
-        #
-        # The reactor depends on private GitHub Packages artifacts
-        # (io.nxmatic:java-bbox-api-client, java-systemd) that need auth. Rather
-        # than plumb a token into the sandbox, reuse the host `~/.m2/repository`,
-        # which the dev loop has already populated with these (release) artifacts.
-        # The build user can't WRITE to the host repo, so it can't be the primary
-        # local repo (Maven writes tracking files there → AccessDeniedException).
-        # Instead use Maven 3.9's chained local repo: a writable $TMPDIR primary
-        # plus the host repo as a READ-ONLY tail (`maven.repo.local.tail`).
-        # Private deps resolve from the read-only tail (no write attempt, no 401);
-        # public deps read through and download into the temp primary. This makes
-        # the build impure (reads host state via `getEnv "HOME"`); the top-level
-        # `nixConfig.pure-eval = false` lets `nix build .#seed-master` run it
-        # without a manual `--impure`.
-        hostM2Settings = "${builtins.getEnv "HOME"}/.m2/settings";
-        hostM2Repo = "${builtins.getEnv "HOME"}/.m2/repository";
-        hostGHToken = "${builtins.getEnv "GH_TOKEN"}";
+        # Maven-in-nix pattern (shared `mavenHostPrelude` — full rationale there);
+        # the build runs with sandbox=false (per the host nix.conf) so Maven can
+        # resolve its dependency tree. java-systemd 3.0.0-rc.2 is a release now, so
+        # the tail serves it — no seed needed beyond the staging-extension closure.
         seedMasterJar = pkgs.stdenv.mkDerivation {
           name = "rke2lab-seed-master";
           src = ./.;
@@ -212,47 +275,11 @@
           nativeBuildInputs = mavenBuildInputs pkgs;
 
           buildPhase = ''
-            set -euo pipefail
-            M2_REPO=$TMPDIR/.m2/repository
-            mkdir -p $M2_REPO
-
-            # Reuse strategy (see above): writable $TMPDIR primary + host repo as
-            # read-only tail (`maven.repo.local.tail`). The tail serves released
-            # deps (e.g. io.nxmatic:java-bbox-api-client) and is auth-backed via
-            # the host settings + GH_TOKEN for GitHub Packages.
-            #
-            # EXCEPTION: locally-`mvn install`ed SNAPSHOTs (here
-            # com.github.thjomnx:java-systemd:3.0.0-SNAPSHOT — the upstream
-            # project, present in no remote repo) cannot be served from the tail:
-            # a tail repo's manager won't treat a `maven-metadata-local.xml`
-            # artifact as locally installed, so for a SNAPSHOT it demands remote
-            # timestamped metadata that doesn't exist → "Could not find"
-            # (ignoreAvailability doesn't help — it flips availability, not the
-            # local-install determination). Seed such artifacts into the writable
-            # primary, copying `_remote.repositories` so Maven still reads them as
-            # local installs. Add more lines here if other local-only deps appear.
-            #
-            # NOTE: the multi-user nix build user must be able to traverse the
-            # host home to read the tail/seed source. nix-darwin-home grants this
-            # (home.activation.ensureHomeTraversable: `chmod a+x $HOME`); if the
-            # build can't reach `~/.m2`, that step hasn't run.
-            for a in com/github/thjomnx/java-systemd; do
-              src=${hostM2Repo}/$a
-              if [ -d "$src" ]; then
-                mkdir -p "$M2_REPO/$(dirname "$a")"
-                cp -r "$src" "$M2_REPO/$a"
-                chmod -R u+w "$M2_REPO/$a"
-              fi
-            done
+            ${mavenHostPrelude}
 
             # Pin spotless's shfmt to the flake binary so its version-check
             # matches the binary on PATH.
-            env GH_TOKEN="${hostGHToken}" mvn \
-              -Dmaven.settings="${hostM2Settings}" \
-              -Dmaven.repo.local="$M2_REPO" \
-              -Dmaven.repo.local.tail="${hostM2Repo}" \
-              -Dmaven.repo.local.tail.ignoreAvailability=true \
-              -Dshfmt.version=${pkgs.shfmt.version} -DskipTests clean package
+            mvnHost -Dshfmt.version=${pkgs.shfmt.version} -DskipTests clean package
           '';
 
           installPhase = ''
