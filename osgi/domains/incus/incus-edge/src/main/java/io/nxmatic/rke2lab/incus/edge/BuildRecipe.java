@@ -7,28 +7,28 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * The edge-owned image-build recipe — the {@code remote-build-incus-image.sh} driver and the {@code
- * incus-distrobuilder.yaml} distrobuilder config, both bundle resources. The single owner of the
- * recipe bytes: the {@link #digest()} folds both, so a change to EITHER invalidates the host's
- * image cache, and it is the SAME digest whether the run cultivates (builds for real) or surveys
- * (plans only) — the host cache key must not move between the two. Shared by the {@code
- * Cultivating}/{@code Surveying} builder pair so neither owns the resource plumbing alone.
+ * The edge-owned image-build recipe — the {@code build-node-base-image.sh} nix driver (a bundle
+ * resource). The single owner of the recipe bytes: the {@link #digest()} folds it, so a change to
+ * the driver invalidates the host's image cache, and it is the SAME digest whether the run
+ * cultivates (builds for real) or surveys (plans only) — the host cache key must not move between
+ * the two. Shared by the {@code Cultivating}/{@code Surveying} builder pair so neither owns the
+ * resource plumbing alone.
+ *
+ * <p>The digest captures the build METHOD (how nix is invoked), not the image CONTENT: what {@code
+ * nixosConfigurations.rke2-node-base} evaluates to is determined by {@code flake.lock} + the {@code
+ * nixos/} modules, which the scion folds into the {@code buildChecksum} separately (it holds the
+ * worktree; the edge only holds bundle resources).
  */
 final class BuildRecipe {
 
-  static final String REMOTE_BUILD_SCRIPT_RESOURCE =
-      "io/nxmatic/rke2lab/incus/edge/remote-build-incus-image.sh";
-  static final String DISTROBUILDER_CONFIG_RESOURCE =
-      "io/nxmatic/rke2lab/incus/edge/incus-distrobuilder.yaml";
-  static final String CONFIG_FILENAME = "incus-distrobuilder.yaml";
+  static final String NIX_BUILD_SCRIPT_RESOURCE =
+      "io/nxmatic/rke2lab/incus/edge/build-node-base-image.sh";
 
-  /** A stable SHA-256 over both recipe resources — the host's image-cache key, mode-invariant. */
+  /** A stable SHA-256 over the nix build script — the host's image-cache key, mode-invariant. */
   String digest() {
     try {
       final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      digest.update(load(REMOTE_BUILD_SCRIPT_RESOURCE));
-      digest.update((byte) '\n');
-      digest.update(load(DISTROBUILDER_CONFIG_RESOURCE));
+      digest.update(load(NIX_BUILD_SCRIPT_RESOURCE));
       return HexFormat.of().formatHex(digest.digest());
     } catch (NoSuchAlgorithmException ex) {
       throw new ImageBuildException("SHA-256 is not available", ex);

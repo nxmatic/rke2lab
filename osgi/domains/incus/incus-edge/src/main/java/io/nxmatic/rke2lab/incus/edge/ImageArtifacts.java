@@ -10,10 +10,10 @@ import java.nio.file.Path;
  * directory} over the NFS automount — plus the recipe-digest marker that gates a rebuild.
  *
  * <p>Instance-passing: the edge constructs one from the artifact dir and the recipe digest, then
- * asks {@link #areFresh()} before shelling the (expensive) distrobuilder run and {@link #seal()}
- * after a successful build. An unchanged recipe reuses the existing artifacts instead of rebuilding
- * on every {@code up}; a changed {@code build.sh}/distrobuilder config moves the digest and forces
- * exactly one rebuild. Immutable — {@link #seal()} writes the filesystem, never this value.
+ * asks {@link #areFresh()} before shelling the (expensive) nix build and {@link #seal()} after a
+ * successful build. An unchanged recipe reuses the existing artifacts instead of rebuilding on
+ * every {@code up}; a changed nix build script moves the digest and forces exactly one rebuild.
+ * Immutable — {@link #seal()} writes the filesystem, never this value.
  */
 record ImageArtifacts(Path directory, String recipeDigest) {
 

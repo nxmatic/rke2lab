@@ -17,8 +17,8 @@
     contacts, because an Incus instance needs an Incus image (they are the same concern). incus-contract
     declares both verbs: the instance-reachability contact (IncusInstanceContact, shelled by incus-edge
     as `ssh … incus exec`, extracted from the host SeedSystemdAdapterEndpointGate) and the image-build
-    contact (ImageBuilder, shelled by incus-edge as `distrobuilder build-incus` locally or its ssh
-    recipe remotely, extracted from the host PulumiIncusImageProvider). incus-edge publishes both
+    contact (ImageBuilder, run by incus-edge as `nix build` locally or streamed over ssh
+    remotely, extracted from the host PulumiIncusImageProvider). incus-edge publishes both
     @Components. The host keeps the readiness orchestration and the Pulumi Image resource + cache, and
     composes each contact from the registry — the same shape as the shipped dbus-systemd and cluster
     edges.</description>

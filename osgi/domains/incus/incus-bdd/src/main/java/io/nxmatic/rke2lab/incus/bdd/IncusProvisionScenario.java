@@ -272,9 +272,10 @@ public class IncusProvisionScenario
 
   /**
    * The image-build request the scion drives. When both amendments are present (a live cultivating
-   * run) it is derived from them: {@code distrobuilder} lives only on the remote {@code
-   * builderHost} ({@code bioskop-nixos}), so the edge always shells the build over ssh. The
-   * workspace it {@code cd}s into is the worktree root rebased onto the NFS automount view ({@code
+   * run) it is derived from them: the incus daemon lives only on the remote {@code builderHost}
+   * ({@code bioskop-nixos}), so from the seed-master host the edge streams the nix build over ssh
+   * (nix alone resolves on the Mac, but no local daemon to import into). The workspace it {@code
+   * cd}s into is the worktree root rebased onto the NFS automount view ({@code
    * BootstrapPaths.asAutomountView}, e.g. {@code /net/bioskop.local/private/ …}), the SAME view the
    * Mac reads the artifacts back through. The artifact dir is that root's OWN subpath, so it rides
    * as a path RELATIVE to the workspace and the recipe joins the two — no second translation, and
@@ -285,8 +286,7 @@ public class IncusProvisionScenario
   private ImageBuildRequest imageRequest(
       Optional<Path> worktreeRoot, Optional<Facet> maybeFacet, Optional<Image> maybeImage) {
     if (maybeFacet.isEmpty() || maybeImage.isEmpty()) {
-      return new ImageBuildRequest(
-          "distrobuilder", "/srv/host/incus-build", "artifacts", "", "", "", "");
+      return new ImageBuildRequest("nix", "/srv/host/incus-build", "artifacts", "", "", "", "");
     }
     final Facet facet = maybeFacet.orElseThrow();
     final Image image = maybeImage.orElseThrow();
@@ -427,8 +427,8 @@ public class IncusProvisionScenario
     private final ScenarioGraft graft = new ScenarioGraft();
 
     public When the_image_is_built(@Hidden ImageBuildRequest request) {
-      // Mode-blind: the frontier already chose the builder — CultivatingDistrobuilderImageBuilder
-      // (shells distrobuilder/ssh) or SurveyingImageBuilder (plans, shells nothing). The scion just
+      // Mode-blind: the frontier already chose the builder — CultivatingNixosImageBuilder
+      // (shells nix/ssh) or SurveyingImageBuilder (plans, shells nothing). The scion just
       // drives it; a surveying run touches nothing and the step renders PENDING.
       final Optional<String> failure = imageBuilder.orElseThrow().build(request);
       if (failure.isPresent()) {
@@ -683,6 +683,7 @@ public class IncusProvisionScenario
                   image.builderBinary(),
                   image.builderHost(),
                   imageBuilder.orElseThrow().recipeDigest(),
+                  resolved.worktreeRoot(),
                   Path.of(image.sharedFolder()),
                   resolved.cloudSeedRoot())
               .assemble(networkView, mounts);

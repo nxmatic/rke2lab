@@ -121,7 +121,7 @@ public class IncusProvisionScenarioInContainerTest {
   @Test
   void a_survey_run_selects_surveying_and_renders_pending() throws Exception {
     // Mode-blind scion. TOUCH: under a surveying gate the FRONTIER hands it the surveying builder,
-    // never the cultivating one (which would shell distrobuilder/ssh). Register BOTH halves tagged,
+    // never the cultivating one (which would shell nix/ssh). Register BOTH halves tagged,
     // and prove the frontier picked surveying. RENDER: every step narrates PENDING.
     final RecordingImageBuilder cultivating = new RecordingImageBuilder();
     final RecordingImageBuilder surveying = new RecordingImageBuilder();
@@ -316,7 +316,7 @@ public class IncusProvisionScenarioInContainerTest {
     return new ImageBuilder() {
       @Override
       public Optional<String> build(ImageBuildRequest request) {
-        return Optional.of("distrobuilder exited non-zero");
+        return Optional.of("nix build exited non-zero");
       }
 
       @Override

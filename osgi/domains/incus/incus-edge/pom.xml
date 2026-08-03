@@ -14,8 +14,8 @@
   <name>osgi/domains/incus/incus-edge</name>
   <description>The live incus edge: two @Components toward an Incus host. ProcessBuilderIncusInstanceContact
     satisfies IncusInstanceContact by shelling `ssh … incus exec` (the instance-reachability contact
-    formerly inlined in the host SeedSystemdAdapterEndpointGate); DistrobuilderImageBuilder satisfies
-    ImageBuilder by shelling `distrobuilder build-incus` locally or streaming its bundled ssh recipe
+    formerly inlined in the host SeedSystemdAdapterEndpointGate); CultivatingNixosImageBuilder satisfies
+    ImageBuilder by running `nix build` locally or streaming its bundled build script over ssh
     remotely (the build mechanism formerly inlined in the host PulumiIncusImageProvider). Pure
     ProcessBuilder over the JDK, no embedded third-party jars (the recipe rides as a bundle resource),
     mirroring cluster-edge's kubectl contact.</description>

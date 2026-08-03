@@ -37,7 +37,7 @@ public record BootstrapConfig(
   private static final String DEFAULT_CLUSTER_NAME = "bioskop";
   private static final String DEFAULT_NODE_NAME = "master";
   private static final String DEFAULT_INCUS_PROJECT = "rke2lab";
-  private static final String DEFAULT_IMAGE_ALIAS = "control-node";
+  private static final String DEFAULT_IMAGE_ALIAS = "control-node-base";
   private static final String DEFAULT_PROFILE_NAME = "rke2lab";
   private static final String DEFAULT_LAN_BRIDGE_PARENT = "lan-br";
   private static final String DEFAULT_VMNET_NETWORK_NAME = "vmnet-br";
@@ -114,7 +114,7 @@ public record BootstrapConfig(
   }
 
   public String imageBuilderBinary() {
-    return "distrobuilder";
+    return "nix";
   }
 
   public String netPrefix() {

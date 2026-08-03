@@ -3,13 +3,13 @@ package io.nxmatic.rke2lab.incus.contract;
 import java.util.Optional;
 
 /**
- * The incus domain's image-build contact seam: produce the seed image's distrobuilder artifacts
- * ({@code incus.tar.xz} + {@code rootfs.squashfs}) in the request's artifact directory. The {@code
- * incus-image-edge} provides it by shelling {@code distrobuilder build-incus} locally when the
- * binary is on {@code PATH}, otherwise by streaming its remote build recipe over {@code ssh} to the
- * builder host. The host keeps the Pulumi {@code Image} resource, the artifact cache, and the
- * config-derived path translation, and composes this contact only when a rebuild is actually
- * needed.
+ * The incus domain's image-build contact seam: produce the seed image's Incus artifacts ({@code
+ * incus.tar.xz} + {@code rootfs.squashfs}) in the request's artifact directory. The {@code
+ * incus-image-edge} provides it by running the bundled nix build script locally when {@code nix}
+ * and {@code incus} both resolve on {@code PATH}, otherwise by streaming that script over {@code
+ * ssh} to the builder host. The host keeps the Pulumi {@code Image} resource, the artifact cache,
+ * and the config-derived path translation, and composes this contact only when a rebuild is
+ * actually needed.
  *
  * <p>The grain is coarse — one call runs a whole build — but it owns no caching and no policy: it
  * builds when asked and throws on failure.

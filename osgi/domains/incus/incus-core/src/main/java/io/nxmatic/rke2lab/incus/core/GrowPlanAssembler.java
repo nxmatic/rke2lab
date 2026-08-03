@@ -36,6 +36,7 @@ public final class GrowPlanAssembler {
   private final String builderBinary;
   private final String builderHost;
   private final String recipeDigest;
+  private final Path imageSourceRoot;
   private final Path sharedFolder;
   private final Path cloudSeedRoot;
 
@@ -44,12 +45,14 @@ public final class GrowPlanAssembler {
       String builderBinary,
       String builderHost,
       String recipeDigest,
+      Path imageSourceRoot,
       Path sharedFolder,
       Path cloudSeedRoot) {
     this.imageAlias = imageAlias;
     this.builderBinary = builderBinary;
     this.builderHost = builderHost;
     this.recipeDigest = recipeDigest;
+    this.imageSourceRoot = imageSourceRoot;
     this.sharedFolder = sharedFolder;
     this.cloudSeedRoot = cloudSeedRoot;
   }
@@ -75,9 +78,12 @@ public final class GrowPlanAssembler {
 
   /**
    * The image-cache key the host poses on {@code user.rke2lab.imageBuildChecksum}: SHA-256 of the
-   * edge {@code recipeDigest} (which already folds the build script + distrobuilder config) with
-   * the three image scalars, each separated by {@code '\n'}. The scion is the only place that holds
-   * all four (the recipe digest comes from the edge, OSGi-side); the host recomputes nothing.
+   * edge {@code recipeDigest} (the build METHOD — how nix is invoked) folded with the three image
+   * scalars AND the {@code imageSourceDigest} (the build CONTENT — what {@code
+   * nixosConfigurations.rke2-node-base} evaluates to). The recipe digest is mode-invariant and
+   * bundle-only, so it cannot see the workspace's nix sources; the scion holds the worktree and
+   * folds them here, so editing {@code node-base.nix} or bumping {@code flake.lock} moves the
+   * checksum and {@code replaceOnChanges} recreates the instance onto the new image.
    */
   private String buildChecksum() {
     final MessageDigest digest = sha256();
@@ -88,7 +94,42 @@ public final class GrowPlanAssembler {
     digest.update(builderBinary.getBytes(StandardCharsets.UTF_8));
     digest.update((byte) '\n');
     digest.update(builderHost.getBytes(StandardCharsets.UTF_8));
+    digest.update((byte) '\n');
+    digest.update(imageSourceDigest().getBytes(StandardCharsets.UTF_8));
     return HexFormat.of().formatHex(digest.digest());
+  }
+
+  /**
+   * SHA-256 of the nix sources that determine the built image — {@code flake.lock} (the pinned
+   * inputs: nixpkgs, flox, flox-runtime), {@code flake.nix} (the nixosConfiguration wiring), and
+   * every file under {@code nixos/} (the modules) — folded over the sorted set with path + NUL +
+   * bytes, so two identical trees hash identically. A missing file/dir contributes nothing but the
+   * digest stays stable. Read-only (like {@link #cloudInitChecksum()}): no shelling, so it is
+   * identical whether the run cultivates or surveys.
+   */
+  private String imageSourceDigest() {
+    final MessageDigest digest = sha256();
+    foldFile(digest, imageSourceRoot.resolve("flake.lock"));
+    foldFile(digest, imageSourceRoot.resolve("flake.nix"));
+    final Path nixosDir = imageSourceRoot.resolve("nixos");
+    if (Files.isDirectory(nixosDir)) {
+      try (Stream<Path> files = Files.walk(nixosDir)) {
+        files.filter(Files::isRegularFile).sorted().forEach(file -> foldFile(digest, file));
+      } catch (IOException ex) {
+        throw new UncheckedIOException("cannot walk the nix sources under " + nixosDir, ex);
+      }
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
+  private void foldFile(MessageDigest digest, Path file) {
+    if (!Files.isRegularFile(file)) {
+      return;
+    }
+    digest.update((byte) '\n');
+    digest.update(imageSourceRoot.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
+    digest.update((byte) 0);
+    digest.update(readAll(file));
   }
 
   /**

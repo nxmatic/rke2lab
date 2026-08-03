@@ -16,23 +16,26 @@ import java.util.Set;
 import org.osgi.service.component.annotations.Component;
 
 /**
- * The CULTIVATING incus image-build edge — the single live door. Produces the seed image's
- * distrobuilder artifacts by shelling {@code distrobuilder build-incus} when the binary is on
- * {@code PATH}, otherwise by streaming the bundled build recipe over {@code ssh} to the builder
- * host. The {@code ProcessBuilder} mechanism formerly inlined in the host {@code
- * PulumiIncusImageProvider}.
+ * The CULTIVATING incus image-build edge — the single live door. Builds the NixOS node substrate's
+ * Incus artifacts ({@code incus.tar.xz} + {@code rootfs.squashfs}) by running the bundled nix build
+ * script: {@code nix build …#nixosConfigurations.rke2-node-base.config.system.build.{metadata,
+ * squashfs}}, then {@code incus image import} + alias. It runs the script LOCALLY when both the nix
+ * builder AND the incus client resolve on {@code PATH} (the host is the builder+daemon host),
+ * otherwise it streams the same script over {@code ssh} to the configured builder host.
  *
  * <p>One of the ImageBuilder PAIR: registered with {@code rke2lab.gardening=cultivating} so the
  * frontier picks it when the ambient RunGate is cultivating. Its twin, {@link
- * SurveyingImageBuilder}, plans the build without shelling anything. The build recipe (both bundle
- * resources) is owned by the shared {@link BuildRecipe}, so both impls report the SAME {@link
+ * SurveyingImageBuilder}, plans the build without shelling anything. The build script (the bundle
+ * resource) is owned by the shared {@link BuildRecipe}, so both impls report the SAME {@link
  * #recipeDigest()} — the host's image-cache key must not move between the two modes.
  *
- * <p><b>Runtime dependency:</b> {@code distrobuilder} (+ {@code sudo}) locally, or {@code ssh} and
- * key-based access to the builder host.
+ * <p><b>Runtime dependency:</b> {@code nix} and {@code incus} locally, or {@code ssh} and key-based
+ * access to the builder host. Unlike the former distrobuilder edge it needs no root and no tmpfs
+ * scratch: nix realises the artifacts into {@code /nix/store} and only the two finished files are
+ * published to the artifact dir.
  */
 @Component(service = ImageBuilder.class, property = "rke2lab.gardening=cultivating")
-public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder {
+public final class CultivatingNixosImageBuilder implements ImageBuilder {
 
   private final BuildRecipe recipe = new BuildRecipe();
 
@@ -55,10 +58,14 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
       return;
     }
 
-    final Path workspace = Path.of(request.workspaceDir());
-    final String localExecutable = tryResolveExecutable(request.builderBinary());
-    if (!localExecutable.isBlank()) {
-      runLocalBuildOrThrow(workspace, localExecutable, request.localArtifactDir());
+    // Local build needs BOTH the nix builder AND the incus client (the daemon the build imports
+    // into): nix alone resolves on the seed-master host too, where no incus daemon lives, so it is
+    // not an "am I the builder host" signal by itself. Missing either ⇒ stream the build to the
+    // configured builder host over ssh.
+    final String localNix = tryResolveExecutable(request.builderBinary());
+    final String localIncus = tryResolveExecutable("incus");
+    if (!localNix.isBlank() && !localIncus.isBlank()) {
+      runLocalBuildOrThrow(request, localNix);
     } else {
       runRemoteBuildOrThrow(request);
     }
@@ -71,18 +78,24 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
     return recipe.digest();
   }
 
-  private void runLocalBuildOrThrow(Path workspace, String executable, String artifactDir) {
-    final Path configFile = materializeConfig();
+  private void runLocalBuildOrThrow(ImageBuildRequest request, String nixExecutable) {
+    final Path script = materializeScript();
     try {
-      final List<String> buildCommand =
-          buildIncusAsRootCommand(executable, configFile.toString(), artifactDir);
       runCommandOrThrow(
-          workspace, buildCommand, "Failed to build Incus image artifacts using distrobuilder");
+          Path.of(request.workspaceDir()),
+          List.of(
+              "sh",
+              script.toString(),
+              request.workspaceDir(),
+              request.localArtifactDir(),
+              nixExecutable,
+              request.incusProject()),
+          "Failed to build the NixOS node image with nix");
     } finally {
       try {
-        Files.deleteIfExists(configFile);
+        Files.deleteIfExists(script);
       } catch (IOException ignored) {
-        // A leftover temp config is harmless; the build outcome already stands.
+        // A leftover temp script is harmless; the build outcome already stands.
       }
     }
   }
@@ -91,13 +104,11 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
     final String remoteHost = request.remoteHost();
     if (remoteHost.isBlank()) {
       throw new ImageBuildException(
-          "Unable to locate local executable '"
-              + request.builderBinary()
-              + "' and no remote image.builderHost is configured");
+          "nix is not available locally (or there is no local incus daemon to import into) and no"
+              + " remote image.builderHost is configured");
     }
 
-    final String binary =
-        request.builderBinary().isBlank() ? "distrobuilder" : request.builderBinary();
+    final String binary = request.builderBinary().isBlank() ? "nix" : request.builderBinary();
 
     runRemoteBootstrapOverSshOrThrow(
         Path.of(request.workspaceDir()),
@@ -107,42 +118,19 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
             request.remoteArtifactDir(),
             binary,
             request.incusProject()),
-        "Failed to build Incus image artifacts on remote builder host " + remoteHost);
+        "Failed to build the NixOS node image on remote builder host " + remoteHost);
   }
 
-  /** Write the bundled distrobuilder config to a temp file for a local {@code build-incus}. */
-  private Path materializeConfig() {
+  /** Write the bundled nix build script to a temp file for a local run. */
+  private Path materializeScript() {
     try {
-      final Path configFile = Files.createTempFile("incus-distrobuilder-", ".yaml");
-      Files.write(configFile, recipe.load(BuildRecipe.DISTROBUILDER_CONFIG_RESOURCE));
-      return configFile;
+      final Path script = Files.createTempFile("build-node-base-", ".sh");
+      Files.write(script, recipe.load(BuildRecipe.NIX_BUILD_SCRIPT_RESOURCE));
+      return script;
     } catch (IOException ex) {
       throw new ImageBuildException(
-          "Failed to materialise distrobuilder config: " + ex.getMessage(), ex);
+          "Failed to materialise the nix build script: " + ex.getMessage(), ex);
     }
-  }
-
-  private List<String> buildIncusAsRootCommand(
-      String distrobuilderExecutable, String configPath, String artifactDir) {
-    final List<String> buildCommand =
-        List.of(distrobuilderExecutable, "build-incus", configPath, artifactDir);
-
-    if (isRunningAsRoot()) {
-      return buildCommand;
-    }
-
-    final String sudoExecutable = tryResolveExecutable("sudo");
-    if (sudoExecutable.isBlank()) {
-      throw new ImageBuildException(
-          "distrobuilder build requires root privileges, but sudo was not found");
-    }
-
-    return List.of(
-        sudoExecutable, "-n", distrobuilderExecutable, "build-incus", configPath, artifactDir);
-  }
-
-  private boolean isRunningAsRoot() {
-    return "root".equals(System.getProperty("user.name", ""));
   }
 
   private String tryResolveExecutable(String configuredBinary) {
@@ -170,22 +158,12 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
       }
     }
 
-    final String javaHome = System.getProperty("java.home", "");
-    if (!javaHome.isBlank()) {
-      searchDirectories.add(Path.of(javaHome).resolve("bin").toAbsolutePath().normalize());
-    }
-
     searchDirectories.add(Path.of("/run/current-system/sw/bin"));
     searchDirectories.add(Path.of("/nix/var/nix/profiles/default/bin"));
     searchDirectories.add(Path.of("/opt/homebrew/bin"));
     searchDirectories.add(Path.of("/usr/local/bin"));
     searchDirectories.add(Path.of("/usr/bin"));
     searchDirectories.add(Path.of("/bin"));
-
-    final String home = System.getProperty("user.home", "");
-    if (!home.isBlank()) {
-      searchDirectories.add(Path.of(home).resolve(".flox/bin").toAbsolutePath().normalize());
-    }
 
     for (Path directory : searchDirectories) {
       final Path candidate = directory.resolve(trimmedBinary).normalize();
@@ -273,18 +251,14 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
 
   /**
    * The self-contained bootstrap streamed to the builder over {@code ssh … sh -s}. It decodes the
-   * two bundle resources (the driver script + the distrobuilder config) from base64 heredocs into a
-   * throwaway temp dir, then runs the driver with the config it just wrote. base64 keeps the
-   * heredoc delimiters collision-free (the payload can be any text/binary) and needs nothing beyond
-   * coreutils. Positional args from {@code sh -s}: {@code $1}=remote workspace, {@code $2}=artifact
-   * dir, {@code $3}=builder binary, {@code $4}=incus project; the config path is the temp file this
-   * bootstrap writes.
+   * bundled build script from a base64 heredoc into a throwaway temp dir and runs it. base64 keeps
+   * the heredoc delimiter collision-free and needs nothing beyond coreutils. Positional args from
+   * {@code sh -s}: {@code $1}=remote workspace, {@code $2}=artifact dir, {@code $3}=nix binary,
+   * {@code $4}=incus project.
    */
   private String remoteBootstrap() {
     final String scriptB64 =
-        Base64.getEncoder().encodeToString(recipe.load(BuildRecipe.REMOTE_BUILD_SCRIPT_RESOURCE));
-    final String configB64 =
-        Base64.getEncoder().encodeToString(recipe.load(BuildRecipe.DISTROBUILDER_CONFIG_RESOURCE));
+        Base64.getEncoder().encodeToString(recipe.load(BuildRecipe.NIX_BUILD_SCRIPT_RESOURCE));
     return String.join(
         "\n",
         "set -eu",
@@ -294,12 +268,7 @@ public final class CultivatingDistrobuilderImageBuilder implements ImageBuilder 
         "base64 -d > \"$tmp_dir/build.sh\" <<'B64SCRIPT'",
         scriptB64,
         "B64SCRIPT",
-        "base64 -d > \"$tmp_dir/" + BuildRecipe.CONFIG_FILENAME + "\" <<'B64CONFIG'",
-        configB64,
-        "B64CONFIG",
         "chmod 700 \"$tmp_dir/build.sh\"",
-        "\"$tmp_dir/build.sh\" \"$1\" \"$tmp_dir/"
-            + BuildRecipe.CONFIG_FILENAME
-            + "\" \"$2\" \"$3\" \"$4\"");
+        "\"$tmp_dir/build.sh\" \"$1\" \"$2\" \"$3\" \"$4\"");
   }
 }
