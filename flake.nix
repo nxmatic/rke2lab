@@ -155,7 +155,7 @@
           cat <<EoE
           FATAL: staging-extension not seeded from '${hostM2Repo}'." >&2
           That path has no ~/.m2 artifacts. Either:
-            - pass your M2_REPO and GH_TOKEN through, e.g.:
+            - pass your M2_REPO and GH_TOKEN lathrough, e.g.:
                  sudo env M2_REPO="\$HOME" GH_TOKEN="\$(gh auth token)"
                    darwin-rebuild switch --impure --flake .#nikopol
         EoE
@@ -220,18 +220,19 @@
           '';
         };
 
-      # Pinned-system generation + IFD parse → the canonical, flat blueprint data.
+      # The consumed blueprint is PURE committed data — read from the checked-in
+      # network-blueprint.json, no IFD, no build. This is what lets any system evaluate
+      # `lib.networkBlueprint` without realizing the darwin-pinned netplan jar — notably
+      # an aarch64-linux nikopol-nixos with no darwin builder. The Java stays the source
+      # of truth, materialized into the JSON at regen time on a jar-capable host:
+      #   nix build .#networkBlueprintJson && cp result network-blueprint.json && commit
+      networkBlueprintData = builtins.fromJSON (builtins.readFile ./network-blueprint.json);
+
+      # Regeneration only (NOT on the consumed data path): the jar-built YAML on the
+      # pinned blueprintSystem, surfaced via networkBlueprintYamlPath for inspection.
+      # The blueprintSystem darwin pin now affects ONLY regeneration, never consumption.
       blueprintPkgs = nixpkgs.legacyPackages.${blueprintSystem};
       networkBlueprintYaml = networkBlueprintYamlFor blueprintPkgs;
-      networkBlueprintData = builtins.fromJSON (
-        builtins.readFile (
-          blueprintPkgs.runCommand "blueprint.json" {
-            buildInputs = [ blueprintPkgs.yq-go ];
-          } ''
-            ${blueprintPkgs.yq-go}/bin/yq -o=json '.' ${networkBlueprintYaml}/network-blueprint.yaml > $out
-          ''
-        )
-      );
 
       # Export network blueprint with Nix helpers. `deriveMacs` uses the
       # system-independent `nixpkgs.lib` (pure int/string functions) so the whole
@@ -289,9 +290,17 @@
           '';
         };
 
-        # Per-system inspectable build of the blueprint YAML (the canonical,
-        # consumed copy is the pinned one surfaced under the flat `lib`).
+        # Per-system inspectable build of the blueprint YAML, plus its JSON projection.
+        # networkBlueprintJson is the REGEN artifact for the checked-in data file — run
+        # on a jar-capable host (darwin/bioskop): `nix build .#networkBlueprintJson`,
+        # then `cp result network-blueprint.json` and commit. The consumed data reads
+        # that committed JSON purely (see the flat `lib`), so this is off the eval path.
         networkBlueprintYaml = networkBlueprintYamlFor pkgs;
+        networkBlueprintJson = pkgs.runCommand "network-blueprint.json" {
+          nativeBuildInputs = [ pkgs.yq-go ];
+        } ''
+          yq -o=json '.' ${networkBlueprintYamlFor pkgs}/network-blueprint.yaml > $out
+        '';
 
         # Darwin-buildable incus client. The full `incus` daemon is Linux-only
         # (requires lxc, libcap, cowsql, etc.), but nixpkgs ships a `client.nix`
@@ -444,7 +453,7 @@
 
       in {
         packages = {
-          inherit netplanJar networkBlueprintYaml seedMasterJar;
+          inherit netplanJar networkBlueprintYaml networkBlueprintJson seedMasterJar;
           seed-master = seedMasterJar;
           incus-client = incusClient;
           deploy = deployApp;
@@ -453,6 +462,39 @@
         apps.deploy = {
           type = "app";
           program = "${deployApp}/bin/rke2lab-deploy";
+          meta.description = "Build the seed-master jar and run pulumi preview/up against it";
+        };
+
+        # Regenerate the committed network-blueprint.json from the netplan jar. Run on a
+        # jar-capable host (bioskop/darwin) from the repo root: `nix run .#regen-blueprint`.
+        # The Java stays the source of truth; this materializes it into the checked-in file
+        # that every system then reads purely (no darwin builder on the consume path).
+        apps.regen-blueprint = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "regen-blueprint" ''
+            set -euo pipefail
+            cat ${networkBlueprintJson} > network-blueprint.json
+            echo "regenerated network-blueprint.json from ${networkBlueprintJson}"
+          '');
+          meta.description = "Regenerate the committed network-blueprint.json from the netplan jar";
+        };
+
+        # Anti-drift gate: fail if the committed JSON diverges from the jar output
+        # (compared canonically via jq -S, so formatting never trips it). Defined ONLY on
+        # blueprintSystem — absent elsewhere, so `nix flake check` on an aarch64-linux node
+        # never realizes the darwin-pinned jar.
+        checks = pkgs.lib.optionalAttrs (system == blueprintSystem) {
+          blueprint-fresh =
+            pkgs.runCommand "blueprint-fresh" { nativeBuildInputs = [ pkgs.jq ]; } ''
+              jq -S . ${./network-blueprint.json} > committed.json
+              jq -S . ${networkBlueprintJson} > fresh.json
+              if ! diff -u committed.json fresh.json; then
+                echo "network-blueprint.json is STALE vs the netplan Java source." >&2
+                echo "Regenerate on this jar-capable host: nix run .#regen-blueprint" >&2
+                exit 1
+              fi
+              touch $out
+            '';
         };
 
         # The declared source of truth for the Maven-build toolchain. `mvn` from
