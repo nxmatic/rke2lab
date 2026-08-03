@@ -16,6 +16,7 @@ plugins/
 mcp-needs-auth-cache.json
 .last-cleanup
 plans/
+telemetry/
 
 # Session checkpoints — private, auto-generated before compaction
 checkpoint-*.md
