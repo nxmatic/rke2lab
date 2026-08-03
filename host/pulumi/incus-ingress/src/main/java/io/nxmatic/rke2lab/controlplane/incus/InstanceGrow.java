@@ -262,7 +262,7 @@ public final class InstanceGrow {
     return List.copyOf(devices);
   }
 
-  private static InstanceDeviceArgs nic(
+  private InstanceDeviceArgs nic(
       String name, String hwaddr, String ifName, String nictype, String parent) {
     return device(
         name,
@@ -270,16 +270,15 @@ public final class InstanceGrow {
         Map.of("hwaddr", hwaddr, "name", ifName, "nictype", nictype, "parent", parent));
   }
 
-  private static InstanceDeviceArgs unixChar(String name, String source, String path) {
+  private InstanceDeviceArgs unixChar(String name, String source, String path) {
     return device(name, "unix-char", Map.of("source", source, "path", path));
   }
 
-  private static InstanceDeviceArgs disk(String name, String source, String path) {
+  private InstanceDeviceArgs disk(String name, String source, String path) {
     return device(name, "disk", Map.of("source", source, "path", path));
   }
 
-  private static InstanceDeviceArgs device(
-      String name, String type, Map<String, String> properties) {
+  private InstanceDeviceArgs device(String name, String type, Map<String, String> properties) {
     return InstanceDeviceArgs.builder().name(name).type(type).properties(properties).build();
   }
 }
