@@ -590,3 +590,4 @@ docs/architecture/**/diag-*.svg
 
 # Superpowers skill defaults to docs/superpowers/; our plans/specs live in wip/ (flat wip/plans, wip/specs).
 docs/superpowers/
+.claude/policy-limits.json
