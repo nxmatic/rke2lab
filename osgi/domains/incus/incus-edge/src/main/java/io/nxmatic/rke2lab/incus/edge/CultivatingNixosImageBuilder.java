@@ -52,12 +52,13 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
   }
 
   private void buildOrThrow(ImageBuildRequest request) {
-    final ImageArtifacts artifacts =
-        new ImageArtifacts(Path.of(request.localArtifactDir()), recipe.digest());
-    if (artifacts.areFresh()) {
-      return;
-    }
-
+    // No freshness short-circuit: nix build is idempotent and cheap when the derivation is already
+    // realised, and the import tail is fingerprint-guarded — so we always run the script and let
+    // nix
+    // decide whether a rebuild is needed. (The former distrobuilder cache existed only because a
+    // distrobuilder run always rebuilt from scratch; nix does not, and keying a cache on the build
+    // script's hash alone would serve a STALE image whenever only the committed sources changed.)
+    //
     // Local build needs BOTH the nix builder AND the incus client (the daemon the build imports
     // into): nix alone resolves on the seed-master host too, where no incus daemon lives, so it is
     // not an "am I the builder host" signal by itself. Missing either ⇒ stream the build to the
@@ -69,8 +70,6 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
     } else {
       runRemoteBuildOrThrow(request);
     }
-
-    artifacts.seal();
   }
 
   @Override

@@ -23,14 +23,22 @@ case "$artifact_dir" in
 esac
 mkdir -p "$artifact_dir"
 
-# The homogeneous NixOS substrate every RKE2 node boots from. Build its two Incus artifacts from the
-# flake in the workspace: nix realises them into /nix/store (local, content-addressed) — no tmpfs
-# scratch and no root, unlike distrobuilder. Only the two finished files are published below.
-attr="nixosConfigurations.rke2-node-base.config.system.build"
-nix_flags="--extra-experimental-features nix-command flakes --no-link --print-out-paths"
+# The worktree carries the git `relativeworktrees` extension, which nix's libgit2 cannot parse — a
+# `git+file://` fetch of it fails outright. Export the tracked tree at HEAD with real git (which DOES
+# understand the extension) into a throwaway dir, and build THAT as a path-flake: no git fetch, and
+# always exactly what is committed. flake.lock rides in the archive, so the inputs stay pinned.
+src_dir="$(mktemp -d)"
+trap 'rm -rf "$src_dir"' EXIT
+git -C "$workspace" archive --format=tar HEAD | tar -x -C "$src_dir"
 
-metadata_out="$($nix_bin build $nix_flags "$workspace#$attr.metadata")"
-squashfs_out="$($nix_bin build $nix_flags "$workspace#$attr.squashfs")"
+# The homogeneous NixOS substrate every RKE2 node boots from. Build its two Incus artifacts: nix
+# realises them into /nix/store (local, content-addressed) — no tmpfs scratch and no root, unlike
+# distrobuilder. Only the two finished files are published below.
+attr="nixosConfigurations.rke2-node-base.config.system.build"
+nix_flags="--extra-experimental-features nix-command flakes --no-link --print-out-paths --accept-flake-config"
+
+metadata_out="$($nix_bin build $nix_flags "$src_dir#$attr.metadata")"
+squashfs_out="$($nix_bin build $nix_flags "$src_dir#$attr.squashfs")"
 
 # Locate the artifacts inside the nix outputs, layout-robust: the metadata is a *.tar.xz under the
 # metadata output, the rootfs a *.squashfs under the squashfs output (or the output path itself).
