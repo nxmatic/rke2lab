@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import org.osgi.service.component.annotations.Component;
 
@@ -40,18 +39,11 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
   private final BuildRecipe recipe = new BuildRecipe();
 
   @Override
-  public Optional<String> build(ImageBuildRequest request) {
-    // The internal plumbing throws the edge-private ImageBuildException deep in the process code;
-    // this boundary converts it once into the seam's human summary (empty = success).
-    try {
-      buildOrThrow(request);
-      return Optional.empty();
-    } catch (ImageBuildException failed) {
-      return Optional.of(failed.summary());
-    }
-  }
-
-  private void buildOrThrow(ImageBuildRequest request) {
+  public void build(ImageBuildRequest request) {
+    // The edge-private ImageBuildException (a RuntimeException carrying its message and, where it
+    // wraps one, its cause) is thrown deep in the process plumbing and propagates to the scenario,
+    // which chains it into the failed step so the runbook shows the reason AND the stack — rather
+    // than the caller collapsing it into a bare summary string here.
     // No freshness short-circuit: nix build is idempotent and cheap when the derivation is already
     // realised, and the import tail is fingerprint-guarded — so we always run the script and let
     // nix

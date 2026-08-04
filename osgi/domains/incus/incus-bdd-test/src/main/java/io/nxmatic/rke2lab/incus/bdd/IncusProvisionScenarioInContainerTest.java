@@ -300,9 +300,7 @@ public class IncusProvisionScenarioInContainerTest {
   private static ImageBuilder builds() {
     return new ImageBuilder() {
       @Override
-      public Optional<String> build(ImageBuildRequest request) {
-        return Optional.empty();
-      }
+      public void build(ImageBuildRequest request) {}
 
       @Override
       public String recipeDigest() {
@@ -311,12 +309,12 @@ public class IncusProvisionScenarioInContainerTest {
     };
   }
 
-  /** An ImageBuilder that reports a failed build (present = the failure summary). */
+  /** An ImageBuilder that reports a failed build (throws with the failure message). */
   private static ImageBuilder failsToBuild() {
     return new ImageBuilder() {
       @Override
-      public Optional<String> build(ImageBuildRequest request) {
-        return Optional.of("nix build exited non-zero");
+      public void build(ImageBuildRequest request) {
+        throw new RuntimeException("nix build exited non-zero");
       }
 
       @Override
@@ -333,9 +331,8 @@ public class IncusProvisionScenarioInContainerTest {
     boolean built;
 
     @Override
-    public Optional<String> build(ImageBuildRequest request) {
+    public void build(ImageBuildRequest request) {
       this.built = true;
-      return Optional.empty();
     }
 
     @Override

@@ -430,10 +430,14 @@ public class IncusProvisionScenario
       // Mode-blind: the frontier already chose the builder — CultivatingNixosImageBuilder
       // (shells nix/ssh) or SurveyingImageBuilder (plans, shells nothing). The scion just
       // drives it; a surveying run touches nothing and the step renders PENDING.
-      final Optional<String> failure = imageBuilder.orElseThrow().build(request);
-      if (failure.isPresent()) {
-        record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failure.get());
-        throw new AssertionError("incus image build failed: " + failure.get());
+      final ImageBuilder builder = imageBuilder.orElseThrow();
+      try {
+        builder.build(request);
+      } catch (RuntimeException failed) {
+        // The edge throws with its message AND (where it wraps one) its cause; chain it so the
+        // runbook shows the reason and the stack, not a bare summary string.
+        record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failed.getMessage());
+        throw new AssertionError("incus image build failed: " + failed.getMessage(), failed);
       }
       record("incus image", true, SymptomKind.IMAGE_BUILD_FAILED, null);
       return self();

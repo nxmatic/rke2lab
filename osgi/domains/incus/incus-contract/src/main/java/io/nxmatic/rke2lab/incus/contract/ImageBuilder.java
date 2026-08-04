@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.incus.contract;
 
-import java.util.Optional;
-
 /**
  * The incus domain's image-build contact seam: produce the seed image's Incus artifacts ({@code
  * incus.tar.xz} + {@code rootfs.squashfs}) in the request's artifact directory. The {@code
@@ -18,11 +16,13 @@ public interface ImageBuilder {
 
   /**
    * Build the artifacts described by {@code request}, blocking until they land in the artifact
-   * directory. Returns {@link Optional#empty()} on success; otherwise a short human summary of why
-   * the build failed (binary missing with no remote host configured, a non-zero build exit, an ssh
-   * failure). Never throws for a build failure.
+   * directory. Returns normally on success; on failure it THROWS an unchecked exception carrying a
+   * human message (binary missing with no remote host configured, a non-zero build exit, an ssh
+   * failure) AND, where the failure wraps one, the cause — so the caller surfaces both the reason
+   * and the stack, rather than a bare summary string. A surveying builder plans only and returns
+   * normally without touching anything.
    */
-  Optional<String> build(ImageBuildRequest request);
+  void build(ImageBuildRequest request);
 
   /**
    * A stable digest of the edge-owned build recipe (the remote build script). The host folds this
