@@ -12,10 +12,12 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
  * no worktree root and no {@code BootstrapPaths}.
  *
  * <p>Structure: a sub-view per coherent GROUP of fields ({@link GrowNetworkView}, {@link
- * GrowImageView}). The NixOS {@code node-base} substrate bakes the node's config, systemd units and
- * scripts into the image, so the instance takes NO host disk mounts and NO cloud-init seed — the
- * former {@code /srv/host} delivery mechanism is dissolved. Per-node identity and the manifests
- * (server-manifests) arrive through their own channels, not this plan's device set.
+ * GrowImageView}, {@link GrowIdentityView}). The NixOS {@code node-base} substrate bakes the node's
+ * config, systemd units and scripts into the image, so the instance takes NO host disk mounts and
+ * NO cloud-init seed — the former {@code /srv/host} delivery mechanism is dissolved. The only
+ * per-node difference is the identity view, posed as {@code user.rke2lab.node-*} keys the guest
+ * reads over devlxd; the manifests (server-manifests) arrive through their own channel, not this
+ * plan.
  *
  * <p>{@link SeedContract} binds it to the {@code instance-grow-plan} coordinate ({@link
  * IncusGrowCoordinate#INSTANCE_GROW_PLAN}) for the codec's decode guard. Unlike the OSGi-only
@@ -23,4 +25,5 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedContract;
  * host {@code SeedCodec} decodes it against its own flat copy.
  */
 @SeedContract("instance-grow-plan")
-public record InstanceGrowPlan(GrowNetworkView network, GrowImageView image) {}
+public record InstanceGrowPlan(
+    GrowNetworkView network, GrowImageView image, GrowIdentityView identity) {}

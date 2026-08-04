@@ -17,6 +17,7 @@ import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rke2lab.incus.ingress.GrowIdentityView;
 import io.nxmatic.rke2lab.incus.ingress.GrowImageView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.ingress.IngressConfig;
@@ -34,8 +35,9 @@ import java.util.function.Consumer;
  * scion-projects/host-actualises rule). It runs OUTSIDE Felix (the Pulumi graph cannot enter it),
  * so it is NOT a scion; it computes NOTHING of the domain — it fetches the plan, adopts
  * pre-existing project/network via provider invokes ({@link IncusImportLookup}), and declares
- * Project→{Network,Profile,Image}→Instance from the plan's own flat values (network, image,
- * cloud-init checksum, and the 13 resolved mounts the scion already projected).
+ * Project→{Network,Profile,Image}→Instance from the plan's own flat values (network, image, and the
+ * per-node identity posed as {@code user.rke2lab.node-*} keys). The NixOS node-base substrate bakes
+ * the node's config, so there are no host disk mounts and no cloud-init seed.
  *
  * <p>Instance-passing: it holds the run's {@link IngressConfig} (the ingress vocabulary the run
  * fills — it names no seed-master type), the {@link IncusProviderContext} it builds once, the
@@ -221,6 +223,15 @@ public final class InstanceGrow {
     // The image-build checksum arms replaceOnChanges — a rebuilt node-base image (new fingerprint,
     // new checksum) recreates the instance onto it.
     instanceConfig.put("user.rke2lab.imageBuildChecksum", plan.image().buildChecksum());
+    // The per-node identity the homogeneous node-base guest reads back over devlxd
+    // (/dev/incus/sock) at boot: it resolves its hostname (mDNS <cluster>-<node>.local), its zfs
+    // dataset (control-nodes/<node-name>/containerd) and its rke2 role from these four scalars. The
+    // scion projected them from the netplan blueprint — the host only poses them.
+    final GrowIdentityView identity = plan.identity();
+    instanceConfig.put("user.rke2lab.node-name", identity.nodeName());
+    instanceConfig.put("user.rke2lab.node-hostname", identity.nodeHostname());
+    instanceConfig.put("user.rke2lab.node-kind", identity.nodeKind());
+    instanceConfig.put("user.rke2lab.node-id", String.valueOf(identity.nodeId()));
 
     new Instance(
         "seed-instance",

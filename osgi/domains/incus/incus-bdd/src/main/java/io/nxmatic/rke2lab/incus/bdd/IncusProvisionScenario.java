@@ -26,12 +26,14 @@ import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Facet;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Image;
+import io.nxmatic.rke2lab.incus.core.GrowIdentityResolver;
 import io.nxmatic.rke2lab.incus.core.GrowNetworkResolver;
 import io.nxmatic.rke2lab.incus.core.GrowPlanAssembler;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
 import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
 import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
 import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
+import io.nxmatic.rke2lab.incus.ingress.GrowIdentityView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
@@ -218,7 +220,7 @@ public class IncusProvisionScenario
         .and()
         .the_secrets_are_written(resolved)
         .and()
-        .the_network_is_resolved(resolved);
+        .the_network_and_identity_are_resolved(resolved);
     then()
         .the_instance_is_prepared()
         .and()
@@ -411,10 +413,11 @@ public class IncusProvisionScenario
     @OsgiService(await = false)
     private Optional<AuthTokenContact> authToken = Optional.empty();
 
-    // The flat network view the scion projects for the host GROW — assembled here (WHEN
-    // fabricates),
-    // sealed into the plan by the THEN. Null for an unamended survey (no cluster to resolve).
+    // The flat network + identity views the scion projects for the host GROW — assembled here (WHEN
+    // fabricates), sealed into the plan by the THEN. Null for an unamended survey (no cluster to
+    // resolve). Both derive from the ONE netplan blueprint, so they are produced by the same WHEN.
     @ProvidedScenarioState GrowNetworkView networkView;
+    @ProvidedScenarioState GrowIdentityView identityView;
 
     private final SeedCodec codec = new SeedCodec();
     private final ScenarioGraft graft = new ScenarioGraft();
@@ -507,20 +510,24 @@ public class IncusProvisionScenario
     }
 
     /**
-     * Resolve the network view the host GROW poses — the two NIC hwaddrs + the {@code vmnet}
-     * bridge's dnsmasq config, projected flat from the netplan blueprint (§ the
-     * scion-projects/host-actualises rule). A WHEN because it FABRICATES the value the THEN seals
-     * into the grow plan. NOT gated: a pure OSGi computation off the {@link
+     * Resolve the network + identity views the host GROW poses — the two NIC hwaddrs + the {@code
+     * vmnet} bridge's dnsmasq config, AND the four per-node identity scalars (name, {@code
+     * <cluster>-<node>} hostname, server/agent kind, id), all projected flat from the ONE netplan
+     * blueprint (§ the scion-projects/host-actualises rule). A WHEN because it FABRICATES the
+     * values the THEN seals into the grow plan. NOT gated: a pure OSGi computation off the {@link
      * NetplanSynthesisService}, no edge contacted — inert at preview like the manifests synthesis.
      * Skipped for an unamended survey (no cluster to resolve).
      */
-    public When the_network_is_resolved(@Hidden Optional<Resolved> maybeResolved) {
+    public When the_network_and_identity_are_resolved(@Hidden Optional<Resolved> maybeResolved) {
       if (maybeResolved.isEmpty()) {
         return self();
       }
       final Resolved resolved = maybeResolved.orElseThrow();
       this.networkView =
           new GrowNetworkResolver(netplan.orElseThrow())
+              .resolve(resolved.clusterName(), resolved.nodeName());
+      this.identityView =
+          new GrowIdentityResolver(netplan.orElseThrow())
               .resolve(resolved.clusterName(), resolved.nodeName());
       return self();
     }
@@ -547,9 +554,10 @@ public class IncusProvisionScenario
    */
   static class Then extends Stage<Then> {
 
-    // The network view the WHEN produced — read here to seal it into the grow plan. Null for an
-    // unamended survey (the_network_is_resolved skipped).
+    // The network + identity views the WHEN produced — read here to seal them into the grow plan.
+    // Null for an unamended survey (the_network_and_identity_are_resolved skipped).
     @ExpectedScenarioState GrowNetworkView networkView;
+    @ExpectedScenarioState GrowIdentityView identityView;
 
     // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
     // the Then reads its recipe digest, no longer threaded from the scenario.
@@ -619,14 +627,14 @@ public class IncusProvisionScenario
     /**
      * Seal the ONE immutable {@link InstanceGrowPlan} the host GROW fetches — the scion-projects
      * part of the scion-projects/host-actualises rule (§ host-cellar-realisation,
-     * the-grow-anatomy). The network view the {@code the_network_is_resolved} WHEN produced, plus
-     * the image view and the cloud-init checksum the {@link GrowPlanAssembler} computes OSGi-side
-     * (the {@code buildChecksum} folding the edge {@code recipeDigest} with the image scalars, the
-     * readable artifact paths, and the SHA-256 of the NoCloud seed that arms the replace wire).
-     * Stored at {@link IncusGrowCoordinate#INSTANCE_GROW_PLAN} — the single record the host decodes
-     * host-side via the dual-realm codec. Skipped for an unamended survey (no view resolved). The
-     * store is unconditional on the gate: the cellar routes conserve vs pre-reserve, so a preview
-     * run still records the plan.
+     * the-grow-anatomy). The network + identity views the {@code
+     * the_network_and_identity_are_resolved} WHEN produced, plus the image view the {@link
+     * GrowPlanAssembler} computes OSGi-side (the {@code buildChecksum} folding the edge {@code
+     * recipeDigest} with the image scalars and the nix source digest, and the readable artifact
+     * paths). Stored at {@link IncusGrowCoordinate#INSTANCE_GROW_PLAN} — the single record the host
+     * decodes host-side via the dual-realm codec. Skipped for an unamended survey (no view
+     * resolved). The store is unconditional on the gate: the cellar routes conserve vs pre-reserve,
+     * so a preview run still records the plan.
      */
     public Then the_instance_grow_plan_is_published(
         @Hidden Optional<Resolved> maybeResolved,
@@ -638,7 +646,8 @@ public class IncusProvisionScenario
       }
       final Resolved resolved = maybeResolved.orElseThrow();
       // The NixOS node-base substrate bakes the node's config, so the instance takes no host disk
-      // mounts and no cloud-init seed — the plan carries only the network + image views.
+      // mounts and no cloud-init seed — the plan carries the network + image + identity views, the
+      // last posed as user.rke2lab.node-* keys the guest reads over devlxd.
       final InstanceGrowPlan plan =
           new GrowPlanAssembler(
                   image.alias(),
@@ -647,7 +656,7 @@ public class IncusProvisionScenario
                   imageBuilder.orElseThrow().recipeDigest(),
                   resolved.worktreeRoot(),
                   Path.of(image.sharedFolder()))
-              .assemble(networkView);
+              .assemble(networkView, identityView);
       cellar.store(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, plan);
       return self();
     }

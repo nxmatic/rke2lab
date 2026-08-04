@@ -154,13 +154,14 @@ SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-contain
         user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [CODED]
     AND the_secrets_are_written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets;
         gated on cultivating — the contact shells gh/flox)                                                [CODED]
-    AND the_network_is_resolved — resolve NetplanSynthesisService (@Component), assemble the flat network
-        view (2 NIC hwaddrs + the dnsmasqConfig map) OSGi-side                                            [VISION]
+    AND the_network_and_identity_are_resolved — resolve NetplanSynthesisService (@Component), assemble the
+        flat network view (2 NIC hwaddrs + the dnsmasqConfig map) AND the GrowIdentityView (nodeName,
+        <cluster>-<node> hostname, NodeType.kind(), nodeId) from the one blueprint, OSGi-side           [CODED]
   THEN the_prep_is_stored — IncusHarvest (recipe digest + soil) stored, the request the host fetches to GROW  [CODED]
     AND the_staging_is_published — HostStagingEntry (checksums + git provenance) published                    [CODED]
     AND the_instance_grow_plan_is_published — assemble ONE immutable InstanceGrowPlan {network view, image
-        view (imageAlias, artifact paths, buildChecksum computed OSGi-side), cloudInitChecksum} and store
-        it at INSTANCE_GROW_PLAN — the single record the host GROW fetches (incus-ingress-contract library)  [VISION]
+        view (imageAlias, artifact paths, buildChecksum computed OSGi-side), identity view} and store
+        it at INSTANCE_GROW_PLAN — the single record the host GROW fetches (incus-ingress-contract library)  [CODED]
     AND a build/graft failure surfaces, optionally consulting the doctor                  [CODED]
     AND the instance is NOT started here — GROW is the separate, later pure-host beat
 
@@ -208,10 +209,10 @@ delegating to incus-core instances (`NocloudSeedWriter`, `LaunchSecretsWriter`);
 THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed scenario
 `IncusReconcileScenario` (`IncusScenario.RECONCILE`, a distinct root WHEN).
 
-*Designed-not-coded (2026-07-17), the GROW enablement:* PREPARE gains `the_network_is_resolved` (WHEN)
+*The GROW enablement:* PREPARE has `the_network_and_identity_are_resolved` (WHEN)
 + `the_instance_grow_plan_is_published` (THEN) — the scion resolves `NetplanSynthesisService`, computes
 `buildChecksum` OSGi-side, and assembles ONE immutable `InstanceGrowPlan` (network view + image view +
-cloudInitChecksum) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=dual-realm`
+identity view) it stores at `INSTANCE_GROW_PLAN`. The plan is a flat record in a NEW `type=dual-realm`
 dual-realm module `incus-ingress-contract` (the host face of the incus contract — flat value records only,
 no logic; the first `type=dual-realm` of a domain). The contract also carries `IngressConfig` — the flat
 config the host fills to actualise (incus project/remote + node/profile/bridge names) — so the actualiser

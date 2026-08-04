@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.incus.core;
 
+import io.nxmatic.rke2lab.incus.ingress.GrowIdentityView;
 import io.nxmatic.rke2lab.incus.ingress.GrowImageView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
@@ -52,9 +53,9 @@ public final class GrowPlanAssembler {
     this.sharedFolder = sharedFolder;
   }
 
-  /** Seal the network view + the image into the immutable plan. */
-  public InstanceGrowPlan assemble(GrowNetworkView network) {
-    return new InstanceGrowPlan(network, imageView());
+  /** Seal the network view, the image and the identity into the immutable plan. */
+  public InstanceGrowPlan assemble(GrowNetworkView network, GrowIdentityView identity) {
+    return new InstanceGrowPlan(network, imageView(), identity);
   }
 
   private GrowImageView imageView() {

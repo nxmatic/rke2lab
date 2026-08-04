@@ -281,6 +281,16 @@ public record ClusterNetworkBlueprint(
     public int numericCode() {
       return numericCode;
     }
+
+    /**
+     * The rke2 wire form of the role ({@code server}/{@code agent}) — the single source both the
+     * manifests node-env identity and the incus grow-plan identity project as {@code
+     * RKE2LAB_NODE_KIND}. The enum constant lowercased IS that form, so the mapping lives once
+     * here.
+     */
+    public String kind() {
+      return name().toLowerCase(java.util.Locale.ROOT);
+    }
   }
 
   public record ClusterRef(String name, int id) {}

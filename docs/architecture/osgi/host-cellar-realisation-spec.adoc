@@ -628,11 +628,18 @@ No incremental accumulation (that would mutate), no three separate views fetched
 [listing]
 ----
 InstanceGrowPlan(
-    GrowNetworkView network,        // group: lanHwaddr, wanHwaddr, dnsmasqConfig (Map)
-    GrowImageView   image,          // group: imageAlias, metadataPath, dataPath, buildChecksum
-    String cloudInitChecksum,       // instance scalar → at the ROOT (the plan IS the instance's)
-    List<GrowMountView> mounts)     // the 13 resolved disk mounts: deviceName, source, target
+    GrowNetworkView  network,       // group: lanHwaddr, wanHwaddr, dnsmasqConfig (Map)
+    GrowImageView    image,         // group: imageAlias, metadataPath, dataPath, buildChecksum
+    GrowIdentityView identity)      // group: nodeName, nodeHostname, nodeKind, nodeId
 ----
+
+NOTE: Since the NixOS `node-base` substrate bakes the node's config, systemd units and scripts into
+the image (§ the `/srv/host`+cloud-init dissolution, commit `4508231c`), the plan carries NO host
+disk mounts and NO cloud-init seed. The former `cloudInitChecksum` scalar and the 13 `GrowMountView`
+mounts are gone; the ONLY per-node difference is `GrowIdentityView` — four scalars the scion projects
+from the netplan blueprint (`nodeKind` = `NodeType.kind()`, the same single source the manifests
+node-env identity projects), posed by the host as `user.rke2lab.node-*` config keys the guest reads
+back over devlxd (`/dev/incus/sock`) at boot.
 
 *It lives in a NEW module `incus-ingress-contract` — the HOST FACE of the incus contract, `type=dual-realm`
 dual-realm.* Its coordinate `IncusGrowCoordinate.INSTANCE_GROW_PLAN` lives here too (NOT in the OSGi-only
@@ -648,20 +655,22 @@ domain (the only prior one, `seed-broker-codec`, is a foundation).
 *Governance — the dual-realm library rule (widened 2026-07-17).* The red line for this module is NOT
 "records only / no logic" — it is *no dependency absent from either realm*. A type may carry pure logic
 here IFF it depends only on the JDK + jspecify (no OSGi type, no other domain, no service reference) and
-is owned by this one domain. So besides the flat views it also holds `BootstrapPaths` — the provisioning
-topology (pure `java.nio.file.Path` derivation) the scion materialises into AND derives the 13 instance
-disk mounts from, OSGi-side (`fromLocalWorktree(...).asLiveView().asAutomountView(...).instanceMounts()`,
-each root paired with its `HostPathCatalog` guest target). The plan carries those resolved mounts as
-`GrowMountView` records (2026-07-27): the scion projects the source↔target pairs, the host poses them as
-`disk` devices and derives no path, holds no `BootstrapPaths` and no worktree root — the
-scion-projects/host-actualises rule applied to paths TOO, so the GROW actualises the plan ALONE.
+is owned by this one domain. So besides the flat views it also holds `BootstrapPaths` — the staging
+topology (pure `java.nio.file.Path` derivation, five roots: worktree, clusterNode, manifests, assets,
+secrets) the scion materialises the host staging INTO (`fromLocalWorktree(...).asStagingView()` /
+`asAutomountView(...)`). Since node-base bakes the node (commit `4508231c`), it derives NO instance
+disk mounts and the plan carries none: `BootstrapPaths` stays OSGi-side (the staging write), and the
+host GROW derives no path, holds no `BootstrapPaths` and no worktree root — the
+scion-projects/host-actualises rule, so the GROW actualises the plan ALONE.
 
-*The scion-side producers (incus-core, OSGi-only).* Three collaborators assemble the plan, each named
+*The scion-side producers (incus-core, OSGi-only).* Collaborators assemble the plan, each named
 by `IncusProvisionScenario`'s PREPARE beats: `GrowNetworkResolver` (resolves `NetplanSynthesisService`
-→ the `GrowNetworkView`), `GrowPlanAssembler` (folds network + image + cloud-init into the one
-`InstanceGrowPlan`, computing `buildChecksum` and probing the readable NFS artifact dir), and
-`GitProvenanceReader` (reads the worktree HEAD provenance the checksum folds in). They are incus-core
-computation, consumed only by the incus scion — the same domain across the realm boundary.
+→ the `GrowNetworkView`), `GrowIdentityResolver` (same blueprint → the `GrowIdentityView`, the four
+per-node scalars — both are produced by the one `the_network_and_identity_are_resolved` WHEN),
+`GrowPlanAssembler` (folds network + image + identity into the one `InstanceGrowPlan`, computing
+`buildChecksum` and probing the readable NFS artifact dir), and `GitProvenanceReader` (reads the
+worktree HEAD provenance the checksum folds in). They are incus-core computation, consumed only by
+the incus scion — the same domain across the realm boundary.
 
 *What the scion computes and projects (all OSGi-side, none host):*
 

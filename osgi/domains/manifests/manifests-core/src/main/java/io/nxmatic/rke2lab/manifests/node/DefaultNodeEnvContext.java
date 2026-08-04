@@ -73,11 +73,6 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
   @Override
   public BootstrapIdentity bootstrapIdentity() {
     final String clusterName = blueprint.cluster().name();
-    final String nodeKind =
-        switch (blueprint.node().type()) {
-          case SERVER -> "server";
-          case AGENT -> "agent";
-        };
     return BootstrapIdentity.builder()
         .clusterName(clusterName)
         .clusterId(blueprint.cluster().id())
@@ -85,7 +80,7 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
         .clusterDomain("cluster.local")
         .nodeName(blueprint.node().name())
         .nodeId(blueprint.node().id())
-        .nodeKind(nodeKind)
+        .nodeKind(blueprint.node().type().kind())
         .incusRemoteName(clusterName)
         .build();
   }
