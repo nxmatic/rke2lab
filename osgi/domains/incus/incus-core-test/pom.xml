@@ -12,14 +12,11 @@
   <artifactId>incus-core-test</artifactId>
   <name>osgi/domains/incus/incus-core-test</name>
   <description>The -test fragment of incus-core: a Fragment-Host attached to the incus-core bundle,
-    sharing its classloader so its actor tests run IN-CONTAINER. This is the CROSS-DOMAIN integration
-    home of the host-asset seam — the ONE place both worlds meet in a single Felix: incus-core (the
-    BootstrapHostAssetMaterializer @Component, driver) AND manifests-core with its whole synthesis
-    graph (the three HostAssetProvider @Components, contributors). It proves what neither domain's own
-    tests can: that the materializer's @Reference(MULTIPLE) actually binds the manifests providers SCR
-    publishes (the wiring that broke before), and that a real contribute→materialize round-trip places
-    the synthesised slices into the instance's staging tree. incus-bdd-test deliberately EXCLUDES
-    manifests-core to keep the scion pure; this module is its reciprocal.</description>
+    sharing its classloader so its actor tests run IN-CONTAINER. The CROSS-DOMAIN integration home
+    where incus-core and manifests-core meet in a single Felix (incus-bdd-test deliberately EXCLUDES
+    manifests-core to keep the scion pure; this module is its reciprocal). Currently a scaffold: the
+    host-asset materializer proof it once carried was removed when node-base dissolved the /srv/host
+    delivery, so the in-container driver is @Disabled until a new incus-core cross-bundle proof lands.</description>
 
   <dependencies>
     <!-- The host under test: the materializer + BootstrapPaths logic. provided — the fragment is
@@ -35,7 +32,7 @@
       <artifactId>incus-ingress-contract</artifactId>
       <scope>provided</scope>
     </dependency>
-    <!-- The seam face: HostAssetProvider + the contribution vocabulary the test names. -->
+    <!-- The manifests contract face of the co-resident world the in-container harness installs. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
@@ -103,10 +100,10 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- The CONTRIBUTOR graph: manifests-core + everything it needs to resolve, installed as bundles
-         in-container so SCR activates the three HostAssetProvider @Components the materializer binds.
-         The same closure manifests-core-test stages (the cdk8s carrier + its systemd fragment, the
-         sibling ports, the pipeline engine, unitrepo-core, the third-party OSGi bundles). -->
+    <!-- The co-resident second host: manifests-core + everything it needs to resolve, installed as
+         bundles in-container so the two domains coexist in one Felix. The same closure
+         manifests-core-test stages (the cdk8s carrier + its systemd fragment, the sibling ports, the
+         pipeline engine, unitrepo-core, the third-party OSGi bundles). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>

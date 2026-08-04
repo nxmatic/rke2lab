@@ -11,7 +11,6 @@
  *       io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor}.
  *   <li>{@code flox} — {@code FloxRuntimeManifestsUnit} and the NRI plugin archive assets.
  *   <li>{@code daemonset} — the daemonset script-policy unit that trampolines host assets.
- *   <li>{@code cloudinit} — {@code CloudConfigManifestsUnit} for cloud-init delivery.
  *   <li>{@code libexec} — the systemd libexec placeholder unit.
  * </ul>
  *

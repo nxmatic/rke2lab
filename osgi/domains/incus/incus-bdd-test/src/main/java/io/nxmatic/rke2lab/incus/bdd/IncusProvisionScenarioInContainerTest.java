@@ -22,7 +22,6 @@ import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
 import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
-import io.nxmatic.rke2lab.incus.core.BootstrapHostAssetMaterializer;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.contract.NetplanSynthesisResult;
@@ -147,11 +146,6 @@ public class IncusProvisionScenarioInContainerTest {
     registrations.add(
         context.registerService(Cellar.class, new RecordingCellar(), new Hashtable<>()));
     registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
-    registrations.add(
-        context.registerService(
-            BootstrapHostAssetMaterializer.class,
-            new BootstrapHostAssetMaterializer(),
-            new Hashtable<>()));
     try {
       final ScenarioOutcome outcome =
           new ScenarioPlayer()
@@ -242,16 +236,6 @@ public class IncusProvisionScenarioInContainerTest {
     // at the GIVEN in prod; here the passenger seeds a recording cellar and a fixed current parcel.
     registrations.add(context.registerService(Cellar.class, cellar, new Hashtable<>()));
     registrations.add(context.registerService(Parcel.class, PARCEL, new Hashtable<>()));
-    // The host-asset materializer the scion invokes to place the manifests contributions — a REAL
-    // incus-core instance (in prod an SCR @Component collecting HostAssetProviders from manifests;
-    // here manifests-core is absent, so its providers list is empty and it is a no-op). Registered
-    // only so the required @OsgiService injection succeeds; the default (unamended) run never
-    // invokes it — the WHEN skips.
-    registrations.add(
-        context.registerService(
-            BootstrapHostAssetMaterializer.class,
-            new BootstrapHostAssetMaterializer(),
-            new Hashtable<>()));
     if (doctor != null) {
       registrations.add(
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));

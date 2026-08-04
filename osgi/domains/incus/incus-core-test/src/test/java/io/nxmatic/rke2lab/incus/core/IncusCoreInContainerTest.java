@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.scenario.testkit.ScenarioTestkit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -16,13 +17,13 @@ import org.osgi.framework.Bundle;
 import org.osgi.service.log.LogLevel;
 
 /**
- * The bare-JVM proxy (VSCode-clickable) that runs incus-core's CROSS-DOMAIN host-asset proof
- * in-container. It boots a Felix carrying the JUnit + jGiven worlds, then installs BOTH domain
- * hosts: incus-core (the fixture's Fragment-Host, driver) AND manifests-core (a second host,
- * contributor), plus the full import closure of each — so the incus materializer @Component and the
- * manifests HostAssetProvider @Components activate in the SAME registry. The whole graph is STARTED
- * (not merely resolved): SCR only activates the @Components of ACTIVE bundles, and the proof turns
- * on the materializer's @Reference binding the providers manifests-core publishes.
+ * The bare-JVM proxy (VSCode-clickable) that boots incus-core in-container alongside
+ * manifests-core. It boots a Felix carrying the JUnit + jGiven worlds, then installs BOTH domain
+ * hosts: incus-core (the fixture's Fragment-Host, driver) AND manifests-core (a second host), plus
+ * the full import closure of each, so the two domains resolve and coexist in the SAME registry. The
+ * whole graph is STARTED (not merely resolved) so SCR activates the @Components of both. A harness
+ * kept for incus-core cross-bundle proofs; the former host-asset materializer proof is dissolved
+ * (node-base bakes the node, so there is no /srv/host delivery to prove).
  *
  * <p>This is the reciprocal of {@code IncusBddInContainerTest}, which deliberately excludes
  * manifests-core to keep the incus scion pure; here the two worlds meet on purpose. Only
@@ -39,6 +40,11 @@ import org.osgi.service.log.LogLevel;
 // traces
 // WHICH requirement could not be wired); WARNING is the quiet committed default.
 @FrameworkLog(LogLevel.WARN)
+// Disabled: the in-container harness needs at least one test class in the incus-core package, and
+// the only one (the host-asset materializer wiring proof) was removed when node-base dissolved the
+// /srv/host delivery. Kept — wiring intact — for the next incus-core cross-bundle proof; re-enable
+// by adding an in-container test to the package.
+@Disabled("no in-container test to drive since the host-asset proof was dissolved")
 class IncusCoreInContainerTest {
 
   // Select the fixture by what it declares (type=fixture, suite, role); its host (incus-core) comes
@@ -74,8 +80,8 @@ class IncusCoreInContainerTest {
           final List<Bundle> toResolve = new ArrayList<>(List.of(incusHost, manifestsHost));
           // Close the import graph over BOTH hosts at once (varargs) — one walk, deduped.
           toResolve.addAll(f.installImportClosureOf(incusHost, manifestsHost));
-          // startWholeGraph = true: manifests-core must be ACTIVE for SCR to activate its
-          // HostAssetProviders, which the incus materializer's @Reference then binds.
+          // startWholeGraph = true: both hosts ACTIVE so SCR activates their @Components in the one
+          // registry (the two domains coexist in-container).
           return new Provisioning(incusHost, toResolve, true);
         });
   }

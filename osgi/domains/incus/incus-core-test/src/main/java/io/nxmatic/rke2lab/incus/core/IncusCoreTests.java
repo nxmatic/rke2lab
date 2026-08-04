@@ -9,8 +9,8 @@ import org.junit.jupiter.engine.JupiterTestEngine;
  * THROUGH the incus-core host classloader (a fragment shares its host's loader). The only glue this
  * fragment writes around the generic {@link InContainerJUnitRunner}: it names this host's test
  * package, then delegates. Authored in {@code io.nxmatic.rke2lab.incus.core} so the in-container
- * run reaches incus-core's {@code BootstrapHostAssetMaterializer} @Component through the host's
- * {@code BundleContext} — the same registry manifests-core publishes its HostAssetProviders into.
+ * run reaches incus-core's @Components through the host's {@code BundleContext}. (An in-container
+ * harness kept for incus-core cross-bundle proofs; it currently carries no test class of its own.)
  */
 public final class IncusCoreTests {
 

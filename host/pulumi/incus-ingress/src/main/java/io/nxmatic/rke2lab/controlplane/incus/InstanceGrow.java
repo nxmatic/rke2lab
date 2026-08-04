@@ -18,7 +18,6 @@ import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
 import io.nxmatic.rke2lab.incus.ingress.GrowImageView;
-import io.nxmatic.rke2lab.incus.ingress.GrowMountView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.ingress.IngressConfig;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
@@ -219,9 +218,8 @@ public final class InstanceGrow {
     instanceConfig.put("security.nesting", "true");
     instanceConfig.put("security.syscalls.intercept.bpf", "true");
     instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
-    // Wire #7: the nocloud checksum arms replaceOnChanges — a changed seed recreates the instance
-    // (cloud-init reads its seed once at first boot). Kept as slice.cloud-init for wire stability.
-    instanceConfig.put("user.rke2lab.provisioning.slice.cloud-init", plan.cloudInitChecksum());
+    // The image-build checksum arms replaceOnChanges — a rebuilt node-base image (new fingerprint,
+    // new checksum) recreates the instance onto it.
     instanceConfig.put("user.rke2lab.imageBuildChecksum", plan.image().buildChecksum());
 
     new Instance(
@@ -244,10 +242,10 @@ public final class InstanceGrow {
   }
 
   /**
-   * The 17 instance devices — 2 NICs (hwaddrs from the plan's network view), 2 unix-char (fixed),
-   * and the 13 disk {@link GrowMountView mounts} the scion already resolved OSGi-side
-   * (source↔target pairs, NFS-automount translated). The host derives NO path here: it poses the
-   * plan's mounts as {@code disk} devices, holding no {@code BootstrapPaths} and no worktree root.
+   * The 4 instance devices — 2 NICs (hwaddrs from the plan's network view) and 2 unix-char (fixed:
+   * {@code /dev/kmsg}, {@code /dev/zfs} for the in-guest zfs snapshotter mount). The NixOS {@code
+   * node-base} substrate bakes the node's config, so there are NO host disk mounts: the former
+   * {@code /srv/host} delivery is dissolved.
    */
   private List<InstanceDeviceArgs> seedInstanceDevices(InstanceGrowPlan plan) {
     final GrowNetworkView network = plan.network();
@@ -256,9 +254,6 @@ public final class InstanceGrow {
     devices.add(nic("vmnet0", network.wanHwaddr(), "vmnet0", "bridged", config.vmnetNetworkName()));
     devices.add(unixChar("kmsg.dev", "/dev/kmsg", "/dev/kmsg"));
     devices.add(unixChar("zfs.dev", "/dev/zfs", "/dev/zfs"));
-    for (GrowMountView mount : plan.mounts()) {
-      devices.add(disk(mount.deviceName(), mount.source(), mount.target()));
-    }
     return List.copyOf(devices);
   }
 
@@ -272,10 +267,6 @@ public final class InstanceGrow {
 
   private InstanceDeviceArgs unixChar(String name, String source, String path) {
     return device(name, "unix-char", Map.of("source", source, "path", path));
-  }
-
-  private InstanceDeviceArgs disk(String name, String source, String path) {
-    return device(name, "disk", Map.of("source", source, "path", path));
   }
 
   private InstanceDeviceArgs device(String name, String type, Map<String, String> properties) {

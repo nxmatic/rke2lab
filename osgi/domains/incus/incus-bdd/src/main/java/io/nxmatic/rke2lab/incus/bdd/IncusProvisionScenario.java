@@ -26,14 +26,12 @@ import io.nxmatic.rke2lab.incus.contract.IncusHarvest;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Facet;
 import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Image;
-import io.nxmatic.rke2lab.incus.core.BootstrapHostAssetMaterializer;
 import io.nxmatic.rke2lab.incus.core.GrowNetworkResolver;
 import io.nxmatic.rke2lab.incus.core.GrowPlanAssembler;
 import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
 import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
 import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
 import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
-import io.nxmatic.rke2lab.incus.ingress.GrowMountView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
@@ -136,8 +134,8 @@ public class IncusProvisionScenario
   @MonotonicNonNull private IncusRunbookInput input;
 
   // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The edge
-  // collaborators (imageBuilder, broker, netplan, authToken) + the materializer moved to the stages
-  // that drive them (@OsgiService there, filled by the stage creator). What stays on the scenario:
+  // collaborators (imageBuilder, broker, netplan, authToken) moved to the stages that drive them
+  // (@OsgiService there, filled by the stage creator). What stays on the scenario:
   // parcel — an ambient identity the body reads (Resolved.from) and threads to the Then; doctor —
   // await=false, the consult the body raises on a failure (empty when a world booted without it).
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
@@ -217,8 +215,6 @@ public class IncusProvisionScenario
         .the_image_is_built(imageRequest(worktreeRoot, input.facet(), input.image()))
         .and()
         .the_manifests_are_cultivated(hostScenario, hostTree, input.facet())
-        .and()
-        .the_host_assets_are_materialized(resolved)
         .and()
         .the_secrets_are_written(resolved)
         .and()
@@ -325,7 +321,6 @@ public class IncusProvisionScenario
       String soil,
       String liveRoot,
       Path worktreeRoot,
-      Path cloudSeedRoot,
       Path secretsFile,
       String clusterName,
       String nodeName,
@@ -349,7 +344,6 @@ public class IncusProvisionScenario
               staging.manifestsRoot().toString(),
               local.liveRoot().toString(),
               root,
-              staging.cloudSeedRoot(),
               staging.secretsFile(),
               facet.clusterName(),
               facet.nodeName(),
@@ -413,7 +407,6 @@ public class IncusProvisionScenario
     @OsgiService private Optional<ImageBuilder> imageBuilder = Optional.empty();
     @OsgiService private Optional<SeedBroker> broker = Optional.empty();
     @OsgiService private Optional<NetplanSynthesisService> netplan = Optional.empty();
-    @OsgiService private Optional<BootstrapHostAssetMaterializer> materializer = Optional.empty();
 
     @OsgiService(await = false)
     private Optional<AuthTokenContact> authToken = Optional.empty();
@@ -491,32 +484,6 @@ public class IncusProvisionScenario
       final String runbookJson = codec.decode(reaped.payload()).path("runbook").asText();
       graft.graftUnder(
           hostScenario, hostTree, "the manifests are cultivated", graft.rebuild(runbookJson));
-      return self();
-    }
-
-    /**
-     * Materialise every host asset the manifests providers contribute into their staging slot roots
-     * (§ provisioning-slice delta #2) — a WHEN because it FABRICATES material, like the manifests
-     * synthesis it follows. The manifests sub-sow wrote its tree under the staging slot; {@link
-     * BootstrapHostAssetMaterializer} collects each {@code HostAssetProvider}'s contributions and
-     * places them (the cloud-config unwrapped into {@code cloud.d} as the NoCloud seed, and so on),
-     * so they land BEFORE {@code the_staging_is_published} checksums the tree. The staging {@link
-     * BootstrapPaths} is rebuilt deterministically from the resolved slot (never re-selecting N).
-     * NOT gated: a pure FS materialisation into the staging slot, inert against the live instance
-     * (like the manifests synthesis) — only the promotion into {@code host.live.d} is gated.
-     * Skipped for an unamended survey (no slot materialised).
-     */
-    public When the_host_assets_are_materialized(@Hidden Optional<Resolved> maybeResolved)
-        throws IOException {
-      if (maybeResolved.isEmpty()) {
-        return self();
-      }
-      final Resolved resolved = maybeResolved.orElseThrow();
-      final BootstrapPaths staging =
-          BootstrapPaths.fromLocalWorktree(
-                  resolved.worktreeRoot(), resolved.clusterName(), resolved.nodeName())
-              .asStagingView(Path.of(resolved.stagingRoot()));
-      materializer.orElseThrow().materialize(staging);
       return self();
     }
 
@@ -670,17 +637,8 @@ public class IncusProvisionScenario
         return self();
       }
       final Resolved resolved = maybeResolved.orElseThrow();
-      // The 13 disk mounts resolved OSGi-side: the LIVE tree (host.live.d) the instance mounts,
-      // rebased onto the NFS-automount view the remote NixOS host reads through — the same chain
-      // the
-      // host GROW used to compute itself. Now the scion projects them, so the GROW poses them
-      // alone.
-      final List<GrowMountView> mounts =
-          BootstrapPaths.fromLocalWorktree(
-                  resolved.worktreeRoot(), resolved.clusterName(), resolved.nodeName())
-              .asLiveView()
-              .asAutomountView(resolved.nfsAutomount(), resolved.netPrefix())
-              .instanceMounts();
+      // The NixOS node-base substrate bakes the node's config, so the instance takes no host disk
+      // mounts and no cloud-init seed — the plan carries only the network + image views.
       final InstanceGrowPlan plan =
           new GrowPlanAssembler(
                   image.alias(),
@@ -688,9 +646,8 @@ public class IncusProvisionScenario
                   image.builderHost(),
                   imageBuilder.orElseThrow().recipeDigest(),
                   resolved.worktreeRoot(),
-                  Path.of(image.sharedFolder()),
-                  resolved.cloudSeedRoot())
-              .assemble(networkView, mounts);
+                  Path.of(image.sharedFolder()))
+              .assemble(networkView);
       cellar.store(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, plan);
       return self();
     }

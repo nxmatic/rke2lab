@@ -59,24 +59,6 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
     </dependency>
-    <!-- The FIRST explicit incus->manifests seam: the HostAssetProvider SPI incus @Reference(MULTIPLE)s
-         to collect the host-asset contributions manifests offers. Only the contract face — the content
-         still crosses as raw bytes (no manifests IMPL coupling); incus owns the transform strategy. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests-contract</artifactId>
-    </dependency>
-    <!-- Generic YAML parse for the SEED_DIR strategy — unwrap the cloud-config ConfigMap into the
-         NoCloud seed (§ provisioning-slice #2). No manifests coupling: a bare read into a Map. -->
-    <!-- ObjectMapper / JsonNode are imported directly, not only via the yaml dataformat above. -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.dataformat</groupId>
-      <artifactId>jackson-dataformat-yaml</artifactId>
-    </dependency>
     <!-- OBSERVE: the per-file line-level unified diff of a modified text file (HostTreeDiffer). -->
     <dependency>
       <groupId>io.github.java-diff-utils</groupId>

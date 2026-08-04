@@ -56,26 +56,4 @@ class BootstrapPathsTest {
     final BootstrapPaths view = bootstrapPaths.asAutomountView(false, "/net/nikopol.local");
     assertEquals(bootstrapPaths.worktreeRoot(), view.worktreeRoot());
   }
-
-  // --- instanceMounts: the 13 disk mounts, stable device names paired with their catalog target
-  // ---
-
-  @Test
-  void instanceMounts_yields_thirteen_mounts() {
-    assertEquals(13, bootstrapPaths.instanceMounts().size());
-  }
-
-  @Test
-  void instanceMounts_maintains_device_names_and_targets() {
-    final var mounts = bootstrapPaths.instanceMounts();
-
-    assertEquals("worktree.dir", mounts.get(0).deviceName());
-    assertEquals(BootstrapPaths.HostPathCatalog.WORKTREE.path(), mounts.get(0).target());
-
-    assertEquals("git.dir", mounts.get(3).deviceName());
-    assertEquals(BootstrapPaths.HostPathCatalog.GIT_WORKTREE.path(), mounts.get(3).target());
-
-    assertEquals("manifests.dir", mounts.get(6).deviceName());
-    assertEquals(BootstrapPaths.HostPathCatalog.MANIFESTS.path(), mounts.get(6).target());
-  }
 }

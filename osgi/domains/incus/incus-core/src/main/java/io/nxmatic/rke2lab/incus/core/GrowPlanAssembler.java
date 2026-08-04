@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.incus.core;
 
 import io.nxmatic.rke2lab.incus.ingress.GrowImageView;
-import io.nxmatic.rke2lab.incus.ingress.GrowMountView;
 import io.nxmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
 import java.io.IOException;
@@ -12,7 +11,6 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -20,8 +18,8 @@ import java.util.stream.Stream;
  * the incus PREPARE (§ host-cellar-realisation, the scion-projects/host-actualises rule). Every
  * value it carries is computed OSGi-side so the host actualises without computing anything of the
  * domain: the image {@code buildChecksum} (the edge {@code recipeDigest} folded with the image
- * scalars), the two readable artifact paths, and the cloud-init checksum that arms the
- * nocloud→replace wire.
+ * scalars + the nix source digest) and the two readable artifact paths. The NixOS {@code node-base}
+ * substrate bakes the node's config, so the plan carries no host mounts and no cloud-init seed.
  *
  * <p>Instance-passing: the caller hands the {@link GrowNetworkView} the network beat already
  * resolved and the flat image scalars; this assembler folds them into the plan. No static helper —
@@ -38,7 +36,6 @@ public final class GrowPlanAssembler {
   private final String recipeDigest;
   private final Path imageSourceRoot;
   private final Path sharedFolder;
-  private final Path cloudSeedRoot;
 
   public GrowPlanAssembler(
       String imageAlias,
@@ -46,25 +43,18 @@ public final class GrowPlanAssembler {
       String builderHost,
       String recipeDigest,
       Path imageSourceRoot,
-      Path sharedFolder,
-      Path cloudSeedRoot) {
+      Path sharedFolder) {
     this.imageAlias = imageAlias;
     this.builderBinary = builderBinary;
     this.builderHost = builderHost;
     this.recipeDigest = recipeDigest;
     this.imageSourceRoot = imageSourceRoot;
     this.sharedFolder = sharedFolder;
-    this.cloudSeedRoot = cloudSeedRoot;
   }
 
-  /**
-   * Seal the network view + the image + the cloud-init checksum + the resolved disk mounts into the
-   * immutable plan. The scion resolved the mounts OSGi-side ({@link GrowMountView#resolveFrom} off
-   * the live + automount {@code BootstrapPaths}) so the host GROW poses them without deriving a
-   * single path.
-   */
-  public InstanceGrowPlan assemble(GrowNetworkView network, List<GrowMountView> mounts) {
-    return new InstanceGrowPlan(network, imageView(), cloudInitChecksum(), mounts);
+  /** Seal the network view + the image into the immutable plan. */
+  public InstanceGrowPlan assemble(GrowNetworkView network) {
+    return new InstanceGrowPlan(network, imageView());
   }
 
   private GrowImageView imageView() {
@@ -104,8 +94,8 @@ public final class GrowPlanAssembler {
    * inputs: nixpkgs, flox, flox-runtime), {@code flake.nix} (the nixosConfiguration wiring), and
    * every file under {@code nixos/} (the modules) — folded over the sorted set with path + NUL +
    * bytes, so two identical trees hash identically. A missing file/dir contributes nothing but the
-   * digest stays stable. Read-only (like {@link #cloudInitChecksum()}): no shelling, so it is
-   * identical whether the run cultivates or surveys.
+   * digest stays stable. Read-only: no shelling, so it is identical whether the run cultivates or
+   * surveys.
    */
   private String imageSourceDigest() {
     final MessageDigest digest = sha256();
@@ -160,42 +150,11 @@ public final class GrowPlanAssembler {
     return name == null ? path : path.resolveSibling(name + ".nfs").normalize();
   }
 
-  /**
-   * SHA-256 of the NoCloud seed the instance reads at first boot ({@code user-data} / {@code
-   * meta-data} / {@code network-config} under {@code cloud.d}), folded over the sorted file set so
-   * two identical seeds hash identically. It arms the nocloud→replace wire: the host poses it on
-   * {@code user.rke2lab.provisioning.slice.cloud-init}, and {@code replaceOnChanges(config.*)}
-   * recreates the instance when the seed changes. Empty when the seed dir is absent (an unamended
-   * survey does not reach this assembler).
-   */
-  private String cloudInitChecksum() {
-    final MessageDigest digest = sha256();
-    if (!Files.isDirectory(cloudSeedRoot)) {
-      return HexFormat.of().formatHex(digest.digest());
-    }
-    try (Stream<Path> files = Files.walk(cloudSeedRoot)) {
-      files
-          .filter(Files::isRegularFile)
-          .sorted()
-          .forEach(
-              file -> {
-                digest.update((byte) '\n');
-                digest.update(
-                    cloudSeedRoot.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
-                digest.update((byte) 0);
-                digest.update(readAll(file));
-              });
-    } catch (IOException ex) {
-      throw new UncheckedIOException("cannot walk the NoCloud seed under " + cloudSeedRoot, ex);
-    }
-    return HexFormat.of().formatHex(digest.digest());
-  }
-
   private byte[] readAll(Path file) {
     try {
       return Files.readAllBytes(file);
     } catch (IOException ex) {
-      throw new UncheckedIOException("cannot read NoCloud seed file " + file, ex);
+      throw new UncheckedIOException("cannot read nix source file " + file, ex);
     }
   }
 
