@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 import com.tngtech.jgiven.report.json.ScenarioJsonReader;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.ScenarioCaseModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
@@ -39,10 +40,12 @@ import java.util.Optional;
  * that stands for that crossing and receives the graft.
  *
  * <p>The verdict travels IN the model: if the scion scenario is {@link ExecutionStatus#FAILED}, the
- * rootstock step is marked FAILED and every host step AFTER it is set {@link StepStatus#SKIPPED} —
- * the local fail-fast reproduced across the frontier. One serialized scenario suffices: it carries
- * both the narration (its steps → the sub-tree) and the verdict (its execution status → the
- * propagation).
+ * rootstock step is marked FAILED, every host step AFTER it is set {@link StepStatus#SKIPPED} (the
+ * local fail-fast reproduced across the frontier), and the scion's failure text (the case
+ * errorMessage + stackTrace — jGiven holds it at case level, never on a step) is carried onto the
+ * host case so the reason survives the crossing. One serialized scenario suffices: it carries the
+ * narration (its steps → the sub-tree), the verdict (its execution status → the propagation), and
+ * the reason (its case failure → the host case).
  */
 public final class ScenarioGraft {
 
@@ -107,6 +110,17 @@ public final class ScenarioGraft {
 
     if (scionScenario.getExecutionStatus() == ExecutionStatus.FAILED) {
       rootstock.setStatus(StepStatus.FAILED);
+      // jGiven stores the failure text (errorMessage + stackTrace) only on the CASE, never on a
+      // step — so the FAILED status alone would reach the host runbook with no reason. Carry the
+      // scion case's failure onto the host case (first-wins: an earlier crossing's cause is not
+      // overwritten by a later SKIPPED one) so the operator descends from the seed to the scion's
+      // actual error, and it bubbles up through each graft level to the root runbook.
+      final ScenarioCaseModel scionCase = scionScenario.getScenarioCases().get(0);
+      final ScenarioCaseModel hostCase = hostScenario.getScenarioCases().get(0);
+      if (scionCase.getErrorMessage() != null && hostCase.getErrorMessage() == null) {
+        hostCase.setErrorMessage(scionCase.getErrorMessage());
+        hostCase.setStackTrace(scionCase.getStackTrace());
+      }
       for (int i = rootstockIndex + 1; i < hostSteps.size(); i++) {
         hostSteps.get(i).setStatus(StepStatus.SKIPPED);
       }
