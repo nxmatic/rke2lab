@@ -18,9 +18,11 @@ import org.osgi.service.component.annotations.Component;
  * The CULTIVATING incus image-build edge — the single live door. Builds the NixOS node substrate's
  * Incus artifacts ({@code incus.tar.xz} + {@code rootfs.squashfs}) by running the bundled nix build
  * script: {@code nix build …#nixosConfigurations.rke2-node-base.config.system.build.{metadata,
- * squashfs}}, then {@code incus image import} + alias. It runs the script LOCALLY when both the nix
- * builder AND the incus client resolve on {@code PATH} (the host is the builder+daemon host),
- * otherwise it streams the same script over {@code ssh} to the configured builder host.
+ * squashfs}}, then {@code incus image import} + alias. It runs the script LOCALLY when both {@code
+ * nix} and {@code incus} resolve on {@code PATH} — nix offloads the aarch64-linux build to its
+ * configured remote builder and incus imports to its default remote daemon, the operator's OWN
+ * channels (the import uploads the artifacts over the incus remote); otherwise it streams the same
+ * script over {@code ssh} to the configured builder host.
  *
  * <p>One of the ImageBuilder PAIR: registered with {@code rke2lab.gardening=cultivating} so the
  * frontier picks it when the ambient RunGate is cultivating. Its twin, {@link
@@ -51,10 +53,12 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
     // distrobuilder run always rebuilt from scratch; nix does not, and keying a cache on the build
     // script's hash alone would serve a STALE image whenever only the committed sources changed.)
     //
-    // Local build needs BOTH the nix builder AND the incus client (the daemon the build imports
-    // into): nix alone resolves on the seed-master host too, where no incus daemon lives, so it is
-    // not an "am I the builder host" signal by itself. Missing either ⇒ stream the build to the
-    // configured builder host over ssh.
+    // Build through the operator's OWN nix + incus channels: when both resolve locally (the
+    // seed-master host — the Mac — has them), run the script HERE. nix offloads the aarch64-linux
+    // build to its configured remote builder, and incus imports to its default remote daemon — the
+    // SAME channels every other nix/incus op uses, no bespoke ssh (the import uploads the artifacts
+    // over the incus remote; the round-trip is accepted on a LAN). Only when the tools are NOT both
+    // local do we stream the build over ssh to the configured builder host.
     final String localNix = tryResolveExecutable(request.builderBinary());
     final String localIncus = tryResolveExecutable("incus");
     if (!localNix.isBlank() && !localIncus.isBlank()) {
