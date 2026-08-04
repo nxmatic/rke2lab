@@ -315,15 +315,6 @@
         # entry only ships Linux builds).
         incusClient = pkgs.incus.passthru.client;
 
-        # distrobuilder, surfaced as a pinned flake package so the remote image
-        # builder resolves it with `nix build .#distrobuilder` instead of a full
-        # `flox activate` of the rke2lab dev env — whose k8s include drags a
-        # from-source ceph-client build onto the builder just to put ONE binary on
-        # PATH. Linux-only in nixpkgs (it builds Linux rootfs), so guarded like the
-        # flox-nri plugin above to keep the darwin `packages` eval clean.
-        distrobuilderPackages =
-          if pkgs.stdenv.isLinux then { distrobuilder = pkgs.distrobuilder; } else { };
-
         # Prebuilt pulumi CLI for the deploy wrapper (matches the flox env's
         # `pulumi.pkg-path = "pulumi-bin"`); the `-bin` variant avoids a Go
         # compile and tracks the same release line the dev loop uses.
@@ -461,7 +452,7 @@
           seed-master = seedMasterJar;
           incus-client = incusClient;
           deploy = deployApp;
-        } // floxNriPluginPackages // toolchainPackages // distrobuilderPackages;
+        } // floxNriPluginPackages // toolchainPackages;
 
         apps.deploy = {
           type = "app";

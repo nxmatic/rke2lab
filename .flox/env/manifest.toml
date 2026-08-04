@@ -9,8 +9,6 @@ schema-version = "1.10.0"
 [install]
 pulumi.pkg-path = "pulumi-bin"
 pulumictl.pkg-path = "pulumictl"
-distrobuilder.pkg-path = "distrobuilder"
-distrobuilder.systems = ["aarch64-linux"]
 cdk8s-cli.pkg-path = "cdk8s-cli"
 dasel.pkg-path = "dasel"
 dasel.version = "3.3.0"
@@ -103,6 +101,7 @@ on-activate = '''
 [include]
   environments = [
     { dir = "../.flox.d/git" },
+    { dir = "../.flox.d/jdk" },
     { dir = "../.flox.d/k8s" },
     { dir = "../.flox.d/keyhole" },
     { dir = "../.flox.d/pulumi" },

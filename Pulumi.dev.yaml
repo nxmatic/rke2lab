@@ -7,8 +7,7 @@ config:
   rke2lab:profile:
     name: rke2lab
   rke2lab:logging:
-    # level: warn
-    level: debug
+    level: debug # info,warn,debug 
   rke2lab:incus:
     project: rke2lab
     # ~ expands to the operator's home at load time, so the same value resolves
@@ -16,14 +15,15 @@ config:
     configDir: ~/.config/incus
   rke2lab:image:
     alias: control-node
-    sharedFolder: .local.d/images/distrobuilder
+    sharedFolder: .local.d/images
   rke2lab:network:
     lanBridgeParent: lan-br
     vmnetNetworkName: vmnet-br
   rke2lab:api:
-    endpoint: https://10.66.106.10:6443
+    # endpoint: https://{netplan.vipHost}:6443
   rke2lab:systemd:
-    dbusPort: "12434"
+    # dbusHost: "{cluster}-{node.name}"
+    # dbusPort: "12434"
   rke2lab:manifests:
     # Which domain manifest layers the master publishes (stows via symlink) into RKE2's
     # server-manifests directory, and per-layer synthesis debug. NOTE: not yet wired — the seed

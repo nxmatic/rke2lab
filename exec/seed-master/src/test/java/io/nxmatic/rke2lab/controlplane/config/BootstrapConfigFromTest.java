@@ -22,10 +22,13 @@ class BootstrapConfigFromTest {
     assertEquals("bioskop", boot.clusterName());
     assertEquals("master", boot.nodeName());
     assertEquals("rke2lab", boot.incusProject());
+    // The remote LABEL stays the bare name (a pure label, never resolved); the resolvable address
+    // + the ssh builder host ride the LAN mDNS .local (the incus daemon binds dual-stack, and it is
+    // the operator's own ~/.config/incus channel — the bare tailnet name times out from here).
     assertEquals("bioskop-nixos", boot.incusDefaultRemote());
-    assertEquals(URI.create("https://bioskop-nixos:8443"), boot.incusRemoteAddress());
+    assertEquals(URI.create("https://bioskop-nixos.local:8443"), boot.incusRemoteAddress());
     assertEquals("control-node-base", boot.imageAlias());
-    assertEquals("bioskop-nixos", boot.imageBuilderHost());
+    assertEquals("bioskop-nixos.local", boot.imageBuilderHost());
     assertEquals("rke2lab", boot.profileName());
     assertEquals("lan-br", boot.lanBridgeParent());
     assertEquals("vmnet-br", boot.vmnetNetworkName());

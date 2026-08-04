@@ -54,7 +54,7 @@ projection are host orchestration that genuinely stays.
 
 `PulumiIncusImageProvider` (seed-master) ensures the seed image exists. Most of it is host
 orchestration that stays: the `getImagePlain` reuse lookup, the `com.pulumi.incus.Image` resource it
-schedules, the artifact-directory resolution across NFS mirror candidates, the `.build-checksum.sha256`
+schedules, the artifact-directory resolution across NFS mirror candidates, the `.build.checksum.sha256`
 cache marker, and the NixOS path translation. (The distrobuilder-config materialisation is NO LONGER
 host — the config is an edge bundle resource the edge materialises itself; see § the recipe is
 edge-owned.)

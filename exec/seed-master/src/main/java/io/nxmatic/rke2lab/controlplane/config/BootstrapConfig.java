@@ -62,11 +62,16 @@ public record BootstrapConfig(
     final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
     final String nodeName = config.node().name().orElse(DEFAULT_NODE_NAME);
     // The rke2lab host naming convention is derived from the cluster name — the infra is identical
-    // across clusters, only the prefix differs: the NixOS host is <cluster>-nixos. It is on the
-    // tailnet, so its bare name resolves via MagicDNS (the incus remote URL + image builder host
-    // ride it bare); only the incus remote LABEL (defaultRemote) is a pure label. Deriving here
-    // keeps the cluster name a single source in config.
+    // across clusters, only the prefix differs: the NixOS host is <cluster>-nixos. Its RESOLVABLE
+    // address rides the LAN mDNS <host>.local, NOT the tailnet MagicDNS bare name: the incus daemon
+    // binds dual-stack [::]:8443 which the .local name reaches, and this is the SAME channel the
+    // operator's own ~/.config/incus remote already uses. The bare tailnet name is avoided here —
+    // it resolves to a tailnet IP that currently times out from the seed host. Only the incus
+    // remote
+    // LABEL (defaultRemote) stays the bare name (a pure label, never resolved). Deriving here keeps
+    // the cluster name a single source in config.
     final String nixosHost = clusterName + "-nixos";
+    final String nixosMdnsHost = nixosHost + ".local";
 
     // Cluster-scoped kubeconfig: one file per cluster at .local.d/<cluster>/kubeconfig.yaml.
     final Path kubeconfigRef =
@@ -83,10 +88,10 @@ public record BootstrapConfig(
         config
             .incus()
             .remoteAddress()
-            .orElseGet(() -> URI.create("https://" + nixosHost + ":8443")),
+            .orElseGet(() -> URI.create("https://" + nixosMdnsHost + ":8443")),
         config.incus().configDir(),
         config.image().alias().orElse(DEFAULT_IMAGE_ALIAS),
-        config.image().builderHost().orElseGet(() -> nixosHost),
+        config.image().builderHost().orElseGet(() -> nixosMdnsHost),
         config.image().sharedFolder(),
         config.profile().name().orElse(DEFAULT_PROFILE_NAME),
         config.network().lanBridgeParent().orElse(DEFAULT_LAN_BRIDGE_PARENT),
