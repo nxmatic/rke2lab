@@ -35,7 +35,12 @@ git -C "$workspace" archive --format=tar HEAD | tar -x -C "$src_dir"
 # realises them into /nix/store (local, content-addressed) — no tmpfs scratch and no root, unlike
 # distrobuilder. Only the two finished files are published below.
 attr="nixosConfigurations.rke2-node-base.config.system.build"
-nix_flags="--extra-experimental-features nix-command flakes --no-link --print-out-paths --accept-flake-config"
+# No experimental-features and no --accept-flake-config here: nix-command + flakes are already in the
+# builder's global nix config, and the flake's only nixConfig (pure-eval=false) is irrelevant to this
+# PURE node-base eval. (The earlier `--extra-experimental-features nix-command flakes` on an unquoted,
+# word-split flag string mis-parsed "flakes" as the installable `flake:flakes` and failed the build.)
+# The two remaining flags are single tokens, so word-splitting $nix_flags is safe.
+nix_flags="--no-link --print-out-paths"
 
 metadata_out="$($nix_bin build $nix_flags "$src_dir#$attr.metadata")"
 squashfs_out="$($nix_bin build $nix_flags "$src_dir#$attr.squashfs")"
