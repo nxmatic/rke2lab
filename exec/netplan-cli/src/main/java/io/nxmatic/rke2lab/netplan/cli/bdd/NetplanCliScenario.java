@@ -9,9 +9,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import com.tngtech.jgiven.report.model.ExecutionStatus;
-import com.tngtech.jgiven.report.model.ReportModel;
-import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.SeedRuntime;
@@ -159,19 +156,10 @@ public class NetplanCliScenario
       if (runbook == null || runbook.isBlank()) {
         throw new AssertionError("the netplan sow reaped no runbook — the scion did not grow");
       }
-      // A non-blank runbook is not enough: a FAILED in-container export still reaps its runbook
-      // JSON. Rebuild it and fail the CLI on a FAILED scion — there is no host tree to graft into
-      // here — carrying the scion's own error text; otherwise the CLI exits GREEN on a failed sow.
-      final ReportModel model = new ScenarioGraft().rebuild(runbook);
-      if (model.getScenarios().isEmpty()) {
-        throw new AssertionError("the netplan sow reaped a runbook with no scenario");
-      }
-      final ScenarioModel scenario = model.getScenarios().get(0);
-      if (scenario.getExecutionStatus() == ExecutionStatus.FAILED) {
-        throw new AssertionError(
-            "the netplan export failed in-container: "
-                + scenario.getScenarioCases().get(0).getErrorMessage());
-      }
+      // A non-blank runbook is not enough: a FAILED in-container export still reaps its runbook.
+      // This CLI grafts into no host tree, so it asserts the scion passed here — the assert throws
+      // the scion's own reason (message + stack) on a FAILED sow, else the CLI exits GREEN on it.
+      new ScenarioGraft().assertPassed(runbook, "the netplan export");
       return self();
     }
   }

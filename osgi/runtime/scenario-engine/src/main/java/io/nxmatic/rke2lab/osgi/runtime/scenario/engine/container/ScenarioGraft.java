@@ -128,6 +128,34 @@ public final class ScenarioGraft {
   }
 
   /**
+   * Assert a reaped scion runbook PASSED, else throw its failure reason. For a NON-grafting reaper
+   * — a CLI root that sows a scion and has no host tree to graft the verdict into (unlike {@link
+   * #graftUnder}, which propagates a FAILED scion onto the host runbook and carries its error text
+   * up). The scion's failure crossed the realm as JSON, so jGiven holds only the case {@code
+   * errorMessage} + {@code stackTrace} STRINGS (no live Throwable to chain) — both are folded into
+   * the thrown {@link AssertionError} so the operator sees the reason AND the scion's frames, not a
+   * one-line summary.
+   *
+   * @param label how the operator names the sow (e.g. {@code "the manifests synthesis"})
+   */
+  public void assertPassed(String runbookJson, String label) {
+    final ReportModel model = rebuild(runbookJson);
+    if (model.getScenarios().isEmpty()) {
+      throw new AssertionError(label + " reaped a runbook with no scenario");
+    }
+    final ScenarioModel scenario = model.getScenarios().get(0);
+    if (scenario.getExecutionStatus() != ExecutionStatus.FAILED) {
+      return;
+    }
+    final ScenarioCaseModel failed = scenario.getScenarioCases().get(0);
+    final String stack =
+        failed.getStackTrace() == null || failed.getStackTrace().isEmpty()
+            ? ""
+            : "\n" + String.join("\n", failed.getStackTrace());
+    throw new AssertionError(label + " failed in-container: " + failed.getErrorMessage() + stack);
+  }
+
+  /**
    * Read a within-run fact a scion posed on its model and the graft merged into {@code hostTree} —
    * the ephemeral cellar's read side. Returns the single tag value of {@code kind}, or empty if the
    * scion posed none (a scion that did not run, or a probe with nothing to bring to the terrain).

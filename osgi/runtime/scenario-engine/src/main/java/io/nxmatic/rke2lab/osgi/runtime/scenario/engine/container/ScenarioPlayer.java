@@ -1,6 +1,12 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
+import com.tngtech.jgiven.report.model.ExecutionStatus;
+import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.ScenarioCaseModel;
+import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -94,15 +100,47 @@ public final class ScenarioPlayer {
                     }
                   });
               launcher.execute(request);
-              return outcomeSeed
-                  .find(sessionStore)
-                  .orElseThrow(
-                      () ->
-                          new IllegalStateException(
-                              "the scenario produced no outcome — its body never ran (a"
-                                  + " before-phase failure aborted the node); see the cause",
-                              nodeFailure.first().orElse(null)));
+              final ScenarioOutcome outcome =
+                  outcomeSeed
+                      .find(sessionStore)
+                      .orElseThrow(
+                          () ->
+                              new IllegalStateException(
+                                  "the scenario produced no outcome — its body never ran (a"
+                                      + " before-phase failure aborted the node); see the cause",
+                                  nodeFailure.first().orElse(null)));
+              // jGiven records only the TOP throwable on the failed case (its message + its OWN
+              // frames, never walking getCause) — so the runbook, the graft, and any CLI reaper
+              // would show a root cause stripped of its chain. Overwrite the failed case from the
+              // real Throwable the listener captured (full message + "Caused by:" stack), once here
+              // where both the model and the live Throwable are in hand.
+              nodeFailure
+                  .first()
+                  .ifPresent(failure -> enrichFailedCase(outcome.runbook(), failure));
+              return outcome;
             },
             seedSessionStore);
+  }
+
+  /**
+   * Overwrite the FAILED scenario case's {@code errorMessage} + {@code stackTrace} with the full
+   * captured {@link Throwable} — its whole cause chain and every frame, as {@code printStackTrace}
+   * renders them. jGiven's own capture keeps only the top throwable; this restores the root cause
+   * so it survives serialisation, the cross-realm graft, and a non-grafting CLI reap. Fail-fast
+   * means one failed case per run, so the first match is the one to enrich.
+   */
+  private void enrichFailedCase(ReportModel runbook, Throwable failure) {
+    for (ScenarioModel scenario : runbook.getScenarios()) {
+      if (scenario.getExecutionStatus() != ExecutionStatus.FAILED
+          || scenario.getScenarioCases().isEmpty()) {
+        continue;
+      }
+      final StringWriter trace = new StringWriter();
+      failure.printStackTrace(new PrintWriter(trace));
+      final ScenarioCaseModel failed = scenario.getScenarioCases().get(0);
+      failed.setErrorMessage(failure.toString());
+      failed.setStackTrace(List.of(trace.toString().split("\\R")));
+      return;
+    }
   }
 }
