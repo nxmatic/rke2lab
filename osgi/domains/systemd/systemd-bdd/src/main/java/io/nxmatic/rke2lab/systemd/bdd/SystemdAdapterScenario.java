@@ -276,7 +276,7 @@ public class SystemdAdapterScenario
     private When check(String facet, boolean ready, SymptomKind failureSymptom) {
       record(facet, ready, failureSymptom);
       if (!ready) {
-        throw new AssertionError(facet + ": not ready");
+        throw new SystemdNotReadyError(facet, snapshot);
       }
       return self();
     }
@@ -290,9 +290,18 @@ public class SystemdAdapterScenario
       observations.add(
           new ObservationWire(
               "failed",
-              facet + ": not ready",
+              facet + ": not ready — " + snapshotSummary(),
               Optional.of(failureSymptom),
-              Map.of("facet", facet)));
+              Map.of("facet", facet, "snapshot", snapshotSummary())));
+    }
+
+    // The probe's verdict is a single boolean, but WHY it is not-ready lives in the snapshot — the
+    // mandatory target, its state, failed units. Carry that into the failure message AND the
+    // observation so the runbook is self-diagnosing (no step-debugger, no log fishing). Null only
+    // on
+    // the unreachable path, where the caught exception already carries the reason.
+    private String snapshotSummary() {
+      return snapshot == null ? "no snapshot (endpoint unreachable)" : snapshot.summary();
     }
   }
 
