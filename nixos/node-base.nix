@@ -210,6 +210,23 @@ in
     ];
   };
 
+  # mDNS advertisement — the seed-master systemd adapter (and the incus remote) reach this node by
+  # its <cluster>-<node>.local name, so the node must ANSWER that name over mDNS. rke2lab-identity
+  # sets the hostname at runtime (ordered before avahi below), and avahi publishes it + its LAN
+  # addresses. Without this the guest never advertises: nikopol-master.local is unresolvable and the
+  # adapter probe dies with UnknownHostException before it ever reaches dbus :12434 (the host
+  # nikopol-nixos.local resolves only because the HOST runs avahi; the guest must run its own).
+  services.avahi = {
+    enable = true;
+    ipv4 = true;
+    ipv6 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      workstation = true;
+    };
+  };
+
   # Nix substrate config — the declarative form of what rke2lab-nix-install.sh +
   # rke2lab-flox-install.sh wrote into /etc/nix/{nix,flox}.conf on the Debian node.
   # NOT translated here (handled elsewhere on purpose):
