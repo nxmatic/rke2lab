@@ -26,28 +26,35 @@ mkdir -p "$artifact_dir"
 metadata_name="incus.tar.xz"
 rootfs_name="rootfs.squashfs"
 
-# Freshness gate over the EXACT build inputs at HEAD. `git ls-tree` lists the blob SHA of every file
-# under flake.lock / flake.nix / nixos/ — a CONTENT digest (not mtimes, not the commit id) of exactly
-# what nix will build from (HEAD, via the git-archive below — NOT the worktree the scion digests,
-# which may carry uncommitted edits). Unchanged inputs + both artifacts still on disk ⇒ the artifacts
+# Build from the STAGED index, not HEAD: `git write-tree` writes the current index to a tree object
+# and prints its SHA. When nothing is staged that tree is byte-identical to HEAD's (so an unamended
+# run behaves exactly as before); when node-base edits are `git add`-ed, they are built WITHOUT a
+# commit — the iteration loop is stage-and-grow, not commit-and-grow. Unstaged working-tree edits are
+# NOT included: stage what you want built. Real git writes the tree (it understands this worktree's
+# `relativeworktrees` extension); only nix's libgit2 chokes on the extension, which is why the tree
+# is exported to a throwaway dir below rather than fetched as a git+file flake.
+source_tree="$(git -C "$workspace" write-tree)"
+
+# Freshness gate over the EXACT build inputs in that tree. `git ls-tree` lists the blob SHA of every
+# file under flake.lock / flake.nix / nixos/ — a CONTENT digest (not mtimes, not the commit id) of
+# exactly what nix will build from. Unchanged inputs + both artifacts still on disk ⇒ the artifacts
 # are current, so skip nix entirely. (nix would only RE-EVALUATE anyway — realisation is already
 # store-cached — but the git-archive tempdir gives a fresh flake path each run, so nix's own eval
 # cache never hits; this gate is what spares that seconds-long NixOS eval on an unchanged tree.)
-source_digest="$(git -C "$workspace" ls-tree -r HEAD -- flake.lock flake.nix nixos | sha256sum | awk '{print $1}')"
+source_digest="$(git -C "$workspace" ls-tree -r "$source_tree" -- flake.lock flake.nix nixos | sha256sum | awk '{print $1}')"
 checksum_file="$artifact_dir/.build.checksum.sha256"
 
 if [ -f "$checksum_file" ] && [ "$(cat "$checksum_file")" = "$source_digest" ] &&
     [ -f "$artifact_dir/$metadata_name" ] && [ -f "$artifact_dir/$rootfs_name" ]; then
     echo "node-base sources unchanged ($source_digest) — reusing on-disk artifacts, skipping nix build"
 else
-    # The worktree carries the git `relativeworktrees` extension, which nix's libgit2 cannot parse — a
-    # `git+file://` fetch of it fails outright. Export the tracked tree at HEAD with real git (which
-    # DOES understand the extension) into a throwaway dir, and build THAT as a path-flake: no git
-    # fetch, and always exactly what is committed. flake.lock rides in the archive, so inputs stay
-    # pinned.
+    # Export the staged tree (computed above) with real git into a throwaway dir, and build THAT as a
+    # path-flake: no git+file fetch (which libgit2 would reject over the `relativeworktrees`
+    # extension), and exactly the tree the freshness digest was taken over. flake.lock rides in the
+    # archive, so inputs stay pinned.
     src_dir="$(mktemp -d)"
     trap 'rm -rf "$src_dir"' EXIT
-    git -C "$workspace" archive --format=tar HEAD | tar -x -C "$src_dir"
+    git -C "$workspace" archive --format=tar "$source_tree" | tar -x -C "$src_dir"
 
     # The homogeneous NixOS substrate every RKE2 node boots from. Build its two Incus artifacts: nix
     # realises them into /nix/store (local, content-addressed) — no tmpfs scratch and no root, unlike
