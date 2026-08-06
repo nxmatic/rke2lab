@@ -220,6 +220,12 @@ in
     enable = true;
     ipv4 = true;
     ipv6 = true;
+    # Advertise ONLY on lan0 (the canonical LAN bridge, same L2 as the operator's Mac). The node
+    # also carries vmnet0 (the internal per-cluster bridge, e.g. 10.80.8.0/21) whose address is NOT
+    # routable from outside the cluster; advertising there would let a resolver pick the dead IP for
+    # <cluster>-<node>.local and the systemd-adapter probe would connect to nothing. lan0 is the
+    # instance NIC name InstanceGrow assigns, stable across boots.
+    allowInterfaces = [ "lan0" ];
     publish = {
       enable = true;
       addresses = true;
