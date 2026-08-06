@@ -292,8 +292,7 @@ public class BboxReconciliationScenario
                             + "): "
                             + o.failureMessage().orElse("no reason reported"))
                 .collect(Collectors.joining("; "));
-        throw new AssertionError(
-            refused.size() + " reservation row(s) refused by the router — " + reasons);
+        throw new BboxReservationError(refused, reasons);
       }
       return self();
     }

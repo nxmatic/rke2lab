@@ -433,7 +433,7 @@ public class IncusProvisionScenario
         // The edge throws with its message AND (where it wraps one) its cause; chain it so the
         // runbook shows the reason and the stack, not a bare summary string.
         record("incus image", false, SymptomKind.IMAGE_BUILD_FAILED, failed.getMessage());
-        throw new AssertionError("incus image build failed: " + failed.getMessage(), failed);
+        throw new IncusImageBuildError(request, failed);
       }
       record("incus image", true, SymptomKind.IMAGE_BUILD_FAILED, null);
       return self();

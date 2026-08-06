@@ -20,7 +20,9 @@ public enum Symptom {
   CONTROLLER_NOT_READY("controller-not-ready"),
   RESERVATION_REFUSED("reservation-refused"),
   IMAGE_BUILD_FAILED("image-build-failed"),
-  INSTANCE_UNREACHABLE("instance-unreachable");
+  INSTANCE_UNREACHABLE("instance-unreachable"),
+  BLUEPRINT_EXPORT_FAILED("blueprint-export-failed"),
+  SYNTHESIS_INCOMPLETE("synthesis-incomplete");
 
   /** Envelope key under which a probe records its symptom on a non-ok result. */
   public static final String ENVELOPE_KEY = "symptom";

@@ -264,18 +264,26 @@ public class ManifestSynthesisScenario
     public Then every_enabled_domain_produced_its_units() {
       final int enabled = domainPolicy.enabledDomainIds().size();
       if (result.domainCount() < enabled) {
-        throw new AssertionError(
-            "expected at least " + enabled + " synthesised domains, got " + result.domainCount());
+        throw new ManifestSynthesisError(
+            "expected at least " + enabled + " synthesised domains, got " + result.domainCount(),
+            ManifestSynthesisError.Gap.DOMAIN_COUNT_SHORT,
+            result);
       }
       return self();
     }
 
     public Then the_manifests_file_is_written() {
       if (!Files.exists(result.manifestFile())) {
-        throw new AssertionError("manifest file was not written: " + result.manifestFile());
+        throw new ManifestSynthesisError(
+            "manifest file was not written: " + result.manifestFile(),
+            ManifestSynthesisError.Gap.MANIFEST_FILE_MISSING,
+            result);
       }
       if (result.manifestUnitHitCount() <= 0) {
-        throw new AssertionError("no manifest units were processed");
+        throw new ManifestSynthesisError(
+            "no manifest units were processed",
+            ManifestSynthesisError.Gap.NO_UNITS_PROCESSED,
+            result);
       }
       return self();
     }
@@ -298,7 +306,10 @@ public class ManifestSynthesisScenario
                 + domainId.toUpperCase(Locale.ROOT).replace('-', '_')
                 + "_ENABLED";
         if (!rendered.contains(var)) {
-          throw new AssertionError("synthesised manifests miss the publish var " + var);
+          throw new ManifestSynthesisError(
+              "synthesised manifests miss the publish var " + var,
+              ManifestSynthesisError.Gap.MISSING_PUBLISH_VAR,
+              result);
         }
       }
       return self();

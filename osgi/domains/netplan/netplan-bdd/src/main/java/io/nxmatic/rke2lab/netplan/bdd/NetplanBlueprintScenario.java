@@ -235,7 +235,7 @@ public class NetplanBlueprintScenario
 
     public Then the_blueprint_file_is_written() {
       if (!Files.exists(blueprintFile)) {
-        throw new AssertionError("the blueprint export was not written: " + blueprintFile);
+        throw new NetplanExportError(blueprintFile, NetplanExportError.Reason.MISSING);
       }
       final long size;
       try {
@@ -244,7 +244,7 @@ public class NetplanBlueprintScenario
         throw new UncheckedIOException("cannot stat the blueprint export " + blueprintFile, ex);
       }
       if (size <= 0) {
-        throw new AssertionError("the blueprint export is empty: " + blueprintFile);
+        throw new NetplanExportError(blueprintFile, NetplanExportError.Reason.EMPTY);
       }
       return self();
     }

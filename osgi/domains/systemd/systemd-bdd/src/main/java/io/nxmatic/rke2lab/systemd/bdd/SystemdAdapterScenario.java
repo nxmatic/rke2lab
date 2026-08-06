@@ -253,7 +253,7 @@ public class SystemdAdapterScenario
         this.snapshot = probe.orElseThrow().probe(endpoint);
       } catch (RuntimeException unreachable) {
         record("systemd endpoint", false, SymptomKind.CONNECTION_REFUSED);
-        throw new AssertionError("systemd endpoint: " + unreachable.getMessage(), unreachable);
+        throw new SystemdNotReadyError("systemd endpoint", unreachable);
       }
       return check(
           "systemd endpoint", snapshot.runtimePrecheckReady(), SymptomKind.CONNECTION_REFUSED);

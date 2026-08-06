@@ -397,6 +397,51 @@ Acting on the record is step 2 (remediation).
 . No-compat throughout: old names and the old output key are deleted in the same change that
   introduces the new ones; no aliases, no deprecation.
 
+== Typed recovery errors — the `Symptomatic` capability
+
+A scenario's readiness check has two channels for the SAME failure. The structured one is the
+`ObservationWire` it records into the `readiness-checkpoint` envelope — a `status`, a `summary`, a
+typed `SymptomKind`, and an open `details` bag — which the doctor reads after the play. The second
+is the throwable the fail-fast WHEN/THEN raises so jGiven marks the step FAILED and the chain skips
+the rest.
+
+The defect was that this throwable was a *bare* `AssertionError` whose only signal was a flattened
+message string: a catcher (a doctor specialist, the runbook's error enricher) got a sentence to
+re-parse, not data. `Symptomatic` (in `doctor-contract`, beside `SymptomKind`) closes that gap —
+the capability a readiness failure carries so its recovery data is typed:
+
+* `symptom()` — the same `SymptomKind` routing key the observation records, so a catcher routes to a
+  specialist without string-matching;
+* `recoveryContext()` — the typed twin of the observation's `details` bag.
+
+It is an INTERFACE, not a base class, deliberately: `doctor-contract` is a pure-contract bundle
+(only records / enums / interfaces / sealed ADTs may cross its exported surface — the
+`contract-purity` staging gate), and a throwable base would be a concrete class. So each domain
+raises its own `AssertionError` subclass that `implements Symptomatic` and ALSO exposes its own
+typed member — the datum a domain-aware catcher downcasts for: `SystemdNotReadyError.snapshot()`
+(the systemd status snapshot, or null when the endpoint was unreachable),
+`ClusterNotReadyError.phase()`, `IncusImageBuildError.request()`,
+`BboxReservationError.refusedRows()`, `NetplanExportError` (path + reason), `ManifestSynthesisError`
+(result + which `Gap` failed). A consumer reads them uniformly by pattern:
+
+[source,java]
+----
+if (throwable instanceof Symptomatic s) {
+  route(s.symptom());            // typed routing key, no string-parsing
+  inspect(s.recoveryContext());  // structured facts
+}
+----
+
+[cols="1,1",options="header"]
+|===
+| ❌ Anti-pattern | ✅ Typed
+| `throw new AssertionError(phase.label() + ": not ready")` | `throw new ClusterNotReadyError(phase, symptom)`
+|===
+
+It does NOT couple the scenario engine to `doctor-contract`: the engine's `enrichFailedCase` still
+renders the throwable's message + stack; the typed data is for the in-realm catcher and mirrors the
+checkpoint channel, it does not replace it.
+
 == Related documentation
 
 * link:glossary.adoc[Doctor Glossary] — the term source of truth for the clinical vocabulary.

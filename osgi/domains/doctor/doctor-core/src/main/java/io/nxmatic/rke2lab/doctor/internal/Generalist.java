@@ -391,6 +391,12 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       // Incus provisioning symptoms route to the INCUS domain (no incus specialist treats them yet,
       // so the plan is empty until one is added — symptom seen, no treatment offered).
       case IMAGE_BUILD_FAILED, INSTANCE_UNREACHABLE -> List.of(Specialty.INCUS);
+      // A failed netplan blueprint export is a network-config fault — routes to the NETWORK domain
+      // (no specialist treats it yet: symptom seen, empty plan).
+      case BLUEPRINT_EXPORT_FAILED -> List.of(Specialty.NETWORK);
+      // An incomplete manifest synthesis has no domain specialty (manifests is not a Specialty), so
+      // it routes nowhere — the symptom is recorded, no treatment offered.
+      case SYNTHESIS_INCOMPLETE -> List.of();
     };
   }
 }

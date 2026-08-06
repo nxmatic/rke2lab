@@ -19,7 +19,9 @@ public enum SymptomKind implements WireEnum {
   CONTROLLER_NOT_READY("controller-not-ready"),
   RESERVATION_REFUSED("reservation-refused"),
   IMAGE_BUILD_FAILED("image-build-failed"),
-  INSTANCE_UNREACHABLE("instance-unreachable");
+  INSTANCE_UNREACHABLE("instance-unreachable"),
+  BLUEPRINT_EXPORT_FAILED("blueprint-export-failed"),
+  SYNTHESIS_INCOMPLETE("synthesis-incomplete");
 
   private final String slug;
 

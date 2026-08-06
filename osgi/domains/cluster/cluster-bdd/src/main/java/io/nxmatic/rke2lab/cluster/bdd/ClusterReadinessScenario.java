@@ -219,7 +219,7 @@ public class ClusterReadinessScenario
               phase.label() + ": not ready",
               Optional.of(failureSymptom),
               Map.of("phase", phase.name())));
-      throw new AssertionError(phase.label() + ": not ready");
+      throw new ClusterNotReadyError(phase, failureSymptom);
     }
   }
 
