@@ -165,6 +165,51 @@ in
     '';
   };
 
+  # dbus-over-TCP for the seed-master systemd adapter — the baked replacement for the old
+  # rke2lab-dbus-tcp-system-bus.sh host script. The adapter opens an anonymous-SASL DBus connection
+  # to a node's system bus over TCP (port 12434) to read live unit state. Baked on EVERY node (not
+  # master-only as the Debian script was): the substrate is homogeneous, exposing the bus uniformly
+  # on the lab bridge is a good-to-have and lets this be FULLY DECLARATIVE — no runtime node.env
+  # gate, no dbus restart. Two pieces:
+  #   1. the anonymous-allow policy;
+  #   2. a dbus.socket drop-in adding the TCP ListenStream beside the unix socket (the leading ""
+  #      resets systemd's inherited list so the unix listener survives). dbus comes up with the TCP
+  #      listener from boot.
+  # Classic dbus-daemon, NOT dbus-broker (the NixOS default): dbus-java's anonymous SASL over TCP
+  # relies on <auth>ANONYMOUS</auth> + <allow_anonymous/>, which the broker does not honour.
+  services.dbus.implementation = "dbus";
+  services.dbus.packages = [
+    (pkgs.writeTextDir "share/dbus-1/system.d/40-rke2lab-allow-all.conf" ''
+      <!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+       "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+      <busconfig>
+        <auth>ANONYMOUS</auth>
+        <allow_anonymous/>
+        <policy context="default">
+          <allow send_type="method_call"/>
+          <allow send_type="method_return"/>
+          <allow send_type="signal"/>
+          <allow send_type="error"/>
+          <allow send_destination="*"/>
+          <allow receive_type="method_call"/>
+          <allow receive_type="method_return"/>
+          <allow receive_type="signal"/>
+          <allow receive_type="error"/>
+          <allow eavesdrop="true"/>
+          <allow own="*"/>
+        </policy>
+      </busconfig>
+    '')
+  ];
+  systemd.sockets.dbus = {
+    overrideStrategy = "asDropin";
+    socketConfig.ListenStream = [
+      ""
+      "/run/dbus/system_bus_socket"
+      "0.0.0.0:12434"
+    ];
+  };
+
   # Nix substrate config — the declarative form of what rke2lab-nix-install.sh +
   # rke2lab-flox-install.sh wrote into /etc/nix/{nix,flox}.conf on the Debian node.
   # NOT translated here (handled elsewhere on purpose):
