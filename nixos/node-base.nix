@@ -62,6 +62,27 @@ in
     service-cidr: 10.43.0.0/16,fd00:43::/112
   '';
 
+  # rke2lab.target — the node's substrate-ready signal the seed-master systemd adapter probes as its
+  # mandatory target. It aggregates exactly the rke2lab units that remain on this homogeneous node:
+  # identity resolved (devlxd → node.env + hostname), the zfs snapshotter dataset mounted, and
+  # rke2-server started. `wants` (weak) so the target still activates for the probe to read even if a
+  # unit degraded — the adapter's snapshot reports failedUnits separately; `after` so the target only
+  # goes active once the boot has actually reached this stage. Pulled into the boot by multi-user.
+  systemd.targets.rke2lab = {
+    description = "rke2lab node substrate ready";
+    wants = [
+      "rke2lab-identity.service"
+      "rke2lab-zfs-containerd.service"
+      "rke2-server.service"
+    ];
+    after = [
+      "rke2lab-identity.service"
+      "rke2lab-zfs-containerd.service"
+      "rke2-server.service"
+    ];
+    wantedBy = [ "multi-user.target" ];
+  };
+
   # containerd runtime config (rke2's embedded containerd) — the declarative form of
   # rke2lab-server-pre-start.sh (NRI) + config-v3.toml (zfs snapshotter) +
   # rke2lab-configure-containerd-zfs-mount.sh. Placed under /var/lib via tmpfiles (environment.etc
