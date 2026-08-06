@@ -27,6 +27,14 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <!-- byte-buddy at compile scope for PulumiRunnerThrottleAgent (the Launcher-Agent-Class that
+         throttles pulumi-java's DefaultRunner busy-poll). Already flat-shaded into the uber-jar via
+         jGiven's closure; declared here so the agent + its Advice compile. Version from the BOM
+         (spring-boot-dependencies, the same byte-buddy jGiven uses). -->
+    <dependency>
+      <groupId>net.bytebuddy</groupId>
+      <artifactId>byte-buddy</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
@@ -557,6 +565,11 @@
                          injector needs java.lang opened under JDK module encapsulation. Honored
                          when Pulumi launches the exec jar with `java -jar`. -->
                     <Add-Opens>java.base/java.lang</Add-Opens>
+                    <!-- Executable-jar agent (JDK 9+): the JVM runs its agentmain before Main,
+                         handing it Instrumentation — no -javaagent flag, no self-attach. It
+                         throttles pulumi-java's DefaultRunner busy-poll. See
+                         PulumiRunnerThrottleAgent. -->
+                    <Launcher-Agent-Class>io.nxmatic.rke2lab.controlplane.PulumiRunnerThrottleAgent</Launcher-Agent-Class>
                   </manifestEntries>
                 </transformer>
               </transformers>
