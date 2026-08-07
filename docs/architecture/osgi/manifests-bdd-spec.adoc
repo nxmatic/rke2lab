@@ -33,7 +33,7 @@ flowchart TB
     handler["ManifestsRunbookHandler<br/>serves RunbookCoordinate('manifests')"]
     front["ManifestsBddScenarios.run(trigger)<br/>in-container JUnit launcher"]
     scen["ManifestSynthesisScenario<br/>resolves synthesis service from registry (mode-blind)"]
-    svc["ManifestSynthesisService (SCR)<br/>synthesises manifests + env-config ConfigMaps"]
+    svc["ManifestSynthesisService (SCR)<br/>synthesises the K8s manifest tree"]
   end
 
   caller -->|"sow(RunbookCoordinate('manifests'), policyJSON)"| broker
@@ -93,7 +93,7 @@ policy reachable through it.**
   **ignores its trigger** — the sow trigger is empty (`"{}"`) today.
 * Manifests has ONE policy path: the activation facet. Both the seed flow AND
   `manifests-cli` sow the `manifests` coordinate through the broker; the scion derives
-  `ManifestDomainPolicy` (+ `RKE2LAB_MANIFESTS_PUBLISH_*`) from the `publish` facet of
+  `ManifestDomainPolicy` from the `publish` facet of
   `ManifestsRunbookInput` (the host contributes it, or it falls to `defaults()`). The
   former system-properties path (`ManifestSynthesisRequest.fromSystemProperties()`,
   `-Drke2lab.manifests.policy.enabledDomains=…`) is gone — no second vocabulary to drift.
@@ -162,8 +162,7 @@ flowchart LR
   `SowAndGraftStage` stop sending empty), not manifests-only.
 . **One translator per domain — the scion.** Each scion reads its own facet in
   `handle(trigger)` and translates it in its OWN vocabulary. The manifests scion
-  owns `ManifestDomainCatalog` + the `RKE2LAB_MANIFESTS_PUBLISH_*` naming, so it derives
-  `ManifestDomainPolicy` + `FloxDebugPolicy` + the publish-time seed vars from the
+  owns `ManifestDomainCatalog`, so it derives `ManifestDomainPolicy` + `FloxDebugPolicy` from the
   `publish`/`debug` concerns. A scion sees ONLY its facet, never another soil's config.
 
 **Consequences.** `fromSystemProperties()` dissolves — the CLI reads the same file
@@ -171,11 +170,9 @@ as the seed, through the same reader. Both host policy classes are GONE (deleted
 `1f7c1ee54`): `ManifestLinkPolicy` (whose sole job was translating the raw booleans
 into `ManifestDomainPolicy` + `toEnvMap()`) AND `ControlplanePolicy` (the aggregate
 that held it) were orphaned live logic with no production caller, and the translation
-now lives OSGi-side in the scion. The scion derives BOTH `ManifestDomainPolicy`
-(synth-time filter) and the `RKE2LAB_MANIFESTS_PUBLISH_*` seed vars (publish-time overlay)
-from its own `publish`/`debug` facet — it owns `ManifestDomainCatalog` + the
-`RKE2LAB_MANIFESTS_PUBLISH_*` naming, so no host type names `manifests.contract` (the gate
-is clear, and LOCKED at ERROR). The scion's facet is defaulted today
+now lives OSGi-side in the scion. The scion derives `ManifestDomainPolicy` (the synth-time
+filter) from its own `publish`/`debug` facet — it owns `ManifestDomainCatalog`, so no host type
+names `manifests.contract` (the gate is clear, and LOCKED at ERROR). The scion's facet is defaulted today
 (`ManifestsRunbookInput.defaults()`); the host does not pilot it (a decision, not a
 gap — the policy is a manifests concern, not a host one). `readiness` / `preview`
 were always separate concerns (they lived on the now-deleted host policy); they stay
@@ -203,52 +200,28 @@ with two distinct ends, and the scion owns BOTH:
   rejects an all-disabled set
 | in-container (manifests-core) — correct already
 
-| *publish-time* | which layers the master *publishes live* — the `RKE2LAB_MANIFESTS_PUBLISH_*`
-  env vars emitted as an env-config section by `PublishNodeEnvContributor` (one variable per
-  publishable domain, read from the `ManifestDomainPolicy`), read by `rke2lab-manifests-install.sh`
-  and the per-layer `*-ready.sh` gates on the master
-| **in-container** — the scion derives the policy from its facet; the contributor emits the vars
 |===
 
-Both ends derive from the SAME operator choice, and the scion covers both:
+From its facet (the `manifests` sub-map of the one policy, § the single path), the scion derives
+the `ManifestDomainPolicy` and, at synth-time, filters the domain registry — which layers
+synthesise. This is why the scion is the natural home: it is the single point that already knows
+the catalog, and it satisfies synthesis from one payload without any host type naming a domain
+vocabulary.
 
-* from its facet (the `manifests` sub-map of the one policy, § the single path), the
-  scion derives the `ManifestDomainPolicy` — synth-time it filters the domain registry, and at
-  synthesis the `PublishNodeEnvContributor` reads it off the `NodeEnvContext` to emit the
-  `RKE2LAB_MANIFESTS_PUBLISH_<X>_ENABLED` variables (it owns that naming, so this is legitimate
-  in-container);
-* the synthesis service runs the contributor as a normal env-config section, so the publish
-  variables land in the env-config ConfigMaps with the right `RKE2LAB_MANIFESTS_PUBLISH_*` — the
-  master's install/ready scripts see exactly what they need (the founding rule: invisible at the
-  master frontier).
-
-This is why the scion is the natural home: it is the single point that already knows
-the catalog, and it can satisfy both ends from one payload without any host type
-naming a domain vocabulary.
-
-==== The scion owns both ends — the policy IS the synthesis input
+==== The policy IS the synthesis input
 
 The activation choice drives synthesis structurally, not by promise:
 `ManifestSynthesisRequest` carries `manifestDomainPolicy` + `floxDebugPolicy` as
 FIELDS — synthesis does not run without them. The scion derives both from its facet
 (the `publish`/`debug` concerns) and calls `synthesize(request)`, so the policy IS the
-synthesis input, not something computed beside it. It owns `ManifestDomainCatalog` +
-the `RKE2LAB_MANIFESTS_PUBLISH_*` naming, so no host type names `manifests.contract`.
+synthesis input, not something computed beside it. It owns `ManifestDomainCatalog`, so no host
+type names `manifests.contract`.
 
-Both ends are covered in one place:
-
-* *synth-time* — `ManifestDomainPolicy` filters which domains synthesize;
-* *publish-time* — `PublishNodeEnvContributor` emits the `RKE2LAB_MANIFESTS_PUBLISH_*`
-  variables as an env-config section (from the same `ManifestDomainPolicy`). On the master those
-  vars are sourced into the systemd env, and `rke2lab-manifests-install.sh <layer>`
-  reads `RKE2LAB_MANIFESTS_PUBLISH_<LAYER>_ENABLED`: an enabled layer is STOWED (its
-  non-local-config manifests `ln -sfn`'d into rke2's server manifest dir, where rke2
-  auto-applies), a disabled one has its target removed. `rke2lab-layer-ready.sh` gates
-  readiness on the same flag. The operator's choice made live — invisible at the
-  master frontier (the founding rule).
-
-The former host-side projection of this (the deleted `ManifestLinkPolicy`/`ControlplanePolicy`)
-is gone; its logic is this scion's, driven by the sown facet.
+At synth-time the `ManifestDomainPolicy` filters which domains synthesise; the enabled layers'
+manifests land in the per-resource tree RKE2 auto-applies from `server/manifests`. The former
+host-side projection of this (the deleted `ManifestLinkPolicy` / `ControlplanePolicy`, and the
+`RKE2LAB_MANIFESTS_PUBLISH_*` env-var overlay the node once read) is gone; the operator's choice
+is made live by what is synthesised, not by a separate publish section.
 
 === Scope — which of the host policies this scion absorbs
 
@@ -300,11 +273,10 @@ the scenario's — the preview inertness the map requires, lifted out of the sce
 ----
 GIVEN the activation facet (which domains the operator enabled)
   AND the synthesis service, resolved from this bundle's registry
-WHEN the policy is derived from the facet            [the scion builds the ManifestDomainPolicy — synth-time filter AND the source the publish contributor reads]
-  AND the manifests are synthesized                  [service.synthesize(request) → the K8s/systemd/rke2-config tree + env-config ConfigMaps, filtered synth-time]
+WHEN the policy is derived from the facet            [the scion builds the ManifestDomainPolicy — the synth-time domain filter]
+  AND the manifests are synthesized                  [service.synthesize(request) → the K8s manifest tree (+ rke2-config), filtered synth-time]
 THEN every enabled domain produced its units         [domainCount matches the enabled set]
   AND the manifests file is written                   [the consolidated manifestFile exists, hit count > 0]
-  AND the publish env section is synthesized          [PublishNodeEnvContributor's RKE2LAB_MANIFESTS_PUBLISH_* match the enabled set — what the master's scripts read]
 ----
 
 No doctor consult. A synthesis `IOException` or an empty domain set fails the step —

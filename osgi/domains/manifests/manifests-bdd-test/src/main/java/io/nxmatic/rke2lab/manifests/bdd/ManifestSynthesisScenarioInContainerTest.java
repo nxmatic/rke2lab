@@ -24,7 +24,7 @@ import org.osgi.framework.ServiceRegistration;
  * The in-container proof of the manifests scion, run WHERE the scenario lives (this passenger
  * shares the manifests-bdd host loader through the fragment). It resolves the REAL synthesis:
  * manifests-core's DS {@code ManifestSynthesisService} activates under SCR and the scenario drives
- * it (the env-config synthesis, including the {@code PublishNodeEnvContributor}, runs inside it).
+ * it (the real cdk8s synthesis runs inside it).
  *
  * <p>The synthesis binds ONE collaborator, {@link SshToAgeConverter} — a pure external-tool seam
  * (OpenSSH→age), mandatory so the {@code @Component} activates. The passenger registers a stub for
@@ -35,11 +35,11 @@ import org.osgi.framework.ServiceRegistration;
  *
  * <p>It proves BOTH renders, as every sibling scion does. A LIVE run (no gate — {@code
  * GardeningSelection} defaults to cultivating) plays GREEN: the operator's facet is translated and
- * synthesised (the publish env section among the ConfigMaps). A SURVEY run (a surveying {@link
- * RunGate}) renders PENDING: manifests is a MODE-BLIND materialiser with no live-mutating edge — no
- * {@code Cultivating}/{@code Surveying} pair, since its single synthesis is honest as a plan (it
- * writes only to staging) — so {@code SurveyRenderExtension} gives it a {@code
- * PendingMarkingScenarioExecutor}: the bodies STILL run, only the render is rewritten PENDING.
+ * synthesised into the manifest tree. A SURVEY run (a surveying {@link RunGate}) renders PENDING:
+ * manifests is a MODE-BLIND materialiser with no live-mutating edge — no {@code Cultivating}/{@code
+ * Surveying} pair, since its single synthesis is honest as a plan (it writes only to staging) — so
+ * {@code SurveyRenderExtension} gives it a {@code PendingMarkingScenarioExecutor}: the bodies STILL
+ * run, only the render is rewritten PENDING.
  *
  * <p>It plays in-container through {@link ScenarioPlayer} (the shared play recipe the production
  * {@code GenericRunbookHandler} also drives) — seeding the activation facet through the scenario's
@@ -62,7 +62,7 @@ public class ManifestSynthesisScenarioInContainerTest {
     assertEquals(
         ExecutionStatus.SUCCESS,
         runbook.getScenarios().get(0).getExecutionStatus(),
-        "the facet was translated and synthesised (publish env section included) — plays green");
+        "the facet was translated and synthesised into the manifest tree — plays green");
   }
 
   @Test
@@ -79,8 +79,8 @@ public class ManifestSynthesisScenarioInContainerTest {
         stepNamed(runbook, "the manifests are synthesized"),
         "the surveyed run still played the synthesis step (a materialiser, not survey-inert)");
     // ...and the run reads PENDING, not FAILED — and that distinction IS the proof the bodies ran:
-    // had synthesis produced nothing, the THEN assertions (the manifests file, the publish env
-    // section) would have THROWN and the scenario would read FAILED. PENDING means they held, and
+    // had synthesis produced nothing, the THEN assertion (the manifests file) would have THROWN
+    // and the scenario would read FAILED. PENDING means it held, and
     // only the render was rewritten — a plan, not a result, exactly as every sibling scion proves.
     assertEquals(
         ExecutionStatus.SCENARIO_PENDING,

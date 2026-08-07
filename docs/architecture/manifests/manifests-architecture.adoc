@@ -3,8 +3,7 @@
 :toclevels: 3
 
 This is the **canonical reference** for the `manifests` module: how rke2lab synthesizes
-**both** Kubernetes manifests and systemd unit files from a single source using CDK8s and a
-custom cdk8s-systemd extension.
+Kubernetes manifests from context-aware domain definitions using CDK8s.
 
 It absorbs and supersedes four older documents (nomenclature, system-architecture,
 synthesis-architecture, chart-vs-construct). For runtime and policy concerns it links out to
@@ -20,20 +19,21 @@ focused companions; see <<related-documentation>>.
 == Overview
 
 The manifests module transforms high-level, context-aware domain definitions (networking,
-storage, gitops, cluster-api, …) into two coordinated output trees:
+storage, gitops, cluster-api, …) into the **Kubernetes manifests** (`manifests.k8s.yaml`)
+installed into the cluster — synthesized from `ManifestsUnit` definitions in a single pass.
 
-* **Kubernetes manifests** (`manifests.k8s.yaml`) — installed into the cluster
-* **systemd unit files** (`systemd/*.service`, `*.target`, drop-ins) — the bootstrap machinery
-  that installs those manifests at the right moment in the boot sequence
-
-Both are synthesized from the **same** `ManifestsUnit` definitions in a single pass, so there is
-no duplication between "what to deploy" and "how/when to install it".
+[NOTE]
+====
+The module once emitted a SECOND output tree — systemd unit files + `/srv/host` scripts, the
+bootstrap machinery that installed those manifests. That systemd synthesis was *dissolved* when
+the node moved to a declarative NixOS substrate (see
+link:../nixos-substrate/target-vision.adoc[target vision]); node unit ordering now lives in the
+`nixos/` modules. What remains is the single K8s-manifest synthesis described here.
+====
 
 The system uses:
 
 * **CDK8s** for type-safe K8s object creation (the upstream `Construct`/`Chart`/`ApiObject` model)
-* a **cdk8s-systemd extension** (`SystemdChart`, `SystemdService`, `SystemdTarget`, `SystemdDropIn`)
-  that reuses the same Construct tree pattern but emits INI-style unit files
 * a **ThreadLocal `ManifestSynthesisContext`** for injecting runtime configuration into units
 * the **Construct tree pattern** for object collection and serialization
 
@@ -63,23 +63,22 @@ distinct vocabulary.
 |Single source of truth for domain ID strings (kebab-case). Always use its accessor methods,
  never string literals — see link:manifest-domain-catalog-pattern.adoc[the catalog pattern].
 
-|**Chart / SystemdChart**
+|**Chart**
 |created in `DefaultManifestSynthesisService`
-|The two — and only two — synthesis boundaries. `Chart` emits K8s YAML; `SystemdChart` emits
- systemd files. See <<chart-vs-construct>>.
+|The single synthesis boundary. `Chart` emits the consolidated K8s YAML. See <<chart-vs-construct>>.
 
-|**NodeEnv contributors**
-|`node/` and `units/<domain>/<Name>NodeEnvContributor.java`
-|Per-domain contributions to the node environment (the `manifests.node` SPI). Orthogonal to
- manifest synthesis; mentioned here only to disambiguate the package.
+|**NodeEnvContext**
+|`node/DefaultNodeEnvContext.java`
+|The read-only node context (cluster/node identity + network topology) threaded to units at
+ synthesis time.
 |===
 
 [IMPORTANT]
 ====
 There is **no** separate `Component` class and **no** singular `ManifestUnit`. An earlier design
 split each unit into a `Component` (CDK8s Construct) plus a `ManifestUnit` wrapper. Those were
-merged: today a single `*ManifestsUnit` class both extends `Construct` and carries the metadata,
-dependencies, and systemd synthesis. If you find a doc or comment mentioning `Component`,
+merged: today a single `*ManifestsUnit` class both extends `Construct` and carries the metadata
+and dependencies. If you find a doc or comment mentioning `Component`,
 `ManifestUnit` (singular), `LayerDomain`, or `manifests/layers/`, it is stale.
 ====
 
@@ -95,21 +94,15 @@ that wires it into the CDK8s tree.
 public interface ManifestsUnit {
   String manifestUnitId();
   List<String> dependsOnManifestsUnitIds();
+  default String outputDir() { /* last segment of manifestUnitId() */ }
 
-  // K8s synthesis — create ApiObjects. Override one of these.
-  default void apply(Chart chart) { /* ... */ }
-  default void apply(ManifestsUnitContext context) { apply(context.chart()); }
-
-  // Systemd synthesis — default no-op; override to emit an installer service.
-  default void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) { }
+  // K8s synthesis — create ApiObjects.
+  void apply(ManifestsUnitContext context);
 }
 ----
 
-A unit has a **dual responsibility**:
-
-. **K8s synthesis** (in its constructor): create `ApiObject` instances as children of `this`.
-. **Systemd synthesis** (`synthesizeSystemdUnits`): create the systemd service that *installs*
-  those manifests, ordered relative to `rke2-server.service`.
+A unit's single responsibility is **K8s synthesis**: create `ApiObject` instances as children of
+`this` (the unit IS-A Construct), which CDK8s walks into the consolidated `manifests.k8s.yaml`.
 
 ==== The canonical constructor
 
@@ -132,11 +125,6 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
     // K8s resources created during construction — 'this' is the parent Construct
     createHelmChartConfig();
     createClustermeshRemoteUsersConfigMap();
-  }
-
-  @Override
-  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
-    // ... installer service, see "Systemd Integration" below
   }
 }
 ----
@@ -179,12 +167,6 @@ public class ManifestsDomain {
   private final String domainId;                       // e.g. "cluster-api" (from catalog)
   private final List<String> dependsOnDomainIds;
   private final List<? extends ManifestsUnit> units;   // field name is "units"
-
-  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
-    for (ManifestsUnit unit : units) {
-      unit.synthesizeSystemdUnits(systemdChart, context);
-    }
-  }
 }
 ----
 
@@ -206,7 +188,6 @@ CDK8s provides two base classes, and choosing wrong silently breaks the pipeline
 The only Charts in the codebase are the two created in `DefaultManifestSynthesisService`:
 
 * `new Chart(app, "manifests")` — K8s resources
-* `new SystemdChart(app, "systemd")` — systemd units
 ====
 
 === Why a single Chart
@@ -247,22 +228,17 @@ graph TB
     Problem["<b>Challenge:</b><br/>Bootstrap a Kubernetes cluster in Incus containers<br/>with proper lifecycle management"]
 
     K8sManifests["Kubernetes Manifests<br/>(HelmChartConfig, ConfigMaps, Secrets)"]
-    SystemdUnits["Systemd Units<br/>(.service files that install manifests)"]
     Bootstrap["Bootstrap Orchestration<br/>(seed-master)"]
 
     R1["R1: Synthesize K8s manifests<br/>programmatically (CDK8s)"]
-    R2["R2: Generate systemd units<br/>to install them"]
-    R3["R3: Maintain ordering<br/>(before/after rke2-server)"]
-    R4["R4: Single source of truth<br/>(1 ManifestsUnit = K8s + systemd)"]
+    R3["R3: Deliver to server/manifests<br/>(RKE2 auto-applies)"]
+    R4["R4: Single source of truth<br/>(1 ManifestsUnit = its K8s manifests)"]
 
     Problem --> K8sManifests
-    Problem --> SystemdUnits
     Problem --> Bootstrap
     K8sManifests --> R1
-    SystemdUnits --> R2
     Bootstrap --> R3
     R1 --> R4
-    R2 --> R4
     R3 --> R4
 
     style Problem fill:#ffcccc
@@ -286,17 +262,11 @@ graph TB
     end
 
     subgraph "RKE2Lab Extension [Custom]"
-        SystemdChart["<b>SystemdChart</b><br/>systemd synthesis boundary"]
         Abstract["<b>AbstractManifestsUnit</b><br/>extends Construct + implements ManifestsUnit"]
-        Iface["<b>ManifestsUnit</b> [interface]<br/>apply(Chart) + synthesizeSystemdUnits(...)"]
-        SystemdUnit["<b>SystemdUnit</b><br/>base systemd construct"]
-        SystemdService["<b>SystemdService / SystemdTarget / SystemdDropIn</b>"]
+        Iface["<b>ManifestsUnit</b> [interface]<br/>apply(ManifestsUnitContext)"]
 
-        SystemdChart -->|extends| CDK8sConstruct
         Abstract -->|extends| CDK8sConstruct
         Abstract -->|implements| Iface
-        SystemdUnit -->|extends| CDK8sConstruct
-        SystemdService -->|extends| SystemdUnit
     end
 
     subgraph "Domain Model [Application]"
@@ -310,46 +280,36 @@ graph TB
         Flux -->|extends| Abstract
     end
 
-    CDK8sApp -.->|creates| SystemdChart
     CDK8sChart -.->|parent of| Cilium
     Cilium -->|creates children| CDK8sApiObject
-    Cilium -->|creates| SystemdService
 
     style CDK8sApp fill:#e1f5ff,stroke:#0066cc
     style CDK8sChart fill:#e1f5ff,stroke:#0066cc
     style CDK8sConstruct fill:#e1f5ff,stroke:#0066cc
     style CDK8sApiObject fill:#e1f5ff,stroke:#0066cc
-    style SystemdChart fill:#ffe1e1,stroke:#cc0000
     style Abstract fill:#ffe1e1,stroke:#cc0000
     style Iface fill:#ffe1e1,stroke:#cc0000
-    style SystemdUnit fill:#ffe1e1,stroke:#cc0000
-    style SystemdService fill:#ffe1e1,stroke:#cc0000
     style Domain fill:#e1ffe1,stroke:#00cc00
     style Cilium fill:#e1ffe1,stroke:#00cc00
     style Flux fill:#e1ffe1,stroke:#00cc00
 ----
 
-**Legend** — 🔵 CDK8s upstream (reused as-is); 🔴 rke2lab cdk8s-systemd extension; 🟢 application
+**Legend** — 🔵 CDK8s upstream (reused as-is); 🔴 rke2lab manifests extension; 🟢 application
 domain model.
 
 === C4 L3: Construct tree at runtime
 
-After synthesis, the same unit appears in both trees: as a Construct owning K8s `ApiObject`s, and
-(via its callback) as the author of a `SystemdService` that installs them.
+After synthesis, each unit is a Construct owning its K8s `ApiObject`s.
 
 [source,text]
 ----
 App
-├─ Chart ("manifests")
-│  ├─ CiliumConfigManifestsUnit ("networking-cilium-config")
-│  │  ├─ ApiObject ("helmchartconfig-rke2-cilium")
-│  │  └─ ApiObject ("configmap-clustermesh-remote-users")
-│  └─ FluxOperatorManifestsUnit ("gitops-flux-operator")
-│     └─ ApiObject ("helmchart-flux-operator")
-└─ SystemdChart ("systemd")
-   ├─ SystemdTarget ("rke2lab")            ├─ ... -network, -tools, -bootstrap
-   ├─ SystemdTarget ("rke2lab-manifests")  └─ ... -secrets
-   └─ SystemdService ("rke2lab-cilium-config-manifests")
+└─ Chart ("manifests")
+   ├─ CiliumConfigManifestsUnit ("networking-cilium-config")
+   │  ├─ ApiObject ("helmchartconfig-rke2-cilium")
+   │  └─ ApiObject ("configmap-clustermesh-remote-users")
+   └─ FluxOperatorManifestsUnit ("gitops-flux-operator")
+      └─ ApiObject ("helmchart-flux-operator")
 ----
 
 CDK8s tracks everything via parent-child registration, so units never store references — they
@@ -441,7 +401,6 @@ sequenceDiagram
     participant Ctx as ManifestSynthesisContext
     participant App as cdk8s App
     participant Chart as Chart "manifests"
-    participant SysChart as SystemdChart "systemd"
     participant Unit as ManifestsUnit
 
     Boot->>Svc: synthesize(request)
@@ -449,28 +408,16 @@ sequenceDiagram
     activate Ctx
     Svc->>App: new App(outdir)
     Svc->>Chart: new Chart(app, "manifests")
-    Svc->>SysChart: new SystemdChart(app, "systemd")
 
     Note over Svc,Unit: K8s synthesis — units sorted by manifestUnitId
     loop for each ManifestsUnit
-        Svc->>Unit: apply(chart) via dependency applier
+        Svc->>Unit: apply(context) via dependency applier
         Unit->>Ctx: current().bootstrapIdentity() / componentVersions() / ...
         Unit->>Chart: new ApiObject(this, props)
     end
 
-    Note over Svc,SysChart: Systemd synthesis
-    Svc->>SysChart: create targets (rke2lab, -network, -tools,<br/>-bootstrap, -manifests, -secrets)
-    Svc->>SysChart: BootstrapInfrastructureSynthesizer.synthesizeAll()
-    loop for each ManifestsDomain
-        Svc->>Unit: domain.synthesizeSystemdUnits(systemdChart, context)
-        Unit->>SysChart: new SystemdService(...)
-    end
-    Svc->>SysChart: finalizeTargetDependencies()
-    Svc->>SysChart: SystemdDropIn for rke2-server.service
-
     Note over Svc,App: Write files
     Svc->>App: app.synth()  %% -> manifests.k8s.yaml
-    Svc->>SysChart: synthesize(systemdOutdir)  %% -> *.service/*.target
     Svc->>Svc: enforceLiteralBlockStyle() + move to final location
     deactivate Ctx
     Svc-->>Boot: ManifestSynthesisResult
@@ -569,60 +516,15 @@ seam (`ManifestsUnitVisitor` / `ManifestsUnitContext` / `Cdk8sApiObjectResolver`
 all of this — only the *source* of the order moved, from a DFS walker to the resolver wiring plus
 a topological sort.
 
-== Systemd Integration
+== Delivery to the node
 
-Each unit that needs an installer overrides `synthesizeSystemdUnits`. Example
-(`CiliumConfigManifestsUnit`, a special case that must run **before** the server):
-
-[source,java]
-----
-@Override
-public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
-  var installService = systemdChart.findUnit("rke2lab-install");
-  if (installService == null) {
-    throw new IllegalStateException(
-        "rke2lab-install service not found — ensure BootstrapInfrastructureSynthesizer runs first");
-  }
-
-  new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
-      .description("Install RKE2Lab Cilium config manifests before server start")
-      .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
-      .after("local-fs.target", installService.getUnitFileName())
-      .requires(installService.getUnitFileName())
-      .before("rke2-server.service")                       // special: BEFORE the server
-      .conditionPathExists(
-          "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh",
-          "/srv/host/rke2-manifests.d")
-      .type(ServiceType.ONESHOT)
-      .execStart(
-          "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config")
-      .remainAfterExit(true)
-      .standardOutput(StandardStream.JOURNAL)
-      .standardError(StandardStream.JOURNAL)
-      .partOf(context.rke2labTarget().getUnitFileName())
-      .wantedBy(context.rke2labTarget().getUnitFileName());
-}
-----
-
-The link between K8s manifests and their installer:
-
-. The unit constructor creates K8s resources → written to `manifests.k8s.yaml`.
-. `synthesizeSystemdUnits` creates a service whose `ExecStart` runs
-  `rke2lab-manifests-install.sh <domain>/<unit>`.
-. seed-master materializes the exploded manifests to `/srv/host/rke2-manifests.d/…`.
-. The service symlinks them into RKE2's watched directory; RKE2 auto-applies them.
-
-The full runtime journey is covered in link:manifest-apply-flow.adoc[Manifest Apply Flow], and the
-target hierarchy / ordering rules in link:systemd-architecture.adoc[Systemd Architecture]. Use
-`SystemdSynthesisContext` accessors (`rke2labTarget()`, `manifestsTarget()`, …) rather than
-hardcoding target names.
-
-=== Ordering: before vs after rke2-server
-
-* **Before** (`.before("rke2-server.service")`): cilium config, RKE2 config — must exist before
-  the API server starts.
-* **After** (via `rke2lab-manifests.target`, which is `WantedBy=rke2-server.service`): most
-  installers, GitOps, Cluster API operators — need a running API server.
+The synthesised, exploded per-resource tree is delivered to the node's
+`server/manifests` directory (via the scion → `manifestsRoot` → jsync promotion), where RKE2
+auto-applies it. A unit no longer emits systemd installer services: the former
+`synthesizeSystemdUnits` / `SystemdService` `/srv/host` installers were dissolved when the node
+moved to a declarative NixOS substrate (see
+link:../nixos-substrate/target-vision.adoc[the NixOS node-substrate target vision]). The full
+runtime journey is covered in link:manifest-apply-flow.adoc[Manifest Apply Flow].
 
 [[manifests-core-impl]]
 == The manifests-core implementation inventory
@@ -651,8 +553,6 @@ graph TB
       RH["HighAvailability"]
     end
     subgraph node["node environment"]
-      NIC["NodeEnvIdentityContributor"]
-      PNEC["PublishNodeEnvContributor"]
       DNEC["DefaultNodeEnvContext"]
     end
     subgraph prof["pod + sidecar profiles"]
@@ -736,20 +636,9 @@ cross-domain ordering.
 |===
 | Type | Role
 
-| `NodeEnvIdentityContributor`
-| A `NodeEnvContributor` contributing node-identity variables (ID, name, kind) and canonical path
-  references for the node domain.
-
-| `PublishNodeEnvContributor`
-| A `NodeEnvContributor` emitting the `RKE2LAB_MANIFESTS_PUBLISH_<domain>_ENABLED` variables — one
-  per publishable domain (`ManifestDomainCatalog.stageALinkableDomains()`), read from the
-  `ManifestDomainPolicy` on the `NodeEnvContext`. This is the publish activation the systemd
-  stow/readiness scripts gate on, contributed as a normal env-config section (design (ii)) rather
-  than an out-of-band overlay.
-
 | `DefaultNodeEnvContext`
-| The `NodeEnvContext` implementation: synthesis-time node/cluster paths, network addresses and
-  cluster parameters derived from a netplan blueprint.
+| The `NodeEnvContext` implementation: the run's cluster/node identity and network topology,
+  derived once from the handed-over identity via a netplan blueprint and threaded to every unit.
 |===
 
 === Pod and sidecar profiles
@@ -800,14 +689,10 @@ Immutable configuration objects the runtime units build their pod specs from.
 arbitrary scope) instead of `this` drops the unit out of the tree. Create them in the constructor
 with `this` as parent.
 
-❌ **Create systemd units in the constructor.** The `SystemdChart` does not exist during K8s
-synthesis. Emit them only from `synthesizeSystemdUnits`.
-
 ❌ **Extend `Chart` from a unit.** See <<chart-vs-construct>> — it produces an orphaned output file
 the exploder ignores.
 
-❌ **Hardcode domain ID strings or systemd target names.** Use `ManifestDomainCatalog` accessors
-and `SystemdSynthesisContext` accessors. See
+❌ **Hardcode domain ID strings.** Use `ManifestDomainCatalog` accessors. See
 link:manifest-domain-catalog-pattern.adoc[the catalog pattern].
 
 == Adding a New ManifestsUnit
@@ -817,8 +702,6 @@ link:manifest-domain-catalog-pattern.adoc[the catalog pattern].
   `ManifestDomainCatalog` accessor (e.g. `ManifestDomainCatalog.STORAGE + "/minio"`).
 . Create K8s `ApiObject`s in the constructor, stamping
   `PackageMetadataProfile.packageAnnotations(...)` on each so the exploder routes them.
-. If it needs an installer, override `synthesizeSystemdUnits`, using
-  `SystemdSynthesisContext` accessors for target names.
 . Register the unit in its domain (via the domain's `ManifestsDomainRegistrar`). If it depends on
   another unit, declare that in `dependsOnManifestsUnitIds`; if the dependency lives in another
   domain, that domain must be reachable through `dependsOnDomainIds` (the cross-domain rule — see
@@ -871,9 +754,8 @@ back to this doc — read them next to the code in your IDE. Start points:
 
 * link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/package-info.java[manifests/] — the SPI core (this module's entry point)
 * link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/package-info.java[domain/] — the per-concern `ManifestsDomainRegistrar`s
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/node/package-info.java[node/] — the NodeEnv contributor SPI
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/node/package-info.java[node/] — the node environment context
 * link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/profiles/package-info.java[profiles/] — the immutable context records
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/systemd/package-info.java[systemd/] — bootstrap/infrastructure systemd synthesis
 * `units/<domain>/` — one overview per domain: link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/networking/package-info.java[networking], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/package-info.java[gitops], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[clusterapi], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/mesh/package-info.java[mesh], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/storage/package-info.java[storage], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/platform/package-info.java[platform], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/cicd/package-info.java[cicd], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/ha/package-info.java[ha], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/cluster/package-info.java[cluster], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/runtime/package-info.java[runtime]
 
 [[related-documentation]]

@@ -125,22 +125,12 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-cdk8s-manifests</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-contract</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- ssh-to-age-edge: DefaultManifestSynthesisService has a MANDATORY @Reference SshToAgeConverter,

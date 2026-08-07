@@ -596,22 +596,15 @@ dotfiles the loader's visible-`*.yml` glob missed); `CONFIGMAP_FILES` extracts e
 `data` key back to its own file under the slot root (executable when the contribution
 declares it) — the systemd bundle.
 
-Three bootstrap providers (manifests-core): *CloudConfig* (`CloudConfigHostAssetProvider`
-→ `CLOUD_SEED` / `SEED_DIR` → cloud.d), *EnvConfig* (`EnvConfigHostAssetProvider` →
-`ENV_CONFIG` / `SHELL_ENV_FILE` → one `rke2lab-environment.sh` in the scripts root, sourced
-by `rke2lab-env-load.sh`), *Systemd bundle* (`SystemdBundleHostAssetProvider`). For systemd,
-`SystemdChart` OWNS both the units AND the scripts (a `SystemdScript` construct; the content
-is injected from manifests-core's classpath, the chart owns the collection) — the synthesis
-carries the whole bundle as TWO local-config ConfigMap dotfiles (units + drop-ins, and
-scripts) so `manifests.d/systemd` holds ONLY manifests, never raw `.service`/`.sh`; the
-provider reads them and yields two `CONFIGMAP_FILES` contributions → `SYSTEMD_UNITS`
-(systemd-units.d) + `SYSTEMD_SCRIPTS` (systemd-scripts.d, executable). No archive/base64: the
-daemonset needs those only to beat the 1MiB limit of a REAL k8s ConfigMap; these are
-local-config, never applied, materialised disk-to-disk in-JVM. The DAEMONSET path
+The bootstrap host-asset providers that once delivered `/srv/host` assets — CloudConfig, EnvConfig,
+and the systemd bundle (units + scripts carried as local-config ConfigMap dotfiles, materialised
+disk-to-disk on the node) — were *dissolved* when the node moved to a declarative NixOS substrate:
+its config, systemd units and scripts are baked by the `nixos/` modules
+(link:../nixos-substrate/target-vision.adoc[target vision]), not synthesised and materialised as
+host assets. The DAEMONSET path
 (link:../patterns/daemonset-host-assets-architecture.adoc[daemonset-host-assets],
-`daemonset-host-asset-materializer.sh`, flox) brings its resources to the host VIA THE
-CLUSTER — an entirely separate channel with its OWN `HostAssetDeliveryPolicy`, NOT a
-`HostAssetProvider`, out of scope here.
+`daemonset-host-asset-materializer.sh`, flox) survives — it brings the flox runtime to the host VIA
+THE CLUSTER, an entirely separate in-cluster delivery channel.
 
 === Figure — C1 system context
 
@@ -684,7 +677,7 @@ flowchart TB
 
 == Related Documentation
 
-* link:../patterns/daemonset-host-assets-architecture.adoc[Daemonset host-assets] — the SEPARATE in-cluster delivery channel (flox), the counterpart backend to the bootstrap service above
+* link:../patterns/daemonset-host-assets-architecture.adoc[Daemonset host-assets] — the SEPARATE in-cluster delivery channel (flox)
 * link:../bdd/bdd.adoc#clusterseed-scenario-map[BDD-as-engine — the ClusterSeed scenario map] — the target host runbook these gestures compose into
 * link:../atlas/seed.adoc[Atlas — Seed orchestration] — Diagram R (the host realisation) states the graph stays host, the metier becomes scions
 * link:../osgi/seed-broker-spec.adoc[Seed broker spec] — `broker.sow` and the runbook handler, the channel the activation payload travels

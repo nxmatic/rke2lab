@@ -38,7 +38,7 @@
          installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade). runtime
          scope MACHINE-ENFORCES path 2: the CLI compiles only against -port + OsgiRuntime, never
          against a manifests-core impl type — the compiler now forbids the host→impl leak. The stage
-         execution + manifests-d unpack still resolve the reactor artifact at runtime scope. -->
+         execution still resolves the reactor artifact at runtime scope. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>

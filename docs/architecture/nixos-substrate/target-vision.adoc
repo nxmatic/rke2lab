@@ -247,7 +247,7 @@ The post-join host mutation follows one arc, deliberately staged:
 . *baked declaratively* where stable — into `rke2lab-node-base` (the flox runtime, the
   networking, the containerd config).
 . *Go controller* for what stays dynamic — a reconciler over a CRD (the existing
-  `HostAssetDeliveryPolicy` Java model is the proto-contract to formalise), with a DaemonSet
+  former `HostAssetDeliveryPolicy` Java model, since removed, sketched the proto-contract), with a DaemonSet
   agent as its hands. Replaces the residual scripting with typed, reconciled code.
 
 The controller never crosses the pre-join floor either: bootstrap-critical config is always

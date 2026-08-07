@@ -314,7 +314,7 @@ Folding the unitrepo docs in reconciles their vocabulary with the atlas's reserv
 
 * *World-A* (the unitrepo durability regime, pull=own) collides with `world` = the runtime classloader
   region. Renamed *the pull-own regime*.
-* *node* — the unitrepo peer-node is disambiguated from rke2lab's cluster/env node (`NodeEnvContributor`):
+* *node* — the unitrepo peer-node is disambiguated from rke2lab's cluster/env node (`NodeEnvContext`):
   say *unit-node* vs *cluster-node* where both are in scope.
 * *name-space* (schema-name space, class space) — kept hyphenated, never bare `space` (which is a layout
   dir).

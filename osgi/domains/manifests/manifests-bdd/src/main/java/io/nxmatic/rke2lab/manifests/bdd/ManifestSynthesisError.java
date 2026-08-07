@@ -7,9 +7,9 @@ import java.util.Map;
 
 /**
  * The manifest synthesis produced an incomplete result — fewer domains than enabled, no file
- * written, no units processed, or a missing publish var. {@link Symptomatic}: carries the {@link
- * ManifestSynthesisResult} as a typed member and the {@link Gap} that failed, so a consumer sees
- * exactly which post-condition broke and against what result.
+ * written, or no units processed. {@link Symptomatic}: carries the {@link ManifestSynthesisResult}
+ * as a typed member and the {@link Gap} that failed, so a consumer sees exactly which
+ * post-condition broke and against what result.
  */
 public final class ManifestSynthesisError extends AssertionError implements Symptomatic {
 
@@ -17,8 +17,7 @@ public final class ManifestSynthesisError extends AssertionError implements Symp
   public enum Gap {
     DOMAIN_COUNT_SHORT,
     MANIFEST_FILE_MISSING,
-    NO_UNITS_PROCESSED,
-    MISSING_PUBLISH_VAR
+    NO_UNITS_PROCESSED
   }
 
   private final transient ManifestSynthesisResult result;

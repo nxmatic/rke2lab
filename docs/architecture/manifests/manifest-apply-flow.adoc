@@ -6,6 +6,16 @@
 
 RKE2Lab manifests flow through a multi-stage pipeline from CDK8s synthesis to live Kubernetes resources. **RKE2's built-in auto-deploy mechanism** applies manifests by watching a directory; no explicit `kubectl apply` is needed.
 
+[NOTE]
+====
+*Partly historical.* The detailed on-node steps below (the `rke2lab-manifests-install.sh` installer
+reading `RKE2LAB_MANIFESTS_PUBLISH_*` flags and symlinking `/srv/host/rke2-manifests.d/<layer>` into
+the server-manifests dir) describe the former `/srv/host` install flow, which was *dissolved* with
+the NixOS node substrate (see link:../nixos-substrate/target-vision.adoc[target vision]). Today the
+synthesised, exploded tree is delivered straight to the node's `server/manifests` and RKE2
+auto-applies it — no install script, no publish-flag gating, no symlink stow.
+====
+
 This document traces the complete flow using the `networking` layer as the reference example and explains how staged post-cluster resources fit into the same pattern.
 
 == The Five-Stage Pipeline

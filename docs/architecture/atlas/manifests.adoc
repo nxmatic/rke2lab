@@ -32,11 +32,6 @@ convergence unitrepo's verdict already named (a `ManifestsUnit` is the first con
 | ✅ Shipped (blue)
 | Each unit synthesises Kubernetes resources type-safely; `AbstractManifestsUnit` is the base.
 
-| dual emission — manifests + systemd from one source
-| ✅ Shipped (blue)
-| The same `ManifestsUnit` emits K8s manifests and, via `synthesizeSystemdUnits`, the systemd installer
-  units — no duplicated source of truth. The seam to the systemd view.
-
 | coherent visit-order — the `UnitResolver` consumer
 | ✅ Shipped (blue)
 | `ManifestsUniverse` + `CoherentManifestsDomainRegistry` resolve units into a topological visit-order:
@@ -150,10 +145,6 @@ Colored by horizon; all but one are blue.
 | now (blue)
 | `ManifestsUnit` plus CDK8s `Chart`
 
-| one unit source emits both K8s manifests and systemd units
-| now (blue)
-| `AbstractManifestsUnit.synthesizeSystemdUnits`
-
 | units resolve into a coherent visit-order in one gate
 | now (blue)
 | `UnitResolver` plus `CoherentManifestsDomainRegistry`
@@ -194,11 +185,6 @@ the richest playable surface after the runtime view), one green design target.
 .. WHEN `ManifestsUnit` + CDK8s `Chart` express each resource as typed Java
 .. THEN manifests synthesise from typed units — AND the YAML is generated, never hand-edited.
 
-. *One unit source emits both K8s manifests and systemd units* — `[playable]` blue +
-.. GIVEN a `ManifestsUnit` synthesising Kubernetes resources
-.. WHEN `AbstractManifestsUnit.synthesizeSystemdUnits` derives the installer units from the same source
-.. THEN one unit source emits both the K8s manifests and the systemd units — AND there is no second
-   source of truth to drift (the seam to the systemd view).
 
 . *Units resolve into a coherent visit-order in one gate* — `[playable]` blue +
 .. GIVEN units with inter-unit and cross-domain dependencies
@@ -248,47 +234,29 @@ playable-and-blue (the shipped synthesis layer), one narrated-green (the lifecyc
 === Diagram N — the contribution seam: how a domain feeds the synthesis
 
 The nine capabilities above are what the synthesis DOES. This is what feeds it: a domain never writes
-into the synthesis directly — it publishes a CONTRIBUTION and the synthesis aggregates. There is not
-one contribution but THREE typed channels, because a domain produces three payloads consumed at three
-points. Two channels ship as SCR-discovered contributions keyed by `domainId`; the unit channel is the
-static laggard the design aligns. Full detail:
+into the synthesis directly — it publishes a CONTRIBUTION (a set of CDK8s constructs) and the synthesis
+aggregates. There were once THREE typed channels (manifest units, node-env env sections, host-assets);
+the node-env and host-asset channels were *dissolved* into the declarative NixOS node substrate,
+leaving the unit channel. Full detail:
 link:../manifests/manifests-contribution-channels.adoc[the contribution channels spec].
 
 [mermaid]
 ....
 flowchart TB
   subgraph dom ["a domain, e.g. networking"]
-    D["produces units, env sections, host assets"]
+    D["produces manifest units"]
   end
-  U["ManifestsDomainRegistrar<br/>units<br/>DESIGN: still static"]
-  E["NodeEnvContributor<br/>env sections<br/>shipped SCR"]
-  H["HostAssetProvider<br/>host files<br/>shipped SCR"]
-  RB["ManifestsDomainRegistryBuilder<br/>static register"]
-  NR["NodeEnvContributorRegistry<br/>Reference MULTIPLE"]
-  IM["incus materializer<br/>Reference MULTIPLE"]
+  U["ManifestsDomainRegistrar<br/>@Component, keyed by domainId"]
+  RB["DefaultManifestSynthesisService<br/>@Reference(MULTIPLE)"]
   D -->|units| U
-  D -->|env| E
-  D -->|assets| H
-  U -->|register static| RB
-  E -->|discovered| NR
-  H -->|discovered| IM
-  classDef shipped fill:#eef,stroke:#88a,stroke-width:1px;
+  U -->|SCR-discovered| RB
   classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
-  class E,H,NR,IM shipped;
   class U,RB neu;
 ....
 
-*The design target (green boxes).* Align the unit channel on the shape the other two already have:
-`ManifestsDomainRegistrar` becomes an SCR `@Component` keyed by `domainId`, collected by a registry via
-`@Reference(MULTIPLE)`, and the static `register(new XxxRegistrar())` chain in the synthesis is erased.
-The three channels then share ONE shape (SCR, `domainId`), while staying three distinct contracts —
-the payloads and consumers differ, folding them into one interface would leak all three concerns into
-one signature.
-
-*Two orthogonal axes.* Aligning the mechanism (static → SCR) is independent of WHERE a contributor
-lives (the home). Today every contributor — even the SCR ones — lives inside `manifests-core`; no
-contribution is yet distributed to a domain's own module. The home policy is hybrid: a contributor
-moves to a domain module only when that domain has a real runtime reason to live there (systemd owns
-its runtime units); the pure-k8s-workload contributors (gitops, mesh, cicd, storage, ...) stay grouped
-rather than exploded into empty bundles, because the OSGi domains and the manifest domains are
-orthogonal taxonomies — only `cluster` overlaps.
+*The completed migration.* The unit channel was once the static laggard — a hand-maintained
+`register(new XxxRegistrar())` chain. It has since been aligned on the SCR contribution *shape* the
+node-env and host-asset channels pioneered before they were dissolved: `ManifestsDomainRegistrar` is an
+SCR `@Component` keyed by `domainId`, collected by `DefaultManifestSynthesisService` via
+`@Reference(MULTIPLE)`, and the static chain is erased. The shape outlived the two channels that first
+carried it.

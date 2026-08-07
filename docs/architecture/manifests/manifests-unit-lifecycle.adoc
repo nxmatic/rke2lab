@@ -171,10 +171,9 @@ in hand.
 
 Each unit declares an output directory (`<domain>/<outputDir>()`) where its manifests are
 exploded. A unit may legitimately produce *zero* manifests in a given mode — e.g.
-`ImageStateConfigMapManifestsUnit` skips when there is no real image identity, and
-`RuntimeSystemdLibexecPlaceholderManifestsUnit` is a placeholder. Without intervention, no
-output directory is created, and the per-(domain,phase) installer service fails at boot
-(`rke2lab-manifests-install.sh <subpath>` does `exit 1` when the source dir is absent).
+`ImageStateConfigMapManifestsUnit` skips when there is no real image identity. Without
+intervention, no output directory is created, and a downstream consumer expecting it (the
+explode step, a reader walking the per-resource tree) trips over the missing dir.
 
 To stay *deterministic*, every unit emits a *group marker* during synthesize: a placeholder
 that guarantees the output directory exists even when empty.
@@ -230,8 +229,6 @@ literal could die): `HeadscaleManifestsUnit`, `TailscaleManifestsUnit`, `TektonD
 
 == Related Documentation
 
-* link:rke2-install-phases.adoc[RKE2 Install Phases] — the per-(domain,phase) installer that
-  requires the output directory to exist.
 * link:manifests-architecture.adoc[Manifests Architecture] — ManifestsUnit / domain model.
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] — when a unit
   produces nothing.

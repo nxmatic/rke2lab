@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>pulumi-edge-testkit</artifactId>
-  <name>host/pulumi-edge-testkit</name>
+  <name>host/pulumi/pulumi-edge-testkit</name>
   <description>Shared test fixtures for pulumi-edge: reusable checkpoint/stack stubs,
     kept in main scope so consumers depend on them without a test-jar.</description>
 

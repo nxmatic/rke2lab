@@ -10,8 +10,6 @@
  *   <li>{@link io.nxmatic.rke2lab.manifests.units.networking.KdnsManifestsUnit} — KDns deployment.
  *   <li>{@link io.nxmatic.rke2lab.manifests.units.networking.EnvoyGatewayManifestsUnit} — Envoy
  *       Gateway.
- *   <li>{@link io.nxmatic.rke2lab.manifests.units.networking.NetworkingNodeEnvContributor} —
- *       networking slice of the node environment.
  * </ul>
  *
  * <p>Registered by {@link io.nxmatic.rke2lab.manifests.domain.NetworkingDomainRegistrar}.

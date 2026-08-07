@@ -5,8 +5,6 @@
  * <ul>
  *   <li>{@link io.nxmatic.rke2lab.manifests.units.ha.KubeVipManifestsUnit} — kube-vip for the
  *       control-plane virtual IP.
- *   <li>{@link io.nxmatic.rke2lab.manifests.units.ha.HighAvailabilityNodeEnvContributor} — HA slice
- *       of the node environment.
  * </ul>
  *
  * <p>Registered by {@link io.nxmatic.rke2lab.manifests.domain.HighAvailabilityDomainRegistrar}

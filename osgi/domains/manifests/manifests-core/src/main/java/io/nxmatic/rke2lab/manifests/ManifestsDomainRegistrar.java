@@ -4,9 +4,7 @@ package io.nxmatic.rke2lab.manifests;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 
 /**
- * A domain's contribution of manifest units to the synthesis — the unit channel of the two
- * contribution channels (units here, node-env via {@code NodeEnvContributor}); see {@code
- * docs/architecture/manifests/manifests-contribution-channels.adoc}. Each implementation is an SCR
+ * A domain's contribution of manifest units to the synthesis. Each implementation is an SCR
  * {@code @Component(service = ManifestsDomainRegistrar.class)} discovered through the OSGi registry
  * and collected by {@code DefaultManifestSynthesisService} (a {@code @Reference(MULTIPLE)}), which
  * calls {@link #domain(ManifestDomainPolicy)} on each at synthesis time and builds the {@link

@@ -137,7 +137,7 @@
          flattened into the uber-jar (excluded from the shade). runtime scope MACHINE-ENFORCES path
          2: seed-master's main + tests compile only against -port + OsgiRuntime, never against a
          manifests-core impl type (the realgraph fixture that once forced compile scope is gone). The
-         stage-embedded-bundles + manifests-d unpack still resolve the reactor artifact at runtime. -->
+         stage-embedded-bundles execution still resolves the reactor artifact at runtime. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
@@ -568,19 +568,6 @@
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
           <execution>
-            <id>clean-unpacked-manifests-generated-resources</id>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <target>
-                <delete dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rke2lab/controlplane/incus/manifests" quiet="true"/>
-                <delete dir="${project.build.directory}/classes/META-INF/io.nxmatic/rke2lab/controlplane/incus/manifests" quiet="true"/>
-              </target>
-            </configuration>
-          </execution>
-          <execution>
             <id>copy-incus-assets-into-generated-resources</id>
             <goals>
               <goal>run</goal>
@@ -674,27 +661,6 @@
               <overWriteReleases>true</overWriteReleases>
               <overWriteSnapshots>true</overWriteSnapshots>
               <artifactItems/>
-            </configuration>
-          </execution>
-          <execution>
-            <id>unpack-manifests-bundle</id>
-            <goals>
-              <goal>unpack</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <skip>${rke2lab.staging.skip}</skip>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>io.nxmatic.rke2lab</groupId>
-                  <artifactId>manifests-core</artifactId>
-                  <version>${rke2lab.version}</version>
-                  <classifier>manifests-d</classifier>
-                  <type>zip</type>
-                  <outputDirectory>${project.build.directory}/generated-resources/META-INF/io.nxmatic/rke2lab/controlplane/incus/manifests</outputDirectory>
-                  <overWrite>true</overWrite>
-                </artifactItem>
-              </artifactItems>
             </configuration>
           </execution>
         </executions>

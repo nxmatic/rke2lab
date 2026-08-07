@@ -124,7 +124,6 @@ sequenceDiagram
 
 | `DefaultHealthSystem` (`Specialist`) +
 `DefaultSeedBroker` (`SeedHandler`) +
-`NodeEnvContributorRegistry` (`NodeEnvContributor`) +
 `DefaultManifestSynthesisService` (`ManifestsDomainRegistrar`)
 | `MULTIPLE`/`STATIC`/RELUCTANT
 | Snapshot at activation. Safe TODAY only because every contributor is a DS bundle component present
@@ -357,10 +356,6 @@ Proof that the pattern holds in production — do NOT re-invert these:
 | `ManifestsDomainRegistrar` → `ManifestsDomainRegistry`
 | `domain(policy)` SPI aggregated by `@Reference(MULTIPLE)`; no static registration.
 
-| Host-asset channel
-| `HostAssetProvider` → `BootstrapHostAssetMaterializer`
-| Contributor SPI aggregated by `@Reference(MULTIPLE)`.
-
 | Pulumi outputs
 | `PulumiOutputContributor` → `PulumiOutputRegistry`
 | `add()`/`assemble()` contributor aggregation.
@@ -373,10 +368,10 @@ Proof that the pattern holds in production — do NOT re-invert these:
 
 == Remaining hold-outs (application targets)
 
-`NodeEnvContext` was the FIRST realized application: its fat interface (~35 accessors) is now a thin
-composite of three interface-segregated views — `BootstrapIdentity`, `NetworkTopology` (carrying the
-host MACs), and `HostPaths` — with every consumer re-typed onto the view that concerns it (commit
-`75627e53`). It is the working in-process `View` exemplar the generalization section draws from.
+`NodeEnvContext` was the FIRST realized application: its fat interface is now a thin composite of
+interface-segregated views — `BootstrapIdentity` and `NetworkTopology` (carrying the host MACs) —
+with every consumer re-typed onto the view that concerns it. It is the working in-process `View`
+exemplar the generalization section draws from.
 
 The synthesis side still carries the anti-patterns elsewhere. Bringing them into conformance is the
 remaining work:
@@ -391,11 +386,6 @@ remaining work:
   call sites, each taking ONE slice. The views already exist (`BootstrapIdentity`, `NetworkTopology`,
   `ComponentVersions`, `ImageState`, `IncusIdentityMaterial`, `FloxDebugPolicy`, `SopsAgeMaterial`).
   Invert to injected narrow views; delete the ThreadLocal.
-
-| `SystemdSynthesisContext`
-| small
-| Mild residual fat-aggregate, but already instance-passed and phase-narrowed (`targetFor(phase)`).
-  Optional.
 |===
 
 == Composition root & delivery — the jGiven scenario-state

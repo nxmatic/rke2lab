@@ -5,8 +5,6 @@
  * <ul>
  *   <li>{@link io.nxmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit} —
  *       the runtime namespace many other units depend on.
- *   <li>{@link io.nxmatic.rke2lab.manifests.units.cluster.ClusterNodeEnvContributor} — cluster
- *       slice of the node environment.
  *   <li>{@link io.nxmatic.rke2lab.manifests.units.cluster.ClusterRefs} — shared resource references
  *       for cross-unit wiring.
  * </ul>

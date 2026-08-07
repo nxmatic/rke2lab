@@ -1,18 +1,13 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer;
-import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * A manifest domain groups related ManifestsUnits and optionally synthesizes systemd support units.
+ * A manifest domain groups related ManifestsUnits.
  *
- * <p>Domains correspond to installer services (e.g., "cluster-api" →
- * rke2lab-cluster-api-manifests.service).
+ * <p>Domains correspond to a coherent set of Kubernetes manifests (e.g., "cluster-api", "gitops")
+ * synthesised and delivered together to the node's {@code server/manifests} tree.
  */
 public class ManifestsDomain {
   private final String domainId;
@@ -46,31 +41,5 @@ public class ManifestsDomain {
 
   public List<? extends ManifestsUnit> units() {
     return units;
-  }
-
-  /**
-   * Synthesizes systemd units for this domain.
-   *
-   * <p>Default implementation delegates to each ManifestsUnit's {@link
-   * ManifestsUnit#synthesizeSystemdUnits}. Domains can also emit their own installer service that
-   * installs all manifests in this domain.
-   *
-   * @param systemdChart the systemd chart to populate
-   * @param context systemd synthesis context (contains references to common targets)
-   */
-  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
-    // Group this domain's units by lifecycle phase, then emit one installer service per phase
-    // present. The installer links the sub-paths of its phase; ordering is derived by the
-    // synthesizer from the phase (see InstallPhase / docs/rke2-install-phases.adoc).
-    final Map<InstallPhase, List<String>> subpathsByPhase = new LinkedHashMap<>();
-    for (ManifestsUnit unit : units) {
-      subpathsByPhase
-          .computeIfAbsent(unit.installPhase(), p -> new ArrayList<>())
-          .add(domainId + "/" + unit.outputDir());
-    }
-
-    final SystemdUnitSynthesizer synthesizer =
-        new SystemdUnitSynthesizer(systemdChart, domainId, context);
-    subpathsByPhase.forEach(synthesizer::phaseInstaller);
   }
 }

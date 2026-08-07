@@ -100,19 +100,6 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>ndh-contract</artifactId>
     </dependency>
-    <!-- systemd's cdk8s rendering of its units (io.nxmatic.rke2lab.systemd.cdk8s), contributed as a
-         fragment of the manifests-cdk8s carrier. manifests-core imports that package to drive the
-         systemd-unit synthesis. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-cdk8s-manifests</artifactId>
-    </dependency>
-    <!-- The systemd domain's unit vocabulary: StorageStage synthesises the dbus-tcp unit from the
-         typed SystemdUnitId, not a literal — the import draws the producer edge in the graph. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-contract</artifactId>
-    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
@@ -165,26 +152,6 @@
         <artifactId>maven-jar-plugin</artifactId>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>3.7.1</version>
-        <executions>
-          <execution>
-            <id>attach-manifests-zip</id>
-            <goals>
-              <goal>single</goal>
-            </goals>
-            <phase>package</phase>
-            <configuration>
-              <descriptors>
-                <descriptor>${project.basedir}/src/assembly/manifests-d.xml</descriptor>
-              </descriptors>
-              <appendAssemblyId>true</appendAssemblyId>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>dev.dimlight</groupId>
         <artifactId>shellcheck-maven-plugin</artifactId>
         <executions>
@@ -211,7 +178,8 @@
                 <arg>--norc</arg>
               </args>
               <failBuildIfWarnings>false</failBuildIfWarnings>
-              <binaryResolutionMethod>embedded</binaryResolutionMethod>
+              <binaryResolutionMethod>external</binaryResolutionMethod>
+              <externalBinaryPath>${maven.multiModuleProjectDirectory}/.flox/run/aarch64-darwin.rke2lab-run/bin/shellcheck</externalBinaryPath>
             </configuration>
           </execution>
         </executions>

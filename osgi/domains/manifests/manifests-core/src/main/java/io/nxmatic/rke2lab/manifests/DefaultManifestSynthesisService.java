@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.nxmatic.rke2lab.manifests.cdk8s.Cdk8sApps;
-import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
 import io.nxmatic.rke2lab.manifests.contract.ManifestExplodeService;
@@ -16,13 +15,7 @@ import io.nxmatic.rke2lab.manifests.internal.synthesis.OnFailure;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.nxmatic.rke2lab.manifests.internal.synthesis.PhaseRunner;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
-import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
-import io.nxmatic.rke2lab.manifests.systemd.SystemdBundleConfigMaps;
-import io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer;
 import io.nxmatic.rke2lab.ndh.contract.NdhKeystoreReader;
-import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
-import io.nxmatic.rke2lab.systemd.cdk8s.SystemdDropIn;
-import io.nxmatic.rke2lab.systemd.cdk8s.SystemdTarget;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -63,15 +56,11 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
    */
   @Reference private Resolver resolver;
 
-  /** SCR-injected registry of node-env contributors, threaded into each unit's context. */
-  @Reference private NodeEnvContributorRegistry contributorRegistry;
-
   /**
-   * The domain registrars, SCR-collected — the unit contribution channel, aligned on the node-env
-   * channel's shape (cardinality MULTIPLE). Each registrar contributes one manifest domain with its
-   * units; {@link #buildDomainRegistry} iterates them as {@code domain(policy)} at build time, so a
-   * registrar stays a stateless singleton and the run policy is a call-time argument. This replaces
-   * the former static {@code register(new XxxRegistrar())} chain.
+   * The domain registrars, SCR-collected — the unit contribution channel (cardinality MULTIPLE).
+   * Each registrar contributes one manifest domain with its units; {@link #buildDomainRegistry}
+   * iterates them as {@code domain(policy)} at build time, so a registrar stays a stateless
+   * singleton and the run policy is a call-time argument.
    */
   @Reference(cardinality = ReferenceCardinality.MULTIPLE)
   private List<ManifestsDomainRegistrar> domainRegistrars;
@@ -130,7 +119,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
   ManifestSynthesisResult synthesizeInContext(ManifestSynthesisRequest request) throws IOException {
     // Local pipeline for the manifest synthesis workflow (fluent synthesis grammar).
-    // Structure: setup → registry → targets → units → finalization → synthesis
+    // Structure: setup → registry → synthesis
     final class SynthesisPipeline {
       final ManifestSynthesisRequest request;
       final PhaseRunner runner = new PhaseRunner("manifest-synthesis");
@@ -143,34 +132,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         return new AwaitingOnFailure(new State(request, handler));
       }
 
-      /** Cdk8s app, charts and output paths — produced once by the setup stage. */
-      record Scaffold(
-          App app,
-          Chart chart,
-          SystemdChart systemdChart,
-          Path synthOutdir,
-          Path synthManifestFile,
-          Path systemdOutdir) {}
+      /** Cdk8s app, chart and output paths — produced once by the setup stage. */
+      record Scaffold(App app, Chart chart, Path synthOutdir, Path synthManifestFile) {}
 
       /** Configured domain registry and its unit hit count — produced by the registry stage. */
       record Registry(ManifestsDomainRegistry domainRegistry, int manifestUnitHitCount) {}
 
-      /** Systemd target hierarchy and its context — produced by the systemd-targets stage. */
-      record Targets(
-          SystemdTarget rke2labTarget,
-          SystemdTarget networkTarget,
-          SystemdTarget toolsTarget,
-          SystemdTarget bootstrapTarget,
-          SystemdTarget manifestsTarget,
-          SystemdTarget cniManifestsTarget,
-          SystemdTarget operatorManifestsTarget,
-          SystemdTarget secretsTarget,
-          SystemdSynthesisContext systemdContext) {}
-
       /**
        * Working memory shared across pipeline stages. Each phase produces one immutable record; the
        * type-state chain guarantees a record is set before a later stage reads it, so the narrowing
-       * accessors never fail. These three slots are the only mutable state.
+       * accessors never fail. These two slots are the only mutable state.
        */
       final class State {
         final ManifestSynthesisRequest request;
@@ -178,7 +149,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
         @Nullable Scaffold scaffold;
         @Nullable Registry registry;
-        @Nullable Targets targets;
 
         State(ManifestSynthesisRequest request, OnFailure onFailure) {
           this.request = request;
@@ -191,10 +161,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
         Registry registry() {
           return Objects.requireNonNull(registry, "domain registry not yet produced");
-        }
-
-        Targets targets() {
-          return Objects.requireNonNull(targets, "systemd targets not yet produced");
         }
       }
 
@@ -235,16 +201,12 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         Cdk8sSetupPhase createChartsAndPaths() {
           final Path synthOutdir = state.request.synthOutdir();
           final Path synthManifestFile = state.request.synthManifestFile();
-          final Path systemdOutdir = synthOutdir.resolve("systemd");
 
           final App app =
               Cdk8sApps.create(AppProps.builder().outdir(synthOutdir.toString()).build());
           final Chart chart = new Chart(app, "manifests");
-          final SystemdChart systemdChart = new SystemdChart(app, "systemd");
 
-          sink.scaffold(
-              new Scaffold(
-                  app, chart, systemdChart, synthOutdir, synthManifestFile, systemdOutdir));
+          sink.scaffold(new Scaffold(app, chart, synthOutdir, synthManifestFile));
 
           return this;
         }
@@ -325,7 +287,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .manifestDomainPolicy()
                   .orElseGet(() -> new ManifestDomainPolicy(java.util.Map.of()));
           final NodeEnvContext nodeEnvContext =
-              new DefaultNodeEnvContext(state.request.bootstrapIdentity(), runPolicy);
+              new DefaultNodeEnvContext(state.request.bootstrapIdentity());
 
           int manifestUnitHitCount = 0;
           for (ManifestsUnit manifestUnit : coherent.visitOrder()) {
@@ -340,7 +302,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                     domainId,
                     manifestUnitId,
                     resolver,
-                    DefaultManifestSynthesisService.this.contributorRegistry,
                     runPolicy,
                     nodeEnvContext,
                     DefaultManifestSynthesisService.this.yaml));
@@ -356,285 +317,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         final State state;
 
         DomainRegistryDone(State state) {
-          this.state = state;
-        }
-
-        AwaitingSystemdTargets then() {
-          return new AwaitingSystemdTargets(state);
-        }
-      }
-
-      final class AwaitingSystemdTargets {
-        final State state;
-
-        AwaitingSystemdTargets(State state) {
-          this.state = state;
-        }
-
-        SystemdTargetsDone during(
-            String phase, Function<SystemdTargetsPhase, SystemdTargetsPhase> body) {
-          final SystemdTargetsPhase stage =
-              new SystemdTargetsPhase(state, targets -> state.targets = targets);
-          runner.runDuring(phase, stage, body, state.onFailure);
-          return new SystemdTargetsDone(state);
-        }
-      }
-
-      final class SystemdTargetsPhase implements Phase.Execution {
-        final State state;
-        final Sink sink;
-
-        SystemdTargetsPhase(State state, Sink sink) {
-          this.state = state;
-          this.sink = sink;
-        }
-
-        /** The write-face of the systemd-targets phase. */
-        interface Sink extends Phase.Sink {
-          void targets(Targets targets);
-        }
-
-        @Override
-        public String role() {
-          return "systemd targets";
-        }
-
-        SystemdTargetsPhase createTargetHierarchy() {
-          final SystemdChart systemdChart = state.scaffold().systemdChart();
-          final ManifestDomainCatalog domainCatalog =
-              ManifestDomainCatalog.builder()
-                  .addDefaultDomains()
-                  .addDefaultStageALinkableDomains()
-                  .build();
-
-          LOG.debug("Creating systemd targets");
-          final SystemdTarget rke2labTarget =
-              new SystemdTarget(systemdChart, "rke2lab")
-                  .description("RKE2 Lab Bootstrap Target")
-                  .documentation("https://github.com/nxmatic/rke2lab")
-                  .wantedBy("multi-user.target");
-
-          final SystemdTarget networkTarget =
-              new SystemdTarget(systemdChart, "rke2lab-network")
-                  .description("RKE2 Lab Network Infrastructure Target")
-                  .after("network-online.target")
-                  .wants("network-online.target")
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy(rke2labTarget.getUnitFileName());
-
-          final SystemdTarget toolsTarget =
-              new SystemdTarget(systemdChart, "rke2lab-tools")
-                  .description("RKE2 Lab Tools and Utilities Target")
-                  .after(networkTarget.getUnitFileName())
-                  .wants(networkTarget.getUnitFileName())
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy(rke2labTarget.getUnitFileName());
-
-          final SystemdTarget bootstrapTarget =
-              new SystemdTarget(systemdChart, "rke2lab-bootstrap")
-                  .description("RKE2 Lab Early Bootstrap (pre-server)")
-                  .after(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
-                  .requires(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy(rke2labTarget.getUnitFileName())
-                  .also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
-
-          final SystemdTarget manifestsTarget =
-              new SystemdTarget(systemdChart, "rke2lab-manifests")
-                  .description("RKE2 Lab Manifest Installers (post-server)")
-                  .after(bootstrapTarget.getUnitFileName(), "rke2-server.service")
-                  .requires("rke2-server.service")
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy("rke2-server.service");
-
-          final SystemdTarget cniManifestsTarget =
-              new SystemdTarget(systemdChart, "rke2lab-cni-manifests")
-                  .description("RKE2 Lab Manifest Installers (post-CNI-ready)")
-                  .after(manifestsTarget.getUnitFileName(), "rke2-server.service")
-                  .requires("rke2-server.service")
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy(rke2labTarget.getUnitFileName());
-
-          final SystemdTarget operatorManifestsTarget =
-              new SystemdTarget(systemdChart, "rke2lab-operator-manifests")
-                  .description("RKE2 Lab Manifest Installers (post-operator-ready)")
-                  .after(cniManifestsTarget.getUnitFileName(), "rke2-server.service")
-                  .requires("rke2-server.service")
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy(rke2labTarget.getUnitFileName());
-
-          final SystemdTarget secretsTarget =
-              new SystemdTarget(systemdChart, "rke2lab-secrets")
-                  .description("RKE2 Lab Secrets Installers (post-server)")
-                  .after(
-                      bootstrapTarget.getUnitFileName(),
-                      manifestsTarget.getUnitFileName(),
-                      "rke2-server.service")
-                  .requires("rke2-server.service")
-                  .partOf(rke2labTarget.getUnitFileName())
-                  .wantedBy(rke2labTarget.getUnitFileName());
-
-          final SystemdSynthesisContext systemdContext =
-              SystemdSynthesisContext.builder()
-                  .rke2labTarget(rke2labTarget)
-                  .bootstrapTarget(bootstrapTarget)
-                  .manifestsTarget(manifestsTarget)
-                  .cniManifestsTarget(cniManifestsTarget)
-                  .operatorManifestsTarget(operatorManifestsTarget)
-                  .secretsTarget(secretsTarget)
-                  .networkTarget(networkTarget)
-                  .toolsTarget(toolsTarget)
-                  .domainCatalog(domainCatalog)
-                  .build();
-
-          sink.targets(
-              new Targets(
-                  rke2labTarget,
-                  networkTarget,
-                  toolsTarget,
-                  bootstrapTarget,
-                  manifestsTarget,
-                  cniManifestsTarget,
-                  operatorManifestsTarget,
-                  secretsTarget,
-                  systemdContext));
-
-          return this;
-        }
-      }
-
-      final class SystemdTargetsDone {
-        final State state;
-
-        SystemdTargetsDone(State state) {
-          this.state = state;
-        }
-
-        AwaitingSystemdUnits then() {
-          return new AwaitingSystemdUnits(state);
-        }
-      }
-
-      final class AwaitingSystemdUnits {
-        final State state;
-
-        AwaitingSystemdUnits(State state) {
-          this.state = state;
-        }
-
-        SystemdUnitsDone during(String phase, Function<SystemdUnitsPhase, SystemdUnitsPhase> body) {
-          final SystemdUnitsPhase stage = new SystemdUnitsPhase(state);
-          runner.runDuring(phase, stage, body, state.onFailure);
-          return new SystemdUnitsDone(state);
-        }
-      }
-
-      final class SystemdUnitsPhase implements Phase.Execution {
-        final State state;
-
-        SystemdUnitsPhase(State state) {
-          this.state = state;
-        }
-
-        @Override
-        public String role() {
-          return "systemd units";
-        }
-
-        SystemdUnitsPhase synthesizeInfrastructureAndDomains() {
-          final SystemdChart systemdChart = state.scaffold().systemdChart();
-          final SystemdSynthesisContext systemdContext = state.targets().systemdContext();
-
-          LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
-          new SystemdInfrastructureSynthesizer(systemdChart, systemdContext).synthesizeAll();
-
-          for (ManifestsDomain domain : state.registry().domainRegistry().domains()) {
-            LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
-            domain.synthesizeSystemdUnits(systemdChart, systemdContext);
-          }
-
-          return this;
-        }
-      }
-
-      final class SystemdUnitsDone {
-        final State state;
-
-        SystemdUnitsDone(State state) {
-          this.state = state;
-        }
-
-        AwaitingTargetFinalization then() {
-          return new AwaitingTargetFinalization(state);
-        }
-      }
-
-      final class AwaitingTargetFinalization {
-        final State state;
-
-        AwaitingTargetFinalization(State state) {
-          this.state = state;
-        }
-
-        TargetFinalizationDone during(
-            String phase, Function<TargetFinalizationPhase, TargetFinalizationPhase> body) {
-          final TargetFinalizationPhase stage = new TargetFinalizationPhase(state);
-          runner.runDuring(phase, stage, body, state.onFailure);
-          return new TargetFinalizationDone(state);
-        }
-      }
-
-      final class TargetFinalizationPhase implements Phase.Execution {
-        final State state;
-
-        TargetFinalizationPhase(State state) {
-          this.state = state;
-        }
-
-        @Override
-        public String role() {
-          return "target finalization";
-        }
-
-        TargetFinalizationPhase finalizeAndCreateDropIn() {
-          final SystemdChart systemdChart = state.scaffold().systemdChart();
-          final Targets targets = state.targets();
-
-          LOG.debug("Configuring main rke2lab.target dependencies");
-          targets
-              .rke2labTarget()
-              .after(
-                  targets.networkTarget().getUnitFileName(),
-                  targets.toolsTarget().getUnitFileName(),
-                  targets.bootstrapTarget().getUnitFileName(),
-                  "rke2-server.service")
-              .wants(
-                  targets.networkTarget().getUnitFileName(),
-                  targets.toolsTarget().getUnitFileName(),
-                  targets.bootstrapTarget().getUnitFileName(),
-                  targets.manifestsTarget().getUnitFileName(),
-                  targets.cniManifestsTarget().getUnitFileName(),
-                  targets.operatorManifestsTarget().getUnitFileName(),
-                  targets.secretsTarget().getUnitFileName(),
-                  "rke2-server.service");
-
-          LOG.debug("Finalizing systemd target dependencies");
-          systemdChart.finalizeTargetDependencies();
-
-          LOG.debug("Creating rke2-server.service drop-in for lifecycle hooks");
-          new SystemdDropIn(systemdChart, "rke2lab-server-hooks", "rke2-server.service")
-              .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
-              .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
-              .wants(targets.manifestsTarget().getUnitFileName());
-
-          return this;
-        }
-      }
-
-      final class TargetFinalizationDone {
-        final State state;
-
-        TargetFinalizationDone(State state) {
           this.state = state;
         }
 
@@ -675,14 +357,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             LOG.info(
                 "Calling app.synth() to synthesize K8s manifests to: {}", scaffold.synthOutdir());
             scaffold.app().synth();
-            LOG.info(
-                "app.synth() completed, now carrying the systemd bundle as ConfigMaps to: {}",
-                scaffold.systemdOutdir());
-            // (X) the chart owns the scripts too: register the bundled host scripts, then carry the
-            // whole systemd bundle (units + drop-ins + scripts) as local-config ConfigMap dotfiles
-            // the incus host materializer extracts — manifests.d/systemd holds ONLY manifests.
-            SystemdBundleConfigMaps.synthesize(scaffold.systemdChart(), scaffold.systemdOutdir());
-            LOG.info("systemd bundle carried as ConfigMaps");
 
             final Path synthesizedFile = getSynthesizedFile();
 
@@ -693,15 +367,14 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                 synthesizedFile, scaffold.synthManifestFile(), StandardCopyOption.REPLACE_EXISTING);
 
             LOG.info(
-                "Synthesized K8s manifests and systemd units from canonical manifest units (manifest unit hits={})",
+                "Synthesized K8s manifests from canonical manifest units (manifest unit hits={})",
                 state.registry().manifestUnitHitCount());
 
             // Explode the consolidated manifest into the per-resource tree the node consumes and
-            // the
-            // host artifacts read: cluster-apply resources become visible files (RKE2 auto-deploys
-            // them), local-config resources become hidden dotfiles (skipped by apply, read by host
-            // consumers — e.g. runtime/cloud-config/.configmap-cloud-config.yml, the NoCloud seed
-            // the incus scion unwraps). Into synthOutdir, alongside the systemd/ carve-out.
+            // the host artifacts read: cluster-apply resources become visible files (RKE2
+            // auto-deploys them), local-config resources become hidden dotfiles (skipped by apply,
+            // read by host consumers — e.g. runtime/cloud-config/.configmap-cloud-config.yml, the
+            // NoCloud seed the incus scion unwraps). Into synthOutdir.
             explodeService.explode(
                 new ManifestExplodeRequest(scaffold.synthManifestFile(), scaffold.synthOutdir()));
             LOG.info(
@@ -748,7 +421,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           final Registry registry = state.registry();
           return new ManifestSynthesisResult(
               scaffold.synthManifestFile(),
-              scaffold.systemdOutdir(),
               registry.manifestUnitHitCount(),
               registry.domainRegistry().domains().size());
         }
@@ -759,12 +431,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         .during("cdk8s setup", setup -> setup.createChartsAndPaths())
         .then()
         .during("domain registry", registry -> registry.buildAndApplyUnits())
-        .then()
-        .during("systemd targets", targets -> targets.createTargetHierarchy())
-        .then()
-        .during("systemd units", units -> units.synthesizeInfrastructureAndDomains())
-        .then()
-        .during("target finalization", finalization -> finalization.finalizeAndCreateDropIn())
         .then()
         .during("synthesis", synthesis -> synthesis.synthAndPostprocess())
         .complete();

@@ -22,7 +22,6 @@
   <modules>
     <module>systemd-contract</module>
     <module>systemd-core</module>
-    <module>systemd-cdk8s-manifests</module>
     <module>dbus-systemd-edge</module>
     <module>dbus-systemd-edge-test</module>
     <module>systemd-bdd</module>

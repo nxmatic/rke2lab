@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -106,12 +105,7 @@ public class ManifestSynthesisScenario
         Objects.requireNonNull(input, "the activation facet was not seeded before the body");
     given().the_activation_facet(facet);
     when().the_policy_is_derived_from_the_facet().and().the_manifests_are_synthesized();
-    then()
-        .every_enabled_domain_produced_its_units()
-        .and()
-        .the_manifests_file_is_written()
-        .and()
-        .the_publish_env_section_is_synthesized();
+    then().every_enabled_domain_produced_its_units().and().the_manifests_file_is_written();
   }
 
   /** Given: the activation facet and the synthesis collaborators. */
@@ -128,11 +122,9 @@ public class ManifestSynthesisScenario
 
   /**
    * When: the transposition of {@code HostSlotManifest.Builder.policy()}. Derives the {@link
-   * ManifestDomainPolicy} + {@link FloxDebugPolicy} from the facet and synthesises. The one policy
-   * drives BOTH the synth-time domain filter AND — threaded through the synthesis into the
-   * env-config unit — the {@code RKE2LAB_MANIFESTS_PUBLISH_*} publish section (no out-of-band
-   * overlay). Mode-blind: the materialisation target follows the SOIL amendment alone (a temp dir
-   * here), never a run gate.
+   * ManifestDomainPolicy} + {@link FloxDebugPolicy} from the facet and synthesises. The policy
+   * drives the synth-time domain filter (which layers synthesise). Mode-blind: the materialisation
+   * target follows the SOIL amendment alone (a temp dir here), never a run gate.
    */
   public static class When extends Stage<When> {
 
@@ -157,9 +149,7 @@ public class ManifestSynthesisScenario
     public When the_policy_is_derived_from_the_facet() {
       final ManifestsRunbookInput.PublishFacet publish = facet.facets().publish();
       // The one policy the run carries: base infra (cluster/runtime/platform) always on; the rest
-      // follow the facet. It drives BOTH the synth-time domain filter AND — threaded through the
-      // synthesis into the env-config unit — the PublishNodeEnvContributor's RKE2LAB_MANIFESTS_
-      // PUBLISH_* section. No out-of-band overlay: the publish vars are a synthesised env section.
+      // follow the facet. It drives the synth-time domain filter (which layers synthesise).
       this.domainPolicy =
           ManifestDomainPolicy.builder()
               .domainCatalog(CATALOG)
@@ -284,33 +274,6 @@ public class ManifestSynthesisScenario
             "no manifest units were processed",
             ManifestSynthesisError.Gap.NO_UNITS_PROCESSED,
             result);
-      }
-      return self();
-    }
-
-    public Then the_publish_env_section_is_synthesized() {
-      final String rendered;
-      try {
-        rendered = Files.readString(result.manifestFile());
-      } catch (IOException ex) {
-        throw new UncheckedIOException(
-            "cannot read the synthesised manifests " + result.manifestFile(), ex);
-      }
-      // The PublishNodeEnvContributor emits an env-section-publish ConfigMap during synthesis, so
-      // the consolidated manifest names one RKE2LAB_MANIFESTS_PUBLISH_<LAYER>_ENABLED per
-      // publishable
-      // layer — what the master's install/ready scripts read. No out-of-band overlay.
-      for (String domainId : CATALOG.stageALinkableDomains()) {
-        final String var =
-            "RKE2LAB_MANIFESTS_PUBLISH_"
-                + domainId.toUpperCase(Locale.ROOT).replace('-', '_')
-                + "_ENABLED";
-        if (!rendered.contains(var)) {
-          throw new ManifestSynthesisError(
-              "synthesised manifests miss the publish var " + var,
-              ManifestSynthesisError.Gap.MISSING_PUBLISH_VAR,
-              result);
-        }
       }
       return self();
     }

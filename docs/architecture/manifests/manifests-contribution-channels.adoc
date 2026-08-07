@@ -3,173 +3,74 @@
 :toclevels: 3
 
 How a domain hands work to the manifests synthesis. The synthesis does not own
-what it assembles: domains *contribute*, and the synthesis aggregates. This
-document is the single reference for the contribution *channels* -- what a domain
-contributes (the payload), to whom (the aggregator), and in what manner (the
-wiring).
+what it assembles: domains *contribute* manifest units, and the synthesis
+aggregates them into the Kubernetes payload delivered to the node's
+`server/manifests` tree.
 
 [NOTE]
 ====
-*SHIPPED vs DESIGN.* Two of the three channels (node-env, host-assets) already
-run as SCR-discovered contributions -- SHIPPED. The third (manifest units) is
-still statically wired; aligning it on the same pattern is the DESIGN target
-below. Each section marks which it is.
+*Historical note.* This document once described *three* contribution channels
+(manifest units, node-env sections, host-assets). Two of them — the node-env
+`KEY=VALUE` env-var channel and the `/srv/host` host-asset materialisation — were
+*dissolved* when the node substrate moved to a declarative NixOS base: the node's
+identity, PKI, containerd/NRI config, dbus and toolbox are now baked by the
+`nixos/` modules, not delivered as synthesised env files or `/srv/host` scripts.
+See link:../nixos-substrate/target-vision.adoc[the NixOS node-substrate target
+vision]. What remains here is the one surviving channel — manifest units — plus
+the read-only node context threaded to them.
 ====
 
-== Overview
+== The manifest-unit channel
 
-A domain never writes into the manifests synthesis directly. It publishes a
-*contribution*, and the synthesis *collects* it. There is not one contribution
-but three, because a domain produces three distinct kinds of payload consumed at
-three distinct points:
+A domain never writes into the synthesis directly. It publishes a
+*contribution* and the synthesis *collects* it. The contribution is a set of
+CDK8s constructs synthesised to Kubernetes YAML.
 
-* *manifest units* -- CDK8s constructs synthesized to Kubernetes YAML.
-* *node-env sections* -- `KEY=VALUE` environment the node reads at boot.
-* *host-assets* -- files (scripts, cloud-config, env) materialized onto the host.
+* the contributor is an SCR `@Component(service = ManifestsDomainRegistrar.class)`
+  keyed by its manifest `domainId` (`networking`, `storage`, `high-availability`, …);
+* the run-scoped policy arrives as a *method parameter* at collection time —
+  `ManifestsDomainRegistrar.domain(ManifestDomainPolicy)` — never as construction
+  state, so a registrar stays a stateless singleton;
+* the aggregator, `DefaultManifestSynthesisService`, collects every registrar with
+  one `@Reference(MULTIPLE)` and builds the `ManifestsDomainRegistry` from the
+  results — no static registration.
 
-The manner should be uniform: every contributor is an SCR `@Component` keyed by a
-`domainId`, and the aggregator collects it with a single
-`@Reference(MULTIPLE)`. Node-env and host-assets already work this way; manifest
-units are the laggard the design aligns.
+=== Migration to the SCR shape (DONE)
 
-== The three channels: what, and to whom
-
-[mermaid]
-....
-flowchart TB
-  subgraph dom ["a domain, e.g. networking"]
-    D["produces units, env sections, host assets"]
-  end
-  subgraph channels ["3 typed contracts (WHAT)"]
-    U["ManifestsDomainRegistrar<br/>k8s units<br/>DESIGN: still static"]
-    E["NodeEnvContributor<br/>env sections<br/>SHIPPED: SCR"]
-    H["HostAssetProvider<br/>host files<br/>SHIPPED: SCR"]
-  end
-  subgraph collectors ["TO WHOM (aggregators)"]
-    RB["registry builder<br/>static register per domain"]
-    NR["NodeEnvContributorRegistry<br/>Reference MULTIPLE"]
-    IM["incus materializer<br/>Reference MULTIPLE"]
-  end
-  D -->|units| U
-  D -->|env| E
-  D -->|assets| H
-  U -->|register static| RB
-  E -->|discovered| NR
-  H -->|discovered| IM
-....
-
-.The three channels
-[cols="1,1,1,1",options="header"]
-|===
-| Channel | Payload | Aggregator | Manner
-| `ManifestsDomainRegistrar` | manifest units | `ManifestsDomainRegistryBuilder` | static (DESIGN target: SCR)
-| `NodeEnvContributor`       | node-env sections | `NodeEnvContributorRegistry` | SCR, keyed by `domainId`
-| `HostAssetProvider`        | host-asset files  | incus `BootstrapHostAssetMaterializer` | SCR, `@Reference(MULTIPLE)`
-|===
-
-They stay *three distinct contracts*, not one merged contract: the payloads and
-the consumers differ (Kubernetes YAML assembled in-process, env read at boot by
-the node, files materialized by incus). Folding them into one interface would be
-an abstraction that leaks all three concerns into a single signature. What they
-share is the *shape*, not the contract.
-
-== The manner: SCR, keyed by domainId (SHIPPED for env and host-assets)
-
-The node-env channel is the reference implementation of the shape every channel
-should follow:
-
-* the contributor is an SCR `@Component(service = NodeEnvContributor.class)`;
-* it declares its `domainId()` (`networking`, `storage`, `high-availability`, ...);
-* the run-scoped input (policy, paths, identity) arrives as a *method parameter*
-  at collection time (`contributeVariables(section, NodeEnvContext)`), never as
-  construction state;
-* the aggregator collects every contributor with one `@Reference(MULTIPLE)`.
-
-The host-asset channel follows the same shape (`contribute(Path)` collected by
-incus). Responsibility split on the host-asset seam: the domain names a *logical
-slot* + content and DECLARES whether the placed files are executable (a systemd
-script must run, a unit file must not -- `HostAssetContribution.executableFiles`);
-incus, which owns the instance, maps the slot to a `/srv/host/...` root and APPLIES
-the declared mode -- it never infers executability from the slot, so it stays
-agnostic of its clients. The manifest-unit channel already has the method-parameter half --
-`ManifestsDomainRegistrar.domain(ManifestDomainPolicy)` takes the policy as an
-argument -- but is still collected statically.
-
-== DESIGN: align the manifest-unit channel
-
-[mermaid]
-....
-flowchart LR
-  subgraph now ["current"]
-    E2["NodeEnvContributor<br/>Component SCR, domainId"]
-    U2["ManifestsDomainRegistrar<br/>plain class, static wiring"]
-  end
-  subgraph target ["target"]
-    T["ManifestsDomainRegistrar<br/>Component SCR, domainId<br/>collected by Reference MULTIPLE"]
-  end
-  U2 -->|align on its sibling| T
-  E2 -->|the shape to copy| T
-....
-
-The target: promote `ManifestsDomainRegistrar` to an SCR `@Component`, collected
-by a registry aggregator with `@Reference(MULTIPLE)` exactly as
-`NodeEnvContributorRegistry` collects env contributors, and call
-`.domain(policy)` on each at collection time. The static chain in
-`DefaultManifestSynthesisService` (the explicit `register(new XxxRegistrar())`
-sequence) is then erased -- the same erasure the other two channels already had.
+This SCR-discovered wiring is the *completed* migration of the manifest-unit
+channel. It was formerly the laggard — statically wired through a hand-maintained
+`register(new XxxRegistrar())` chain in `DefaultManifestSynthesisService`, a second
+source of truth beside the components. Promoting each registrar to an SCR
+`@Component(service = ManifestsDomainRegistrar.class)` and collecting them with a
+single `@Reference(MULTIPLE)` erased that static chain — aligning the units channel
+onto the SCR contribution *shape* that the node-env and host-asset channels had
+pioneered before they were dissolved into the NixOS node substrate. The shape
+outlived the two channels that first carried it.
 
 === Anti-patterns
 
-* *Static registration of contributors* (❌ the manifest-unit channel today): a
-  hard-coded `register(new XxxRegistrar())` list is a second source of truth
-  beside the components and cannot be extended without editing the aggregator.
-  ✅ Publish an SCR `@Component`; let the aggregator discover it.
-* *One merged contribution contract* (❌): a single `contribute()` returning
-  units *and* env *and* assets couples three consumers to one signature. ✅ Three
-  contracts of the same shape, each keyed by `domainId`.
-* *Run state in the constructor* (❌): a contributor built with policy/paths baked
-  in cannot be a stateless SCR singleton. ✅ Take the run-scoped context as a
-  method parameter at collection time.
+* *Run state in the constructor* (❌): a registrar built with policy baked in
+  cannot be a stateless SCR singleton. ✅ Take the run-scoped policy as a method
+  parameter at collection time.
+* *A second source of truth* (❌): a hand-maintained `register(new XxxRegistrar())`
+  list beside the components. ✅ Publish an SCR `@Component`; let the aggregator
+  discover it.
 
-== Two orthogonal axes: mechanism and home
+== The node context (read-only, not a contribution)
 
-Aligning the mechanism (static -> SCR) is independent from *where the contributor
-lives* (the home). Today every contributor -- even the SCR ones -- lives inside
-`manifests-core`; no contribution is yet distributed to a domain's own module.
-
-[mermaid]
-....
-flowchart TB
-  subgraph axes ["two independent decisions"]
-    subgraph mech ["MECHANISM axis"]
-      MA["static register"]
-      MB["SCR discovery"]
-      MA -->|units must catch up| MB
-    end
-    subgraph home ["HOME axis"]
-      HA["all inside manifests-core today"]
-      HB["contributor in the domain module"]
-      HA -->|distribution, not started| HB
-    end
-  end
-....
-
-*Home policy (hybrid).* The OSGi domains (things with a runtime: incus, systemd,
-cluster, doctor, ...) and the manifest domains (k8s workloads: gitops, mesh,
-cicd, storage, ...) are orthogonal taxonomies -- only `cluster` overlaps. Most
-manifest domains have no OSGi module to move into. So distribution is applied
-only where a domain has a real runtime home (systemd owns its runtime units);
-pure-k8s-workload contributors stay grouped rather than exploded into empty
-bundles. A contributor moves to a domain module when that domain has a second,
-runtime reason to exist there -- not for distribution's own sake.
+Units that need the run's cluster/node facts read them from a `NodeEnvContext`
+threaded into their `ManifestsUnitContext`. `DefaultNodeEnvContext` derives it once
+from the handed-over identity via the netplan blueprint and exposes two narrow
+views — `bootstrapIdentity()` and `networkTopology()`. This is a *context*, not a
+contribution channel: units consume it, they do not publish into it.
 
 == Related Documentation
 
-* link:manifests-architecture.adoc[Manifests Architecture] -- the canonical
-  module reference; this doc details the contribution seam it introduces.
-* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] -- the
+* link:manifests-architecture.adoc[Manifests Architecture] — the canonical module
+  reference; this doc details the contribution seam.
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] — the
   `ManifestDomainPolicy` a registrar reads to include units conditionally.
-* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] -- the
-  single source of the `domainId`s the channels key on.
-* link:../patterns/daemonset-host-assets-architecture.adoc[Daemonset Host Assets]
-  -- the host-asset channel in depth.
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] — the
+  single source of the `domainId`s the channel keys on.
+* link:../nixos-substrate/target-vision.adoc[NixOS Node-Substrate Target Vision] —
+  where the former node-env and host-asset channels now live (baked declaratively).

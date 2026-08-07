@@ -2,7 +2,6 @@
 package io.nxmatic.rke2lab.manifests.units.networking;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
-import io.nxmatic.rke2lab.manifests.InstallPhase;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -23,11 +22,6 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
 
   public CiliumConfigManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
-  }
-
-  @Override
-  public InstallPhase installPhase() {
-    return InstallPhase.PRE_SERVER;
   }
 
   @Override

@@ -1,148 +1,28 @@
 = Control Node Host Assets Architecture
 
-== Why this change
+== Status: DISSOLVED
 
-Today, host assets are produced in multiple places:
+[NOTE]
+====
+This was a *design* note for a single contract-driven model of control-node host
+assets — a "runtime filesystem contract" of logical aliases (`env`, `scripts`,
+`systemd`, `rke2Config`, `cloudNoCloud`, …) mapping to `/srv/host/*` destinations,
+a layer contribution API, a script-interface layer, and a materialisation
+pipeline that rendered those assets onto the node.
 
-- Layer code emits ConfigMaps/Secrets and script payloads.
-- `manifests` materializes embedded resources for runtime installers.
-- `controlplane` mounts host paths into `/srv/host/*`.
+The whole premise — that the control node consumes host assets delivered under
+`/srv/host/*` (mounted by `controlplane`, materialised from manifest synthesis) —
+is gone. The node moved to a declarative NixOS substrate: its config, systemd
+units, scripts, identity, PKI and toolbox are baked by the `nixos/` modules, so
+there is no `/srv/host` asset root to own, alias, or materialise. See
+link:../nixos-substrate/target-vision.adoc[the NixOS node-substrate target
+vision].
 
-This works, but path ownership and contribution boundaries are implicit. Recent rename drift (`/srv/host/*` to `*.d`) showed we need one contract-driven model.
-
-== Goals
-
-- Single, owned filesystem contract for controlnode host assets.
-- Layer-driven contributions via a stable API (not ad-hoc file/path strings).
-- A dedicated script-interface layer handling script/unit integration.
-- Explicit separation between external source inputs and node-owned host assets.
-- One source of truth for runtime path aliases consumed by:
-  - `controlplane` mount devices,
-  - runtime env config (`paths.env`),
-  - script installers/materializers.
-
-== Architecture
-
-=== 1) Runtime Filesystem Contract
-
-Introduce a shared contract object (logical aliases + canonical destinations).
-
-Important boundary:
-
-* the *runtime filesystem contract* owns durable runtime asset destinations on the NixOS guest/host view
-* the *developer worktree* is not one of those durable runtime destinations
-* the developer worktree originates on the macOS workstation that runs the NixOS VM through Tart/VZ
-
-So the worktree should be modeled as an *external source input*, projected into the VM, not as a `/srv/host/*` asset root alongside generated runtime artifacts.
-
-Example aliases:
-
-- `env` -> `/srv/host/rke2lab-environment.d`
-- `scripts` -> `/srv/host/systemd-scripts.d`
-- `systemd` -> `/srv/host/systemd-units.d`
-- `manifests` -> `/srv/host/rke2-manifests.d`
-- `rke2Config` -> `/srv/host/rke2-config.d`
-- `cloudNoCloud` -> `/srv/host/cloudconfig-nocloud.d`
-- `share` -> `/srv/host/rke2lab-share.d`
-- `kubeconfig` -> `/srv/host/rke2lab-kube.d`
-- `daemonset` -> `/srv/host/k8s-daemonset.d`
-
-The contract also carries source-side expectations (host view paths) where needed.
-
-=== 1a) External source contract
-
-The worktree should be represented separately from runtime asset aliases.
-
-Canonical model:
-
-- authoritative repository worktree lives on the macOS workstation where the operator is editing the repo
-- that macOS workstation runs the NixOS VM via Tart/VZ
-- the NixOS guest consumes the worktree through a projection/share provided by that local virtualization boundary
-- runtime materializers may read from the projected worktree, but they do not own it and must not redefine it as a generated `/srv/host/*` directory
-
-In other words:
-
-- `/srv/host/*` paths are for owned runtime outputs and stable guest/host integration points
-- the worktree is an upstream source input originating from macOS
-
-That distinction prevents a category error where a mutable developer checkout is mistaken for a provisioned node asset.
-
-=== 2) Contribution API for layers
-
-Define a runtime contribution model where each layer contributes declaratively:
-
-- file assets (path, content/binary, mode/executable)
-- environment exports (key/value)
-- script hooks (well-known entrypoints)
-- systemd units/drop-ins
-- ordering/dependencies
-
-No layer should hardcode global `/srv/host/*` strings directly.
-
-=== 3) Script Interface Layer
-
-Add a dedicated layer for script integration concerns:
-
-- resolves script entrypoints
-- wires env-loading contract
-- owns bridge scripts and execution order
-- validates required aliases before execution
-
-Other domain layers contribute assets + intents, but do not directly orchestrate script invocation glue.
-
-=== 4) Materialization pipeline
-
-Create one materializer that:
-
-1. merges all layer contributions,
-2. validates collisions/conflicts,
-3. renders host assets to deterministic package layout,
-4. emits env-config from contract aliases,
-5. publishes metadata manifest (inventory + checksums).
-
-== Integration with existing code
-
-=== `controlplane`
-
-- Replace hardcoded guest mount strings in `IncusResourceBootstrap` with values from Runtime Filesystem Contract.
-- Keep current mount behavior, but sourced from contract constants/descriptor.
-- Treat the developer worktree as a separately described external source mount originating from the macOS host, not as a generated runtime asset alias.
-
-=== `manifests`
-
-- Move `Main.SHIM_ASSETS` + runtime path strings behind contribution/materializer API.
-- Runtime domain units (`RuntimeDomainRegistrar`) contribute payloads via API instead of direct path scattering.
-- Any worktree-first source resolution should point at the projected macOS-backed worktree contract, not an invented `/srv/host/*` worktree output.
-
-=== Scripts/systemd
-
-- Scripts consume resolved aliases from env contract (`RKE2LAB_*`) only.
-- Systemd units reference alias-derived paths generated by contract.
-- Where scripts need repository sources, they should receive an explicit source-path contract describing the projected worktree origin.
-
-== Invariants / guardrails
-
-- Path aliases are canonical and immutable per schema version.
-- No duplicate write target across layers unless explicitly merged.
-- Executable bit and line endings are normalized at materialization time.
-- Build fails on unresolved alias or conflicting contributions.
-- External source inputs, such as the projected macOS-backed worktree, are not treated as writable runtime asset targets.
-
-== Validation strategy
-
-- Unit tests: alias map, collision detection, deterministic inventory hash.
-- Integration tests: synthesized manifests include alias-consistent paths.
-- Packaging tests: controlplane embedded manifests match contract.
-- Runtime smoke: `/srv/host/*` mount points and installer scripts resolve from env aliases only.
-- Source-path tests: worktree consumers resolve the projected macOS-backed repository path without reclassifying it as a generated runtime asset.
-
-== Expected outcomes
-
-- No drift between mount paths, env config, and scripts.
-- No confusion between macOS-origin worktree inputs and NixOS-owned runtime outputs.
-- Clear ownership boundaries:
-  - layers contribute content/intent,
-  - runtime interface layer handles script orchestration,
-  - runtime contract owns generated filesystem view,
-  - source contract describes externally projected inputs such as the macOS-backed worktree.
-- Faster, safer refactors when path topology evolves.
+What survives on the manifests side is only the Kubernetes payload: the runtime
+domain units (contributed by `RuntimeDomainRegistrar`) synthesise k8s manifests
+delivered to the node's `server/manifests` tree — no `/srv/host` scattering, no
+runtime path aliases. The one host-mutating workflow that legitimately begins in
+a pod and completes on the node (the flox runtime install) is the *daemonset*
+delivery, documented separately in
+link:daemonset-host-assets-architecture.adoc[Daemonset Host Assets].
+====

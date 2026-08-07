@@ -521,10 +521,9 @@ flowchart TB
   asm -->|ambient FACET, merged under sown| refl
   refl -->|amended ManifestsRunbookInput| M
   subgraph scions["domain scions (broker.sow(RUNBOOK), in-container)"]
-    M["manifests<br/>facets → ManifestDomainPolicy (synth)<br/>+ PublishNodeEnvContributor RKE2LAB_MANIFESTS_PUBLISH_* section (publish)"]
+    M["manifests<br/>facets → ManifestDomainPolicy (synth-time domain filter)"]
   end
-  M -->|synth-time| tree["K8s + systemd + rke2-config tree"]
-  M -->|publish-time| ov["env-config ConfigMap (a synthesised env section)<br/>read by master install/ready scripts — NO out-of-band overlay"]
+  M -->|synth-time| tree["K8s manifest tree (+ rke2-config)"]
 
   classDef src fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef new fill:#ffd,stroke:#aa2,stroke-width:2px;
@@ -532,11 +531,9 @@ flowchart TB
   class asm,refl,M new;
 ....
 
-The two ends of the manifests policy (synth-time filter, publish-time env section) both derive
-from its `FACET` (the composite `Facets` mirroring the `rke2lab:manifests:` subtree), decoded
-in-container — dissolving the former host-side policy leak. The publish vars are a SYNTHESISED
-env section (the `PublishNodeEnvContributor`'s `RKE2LAB_MANIFESTS_PUBLISH_*` keys in the
-env-config ConfigMap the master scripts read), NOT an out-of-band overlay file.
+The manifests policy derives from its `FACET` (the composite `Facets` mirroring the
+`rke2lab:manifests:` subtree), decoded in-container — dissolving the former host-side policy
+leak. It drives the synth-time domain filter: which layers synthesise into the manifest tree.
 `fromSystemProperties()` (CLI) and `toEnvMap()` (seed) collapse into this one
 facet-translation. `Readiness`/`Preview` become the
 cluster/systemd FACETs of the SAME channel, reachable the day those owners contribute theirs —

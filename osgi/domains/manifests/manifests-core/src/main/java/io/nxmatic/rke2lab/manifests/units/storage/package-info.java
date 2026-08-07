@@ -5,8 +5,6 @@
  * <ul>
  *   <li>{@link io.nxmatic.rke2lab.manifests.units.storage.OpenebsZfsManifestsUnit} — OpenEBS ZFS
  *       local-PV storage.
- *   <li>{@link io.nxmatic.rke2lab.manifests.units.storage.StorageNodeEnvContributor} — storage
- *       slice of the node environment.
  * </ul>
  *
  * <p>Registered by {@link io.nxmatic.rke2lab.manifests.domain.StorageDomainRegistrar}.

@@ -67,7 +67,7 @@ services from the SCR registry. The pieces:
 * *felix.scr + embedded Felix* — `@Component` publishes, `@Reference` binds; the anti-cheat is a
   consumer left unsatisfied when its provider is absent.
 * *The 5 SPIs as `@Component`s, consumed intra-bundle via `@Reference`* — e.g.
-  `NodeEnvContributorRegistry` aggregates its 7 contributors through SCR.
+  `DefaultManifestSynthesisService` aggregates its domain registrars through SCR.
 * *API-extraction* — the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the
   DOMAIN, not the adapter); the host compiles against the port and fails fast at build; each port
   carries its own `@Version`, imported versioned.
@@ -134,7 +134,7 @@ This does not erase the old contract box — it types it. The `Require/Provide o
 flowchart TB
   subgraph OSGI["OSGi space — pure models"]
     spi["the 5 SPIs + impls (manifests, netplan)"]:::osgi
-    reg2["NodeEnvContributorRegistry (in-bundle)"]:::osgi
+    reg2["DefaultManifestSynthesisService (in-bundle)"]:::osgi
   end
   subgraph HOST["host space — actualises"]
     seam0["IncusResourceBootstrap.singleSpiProvider"]:::host
@@ -160,7 +160,7 @@ flowchart TB
     bapi["the ports: manifests-port / netplan-contract / systemd-port (osgi/, versioned)"]:::neu
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component (R2)"]:::neu
-    reg2["NodeEnvContributorRegistry @Component+@Reference (R3)"]:::neu
+    reg2["DefaultManifestSynthesisService @Component+@Reference (R3)"]:::neu
   end
   subgraph HOST["host space — actualises"]
     seam0["IncusResourceBootstrap"]:::host
@@ -208,7 +208,7 @@ flowchart TB
 . *The ports are NEW osgi/ boxes, not a rewrite.* They lift the boundary models OUT of the OSGi impl
   modules into `osgi/<domain>/<domain>-port`; the impls then depend on them (DIP), and the host compiles
   + host-loads them (system-exported). The host's current direct imports of impl classes
-  (`NodeEnvContributorRegistry`, `ManifestYaml`, `FloxRuntimeAssets`) are wrong-direction crossings the
+  (`DefaultManifestSynthesisService`, `ManifestYaml`, `FloxRuntimeAssets`) are wrong-direction crossings the
   atlas already flags — inverted at R4, not lifted into the port.
 
 . *Honest scope.* R1–R3 are proven on embedded Felix (surefire, no `-Plive`). R4's proof is a real
@@ -232,7 +232,7 @@ flowchart TB
     bapi["the ports + netplan.api now in netplan-contract"]:::osgi
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component"]:::osgi
-    reg2["NodeEnvContributorRegistry @Component+@Reference"]:::osgi
+    reg2["DefaultManifestSynthesisService @Component+@Reference"]:::osgi
     pc["manifests.internal.synthesis — PASSIVE grammar<br/>Phase / PhaseRunner / PhaseFailure (un-exported)"]:::osgi
     plan["BootPlanner → BootPlan (pure decision)"]:::osgi
   end
@@ -308,7 +308,7 @@ AND its additivity.
    `ServiceLoader` stays active.
 
 . *A registry aggregates its contributors by reference, not by ServiceLoader* — `[playable]` blue +
-.. GIVEN `NodeEnvContributorRegistry` loading 6 contributors via `ServiceLoader`
+.. GIVEN `DefaultManifestSynthesisService` loading its domain registrars via `ServiceLoader`
 .. WHEN R3 makes it `@Component` + `@Reference`
 .. THEN the registry aggregates its contributors through the service registry — AND the dual
    `forServiceLoader()` path is kept beside it (additive).
