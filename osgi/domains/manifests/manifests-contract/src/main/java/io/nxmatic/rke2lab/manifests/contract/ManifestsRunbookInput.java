@@ -29,8 +29,8 @@ import java.util.Optional;
  *       staging-view {@code manifestsRoot}), never from a yaml key. {@link Optional#empty()} when
  *       unamended (a bare {@code shape} probe, or a survey run) — the scion then materialises into
  *       a temp dir; absence is an empty {@link Optional}, never a blank string.
- *   <li>{@link Amendment#WORKTREE} — {@link #worktree} carries the cluster/node identity (see the
- *       {@code Worktree} note below).
+ *   <li>{@link Amendment#IDENTITY} — {@link #identity} carries the cluster/node identity (see the
+ *       {@code Identity} note below).
  * </ul>
  *
  * <p>Because the host only fills amendments by role, ALL the domain knowledge lives in the scion
@@ -44,7 +44,7 @@ import java.util.Optional;
 public record ManifestsRunbookInput(
     @Amendment(Amendment.FACET) Facets facets,
     @Amendment(Amendment.SOIL) Optional<String> materializationRoot,
-    @Amendment(Amendment.WORKTREE) Optional<Worktree> worktree) {
+    @Amendment(Amendment.IDENTITY) Optional<Identity> identity) {
 
   /**
    * The complete facet with every concern at its default — the operator's usual posture, debug off,
@@ -71,16 +71,16 @@ public record ManifestsRunbookInput(
   }
 
   /**
-   * The cluster/node identity the gardener hands over as the {@link Amendment#WORKTREE} amendment —
+   * The cluster/node identity the gardener hands over as the {@link Amendment#IDENTITY} amendment —
    * the same neutral provisioning-scalar role the incus scion reconstructs its topology from. The
    * manifests scion needs only the identity subset (cluster + node name); the synthesis derives the
    * whole network topology from the cluster name (a pure function — see {@code
-   * ClusterNetworkBlueprint.deriveRecipeModel}). A blind subtree mirroring the WORKTREE schema,
-   * naming no other domain's type; the host's extra worktree scalars are ignored on decode. EMPTY =
+   * ClusterNetworkBlueprint.deriveRecipeModel}). A blind subtree mirroring the identity schema,
+   * naming no other domain's type; the host's extra identity scalars are ignored on decode. EMPTY =
    * unamended (a bare survey / the direct CLI call) — the synthesis falls back to an unknown
    * identity.
    */
-  public record Worktree(String clusterName, String nodeName) {}
+  public record Identity(String clusterName, String nodeName) {}
 
   /**
    * The {@code manifests.publish} concern: which domain manifest layers the master publishes into

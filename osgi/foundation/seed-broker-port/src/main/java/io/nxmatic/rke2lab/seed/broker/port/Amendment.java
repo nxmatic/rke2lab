@@ -40,12 +40,12 @@ public @interface Amendment {
   String FACET = "facet";
 
   /**
-   * The worktree provisioning coordinates — the flat scalars (worktree root, cluster, node, NFS
+   * The identity provisioning coordinates — the flat scalars (identity root, cluster, node, NFS
    * automount) the host holds and a domain needs to RECONSTRUCT the provisioning topology in-world.
    * The host fills it from its {@code BootstrapConfig}; the scion computes its own paths from it (§
    * host-cellar-realisation, the whole topology is computed OSGi-side).
    */
-  String WORKTREE = "worktree";
+  String IDENTITY = "identity";
 
   /**
    * The seed-image build coordinates — the flat scalars (image alias, builder binary/host, shared

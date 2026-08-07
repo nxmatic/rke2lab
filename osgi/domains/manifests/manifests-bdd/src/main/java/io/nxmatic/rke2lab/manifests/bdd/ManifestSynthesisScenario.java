@@ -227,7 +227,7 @@ public class ManifestSynthesisScenario
       // from it to every unit. Absent (a bare survey / no worktree amended) → the request keeps its
       // unknown identity and the synthesis renders a clearly-blank cluster.
       facet
-          .worktree()
+          .identity()
           .ifPresent(
               w ->
                   builder.bootstrapIdentity(

@@ -463,7 +463,7 @@ public class IncusProvisionScenario
       // provisioning identity this scion reads from its own FACET. The manifests synthesis derives
       // addressing for THIS cluster from the handed-over name (no hardcoded literal); the extra
       // facet scalars it does not need are ignored on decode. Absent = a bare survey.
-      facet.ifPresent(f -> roleValues.set(Amendment.WORKTREE, codec.decode(codec.encode(f))));
+      facet.ifPresent(f -> roleValues.set(Amendment.IDENTITY, codec.decode(codec.encode(f))));
       final SeedEnvelope amended =
           broker
               .orElseThrow()

@@ -44,6 +44,10 @@ public record OperatorPkiMaterial(String clientCertPem, String clientKeyPem, Str
     final String ca = b64.encodeToString(caCertPem.getBytes(StandardCharsets.UTF_8));
     final String cert = b64.encodeToString(clientCertPem.getBytes(StandardCharsets.UTF_8));
     final String key = b64.encodeToString(clientKeyPem.getBytes(StandardCharsets.UTF_8));
+    // The user name is <cluster>-admin, unique per cluster: kubeconfig users/clusters/contexts are
+    // global lists merged BY NAME, so a shared "rke2lab-admin" would collapse across clusters and
+    // both contexts would point at one (wrong) user cert.
+    final String user = clusterName + "-admin";
     return """
         apiVersion: v1
         kind: Config
@@ -53,7 +57,7 @@ public record OperatorPkiMaterial(String clientCertPem, String clientKeyPem, Str
               server: %s
               certificate-authority-data: %s
         users:
-          - name: rke2lab-admin
+          - name: %s
             user:
               client-certificate-data: %s
               client-key-data: %s
@@ -61,9 +65,10 @@ public record OperatorPkiMaterial(String clientCertPem, String clientKeyPem, Str
           - name: %s
             context:
               cluster: %s
-              user: rke2lab-admin
+              user: %s
         current-context: %s
         """
-        .formatted(clusterName, server, ca, cert, key, clusterName, clusterName, clusterName);
+        .formatted(
+            clusterName, server, ca, user, cert, key, clusterName, clusterName, user, clusterName);
   }
 }
