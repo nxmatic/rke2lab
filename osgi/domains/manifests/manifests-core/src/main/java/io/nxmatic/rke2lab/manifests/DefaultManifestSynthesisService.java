@@ -19,6 +19,7 @@ import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdBundleConfigMaps;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer;
+import io.nxmatic.rke2lab.ndh.contract.NdhKeystoreReader;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdDropIn;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdTarget;
@@ -96,6 +97,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
    */
   @Reference private SshToAgeConverter sshToAgeConverter;
 
+  @Reference private NdhKeystoreReader ndhKeystore;
+
   static final Set<String> SCRIPT_DATA_SUFFIXES =
       Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
 
@@ -117,7 +120,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // the ssh-to-age edge) BEFORE binding the context, so units only render — synthesis takes its
     // prerequisites, it does not fetch them.
     final Optional<SopsAgeMaterial> sopsAgeMaterial =
-        new SopsAgeMaterialResolver(sshToAgeConverter).resolve();
+        new SopsAgeMaterialResolver(sshToAgeConverter, ndhKeystore).resolve();
 
     final var contextScope = ManifestSynthesisContext.of(request, sopsAgeMaterial).bind();
     try (contextScope) {

@@ -198,6 +198,18 @@
         <artifactId>sops-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
+      <!-- The ndh domain: the single reader of the operator key inventory (.ndh-ssh.d/keys.yaml),
+           consumed by manifests-core + cluster-pki-core. -->
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>ndh-contract</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>ndh-core</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>bench-cellar-api</artifactId>

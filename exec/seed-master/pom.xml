@@ -50,6 +50,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
     </dependency>
+    <!-- The cluster-pki dual-realm contract: the host GROW beat fetches ClusterCaBundle +
+         ClusterAgeKey (via ClusterPkiCoordinate) and poses them on the instance's devlxd config —
+         compile scope, the flat host copy the seal scion's OSGi copy is the twin of. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>cluster-pki-contract</artifactId>
+    </dependency>
     <!-- The Pulumi actualiser of the ingress flow: the run delegates the instance grow to
          InstanceGrow here, filling an IngressConfig from its BootstrapConfig — no com.pulumi.incus in
          seed-master itself any more. -->
@@ -157,6 +164,15 @@
       <artifactId>ssh-to-age-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The sops edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime. runtime
+         scope — seed-master never compiles against the edge impl; the cluster-pki seal scion resolves
+         SopsEncryptor from the registry (mandatory @OsgiService). MUST be embedded or the seal never
+         seals. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>sops-edge</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The dbus-systemd edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime,
          NOT flattened into the uber-jar. runtime scope — seed-master never compiles against the edge
          impl; the readiness pipeline resolves SystemdRuntimeProbe from the registry (awaitService).
@@ -219,6 +235,37 @@
       <artifactId>worktree-core</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- ndh-core: the @Component DefaultNdhKeystoreReader publishing NdhKeystoreReader — the single
+         reader of the operator key inventory. Both manifests-core (SopsAgeMaterialResolver, mandatory
+         @Reference) and the cluster-pki seal scion (@OsgiService) resolve it from the registry, so
+         like netplan-core/worktree-core the impl bundle is NOT transitive and must be staged here.
+         runtime scope; embedded INTACT under META-INF/bundles, its SCR component publishing the
+         service. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>ndh-core</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- BouncyCastle: the CA-hierarchy provider cluster-pki-core imports (org.bouncycastle.*). It is
+         provided-scope THERE (not transitive), so the assembler declares it here — a first-class
+         OSGi bundle (1.85 BSN + headers) staged INTACT and installed by OsgiRuntime, satisfying
+         cluster-pki-core's imports so the bundle resolves. runtime scope; version from the
+         bc-jdk18on-bom. Without it the framework fails to boot (cluster-pki-core unresolved). -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcutil-jdk18on</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The domain SCION bundles (*-bdd): each carries the @Component SeedHandler that GROWS its
          runbook coordinate — WorktreeRunbookHandler serves RunbookCoordinate("worktree") (the first
          crossing), BboxRunbookHandler serves RunbookCoordinate("bbox"), and so on for incus
@@ -256,6 +303,11 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>cluster-pki-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT

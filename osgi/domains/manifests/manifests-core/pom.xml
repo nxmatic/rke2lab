@@ -94,6 +94,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
+    <!-- The ndh keystore reader seam: SopsAgeMaterialResolver reads the rke2-cluster SSH key through
+         it (the single reader, realised by ndh-core), no longer navigating keys.yaml itself. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>ndh-contract</artifactId>
+    </dependency>
     <!-- systemd's cdk8s rendering of its units (io.nxmatic.rke2lab.systemd.cdk8s), contributed as a
          fragment of the manifests-cdk8s carrier. manifests-core imports that package to drive the
          systemd-unit synthesis. -->

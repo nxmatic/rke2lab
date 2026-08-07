@@ -24,5 +24,6 @@
   <modules>
     <module>cluster-pki-contract</module>
     <module>cluster-pki-core</module>
+    <module>cluster-pki-bdd</module>
   </modules>
 </project>

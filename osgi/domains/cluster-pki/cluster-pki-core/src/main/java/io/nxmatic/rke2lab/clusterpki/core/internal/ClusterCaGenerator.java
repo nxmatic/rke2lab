@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.clusterpki.core;
+package io.nxmatic.rke2lab.clusterpki.core.internal;
 
 import java.io.StringReader;
 import java.io.StringWriter;

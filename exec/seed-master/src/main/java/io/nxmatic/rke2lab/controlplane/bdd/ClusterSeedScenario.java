@@ -16,6 +16,9 @@ import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
+import io.nxmatic.rke2lab.clusterpki.contract.ClusterAgeKey;
+import io.nxmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
+import io.nxmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
 import io.nxmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
@@ -42,6 +45,7 @@ import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -160,6 +164,8 @@ public class ClusterSeedScenario
         .the_parcels_state_is_fetched()
         .and()
         .the_network_reservations_are_settled(hostScenario, hostTree)
+        .and()
+        .the_cluster_ca_is_sealed(hostScenario, hostTree)
         .and()
         .the_instance_is_provisioned(hostScenario, hostTree)
         .and()
@@ -400,6 +406,21 @@ public class ClusterSeedScenario
     }
 
     @NestedSteps
+    @As("the cluster CA is sealed")
+    public When the_cluster_ca_is_sealed(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // The cluster-pki seal scion mints the deterministic CA ONCE per cluster (idempotent on a
+      // cellar hit, so the CA is stable across re-grows) and files it in the cellar for the GROW to
+      // pose over devlxd. Sown BEFORE provisioning so the PKI exists when the instance grows. No
+      // amendment: the scion reads keys.yaml / .sops.yaml in-container, so the sow carries an empty
+      // trigger (Gardening.sow skips the amend door — no reflector needed).
+      sowAndGraft
+          .sowing("cluster-pki", gardening, hostScenario, hostTree)
+          .the_scion_is_sown_and_grafted("the cluster CA is sealed");
+      return self();
+    }
+
+    @NestedSteps
     @As("the instance is provisioned")
     public When the_instance_is_provisioned(
         @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
@@ -468,9 +489,23 @@ public class ClusterSeedScenario
               config.profileName(),
               config.lanBridgeParent(),
               config.vmnetNetworkName());
+      // The cluster PKI the seal scion filed earlier this run: the sops CA bundle (PLAIN) and the
+      // age identity (SEALED — the transactional cellar reveals it on fetch). Pose both on the
+      // instance's devlxd config so the guest's sops-nix lays the CA set before rke2-server. Read
+      // through the dual-realm ClusterPkiCoordinate (read-your-writes on the run's overlay, else
+      // the
+      // durable backend a prior grow drained). Absent only on a run where nothing sealed — then the
+      // node falls back to a self-signed CA (rke2lab-sops-fetch is tolerant).
+      final Map<String, String> clusterPki = new LinkedHashMap<>();
+      workingCellar
+          .fetch(parcel, ClusterPkiCoordinate.CLUSTER_CA_BUNDLE, ClusterCaBundle.class)
+          .ifPresent(bundle -> clusterPki.put("user.rke2lab.cluster-ca-bundle", bundle.sops()));
+      workingCellar
+          .fetch(parcel, ClusterPkiCoordinate.CLUSTER_AGE_KEY, ClusterAgeKey.class)
+          .ifPresent(ageKey -> clusterPki.put("user.rke2lab.sops-age-key", ageKey.identity()));
       workingCellar
           .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
-          .ifPresent(plan -> new InstanceGrow(ingress, line -> {}).grow(plan));
+          .ifPresent(plan -> new InstanceGrow(ingress, line -> {}).grow(plan, clusterPki));
       return self();
     }
 

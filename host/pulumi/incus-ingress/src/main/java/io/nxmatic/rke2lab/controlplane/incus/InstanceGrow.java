@@ -60,11 +60,22 @@ public final class InstanceGrow {
 
   /** Declare the whole instance graph from the plan; the Pulumi engine schedules it. */
   public void grow(InstanceGrowPlan plan) {
+    grow(plan, Map.of());
+  }
+
+  /**
+   * Grow with EXTRA devlxd config keys merged onto the instance — the host GROW poses the cluster
+   * PKI the seal scion filed (the sops-sealed CA bundle + the age identity, under {@code
+   * user.rke2lab.cluster-ca-bundle} / {@code user.rke2lab.sops-age-key}) alongside the per-node
+   * identity, all read by the guest over devlxd. The values are opaque to the GROW — the scenario
+   * fetched + revealed them and hands them here as a flat {@code key -> value} map.
+   */
+  public void grow(InstanceGrowPlan plan, Map<String, String> extraDevlxdConfig) {
     final Project project = ensureProject();
     ensureNetwork(config.vmnetNetworkName(), project, plan.network());
     final Output<String> profileName = ensureProfile(project);
     final Output<String> imageFingerprint = ensureImage(plan.image(), project);
-    createInstance(plan, project, profileName, imageFingerprint);
+    createInstance(plan, project, profileName, imageFingerprint, extraDevlxdConfig);
   }
 
   private Project ensureProject() {
@@ -207,7 +218,8 @@ public final class InstanceGrow {
       InstanceGrowPlan plan,
       Resource projectDependency,
       Output<String> profileName,
-      Output<String> imageFingerprint) {
+      Output<String> imageFingerprint,
+      Map<String, String> extraDevlxdConfig) {
     final Map<String, String> instanceConfig = new LinkedHashMap<>();
     instanceConfig.put(
         "raw.lxc",
@@ -232,6 +244,9 @@ public final class InstanceGrow {
     instanceConfig.put("user.rke2lab.node-hostname", identity.nodeHostname());
     instanceConfig.put("user.rke2lab.node-kind", identity.nodeKind());
     instanceConfig.put("user.rke2lab.node-id", String.valueOf(identity.nodeId()));
+    // The host GROW poses whatever extra devlxd keys the caller resolved — the cluster PKI the seal
+    // scion filed (the sops CA bundle + the age identity). Opaque here: the scenario fetched them.
+    instanceConfig.putAll(extraDevlxdConfig);
 
     new Instance(
         "seed-instance",

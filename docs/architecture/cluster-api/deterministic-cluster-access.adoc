@@ -57,6 +57,11 @@ untouched. The CA hierarchy is pure Java (no shell); the only external tool cont
 `sops-edge` (sealing the bundle the node's sops-nix decrypts) and the ssh-to-age edge (the cluster
 age identity), both reused, not reinvented.
 
+The seal's orchestration is `ClusterSeal` (its one-act output a `SealedClusterPki` — the sealed
+bundle + the age identity); the operator key inventory is read through the ndh domain's
+`NdhKeystoreReader` seam (the single reader of `.ndh-ssh.d/keys.yaml`, shared with manifests so the
+keys.yaml navigation is never duplicated).
+
 The sops-encrypted cluster-CA bundle and the admin kubeconfig are *projections* — generated
 per-cluster state, not source — and they **never enter the node image**. The image stays a single
 homogeneous artifact: it bakes only the sops *declaration* (which secrets exist, their target paths

@@ -24,6 +24,7 @@
     <module>unitrepo</module>
     <module>ssh-to-age-edge</module>
     <module>sops-edge</module>
+    <module>ndh</module>
     <module>incus</module>
     <module>cluster-pki</module>
     <module>bbox</module>

@@ -8,6 +8,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.manifests.contract.SshToAgeConverter;
+import io.nxmatic.rke2lab.ndh.contract.NdhKeystoreReader;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
@@ -101,6 +102,10 @@ public class ManifestSynthesisScenarioInContainerTest {
     registrations.add(
         context.registerService(
             SshToAgeConverter.class, unreachableConverter(), new Hashtable<>()));
+    // The synthesis component now also binds NdhKeystoreReader (mandatory) — seed a stub reporting
+    // NO key-store, so SopsAgeMaterialResolver fail-softs exactly as before (the test seeds none).
+    registrations.add(
+        context.registerService(NdhKeystoreReader.class, absentKeystore(), new Hashtable<>()));
     if (gate != null) {
       registrations.add(context.registerService(RunGate.class, gate, new Hashtable<>()));
     }
@@ -132,6 +137,39 @@ public class ManifestSynthesisScenarioInContainerTest {
     return sshPrivateKey -> {
       throw new AssertionError(
           "the in-container synthesis reached the ssh-to-age edge, but the test seeds no key-store");
+    };
+  }
+
+  /**
+   * A key-store reader reporting ABSENCE — the test seeds no ndh inventory, so {@code
+   * SopsAgeMaterialResolver} fail-softs on {@code present() == false} and never reaches an
+   * accessor. The accessors throw for the same reason {@link #unreachableConverter()} does:
+   * reaching one is a defect the test must surface, not fabricate around.
+   */
+  private static NdhKeystoreReader absentKeystore() {
+    return new NdhKeystoreReader() {
+      @Override
+      public boolean present() {
+        return false;
+      }
+
+      @Override
+      public String authorityCert(String authority) {
+        throw new AssertionError(
+            "the in-container synthesis read the ndh key-store, but none seeded");
+      }
+
+      @Override
+      public String authorityPrivate(String authority) {
+        throw new AssertionError(
+            "the in-container synthesis read the ndh key-store, but none seeded");
+      }
+
+      @Override
+      public String sshPrivate(String keyName) {
+        throw new AssertionError(
+            "the in-container synthesis read the ndh key-store, but none seeded");
+      }
     };
   }
 }

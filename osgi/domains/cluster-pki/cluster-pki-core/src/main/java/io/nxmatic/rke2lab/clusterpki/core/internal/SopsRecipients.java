@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.clusterpki.core;
+package io.nxmatic.rke2lab.clusterpki.core.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

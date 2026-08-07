@@ -38,6 +38,14 @@
       <artifactId>manifests-contract</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- NdhKeystoreReader — the synthesis now binds it (mandatory); the passenger registers an
+         absent-keystore stub. provided: the interface rides the staged ndh-contract bundle (pulled
+         into the bench by manifests-core's import), the stub is the only impl the test publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>ndh-contract</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <!-- The frontier vocabulary: the RunGate the passenger mocks + registers, the SeedEnvelope the
          trigger rides, the codec that reads the harvested runbook. -->
     <dependency>
