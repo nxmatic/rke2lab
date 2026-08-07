@@ -282252,6 +282252,10 @@
         "nixpkgs": [
           "flake-commons",
           "nixpkgs"
+        ],
+        "sops-nix": [
+          "flake-commons",
+          "sops-nix"
         ]
       }
     },

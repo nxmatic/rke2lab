@@ -25,6 +25,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:architecture/bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster/infrastructure identity flows through synthesis
 * link:architecture/bootstrap/provisioning-slice-architecture.adoc[The incus bootstrap of master] - the Pulumi graph + the materialized targets + the checksum→reload glue, and the current transposition gap
 * link:architecture/osgi/host-cellar-realisation-spec.adoc[Host Cellar realisation] - the host tree the instance mounts: staging slots, promotion, drift
+* link:architecture/cluster-api/deterministic-cluster-access.adoc[Deterministic cluster access] (🎯 target vision) - the operator holds a valid, natively-trusted admin kubeconfig the instant a cluster is grown: a pre-seeded PKI rooted in the ndh `mammoth-skate-tls` root, the cluster-CA bundle a sops view onto ndh key material, delivered to the node over the devlxd secrets membrane. Retires the `/srv/host/kubeconfig` mount + `kubectl` shelling.
 
 === Policies & Configuration
 

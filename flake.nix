@@ -33,6 +33,13 @@
     # locks (github:flox/flox), via the aggregator so it stays in sync with nix-darwin-home.
     flox.follows = "flake-commons/flox";
 
+    # sops-nix for per-node secret decryption on the substrate: the age identity is delivered at
+    # boot over devlxd (never baked), and sops-install-secrets decrypts the cluster-CA bundle +
+    # tokens into /run. Followed through flake-commons so the version stays in lock-step with
+    # nix-darwin-home. Only the flake input and its `nixosModules.sops` are consumed here — the
+    # nix-darwin-home sops *module* is NOT imported (that would breach the invariant above).
+    sops-nix.follows = "flake-commons/sops-nix";
+
     # The flox runtime flake owns the NRI plugin + per-workload package
     # definitions. We re-export its outputs here so the deployable artifacts
     # build through this top-level entry point (and the aarch64-linux NRI plugin
@@ -44,7 +51,7 @@
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox, sops-nix, ... }:
     let
       # Enforce the INVARIANT above mechanically, not just by comment: fail eval
       # (any `nix build`/`nix eval` of this flake) with a printed diagnostic if
@@ -511,7 +518,8 @@
         specialArgs = { inherit flox flox-runtime; };
         modules = [
           "${nixpkgs}/nixos/modules/virtualisation/lxc-container.nix"
-          ./nixos/node-base.nix
+          sops-nix.nixosModules.sops
+          ./nixos
         ];
       };
 

@@ -1,0 +1,140 @@
+= Deterministic cluster access — a pre-seeded PKI the operator already trusts
+:toc: macro
+:toclevels: 3
+
+toc::[]
+
+== Overview — the result we want
+
+The seed-master must reach the live cluster's kube-apiserver to verify readiness. The result this
+document fixes as the target: **the operator's machine holds a valid admin kubeconfig for a cluster
+the instant that cluster is grown — built entirely on the host, from material the operator already
+trusts, and stable across destroy/recreate of the node.** No runtime fetch, no `kubectl` shelling,
+no host-mount channel, no per-node CA churn.
+
+Concretely, the end state has three properties, and each is a departure from what came before:
+
+[cols="1,2,2",options="header"]
+|===
+| Property | What it means | What it replaces
+| **Deterministic** | the kubeconfig is a pure function of the node's deterministic mDNS name (`<cluster>-<node>.local`, derived from the blueprint) and the operator's root of trust (the CA) — computable before the node answers | fetching rke2's self-written `rke2.yaml` and rewriting its `server:` at runtime
+| **Natively trusted** | the kubeconfig's CA is the ndh `mammoth-skate-tls` root, already installed in every client's system trust store — TLS validates with no custom CA bundle and no `--insecure-skip-tls-verify` | an rke2-generated self-signed CA the operator has to carry and skip-verify around
+| **Stable across re-grows** | destroy master, grow it again, the SAME kubeconfig still works — the CA is pre-seeded and constant, not minted fresh on each node's first boot | a new self-signed CA per node → the kubeconfig invalidated on every re-grow
+|===
+
+This dissolves two long-standing defects at once: the cluster-readiness probe **shelling `kubectl`**
+over a **`/srv/host/kubeconfig` path that died with the `/srv/host` teardown**.
+
+== The one idea — own the root, pre-seed the intermediates
+
+RKE2 generates its own CA hierarchy on first boot. But it also honours a *bring-your-own-CA*: if the
+CA set is already present under `/var/lib/rancher/rke2/server/tls/` when the first server starts, rke2
+skips generation and issues every leaf (apiserver, kubelet, etcd, service-account) from the provided
+CAs. We exploit that to make the operator's existing root the cluster's root.
+
+- **Root of trust: `mammoth-skate-tls`.** The ndh SSH/TLS key inventory (`.ndh-ssh.d/keys.yaml`)
+  already carries a dedicated x509 TLS root — `usage: [tls-authority]`, a self-signed `ca_crt` — whose
+  certificate the ndh Nix modules install into every client's system trust store. It signs the
+  headscale HTTPS leaf today; it becomes the root of the cluster's CA chain tomorrow.
+- **rke2's intermediates, rooted on it.** The cluster's `server-ca`, `client-ca`,
+  `request-header-ca`, `etcd/{peer,server}-ca` (+ `service.key`) are generated *once per cluster*,
+  signed by `mammoth-skate-tls`. The root's private key never leaves the operator's machine; only the
+  intermediates travel. Because the chain terminates at a root already in every trust store, anything
+  the cluster serves or that we mint from it validates natively.
+- **The admin kubeconfig is a host-side derivation.** We hold `client-ca`, so we mint the admin client
+  certificate on the host; the endpoint is the node's deterministic mDNS name (`<cluster>-<node>.local`,
+  avahi-advertised on the LAN — the lan0 IP is router-DHCP and not stable, so the NAME is the stable
+  endpoint); the CA is the trusted root.
+  The kubeconfig is assembled on the Mac with nothing fetched from the node.
+
+Nothing here extends the ndh certificate pipeline (which mints only self-signed *roots* and
+end-entity *leaves*, never intermediates): the cluster CA set is produced by rke2's own
+`generate-custom-ca-certs.sh` with our root, and lives rke2lab-side as a **sops view onto the ndh key
+material** — encrypted for the operator and for the cluster age recipient (`age1k0tc4…`, derived from
+the `rke2-cluster` SSH key), `keys.yaml` itself untouched.
+
+The sops-encrypted cluster-CA bundle and the admin kubeconfig are *projections* — generated
+per-cluster state, not source — and they **never enter the node image**. The image stays a single
+homogeneous artifact: it bakes only the sops *declaration* (which secrets exist, their target paths
+and modes), while the per-cluster *data* — the encrypted bundle — arrives at runtime. sops-nix carries
+exactly this split: `validateSopsFiles = false` lets the declared `sopsFile` be a runtime path
+(`/run/rke2lab/cluster-ca-bundle.yaml`, delivered over devlxd beside the age key), and
+`sops-install-secrets` decrypts it on the node and places each CA file before `rke2-server`. No PKI is
+frozen into an immutable image, and no per-cluster image is built.
+
+The projections still have to *persist* — the CA is stable across re-grows (destroy master, grow it
+again, same CA), so the minted bundle is kept, not re-generated. That persistence is the **cellar**:
+the `OpaqueCellar` seam the seed already owns (`cellar.store` at harvest, `cellar.fetch` at the next
+grow). It is deliberately **not a git branch** — nothing reads the bundle *from* git: not Flux (it is
+no manifest), not nix (`validateSopsFiles = false` keeps it out of the eval), not a checkout. The only
+consumers are host-side at runtime — the grow (which projects it into the instance's devlxd config)
+and the readiness probe (which reads the kubeconfig). So the cellar seam suffices; the gitignored,
+per-checkout `.local.d` is retired as a home for anything that must outlive a working tree.
+
+== The target architecture
+
+[mermaid]
+----
+flowchart TB
+  subgraph operator["Operator machine - host of trust"]
+    root["mammoth-skate-tls root CA<br/>(.ndh-ssh.d/keys.yaml, sops)<br/>private key never leaves here"]
+    ceremony["cluster-CA ceremony<br/>(rke2 generate-custom-ca-certs.sh,<br/>rooted on the ndh root)"]
+    bundle["cluster-CA bundle<br/>(server/client/request-header/etcd CAs<br/>plus service.key), sops-encrypted view"]
+    kc["admin kubeconfig<br/>server = mDNS name<br/>CA = ndh root (already trusted)<br/>client cert minted from client-ca"]
+    probe["Fabric8ClusterContact<br/>readyz plus rollout via Java client"]
+    trust["system trust store<br/>(ndh root installed)"]
+    root --> ceremony --> bundle
+    bundle --> kc
+    root -.installed.-> trust
+    kc --> probe
+    trust -.validates.-> probe
+  end
+  subgraph guest["RKE2 node - incus guest"]
+    age["sops age key<br/>(devlxd to /run, via the identity oneshot)"]
+    seed["server/tls seeding<br/>(intermediates in place BEFORE rke2-server)"]
+    tlssan["tls-san drop-in<br/>(mDNS name, per-node)"]
+    rke2["rke2-server<br/>issues all leaves from the seeded CAs"]
+    age --> seed --> rke2
+    tlssan --> rke2
+  end
+  bundle -->|"sops-encrypted, devlxd-delivered"| age
+  probe -->|"https, natively trusted"| rke2
+----
+
+The secret channel to the node is the same membrane the per-node *identity* already uses: **devlxd**.
+The host poses the cluster age key on the incus instance; the identity oneshot (which already reads
+`user.rke2lab.*` over `/dev/incus/sock`) writes it to `/run` so `sops-nix` can decrypt the bundle and
+place the CA set — no `/srv/host`, no mount that an out-of-band remote grow can't resolve. `sops-nix`
+is wired directly into the node image (it is a plain flake input; the ndh nixos sops *module* is not
+imported — that would violate the invariant that nix-darwin-home is never a flake input of rke2lab).
+
+== Anti-patterns this retires
+
+* ❌ **Shelling `kubectl`** from the readiness probe (a `ProcessBuilder` per contact, a CLI on the
+  host's PATH) → ✅ a Java kube client (fabric8) reading a real kubeconfig object.
+* ❌ **A host-mount kubeconfig channel** (`/srv/host/kubeconfig`, dead since the `/srv/host` teardown)
+  → ✅ a host-side derivation that needs nothing mounted from the node.
+* ❌ **Fetching + rewriting rke2's runtime kubeconfig** (discover the address, patch `127.0.0.1`,
+  carry a self-signed CA, skip-verify) → ✅ the endpoint is the node's deterministic mDNS name, the CA
+  is the trusted root, the whole file is deterministic.
+* ❌ **A fresh self-signed cluster CA per node** (kubeconfig invalidated on every re-grow) → ✅ one
+  pre-seeded CA, constant across the destroy/recreate loop.
+* ❌ **`kubeconfig != null` as the "published" check** (always true on a hardcoded path) → ✅ the phase
+  checks the file actually exists at the published, config-derived path.
+* ❌ **Baking the PKI into the node image** (a secret frozen in an immutable, shared artifact; forces a
+  per-cluster image) → ✅ a single homogeneous image bakes only the sops *declaration*; the encrypted
+  bundle is delivered at runtime over devlxd (`validateSopsFiles = false`, runtime `sopsFile`).
+* ❌ **Projections in the gitignored `.local.d`** (per-checkout, lost on re-checkout) → ✅ they persist
+  in the `OpaqueCellar` seam the seed owns (`cellar.store`/`cellar.fetch`) — durable and regenerable,
+  and read only host-side, so no git branch is needed.
+
+== Related documentation
+
+* link:../atlas/cellar-secrets.adoc[Cellar secrets & the clean/smudge filter] — the secrets subsystem
+  this rides on; the cluster age recipient and the sops channel are of the same family.
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] — the devlxd
+  identity membrane the age-key delivery reuses.
+* link:cluster-api-bootstrap-requirements.adoc[Cluster API bootstrap requirements] — what the reachable
+  cluster is expected to carry once access is established.
+* link:../integration-atlas.adoc[Integration Atlas] — the living integration view; this target sits on
+  the secrets + cluster-readiness value threads.

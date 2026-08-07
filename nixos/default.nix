@@ -1,0 +1,29 @@
+# rke2lab node-base — the homogeneous NixOS substrate every RKE2 node shares. This is the aggregator:
+# each concern is a sibling module pulled in via `imports`; the flake imports the directory as
+# `./nixos`. Role (server/agent) and per-node identity (node-ip, hostname, token) are layered on top;
+# this is what is common to all nodes. See docs/architecture/nixos-substrate/target-vision.adoc.
+#
+# Iteration 1 (path B): stock rke2 server, dual-stack, flox baked. Proven end-to-end by the spike
+# (image builds, boots in Incus, rke2-server + containerd come up). Next iterations add the
+# flox-nri-plugin (containerd NRI, from the runtime/flox sub-flake), cilium, and the zfs snapshotter.
+{ lib, ... }:
+{
+  imports = [
+    ./rke2.nix # rke2-server + dual-stack + rke2lab.target
+    ./identity.nix # per-node identity from devlxd (node.env + hostname)
+    ./sops.nix # sops-nix: PKI secret declaration + runtime devlxd delivery
+    ./containerd.nix # flox NRI runtime + zfs snapshotter + dataset mount
+    ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node
+    ./nix-env.nix # nix.settings + the node toolbox on PATH
+  ];
+
+  system.stateVersion = "24.11";
+
+  # Per-node identity is NOT baked: the image is homogeneous. rke2lab-identity.service (./identity.nix)
+  # reads the incus instance's user.rke2lab.node-* keys over devlxd at boot and sets the transient
+  # hostname to <cluster>-<node>. Empty here means "NixOS manages no hostname" — the service owns it.
+  networking.hostName = lib.mkForce "";
+
+  # Lab node: no host firewall in the way of the rke2 control-plane / cluster ports.
+  networking.firewall.enable = false;
+}

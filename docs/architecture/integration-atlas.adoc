@@ -325,6 +325,11 @@ monotone before/after figures.
 
 == Related documentation
 
+* link:cluster-api/deterministic-cluster-access.adoc[Deterministic cluster access] — the target where
+  the operator holds a valid, natively-trusted admin kubeconfig the instant a cluster is grown: a
+  pre-seeded PKI rooted in the ndh `mammoth-skate-tls` root, the cluster-CA bundle a sops view onto the
+  ndh key material, delivered to the node over the devlxd secrets membrane. Sits on the secrets +
+  cluster-readiness value threads.
 * link:designer-runbook.adoc[The designer's runbook] — the live render of THIS atlas's design state;
   it pays the re-entrance debt that this atlas, being hand-written, currently carries (its playable
   half is replayed from the code so it cannot drift).
