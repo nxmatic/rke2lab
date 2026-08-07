@@ -17,7 +17,9 @@ import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SurveyInert;
@@ -28,7 +30,9 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The cluster-readiness checkpoint, a production jGiven scenario told in the CLUSTER DOMAIN's own
@@ -50,9 +54,28 @@ public class ClusterReadinessScenario
         ClusterReadinessScenario.Given,
         ClusterReadinessScenario.When,
         ClusterReadinessScenario.Then>
-    implements ConsultationSource, ScenarioPlayer.Playable, SurveyInert {
+    implements ConsultationSource,
+        ScenarioPlayer.Playable,
+        SurveyInert,
+        InputReceiver<ReadinessInput> {
+
+  /**
+   * The inbound channel {@code ClusterRunbookHandler.seedFrom} seeds the reconciled {@link
+   * ReadinessInput} through and this scenario receives (via {@link InputReceiver}) — single-sourced
+   * here, referenced by the handler for the seeding end ({@code INPUT.into(input)}). Registered as
+   * a {@link RegisterExtension} so its post-processor fires before the body reads {@link #input}.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<ReadinessInput> INPUT =
+      new ScenarioInputSeed<>(ReadinessInput.class, "cluster-runbook-input");
 
   private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The activation input the front-door seeds before the body (InputReceiver) — it carries WHERE
+  // the operator kubeconfig is published (the FACET the host contributes). @MonotonicNonNull: null
+  // until receiveInput sets it (before the body) — and legitimately null in an offline play (no
+  // input seeded), where the marker path suffices because the mock contact ignores it.
+  @MonotonicNonNull private ReadinessInput input;
 
   // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The contact
   // moved to the When stage (@OsgiService there, filled by the stage creator); the doctor stays
@@ -73,6 +96,11 @@ public class ClusterReadinessScenario
   @Override
   public List<SeedEnvelope> consultations() {
     return consultations;
+  }
+
+  @Override
+  public void receiveInput(ReadinessInput input) {
+    this.input = input;
   }
 
   @Test
@@ -129,13 +157,19 @@ public class ClusterReadinessScenario
   }
 
   /**
-   * The kubeconfig the checkpoint reads the cluster through. A published path in live; in the
-   * offline scenario the mock contact ignores it, so a fixed marker suffices to satisfy the
-   * kubeconfig-published phase.
+   * The kubeconfig the checkpoint reads the cluster through: the host's {@link ReadinessInput}
+   * FACET path in a live run; an offline placeholder when unamended — the mock contact ignores it,
+   * so it only satisfies the kubeconfig-published phase (never the dead {@code /srv/host} path).
    */
-  private static Path kubeconfig() {
-    return Path.of("/srv/host/kubeconfig");
+  private Path kubeconfig() {
+    return Optional.ofNullable(input)
+        .flatMap(ReadinessInput::access)
+        .map(ReadinessInput.Access::kubeconfigPath)
+        .map(Path::of)
+        .orElse(UNAMENDED_MARKER);
   }
+
+  private static final Path UNAMENDED_MARKER = Path.of("kubeconfig-unamended");
 
   /** Given: the kubeconfig to read the cluster through, the controllers to wait on, the contact. */
   public static class Given extends Stage<Given> {

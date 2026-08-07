@@ -16,6 +16,7 @@ import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
+import io.nxmatic.rke2lab.clusterpki.contract.AdminCredentials;
 import io.nxmatic.rke2lab.clusterpki.contract.ClusterAgeKey;
 import io.nxmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
 import io.nxmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
@@ -44,6 +45,11 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -172,6 +178,8 @@ public class ClusterSeedScenario
         .the_live_tree_is_reconciled(hostScenario, hostTree)
         .and()
         .the_instance_grows()
+        .and()
+        .the_operator_kubeconfig_is_published()
         .and()
         .the_systemd_adapter_is_launched(hostScenario, hostTree)
         .and()
@@ -318,6 +326,23 @@ public class ClusterSeedScenario
           .registerService(
               AmendmentContributor.class,
               new FacetContributor(new AmendCoordinate("systemd"), systemdFacet.toString()),
+              new Hashtable<>());
+      // The cluster FACET — WHERE the operator kubeconfig is published (kubeconfigRef), contributed
+      // AMBIENT for the cluster-readiness crossing. ClusterAmendReflector gathers it at the door
+      // and
+      // binds it onto ReadinessInput.access, so the fabric8 probe reads the real published path
+      // (not
+      // the dead /srv/host marker). The host names no cluster type — only the neutral path, JSON on
+      // the FACET role.
+      final ObjectNode clusterFacet = JsonNodeFactory.instance.objectNode();
+      clusterFacet.put(
+          "kubeconfigPath", run.config().kubeconfigRef().toAbsolutePath().normalize().toString());
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              AmendmentContributor.class,
+              new FacetContributor(new AmendCoordinate("cluster"), clusterFacet.toString()),
               new Hashtable<>());
       // The entry-gate FACET — the run's GatePolicy (clean-worktree requirement + tolerated paths),
       // contributed AMBIENT the way the incus/manifests FACETs are. The worktree crossing (the
@@ -507,6 +532,44 @@ public class ClusterSeedScenario
           .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
           .ifPresent(plan -> new InstanceGrow(ingress, line -> {}).grow(plan, clusterPki));
       return self();
+    }
+
+    @As("the operator kubeconfig is published")
+    public When the_operator_kubeconfig_is_published() {
+      // The operator's natively-trusted admin kubeconfig, written host-side from the
+      // AdminCredentials
+      // the seal minted (SEALED — the transactional cellar reveals it on fetch). Endpoint added
+      // here:
+      // the apiserver's deterministic mDNS SAN <cluster>-<node>.local (nixos/rke2.nix's tls-san
+      // drop-in), so TLS verifies against the embedded server-ca chain rooted at mammoth-skate-tls.
+      // Written to kubeconfigRef (.local.d/<cluster>/kubeconfig.yaml) — the stable path the
+      // operator
+      // and the readiness probe read. Live-only: absent a deployment there is nothing to access
+      // yet.
+      if (!PulumiDeploymentSeed.isDeploymentPresent()) {
+        return self();
+      }
+      workingCellar
+          .fetch(parcel, ClusterPkiCoordinate.ADMIN_CREDENTIALS, AdminCredentials.class)
+          .ifPresent(this::publishOperatorKubeconfig);
+      return self();
+    }
+
+    private void publishOperatorKubeconfig(AdminCredentials admin) {
+      // The operator reaches the node over its deterministic mDNS name (the lan0 IP is
+      // DHCP-churned);
+      // the in-cluster Secret (rendered by the manifests HA layer) uses the kube-vip VIP instead.
+      final String server =
+          "https://" + config.clusterName() + "-" + config.nodeName() + ".local:6443";
+      final String kubeconfig = admin.kubeconfig(config.clusterName(), server);
+      final Path ref = config.kubeconfigRef();
+      try {
+        Files.createDirectories(ref.toAbsolutePath().getParent());
+        Files.writeString(ref, kubeconfig);
+        Files.setPosixFilePermissions(ref, PosixFilePermissions.fromString("rw-------"));
+      } catch (IOException ex) {
+        throw new UncheckedIOException("failed to publish the operator kubeconfig to " + ref, ex);
+      }
     }
 
     @NestedSteps

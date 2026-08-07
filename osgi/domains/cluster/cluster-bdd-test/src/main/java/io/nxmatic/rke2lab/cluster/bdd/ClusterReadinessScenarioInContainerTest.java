@@ -115,7 +115,10 @@ public class ClusterReadinessScenarioInContainerTest {
         context.registerService(ClusterReadinessContact.class, contact, new Hashtable<>()));
     try {
       final ScenarioOutcome outcome =
-          new ScenarioPlayer().play(ClusterReadinessScenario.class, store -> {});
+          new ScenarioPlayer()
+              .play(
+                  ClusterReadinessScenario.class,
+                  ClusterReadinessScenario.INPUT.into(ReadinessInput.defaults()));
       assertTrue(!contact.probed, "a survey-inert probe never contacts the live cluster");
       assertEquals(
           ExecutionStatus.SCENARIO_PENDING,
@@ -143,7 +146,10 @@ public class ClusterReadinessScenarioInContainerTest {
           context.registerService(ConsultingService.class, doctor, new Hashtable<>()));
     }
     try {
-      return new ScenarioPlayer().play(ClusterReadinessScenario.class, store -> {});
+      return new ScenarioPlayer()
+          .play(
+              ClusterReadinessScenario.class,
+              ClusterReadinessScenario.INPUT.into(ReadinessInput.defaults()));
     } finally {
       registrations.forEach(ServiceRegistration::unregister);
     }

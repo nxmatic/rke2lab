@@ -221,8 +221,7 @@ public final class SystemdInfrastructureSynthesizer {
                     .remountShared()
                     .containerdZfsMountConfig()
                     .dbusTcpSystemBus()
-                    .zfsEarlyUmount()
-                    .vipKubeconfig())
+                    .zfsEarlyUmount())
         .complete();
 
     // Note: rke2lab.target dependencies are set in DefaultManifestSynthesisService

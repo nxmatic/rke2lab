@@ -21,7 +21,9 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.sec.ECPrivateKey;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -124,6 +126,76 @@ public final class ClusterCaGenerator {
     } catch (Exception ex) {
       throw new IllegalStateException("cluster CA generation failed", ex);
     }
+  }
+
+  /**
+   * Mint the operator's admin clientAuth leaf, signed by the cluster {@code client-ca} (the FIRST
+   * cert of {@code clientCaChainPem} — the client-CA itself, ahead of the intermediate + root).
+   * Subject {@code CN=rke2lab-admin, O=system:masters} — the {@code system:masters} group RBAC
+   * binds to cluster-admin. EC prime256v1 key, SEC1 PEM; the cert PEM is the leaf alone (kube's
+   * {@code client-certificate-data}). Endpoint-independent — the host wraps a kubeconfig around it.
+   */
+  public AdminLeaf mintAdminClient(String clientCaChainPem, String clientCaKeyPem) {
+    try {
+      final X509Certificate clientCa = readCert(clientCaChainPem);
+      final PrivateKey clientCaKey = readKey(clientCaKeyPem);
+      final KeyPair adminKey = ec();
+      final X509Certificate adminCert =
+          signLeaf(
+              clientCa, clientCaKey, "CN=rke2lab-admin,O=system:masters", adminKey.getPublic());
+      return new AdminLeaf(chainPem(adminCert), keyPem(adminKey.getPrivate()));
+    } catch (RuntimeException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new IllegalStateException("admin client certificate minting failed", ex);
+    }
+  }
+
+  /** The operator's admin leaf: its certificate PEM + private-key PEM (endpoint-independent). */
+  public record AdminLeaf(String certPem, String keyPem) {}
+
+  /**
+   * The end-entity clientAuth profile for the admin leaf: NOT a CA (BasicConstraints CA:false),
+   * KeyUsage critical {@code digitalSignature|keyEncipherment}, EKU {@code clientAuth}, SKI + AKI
+   * (issuer keyid), sha256, {@link #VALIDITY_DAYS} validity. notBefore is {@code now} — the node
+   * clock is disciplined at the source (chrony on the VZ host), so no skew backdate is needed.
+   */
+  private static X509Certificate signLeaf(
+      X509Certificate issuer, PrivateKey issuerKey, String subjectDn, PublicKey subjectPub)
+      throws Exception {
+    final Instant notBefore = Instant.now();
+    final X500Name issuerDn = new JcaX509CertificateHolder(issuer).getSubject();
+    final BigInteger serial = new BigInteger(64, RANDOM).abs().add(BigInteger.ONE);
+    final JcaX509v3CertificateBuilder b =
+        new JcaX509v3CertificateBuilder(
+            issuerDn,
+            serial,
+            Date.from(notBefore),
+            Date.from(notBefore.plus(VALIDITY_DAYS, ChronoUnit.DAYS)),
+            new X500Name(subjectDn),
+            subjectPub);
+    final JcaX509ExtensionUtils ext = new JcaX509ExtensionUtils();
+    b.addExtension(
+        Extension.subjectKeyIdentifier, false, ext.createSubjectKeyIdentifier(subjectPub));
+    b.addExtension(
+        Extension.authorityKeyIdentifier,
+        false,
+        ext.createAuthorityKeyIdentifier(issuer.getPublicKey()));
+    b.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
+    b.addExtension(
+        Extension.keyUsage,
+        true,
+        new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+    b.addExtension(
+        Extension.extendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeId.id_kp_clientAuth));
+    final String sigAlg =
+        issuerKey.getAlgorithm().startsWith("EC") ? "SHA256withECDSA" : "SHA256withRSA";
+    final X509CertificateHolder holder =
+        b.build(
+            new org.bouncycastle.operator.jcajce.JcaContentSignerBuilder(sigAlg)
+                .setProvider("BC")
+                .build(issuerKey));
+    return new JcaX509CertificateConverter().setProvider("BC").getCertificate(holder);
   }
 
   /** The k3s {@code v3_ca} profile — the one certificate shape every CA in the chain wears. */

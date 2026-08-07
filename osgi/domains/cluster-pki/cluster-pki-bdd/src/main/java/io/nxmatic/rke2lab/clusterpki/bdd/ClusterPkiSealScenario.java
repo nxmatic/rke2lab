@@ -135,7 +135,10 @@ public class ClusterPkiSealScenario
     }
   }
 
-  /** THEN — the PKI is filed: the bundle PLAIN (already sealed), the age identity SEALED. */
+  /**
+   * THEN — the PKI is filed: the bundle PLAIN (already sealed), the age identity SEALED, the
+   * operator's admin credentials SEALED (they carry the admin private key).
+   */
   public static class Then extends Stage<Then> {
 
     @ExpectedScenarioState Optional<SealedClusterPki> sealed;
@@ -147,6 +150,11 @@ public class ClusterPkiSealScenario
             cellar.store(parcel, ClusterPkiCoordinate.CLUSTER_CA_BUNDLE, pki.bundle());
             cellar.store(
                 parcel, ClusterPkiCoordinate.CLUSTER_AGE_KEY, pki.ageKey(), Sensitivity.SEALED);
+            cellar.store(
+                parcel,
+                ClusterPkiCoordinate.ADMIN_CREDENTIALS,
+                pki.adminCredentials(),
+                Sensitivity.SEALED);
           });
       return self();
     }

@@ -44,7 +44,6 @@ public class NodeEnvIdentityContributor implements NodeEnvContributor {
             "RKE2LAB_CLOUDCONFIG_NO_CLOUD_DIR", paths.cloudconfigNocloudDirPath().toString(),
             "RKE2LAB_MANIFESTS_DIR", paths.manifestsDirPath().toString(),
             "RKE2LAB_SHARED_DIR", paths.sharedDirPath().toString(),
-            "RKE2LAB_KUBECONFIG_DIR", paths.kubeconfigDirPath().toString(),
             "RKE2LAB_ENV_FILE",
                 paths.scriptsDirPath().resolve("rke2lab-environment.sh").toString());
       }

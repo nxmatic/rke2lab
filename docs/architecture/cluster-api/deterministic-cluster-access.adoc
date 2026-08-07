@@ -58,7 +58,9 @@ untouched. The CA hierarchy is pure Java (no shell); the only external tool cont
 age identity), both reused, not reinvented.
 
 The seal's orchestration is `ClusterSeal` (its one-act output a `SealedClusterPki` — the sealed
-bundle + the age identity); the operator key inventory is read through the ndh domain's
+bundle + the age identity + the operator's `AdminCredentials`, an admin client cert minted from
+`client-ca` paired with the server-ca chain); the operator key inventory is read through the ndh
+domain's
 `NdhKeystoreReader` seam (the single reader of `.ndh-ssh.d/keys.yaml`, shared with manifests so the
 keys.yaml navigation is never duplicated).
 
@@ -80,15 +82,18 @@ consumers are host-side at runtime — the grow (which projects it into the inst
 and the readiness probe (which reads the kubeconfig). So the cellar seam suffices; the gitignored,
 per-checkout `.local.d` is retired as a home for anything that must outlive a working tree.
 
-Concretely, two cellar cases carry the PKI under `ClusterPkiCoordinate` (the cluster-pki domain's
+Concretely, three cellar cases carry the PKI under `ClusterPkiCoordinate` (the cluster-pki domain's
 dual-realm coordinate — owned by the producing domain, so the incus GROW depends on it, not the
 reverse): `ClusterCaBundle` — the sops blob, filed `PLAIN` because it is already sealed for the
-node's age recipient — and `ClusterAgeKey` — the cluster age identity that decrypts it on the node,
-filed `SEALED` (the `CellarCipher`) so its plaintext never rests beside the bundle. The seal scion
-(an OSGi `@SeedScenario` that seals the bundle through the `SopsEncryptor` edge and derives the
-identity through ssh-to-age) files both; the GROW fetches them (revealing the sealed key) and poses
+node's age recipient; `ClusterAgeKey` — the cluster age identity that decrypts it on the node, filed
+`SEALED` (the `CellarCipher`) so its plaintext never rests beside the bundle; and `AdminCredentials`
+— the operator's admin client cert + key + server-ca chain, filed `SEALED` (it carries the admin
+private key). The seal scion (an OSGi `@SeedScenario` that seals the bundle through the
+`SopsEncryptor` edge, derives the identity through ssh-to-age, and mints the admin leaf from
+`client-ca`) files all three; the GROW fetches the node cases (revealing the sealed key) and poses
 them on the instance's `user.rke2lab.cluster-ca-bundle` / `user.rke2lab.sops-age-key` devlxd keys,
-never inside the (PLAIN) `InstanceGrowPlan`.
+never inside the (PLAIN) `InstanceGrowPlan`, and the host reveals `AdminCredentials` to write the
+operator kubeconfig at `kubeconfigRef` (the mDNS endpoint added host-side).
 
 == The target architecture
 

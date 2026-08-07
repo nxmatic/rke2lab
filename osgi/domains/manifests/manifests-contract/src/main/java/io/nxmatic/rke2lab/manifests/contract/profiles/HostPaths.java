@@ -22,15 +22,14 @@ public record HostPaths(
     Path configDirPath,
     Path cloudconfigNocloudDirPath,
     Path manifestsDirPath,
-    Path sharedDirPath,
-    Path kubeconfigDirPath) {
+    Path sharedDirPath) {
 
   public static Builder builder() {
     return new Builder();
   }
 
   /**
-   * The recommended construction path: names each directory so the nine same-typed paths can't be
+   * The recommended construction path: names each directory so the same-typed paths can't be
    * positionally swapped. Fields are {@link MonotonicNonNull} — null until set, then read once at
    * {@link #build()}, which fails fast on any that was never bound.
    */
@@ -43,7 +42,6 @@ public record HostPaths(
     @MonotonicNonNull private Path cloudconfigNocloudDirPath;
     @MonotonicNonNull private Path manifestsDirPath;
     @MonotonicNonNull private Path sharedDirPath;
-    @MonotonicNonNull private Path kubeconfigDirPath;
 
     private Builder() {}
 
@@ -87,11 +85,6 @@ public record HostPaths(
       return this;
     }
 
-    public Builder kubeconfigDirPath(final Path v) {
-      this.kubeconfigDirPath = v;
-      return this;
-    }
-
     public HostPaths build() {
       return new HostPaths(
           Objects.requireNonNull(rootPath, "rootPath"),
@@ -101,8 +94,7 @@ public record HostPaths(
           Objects.requireNonNull(configDirPath, "configDirPath"),
           Objects.requireNonNull(cloudconfigNocloudDirPath, "cloudconfigNocloudDirPath"),
           Objects.requireNonNull(manifestsDirPath, "manifestsDirPath"),
-          Objects.requireNonNull(sharedDirPath, "sharedDirPath"),
-          Objects.requireNonNull(kubeconfigDirPath, "kubeconfigDirPath"));
+          Objects.requireNonNull(sharedDirPath, "sharedDirPath"));
     }
   }
 }

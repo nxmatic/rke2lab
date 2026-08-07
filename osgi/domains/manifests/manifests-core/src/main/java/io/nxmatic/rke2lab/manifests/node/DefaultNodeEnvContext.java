@@ -66,7 +66,6 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
         .cloudconfigNocloudDirPath(ROOT_PATH.resolve("cloudconfig-nocloud.d"))
         .manifestsDirPath(ROOT_PATH.resolve("rke2-manifests.d"))
         .sharedDirPath(ROOT_PATH.resolve("rke2lab-share.d"))
-        .kubeconfigDirPath(ROOT_PATH.resolve("rke2lab-kube.d"))
         .build();
   }
 

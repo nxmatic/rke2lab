@@ -10,10 +10,10 @@ import io.nxmatic.rke2lab.systemd.contract.SystemdUnitId;
 import java.util.function.Supplier;
 
 /**
- * Storage and system phase: filesystem configuration, ZFS, DBus, and kubeconfig generation. An
- * EFFECT phase — mutates the chart, produces no output for the accumulator, so it has no sink.
- * Reads the flox-install, bootstrap-env and install services through {@code Supplier} read-faces
- * (never by holding the tools/rke2-install phases).
+ * Storage and system phase: filesystem configuration, ZFS, and DBus. An EFFECT phase — mutates the
+ * chart, produces no output for the accumulator, so it has no sink. Reads the flox-install,
+ * bootstrap-env and install services through {@code Supplier} read-faces (never by holding the
+ * tools/rke2-install phases).
  *
  * <p>Package-private phase builder for the synthesis pipeline.
  */
@@ -113,34 +113,6 @@ public final class StoragePhase implements Phase.Execution {
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
         .wantedBy("umount.target");
-    return this;
-  }
-
-  public StoragePhase vipKubeconfig() {
-    final SystemdChart systemdChart = this.systemdChart.get();
-    final SystemdSynthesisContext context = this.context.get();
-    new SystemdService(systemdChart, "rke2lab-vip-kubeconfig")
-        .description("Generate VIP-enabled kubeconfig for cluster access")
-        .after(
-            "local-fs.target",
-            bootstrapEnv.get().getUnitFileName(),
-            floxInstall.get().getUnitFileName(),
-            "rke2-server.service")
-        .requires(
-            bootstrapEnv.get().getUnitFileName(),
-            floxInstall.get().getUnitFileName(),
-            "rke2-server.service")
-        .conditionPathExists(
-            "/srv/host/systemd-scripts.d/rke2lab-vip-kubeconfig.sh",
-            "/etc/rancher/rke2/rke2.yaml",
-            "/var/lib/rancher/rke2/.flox/env")
-        .type(ServiceType.ONESHOT)
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-vip-kubeconfig.sh")
-        .remainAfterExit(true)
-        .standardOutput(StandardStream.JOURNAL)
-        .standardError(StandardStream.JOURNAL)
-        .partOf(context.manifestsTarget().getUnitFileName())
-        .wantedBy(context.manifestsTarget().getUnitFileName());
     return this;
   }
 }

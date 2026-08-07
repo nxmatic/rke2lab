@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.clusterpki.core;
 
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import io.nxmatic.rke2lab.clusterpki.contract.AdminCredentials;
 import io.nxmatic.rke2lab.clusterpki.contract.ClusterAgeKey;
 import io.nxmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
 import io.nxmatic.rke2lab.clusterpki.contract.SopsEncryptor;
@@ -60,15 +61,27 @@ public final class ClusterSeal {
     final List<String> recipients = SopsRecipients.fromDefault();
     final long timestamp = Instant.now().getEpochSecond();
 
+    final ClusterCaGenerator generator = new ClusterCaGenerator();
     final LinkedHashMap<String, String> bundle =
-        new ClusterCaGenerator()
-            .generate(
-                keystore.authorityCert(TLS_AUTHORITY),
-                keystore.authorityPrivate(TLS_AUTHORITY),
-                timestamp);
+        generator.generate(
+            keystore.authorityCert(TLS_AUTHORITY),
+            keystore.authorityPrivate(TLS_AUTHORITY),
+            timestamp);
     final String sealed = sops.encryptYaml(renderYaml(bundle), recipients);
     final String ageIdentity = sshToAge.toAgeKey(keystore.sshPrivate(CLUSTER_SSH_KEY));
-    return new SealedClusterPki(new ClusterCaBundle(sealed), new ClusterAgeKey(ageIdentity));
+
+    // The operator's admin creds: an admin clientAuth leaf minted from the client-ca just
+    // generated,
+    // paired with the server-ca chain (which ends at the mammoth-skate-tls root) so the operator
+    // verifies kube-apiserver natively. Endpoint-independent — the host wraps a kubeconfig around
+    // it.
+    final ClusterCaGenerator.AdminLeaf admin =
+        generator.mintAdminClient(bundle.get("client-ca.crt"), bundle.get("client-ca.key"));
+    final AdminCredentials adminCredentials =
+        new AdminCredentials(admin.certPem(), admin.keyPem(), bundle.get("server-ca.crt"));
+
+    return new SealedClusterPki(
+        new ClusterCaBundle(sealed), new ClusterAgeKey(ageIdentity), adminCredentials);
   }
 
   /**
