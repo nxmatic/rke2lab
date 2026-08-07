@@ -41,6 +41,53 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- fabric8-wrap + its hard import closure, on the TEST classpath so installImportClosureOf can
+         install them into the boot Felix: cluster-edge now imports io.fabric8.* (exported by the
+         wrap), and the wrap itself imports jackson + BouncyCastle + snakeyaml-engine. Without them
+         the edge does not RESOLVE in-container and its @Component never publishes the contact.
+         snakeyaml-engine rides in transitively via the wrap; jackson + BC are declared explicitly
+         (the wrap embeds the fabric8 jars provided, so they are not transitive from it). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>fabric8-wrap</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <!-- osgi.core (test): the passenger + proxy name framework types (FrameworkUtil, BundleContext). -->
     <dependency>
       <groupId>org.osgi</groupId>

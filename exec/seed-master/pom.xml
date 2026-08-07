@@ -266,6 +266,19 @@
       <artifactId>bcutil-jdk18on</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- fabric8 Kubernetes client, as the single wrap bundle: cluster-edge imports io.fabric8.*
+         provided-scope (not transitive), so the assembler stages fabric8-wrap here. fabric8's core
+         jars carry NO OSGi headers and its model jars split-package io.fabric8.kubernetes.api.builder
+         (17x), so they cannot be staged as separate bundles (unlike BouncyCastle) — fabric8-wrap
+         embeds the whole closure lib:=true and exports io.fabric8.* once, dissolving the split. It
+         pulls snakeyaml-engine (the kubeconfig parser) transitively, staged as its own bundle;
+         jackson + BouncyCastle it imports are already staged. Without the wrap the framework boots
+         but cluster-edge is unresolved and the readiness contact never publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>fabric8-wrap</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The domain SCION bundles (*-bdd): each carries the @Component SeedHandler that GROWS its
          runbook coordinate — WorktreeRunbookHandler serves RunbookCoordinate("worktree") (the first
          crossing), BboxRunbookHandler serves RunbookCoordinate("bbox"), and so on for incus

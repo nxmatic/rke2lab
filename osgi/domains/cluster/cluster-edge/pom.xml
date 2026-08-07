@@ -13,10 +13,13 @@
   <artifactId>cluster-edge</artifactId>
   <name>osgi/domains/cluster/cluster-edge</name>
   <description>The cluster external edge: the single door toward the live RKE2 cluster's kube-apiserver.
-    It @Component-provides the cluster domain's ClusterReadinessContact seam (cluster-contract) by shelling
-    kubectl over a published kubeconfig. Pure ProcessBuilder — zero embedded jars (simpler than the
-    dbus-systemd edge, which embedded three for ServiceLoader transport discovery). Stateless, single
-    contact: the host owns the retry loop, the timeout policy, and the Observation projection.</description>
+    It @Component-provides the cluster domain's ClusterReadinessContact seam (cluster-contract) by
+    probing kube-apiserver /readyz and controller rollout through a typed fabric8 KubernetesClient
+    over a published kubeconfig — natively TLS-verified against the deterministic PKI's CA, no
+    kubectl shell, no insecure-skip. fabric8 is a first-class OSGi bundle (imported, not embedded);
+    the JDK HttpClient backend is wired via an explicit factory (no ServiceLoader, which OSGi
+    breaks). Stateless, single contact: the host owns the retry loop, timeout, Observation
+    projection.</description>
 
   <dependencies>
     <dependency>
@@ -26,6 +29,23 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <!-- fabric8 Kubernetes client: the typed door to kube-apiserver. provided — it carries its own
+         Bundle-SymbolicName + OSGi headers (like BouncyCastle), so io.fabric8.* becomes a plain
+         Import-Package computed from the bytecode, and seed-master stages the bundle closure INTACT
+         at runtime. NOT embedded. kubernetes-httpclient-jdk gives the JDK-HttpClient backend, wired
+         explicitly (KubernetesClientBuilder#withHttpClientFactory) so no cross-bundle ServiceLoader
+         lookup is needed. -->
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-client</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-httpclient-jdk</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header -->

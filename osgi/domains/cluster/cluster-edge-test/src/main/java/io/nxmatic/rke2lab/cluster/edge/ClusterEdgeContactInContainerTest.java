@@ -22,10 +22,10 @@ import org.osgi.framework.ServiceReference;
  * in-container, wired bundle-to-bundle.
  *
  * <p>The behavioural proof is the failure mode, because no real cluster is reachable in a unit
- * test: the kubectl contact is stateless and swallows its failure (process error, non-zero exit, or
- * {@code kubectl} absent from PATH all collapse to the same raw fact), so a contact against an
- * unreachable cluster deterministically returns {@code false} — no flakiness, no real cluster
- * needed. An empty controller list is vacuously effective.
+ * test: the fabric8 contact is stateless and swallows its failure (an unreadable kubeconfig, a
+ * refused connection, or a non-2xx {@code /readyz} all collapse to the same raw fact), so a contact
+ * against an unreachable cluster deterministically returns {@code false} — no flakiness, no real
+ * cluster needed. An empty controller list is vacuously effective.
  */
 public class ClusterEdgeContactInContainerTest {
 

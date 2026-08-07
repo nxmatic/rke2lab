@@ -557,6 +557,11 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>fabric8-wrap</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>worktree-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>

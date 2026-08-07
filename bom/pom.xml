@@ -43,6 +43,18 @@
          pkix/util do not — the BOM resolves each to its right version). 1.78.1+ ships proper OSGi
          metadata, so the jars stage as native bundles. -->
     <bouncycastle.version>1.85.2</bouncycastle.version>
+    <!-- fabric8 Kubernetes client: the cluster edge (cluster-edge) reads a published kubeconfig and
+         probes kube-apiserver readiness / controller rollout through a typed client instead of
+         shelling kubectl. kubernetes-client-bom manages the client + its model + the JDK HttpClient
+         backend as one consistent set; the jars ship Bundle-SymbolicName + OSGi headers, so they
+         stage as native bundles (the BouncyCastle path), not lib:=true embeds. -->
+    <fabric8.version>7.8.0</fabric8.version>
+    <!-- snakeyaml-engine (YAML 1.2): the kubeconfig parser fabric8-wrap imports. Distinct from the
+         org.yaml:snakeyaml the rest of the project uses — fabric8's kubernetes-client-api binds
+         org.snakeyaml:snakeyaml-engine, a first-class OSGi bundle (BSN org.snakeyaml.engine). It is
+         the only NOT-yet-staged transitive the fabric8 wrap needs (jackson + BouncyCastle are
+         already staged); declared here so the wrap can pin it and seed-master stage it. -->
+    <snakeyaml-engine.version>3.0.1</snakeyaml-engine.version>
     <victools.version>4.38.0</victools.version>
     <java-diff-utils.version>4.17</java-diff-utils.version>
     <jsync.version>1.5.0</jsync.version>
@@ -121,6 +133,24 @@
         <version>${bouncycastle.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- fabric8 Kubernetes client BOM: manages kubernetes-client + kubernetes-client-api + the
+           kubernetes-model-* set + the httpclient backends in step; consumers declare the artifacts
+           version-less. cluster-edge compiles against it (provided), seed-master stages the closure
+           (runtime) — the BouncyCastle staging pattern, for a first-class OSGi bundle graph. -->
+      <dependency>
+        <groupId>io.fabric8</groupId>
+        <artifactId>kubernetes-client-bom</artifactId>
+        <version>${fabric8.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- The kubeconfig YAML parser fabric8 binds (not managed by the fabric8 BOM). The wrap
+           declares it compile so seed-master stages it as its own bundle. -->
+      <dependency>
+        <groupId>org.snakeyaml</groupId>
+        <artifactId>snakeyaml-engine</artifactId>
+        <version>${snakeyaml-engine.version}</version>
       </dependency>
       <!-- ASM: one version for asm / asm-tree / asm-analysis via the BOM — the staging-extension's
            gates read bytecode (RecordPurity, RealmBoundary) and the PIPELINE_PATTERN read-face check
