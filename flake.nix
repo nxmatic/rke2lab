@@ -232,10 +232,16 @@
         };
 
       # The consumed blueprint is PURE committed data — read from the checked-in
-      # network-blueprint.json, no IFD, no build. This is what lets any system evaluate
-      # `lib.networkBlueprint` without realizing the darwin-pinned netplan jar — notably
-      # an aarch64-linux nikopol-nixos with no darwin builder. The Java stays the source
-      # of truth, materialized into the JSON at regen time on a jar-capable host:
+      # network-blueprint.json, no IFD, no build. The reason is NOT "no builder": the
+      # blueprint sits on the eval hot-path of *every* host config — the catalog's
+      # netplan.lan.hosts `//`-merges the addressing map, so reading any host entry
+      # forces the whole JSON. An IFD here would drag a Java/Maven jar build onto that
+      # path and break routine ops that no remote builder fixes: with the darwin-pinned
+      # jar, any aarch64-linux box evaluating locally has no darwin builder to realize
+      # it; drop the pin to per-system instead and the companion's own first bringup
+      # goes circular (its aarch64-linux jar offloads to the very <host>-nixos being
+      # brought up). Committed data has zero infra dependency. The Java stays the
+      # source of truth, materialized into the JSON at regen time on a jar-capable host:
       #   nix build .#networkBlueprintJson && cp result network-blueprint.json && commit
       networkBlueprintData = builtins.fromJSON (builtins.readFile ./network-blueprint.json);
 
