@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.manifests.ManifestsDomain;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.units.clusterapi.ClusterApiOperatorManifestsUnit;
+import io.nxmatic.rke2lab.manifests.units.clusterapi.ClusterKubeconfigManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.clusterapi.ImageStateConfigMapManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.clusterapi.IncusIdentitySecretManifestsUnit;
 import java.util.List;
@@ -20,6 +21,7 @@ public final class ClusterApiDomainRegistrar implements ManifestsDomainRegistrar
         List.of(
             new IncusIdentitySecretManifestsUnit(),
             new ImageStateConfigMapManifestsUnit(),
-            new ClusterApiOperatorManifestsUnit()));
+            new ClusterApiOperatorManifestsUnit(),
+            new ClusterKubeconfigManifestsUnit()));
   }
 }

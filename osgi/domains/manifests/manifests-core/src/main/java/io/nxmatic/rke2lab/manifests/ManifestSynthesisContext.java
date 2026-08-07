@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -114,6 +115,10 @@ public final class ManifestSynthesisContext {
 
   public Optional<IncusIdentityMaterial> incusIdentity() {
     return request.incusIdentity();
+  }
+
+  public Optional<OperatorPkiMaterial> operatorPki() {
+    return request.operatorPki();
   }
 
   public Optional<SopsAgeMaterial> sopsAgeMaterial() {

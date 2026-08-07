@@ -44,6 +44,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
     </dependency>
+    <!-- cluster-pki-contract: the scion reveals the sealed AdminCredentials from the shared cellar
+         in-container and translates it to the manifests-side OperatorPkiMaterial, so no cluster-pki
+         type crosses into manifests-core (the domain stays gate-clean). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>cluster-pki-contract</artifactId>
+    </dependency>
     <!-- The frontier vocabulary: the RunGate the scion consults (cultivate vs survey), the
          SeedEnvelope the trigger arrives on and the runbook is reaped on, the codec that decodes
          the facet. -->

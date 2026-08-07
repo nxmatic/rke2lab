@@ -7,6 +7,8 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
+import io.nxmatic.rke2lab.clusterpki.contract.AdminCredentials;
+import io.nxmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
@@ -15,11 +17,15 @@ import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.nxmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -65,7 +71,9 @@ public class ManifestSynthesisScenario
         ManifestSynthesisScenario.Given,
         ManifestSynthesisScenario.When,
         ManifestSynthesisScenario.Then>
-    implements InputReceiver<ManifestsRunbookInput>, ScenarioPlayer.Playable {
+    implements InputReceiver<ManifestsRunbookInput>,
+        CellarReceiver<ScenarioCellar>,
+        ScenarioPlayer.Playable {
 
   private static final ManifestDomainCatalog CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
@@ -89,6 +97,13 @@ public class ManifestSynthesisScenario
   // receiveInput sets it (before the body), then read.
   @MonotonicNonNull private ManifestsRunbookInput input;
 
+  // The shared in-container cellar (injected by ScenarioCellarExtension before the body) + the
+  // current plot — the seam through which the sealed AdminCredentials the seal scion filed are
+  // revealed, in-container, never crossing the host membrane.
+  @MonotonicNonNull private ScenarioCellar cellar;
+
+  @OsgiService private Optional<Parcel> parcel = Optional.empty();
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -99,12 +114,32 @@ public class ManifestSynthesisScenario
     this.input = input;
   }
 
+  @Override
+  public void receiveCellar(ScenarioCellar cellar) {
+    this.cellar = cellar;
+  }
+
+  // Reveal the operator's admin PKI from the cellar and translate it into the manifests-side
+  // OperatorPkiMaterial — the ONLY place a cluster-pki type is touched, so manifests-core stays
+  // gate-clean. Empty when no cellar/plot (a bare survey) or the seal has not filed yet.
+  private Optional<OperatorPkiMaterial> revealOperatorPki() {
+    if (cellar == null || parcel.isEmpty()) {
+      return Optional.empty();
+    }
+    return cellar
+        .fetch(parcel.orElseThrow(), ClusterPkiCoordinate.ADMIN_CREDENTIALS, AdminCredentials.class)
+        .map(ac -> new OperatorPkiMaterial(ac.clientCertPem(), ac.clientKeyPem(), ac.caCertPem()));
+  }
+
   @Test
   void the_manifests_are_synthesized_from_the_activation_facet() {
     final ManifestsRunbookInput facet =
         Objects.requireNonNull(input, "the activation facet was not seeded before the body");
     given().the_activation_facet(facet);
-    when().the_policy_is_derived_from_the_facet().and().the_manifests_are_synthesized();
+    when()
+        .the_policy_is_derived_from_the_facet()
+        .and()
+        .the_manifests_are_synthesized(revealOperatorPki());
     then().every_enabled_domain_produced_its_units().and().the_manifests_file_is_written();
   }
 
@@ -168,7 +203,7 @@ public class ManifestSynthesisScenario
       return self();
     }
 
-    public When the_manifests_are_synthesized() {
+    public When the_manifests_are_synthesized(@Hidden Optional<OperatorPkiMaterial> operatorPki) {
       final ManifestsRunbookInput.DebugFacet debug = facet.facets().debug();
       final FloxDebugPolicy floxDebug =
           new FloxDebugPolicy(
@@ -200,6 +235,9 @@ public class ManifestSynthesisScenario
                           .clusterName(w.clusterName())
                           .nodeName(w.nodeName())
                           .build()));
+      // The operator PKI revealed from the cellar (empty on a bare survey / before the seal filed):
+      // the kubeconfig unit renders the operator + CAPI kubeconfigs from it, or nothing.
+      builder.operatorPki(operatorPki);
       final ManifestSynthesisRequest request = builder.build();
       try {
         this.result = synthesis.orElseThrow().synthesize(request);

@@ -41,11 +41,13 @@ CAs. We exploit that to make the operator's existing root the cluster's root.
   signed by `mammoth-skate-tls`. The root's private key never leaves the operator's machine; only the
   intermediates travel. Because the chain terminates at a root already in every trust store, anything
   the cluster serves or that we mint from it validates natively.
-- **The admin kubeconfig is a host-side derivation.** We hold `client-ca`, so we mint the admin client
-  certificate on the host; the endpoint is the node's deterministic mDNS name (`<cluster>-<node>.local`,
-  avahi-advertised on the LAN — the lan0 IP is router-DHCP and not stable, so the NAME is the stable
-  endpoint); the CA is the trusted root.
-  The kubeconfig is assembled on the Mac with nothing fetched from the node.
+- **The admin kubeconfig is synthesized, not host-assembled.** We hold `client-ca`, so the seal mints
+  the admin client certificate (the `AdminCredentials`); its endpoint is the node's deterministic mDNS
+  name (`<cluster>-<node>.local`, avahi-advertised on the LAN — the lan0 IP is router-DHCP and not
+  stable, so the NAME is the stable endpoint); the CA is the trusted root. The kubeconfig is a pure
+  function of that material and needs nothing fetched from the node. It is **rendered inside the
+  manifests synthesis** rather than by a bespoke host step — see § "Delivery: the kubeconfig as a
+  synthesized local-config manifest" below.
 
 Nothing here extends the ndh certificate pipeline (which mints only self-signed *roots* and
 end-entity *leaves*, never intermediates): the cluster CA set is produced OSGi-side by the
@@ -92,8 +94,9 @@ private key). The seal scion (an OSGi `@SeedScenario` that seals the bundle thro
 `SopsEncryptor` edge, derives the identity through ssh-to-age, and mints the admin leaf from
 `client-ca`) files all three; the GROW fetches the node cases (revealing the sealed key) and poses
 them on the instance's `user.rke2lab.cluster-ca-bundle` / `user.rke2lab.sops-age-key` devlxd keys,
-never inside the (PLAIN) `InstanceGrowPlan`, and the host reveals `AdminCredentials` to write the
-operator kubeconfig at `kubeconfigRef` (the mDNS endpoint added host-side).
+never inside the (PLAIN) `InstanceGrowPlan`. The `AdminCredentials` case is revealed IN-CONTAINER by
+the manifests scion (never crossing the host membrane) and translated to the manifests-side
+`OperatorPkiMaterial`, from which the kubeconfig is synthesized — see the delivery section below.
 
 == The target architecture
 
@@ -151,6 +154,41 @@ imported — that would violate the invariant that nix-darwin-home is never a fl
 * ❌ **Projections in the gitignored `.local.d`** (per-checkout, lost on re-checkout) → ✅ they persist
   in the `OpaqueCellar` seam the seed owns (`cellar.store`/`cellar.fetch`) — durable and regenerable,
   and read only host-side, so no git branch is needed.
+
+== Delivery: the kubeconfig as a synthesized local-config manifest
+
+The kubeconfig is not rendered by a bespoke host step. It rides the ONE synthesis pipeline the rest
+of the cluster's manifests already ride — a `kind: Config` is a real (client-side) Kubernetes
+resource, so cdk8s models it natively and the kpt `config.kubernetes.io/local-config` annotation is
+the standard discriminator between "apply into the cluster" and "materialize, don't apply." No cdk8s
+extension is needed (this is the lesson of the retired `systemd-cdk8s`: only genuine k8s resources
+belong in the synthesis; a kubeconfig qualifies, a systemd unit did not).
+
+`ClusterKubeconfigManifestsUnit` (cluster-api domain) renders the admin kubeconfig two ways from one
+material, discriminated by `local-config`:
+
+* **The operator kubeconfig** — endpoint the node's mDNS name (`<cluster>-<node>.local`), the endpoint
+  seed-master reaches the master it bootstrapped over. Carried in a `local-config` Secret so the
+  exploder lands it as a hidden dotfile RKE2 never applies; it is consumed host-side (the readiness
+  probe's kubeconfig).
+* **The CAPI `<cluster>-kubeconfig` Secret** — endpoint the kube-vip VIP (the stable in-cluster
+  endpoint; mDNS does not resolve inside the cluster). The canonical Cluster API kubeconfig Secret
+  (data key `value`, type `cluster.x-k8s.io/secret`, `cluster.x-k8s.io/cluster-name` label) that
+  CAPI reads in-cluster to seed the OTHER nodes (further control-plane + workers). It lives in the
+  cluster's own namespace (`<cluster>`, CAPI's one-namespace-per-managed-cluster convention),
+  materialized alongside the (future) `Cluster` CR. seed-master itself bootstraps only the master
+  control node; CAPI reconciles the rest.
+
+The material crosses the gate boundary cleanly: `AdminCredentials` (cluster-pki) is revealed from the
+cellar in-container by the manifests scion and translated to `OperatorPkiMaterial` — the manifests
+domain's mirror record (contract `profiles`, alongside `SopsAgeMaterial` / `IncusIdentityMaterial`),
+carrying the render as `OperatorPkiMaterial.kubeconfig(cluster, server)`. No `cluster-pki` type
+enters `manifests-core`.
+
+NOTE: The host-side sink for the operator kubeconfig (the dotfile → the readiness probe's kubeconfig
+path, and what the cellar stores) is not yet wired. It waits on resolving the `.local.d`-vs-cellar
+tension in this document (the durable home; § "The one idea" retires `.local.d`, yet the mDNS-endpoint
+bullet above still named it). That is a cluster-readiness integration, tracked separately.
 
 == Related documentation
 

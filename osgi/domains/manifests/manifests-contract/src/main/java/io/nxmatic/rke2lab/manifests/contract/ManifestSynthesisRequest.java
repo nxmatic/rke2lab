@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -25,7 +26,8 @@ public record ManifestSynthesisRequest(
     NetworkTopology networkTopology,
     ComponentVersions componentVersions,
     Optional<ImageState> imageState,
-    Optional<IncusIdentityMaterial> incusIdentity)
+    Optional<IncusIdentityMaterial> incusIdentity,
+    Optional<OperatorPkiMaterial> operatorPki)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rke2lab.manifests.policy.enabledDomains";
@@ -53,6 +55,7 @@ public record ManifestSynthesisRequest(
             componentVersions, "componentVersions is required (no blank-version default)");
     imageState = imageState == null ? Optional.empty() : imageState;
     incusIdentity = incusIdentity == null ? Optional.empty() : incusIdentity;
+    operatorPki = operatorPki == null ? Optional.empty() : operatorPki;
   }
 
   public static Builder builder(Path synthOutdir, Path synthManifestFile) {
@@ -68,7 +71,8 @@ public record ManifestSynthesisRequest(
         .networkTopology(networkTopology)
         .componentVersions(componentVersions)
         .imageState(imageState)
-        .incusIdentity(incusIdentity);
+        .incusIdentity(incusIdentity)
+        .operatorPki(operatorPki);
   }
 
   // Immutable transformations: each returns a new request with one slice replaced. They delegate to
@@ -100,6 +104,10 @@ public record ManifestSynthesisRequest(
 
   public ManifestSynthesisRequest withIncusIdentity(IncusIdentityMaterial material) {
     return toBuilder().incusIdentity(Optional.of(material)).build();
+  }
+
+  public ManifestSynthesisRequest withOperatorPki(OperatorPkiMaterial material) {
+    return toBuilder().operatorPki(Optional.of(material)).build();
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -164,6 +172,7 @@ public record ManifestSynthesisRequest(
     private ComponentVersions componentVersions = ComponentVersions.defaults();
     private Optional<ImageState> imageState = Optional.empty();
     private Optional<IncusIdentityMaterial> incusIdentity = Optional.empty();
+    private Optional<OperatorPkiMaterial> operatorPki = Optional.empty();
 
     private Builder(Path synthOutdir, Path synthManifestFile) {
       this.synthOutdir = synthOutdir;
@@ -205,6 +214,11 @@ public record ManifestSynthesisRequest(
       return this;
     }
 
+    public Builder operatorPki(final Optional<OperatorPkiMaterial> v) {
+      this.operatorPki = v;
+      return this;
+    }
+
     public ManifestSynthesisRequest build() {
       return new ManifestSynthesisRequest(
           synthOutdir,
@@ -215,7 +229,8 @@ public record ManifestSynthesisRequest(
           networkTopology,
           componentVersions,
           imageState,
-          incusIdentity);
+          incusIdentity,
+          operatorPki);
     }
   }
 
