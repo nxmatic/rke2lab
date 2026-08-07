@@ -38,6 +38,11 @@
     <jackson.version>2.22.0</jackson.version>
     <asm.version>9.10.1</asm.version>
     <networknt.json-schema.version>1.5.6</networknt.json-schema.version>
+    <!-- BouncyCastle: the pure-Java CA-hierarchy generator for the deterministic cluster PKI
+         (cluster-pki-core). bc-jdk18on-bom keeps bcprov/bcpkix/bcutil in step (prov has a .2 patch
+         pkix/util do not — the BOM resolves each to its right version). 1.78.1+ ships proper OSGi
+         metadata, so the jars stage as native bundles. -->
+    <bouncycastle.version>1.85.2</bouncycastle.version>
     <victools.version>4.38.0</victools.version>
     <java-diff-utils.version>4.17</java-diff-utils.version>
     <jsync.version>1.5.0</jsync.version>
@@ -104,6 +109,16 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- BouncyCastle: the CA-hierarchy generator (cluster-pki-core) + the OpenSSH/PEM root-key
+           reader. The jdk18on BOM manages bcprov/bcpkix/bcutil together; consumers declare the
+           artifacts version-less. -->
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bc-jdk18on-bom</artifactId>
+        <version>${bouncycastle.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

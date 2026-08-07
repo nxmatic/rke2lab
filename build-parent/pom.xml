@@ -178,6 +178,28 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>cluster-pki-contract</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>cluster-pki-core</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>cluster-pki-bdd</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <!-- The sops external edge is TOP-LEVEL (a generic tool, like ssh-to-age-edge), not a
+           cluster-pki module — its SopsEncryptor seam is consumer-owned in cluster-pki-contract. -->
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>sops-edge</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>bench-cellar-api</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>

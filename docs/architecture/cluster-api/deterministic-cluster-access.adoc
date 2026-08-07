@@ -48,10 +48,14 @@ CAs. We exploit that to make the operator's existing root the cluster's root.
   The kubeconfig is assembled on the Mac with nothing fetched from the node.
 
 Nothing here extends the ndh certificate pipeline (which mints only self-signed *roots* and
-end-entity *leaves*, never intermediates): the cluster CA set is produced by rke2's own
-`generate-custom-ca-certs.sh` with our root, and lives rke2lab-side as a **sops view onto the ndh key
-material** — encrypted for the operator and for the cluster age recipient (`age1k0tc4…`, derived from
-the `rke2-cluster` SSH key), `keys.yaml` itself untouched.
+end-entity *leaves*, never intermediates): the cluster CA set is produced OSGi-side by the
+`cluster-pki` domain — a faithful **BouncyCastle** port of rke2's `generate-custom-ca-certs.sh`
+(proven structurally identical cert-by-cert against OpenSSL 3), rooted on our root — and lives
+rke2lab-side as a **sops view onto the ndh key material** — encrypted for the operator and for the
+cluster age recipient (`age1k0tc4…`, derived from the `rke2-cluster` SSH key), `keys.yaml` itself
+untouched. The CA hierarchy is pure Java (no shell); the only external tool contacts are the
+`sops-edge` (sealing the bundle the node's sops-nix decrypts) and the ssh-to-age edge (the cluster
+age identity), both reused, not reinvented.
 
 The sops-encrypted cluster-CA bundle and the admin kubeconfig are *projections* — generated
 per-cluster state, not source — and they **never enter the node image**. The image stays a single
@@ -71,11 +75,13 @@ consumers are host-side at runtime — the grow (which projects it into the inst
 and the readiness probe (which reads the kubeconfig). So the cellar seam suffices; the gitignored,
 per-checkout `.local.d` is retired as a home for anything that must outlive a working tree.
 
-Concretely, two cellar cases carry the PKI under `IncusGrowCoordinate` (the incus domain's dual-realm
-coordinate, beside `InstanceGrowPlan`): `ClusterCaBundle` — the sops blob, filed `PLAIN` because it is
-already sealed for the node's age recipient — and `ClusterAgeKey` — the cluster age identity that
-decrypts it on the node, filed `SEALED` (the `CellarCipher`) so its plaintext never rests beside the
-bundle. The host-side seal step files both; the GROW fetches them (revealing the sealed key) and poses
+Concretely, two cellar cases carry the PKI under `ClusterPkiCoordinate` (the cluster-pki domain's
+dual-realm coordinate — owned by the producing domain, so the incus GROW depends on it, not the
+reverse): `ClusterCaBundle` — the sops blob, filed `PLAIN` because it is already sealed for the
+node's age recipient — and `ClusterAgeKey` — the cluster age identity that decrypts it on the node,
+filed `SEALED` (the `CellarCipher`) so its plaintext never rests beside the bundle. The seal scion
+(an OSGi `@SeedScenario` that seals the bundle through the `SopsEncryptor` edge and derives the
+identity through ssh-to-age) files both; the GROW fetches them (revealing the sealed key) and poses
 them on the instance's `user.rke2lab.cluster-ca-bundle` / `user.rke2lab.sops-age-key` devlxd keys,
 never inside the (PLAIN) `InstanceGrowPlan`.
 
@@ -86,7 +92,7 @@ never inside the (PLAIN) `InstanceGrowPlan`.
 flowchart TB
   subgraph operator["Operator machine - host of trust"]
     root["mammoth-skate-tls root CA<br/>(.ndh-ssh.d/keys.yaml, sops)<br/>private key never leaves here"]
-    ceremony["cluster-CA ceremony<br/>(rke2 generate-custom-ca-certs.sh,<br/>rooted on the ndh root)"]
+    ceremony["cluster-CA seal - cluster-pki scion<br/>BouncyCastle port of<br/>generate-custom-ca-certs.sh"]
     bundle["cluster-CA bundle<br/>(server/client/request-header/etcd CAs<br/>plus service.key), sops-encrypted view"]
     kc["admin kubeconfig<br/>server = mDNS name<br/>CA = ndh root (already trusted)<br/>client cert minted from client-ca"]
     probe["Fabric8ClusterContact<br/>readyz plus rollout via Java client"]

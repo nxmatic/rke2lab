@@ -15,16 +15,7 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
  * this is the incus domain speaking to itself across the realm boundary, not a second domain.
  */
 public enum IncusGrowCoordinate implements SeedCoordinate {
-  INSTANCE_GROW_PLAN("instance-grow-plan"),
-
-  // The deterministic cluster PKI, sealed host-side once per cluster and posed on the instance's
-  // devlxd config by the GROW (NOT carried in InstanceGrowPlan — that is PLAIN at rest, and the age
-  // key must stay SEALED). Two cases, two sensitivities: the CA bundle is already a sops blob
-  // (PLAIN
-  // in the cellar), the age identity that decrypts it on the node is SEALED (CellarCipher at rest).
-  // See docs/architecture/cluster-api/deterministic-cluster-access.adoc.
-  CLUSTER_CA_BUNDLE("cluster-ca-bundle"),
-  CLUSTER_AGE_KEY("cluster-age-key");
+  INSTANCE_GROW_PLAN("instance-grow-plan");
 
   private static final String DOMAIN = "incus";
 
