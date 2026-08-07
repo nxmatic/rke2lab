@@ -71,6 +71,14 @@ consumers are host-side at runtime — the grow (which projects it into the inst
 and the readiness probe (which reads the kubeconfig). So the cellar seam suffices; the gitignored,
 per-checkout `.local.d` is retired as a home for anything that must outlive a working tree.
 
+Concretely, two cellar cases carry the PKI under `IncusGrowCoordinate` (the incus domain's dual-realm
+coordinate, beside `InstanceGrowPlan`): `ClusterCaBundle` — the sops blob, filed `PLAIN` because it is
+already sealed for the node's age recipient — and `ClusterAgeKey` — the cluster age identity that
+decrypts it on the node, filed `SEALED` (the `CellarCipher`) so its plaintext never rests beside the
+bundle. The host-side seal step files both; the GROW fetches them (revealing the sealed key) and poses
+them on the instance's `user.rke2lab.cluster-ca-bundle` / `user.rke2lab.sops-age-key` devlxd keys,
+never inside the (PLAIN) `InstanceGrowPlan`.
+
 == The target architecture
 
 [mermaid]
