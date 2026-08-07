@@ -33,6 +33,12 @@
             <maxBuildsCached>2</maxBuildsCached>
         </local>
         <projectVersioning adjustMetaInf="true"/>
+        <attachedOutputs>
+          <dirNames>
+            <dirName>classes</dirName>
+            <dirName>test-classes</dirName>
+          </dirNames>
+        </attachedOutputs>
     </configuration>
 
     <input>
