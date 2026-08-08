@@ -65,7 +65,26 @@ Two facts the reading settled, both load-bearing and both places I had it wrong 
      deployment — the harvest folds into the ONE history beside the infra (incus, cluster). A side stack has
      no live deployment, so it keeps the eager out-of-run `up()` (a stable resource name per coordinate makes
      each append a history entry). `fetch` is FILTERED to the `rke2lab:cellar:Entry` type so the resources the
-     run's stack co-hosts (the incus provider, the root `Stack`) are never mistaken for coquilles.
+     run's stack co-hosts (the incus provider, the root `Stack`) are never mistaken for coquilles. The
+     discriminant differs by VERB: a WRITE asks the thread-local deployment (`targets` — staging into the one
+     live deployment needs it on THIS thread), but a READ asks the run stack's IDENTITY
+     (`PulumiDeploymentSeed.runStack`, captured host-side at construction). A scion plays on its OWN worker
+     with no deployment installed, so a thread-local read would fork it to the side-stack history-walk and
+     RESURRECT a coquille a prior reap dropped — a run-stack delete is a tombstone-less omission the history
+     fold cannot honour (the seal read a destroyed CA the grow could not: the seal-vs-grow divergence).
+     Deciding the read by identity makes every thread read the run stack's current state alike.
++
+.The read forks by IDENTITY, not by thread — the off-thread seal and the grow read the run stack alike
+[mermaid]
+....
+flowchart TB
+  grow["grow · ON the deployment thread"] --> dec{"read discriminant"}
+  seal["seal scion · OFF the deployment thread"] --> dec
+  dec -->|"OLD · thread-local deployment (isRunStack)"| fork1["grow → current-state ✓<br/>seal → history-walk ✗"]
+  dec -->|"F2 · run-stack IDENTITY (captured host-side)"| fork2["both → current-state ✓"]
+  fork1 --> bug["history resurrects a reaped/destroyed CA<br/>seal skips · grow sees none → DIVERGENCE"]
+  fork2 --> fixed["one truth, every thread → seal & grow agree"]
+....
   ** the INTERFACE (`Cellar`, `Parcel`) is homed in `seed-broker-port` (the neutral fondation seam)
      because its face must speak gardening; the IMPL is a host object in `pulumi-edge`, laid into Felix at
      boot by `registerService` (§ open question #4, resolved) — because THIS system realises the gardener

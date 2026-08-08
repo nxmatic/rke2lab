@@ -56,9 +56,13 @@ import org.jspecify.annotations.Nullable;
  * and carries the opaque bytes — so the {@link OpaqueCellar} contract ("never opens a payload")
  * holds literally.
  *
- * <p><b>Two soils, one verb.</b> The cellar detects whether a {@link Parcel} is the RUN's OWN stack
- * — the live Pulumi deployment installed on this thread targets that project/stack (§ {@link
- * PulumiDeploymentSeed#targets}). That discriminant routes {@code store} / {@code fetch} / {@code
+ * <p><b>Two soils, one verb.</b> The cellar detects whether a {@link Parcel} is the RUN's OWN
+ * stack, but by a DIFFERENT signal for a write than for a read. A WRITE asks the live Pulumi
+ * deployment installed on THIS thread (§ {@link PulumiDeploymentSeed#targets}) — staging into the
+ * one deployment needs it here. A READ asks the run stack's IDENTITY (§ {@link
+ * PulumiDeploymentSeed#runStack}, captured host-side at construction), thread-INDEPENDENT — so a
+ * scion reading off the deployment thread still reads the run stack's current state, not the
+ * side-stack history-walk. That discriminant routes {@code store} / {@code fetch} / {@code
  * withdraw} down one of two paths; the scion never picks — each verb stays neutral.
  *
  * <p><b>store</b> — the RUN's own stack STAGES the coquille and {@link #conserve} re-declares the
@@ -74,11 +78,12 @@ import org.jspecify.annotations.Nullable;
  * restoring {@code domain} + {@code trail} + opaque {@code payload}, keyed by the output's NATIVE
  * name (the coordinate). The read is FILTERED to the {@code rke2lab:cellar:Entry} type, so the
  * resources the run's own stack co-hosts (the incus provider, the root Stack) are ignored rather
- * than mistaken for malformed coquilles. The run's stack reads its CURRENT state (every live
- * coquille sits in the one checkpoint); a side stack walks its history append-log. The typed
- * overloads ({@code fetch(parcel, type)}, {@code fetch(parcel, coordinate, type)}) DELEGATE the
- * decode to the {@link SeedCodec} — the host decodes any type ITS classpath holds; a type it lacks
- * (a bundle type) is the codec's throw, not a cellar rule.
+ * than mistaken for malformed coquilles. The run's stack (told by IDENTITY, so any thread reads it
+ * alike) reads its CURRENT state (every live coquille sits in the one checkpoint); a side stack
+ * walks its history append-log. The typed overloads ({@code fetch(parcel, type)}, {@code
+ * fetch(parcel, coordinate, type)}) DELEGATE the decode to the {@link SeedCodec} — the host decodes
+ * any type ITS classpath holds; a type it lacks (a bundle type) is the codec's throw, not a cellar
+ * rule.
  *
  * <p><b>withdraw</b> — the RUN's own stack STAGES a removal: the coordinate is simply not
  * re-declared by {@code conserve}, so the run's authoritative {@code up} reaps it — no in-band
@@ -127,6 +132,14 @@ public final class PulumiCellar implements OpaqueCellar {
   private final RunGate gate;
   private final Consumer<String> logger;
 
+  // The RUN's own stack identity, captured host-side at construction (in the GIVEN, where the live
+  // deployment is installed). READS use it to tell the run stack from a side stack by IDENTITY —
+  // thread-INDEPENDENT — so a scion reading off the deployment thread still reads the run stack's
+  // CURRENT state, not the side-stack history-walk (which would resurrect a coquille a prior reap
+  // dropped: a run-stack delete is a tombstone-less omission the fold cannot honour). Empty for a
+  // standalone/preview run (or a test): reads then fall back to the thread-local isRunStack.
+  private final Optional<Parcel> runStack;
+
   // Per-parcel staged current-state for the RUN's own stack (the "one history" path): a store
   // stages its shell, a withdraw stages an empty (an omission). Flushed by conserve() at the drain,
   // where the full live set is re-declared into the run's single deployment. Empty for the eager
@@ -135,13 +148,25 @@ public final class PulumiCellar implements OpaqueCellar {
       new LinkedHashMap<>();
 
   public PulumiCellar(Optional<Path> backendDir, RunGate gate, Consumer<String> logger) {
+    this(backendDir, gate, logger, Optional.empty());
+  }
+
+  public PulumiCellar(
+      Optional<Path> backendDir, RunGate gate, Consumer<String> logger, Optional<Parcel> runStack) {
     this.backendDir = backendDir;
     this.gate = gate;
     this.logger = logger;
+    this.runStack = runStack;
   }
 
   public static PulumiCellar fromEnvironment(RunGate gate, Consumer<String> logger) {
-    return new PulumiCellar(backendDirFromUrl(System.getenv(BACKEND_URL_ENV)), gate, logger);
+    // The run stack identity is read HERE — the GIVEN runs on the worker where PulumiDeploymentSeed
+    // installed the deployment, so a reader on any thread later tells the run stack by identity.
+    return new PulumiCellar(
+        backendDirFromUrl(System.getenv(BACKEND_URL_ENV)),
+        gate,
+        logger,
+        PulumiDeploymentSeed.runStack());
   }
 
   static Optional<Path> backendDirFromUrl(@Nullable String pulumiBackendUrl) {
@@ -193,9 +218,22 @@ public final class PulumiCellar implements OpaqueCellar {
     }
   }
 
-  /** Whether {@code parcel} is the RUN's own stack — the live deployment targets it. */
+  /** Whether {@code parcel} is the RUN's own stack for a WRITE — the live deployment targets it. */
   private boolean isRunStack(Parcel parcel) {
     return PulumiDeploymentSeed.targets(parcel.project(), parcel.stack());
+  }
+
+  /**
+   * Whether {@code parcel} is the RUN's own stack for a READ — decided by the run stack's IDENTITY
+   * (captured host-side at construction), NOT the thread-local deployment. So a scion reading off
+   * the deployment thread still reads the run stack's CURRENT state — the same view the host grow
+   * sees — instead of forking to the side-stack history-walk, which would resurrect a coquille a
+   * prior reap dropped (a run-stack delete is a tombstone-less omission the history fold cannot
+   * honour). Falls back to {@link #isRunStack} when no identity was captured (a standalone/preview
+   * run or a test), preserving the prior behaviour exactly.
+   */
+  private boolean readsRunStack(Parcel parcel) {
+    return runStack.map(parcel::equals).orElseGet(() -> isRunStack(parcel));
   }
 
   /** Stage one run-stack op: a present shell (a store) or an empty (a withdrawal). */
@@ -295,7 +333,7 @@ public final class PulumiCellar implements OpaqueCellar {
     final StackHandle handle = StackHandle.forBackend(root, parcel.project(), parcel.stack());
     final List<Shelved> reaped = new ArrayList<>();
 
-    if (isRunStack(parcel)) {
+    if (readsRunStack(parcel)) {
       // The run's OWN stack holds EVERY live coquille as a resource in ONE current state (conserve
       // re-declares them each up). Read that current state, filtered to our own CellarEntry type so
       // co-resident resources (the incus provider, the root Stack) are ignored rather than mistaken

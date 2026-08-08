@@ -39,6 +39,10 @@ class PulumiCellarRunGateTest {
     return new SeedEnvelope("incus", "incus-prep", "{\"recipeDigest\":\"abc\",\"soil\":\"/plot\"}");
   }
 
+  private static SeedEnvelope harvest(String coordinate) {
+    return new SeedEnvelope("incus", coordinate, "{\"v\":\"" + coordinate + "\"}");
+  }
+
   @Test
   void cultivating_store_conserves_the_harvest(@TempDir Path backend) {
     cellarOver(backend, true).store(PARCEL, harvest());
@@ -56,5 +60,32 @@ class PulumiCellarRunGateTest {
     final List<SeedEnvelope> reaped = cellarOver(backend, true).fetch(PARCEL);
     assertTrue(
         reaped.isEmpty(), "a surveying store (preview) touches no state — nothing conserved");
+  }
+
+  @Test
+  void a_read_by_run_stack_identity_reads_current_state_not_history(@TempDir Path backend) {
+    // Two eager cultivating stores: each is its OWN up, so each CLOBBERS the current-state to its
+    // one entry while HISTORY keeps both. This is the same current-state ≠ history divergence the
+    // run stack's reap-by-omission produces — a coquille dropped from current-state, no tombstone,
+    // still standing in an old checkpoint.
+    cellarOver(backend, true).store(PARCEL, harvest("a"));
+    cellarOver(backend, true).store(PARCEL, harvest("b"));
+
+    // Reader with NO run-stack identity, off the deployment thread (none installed): isRunStack is
+    // false → the side-stack history-walk folds BOTH, resurrecting the clobbered 'a' — the seal's
+    // off-thread bug, reproduced.
+    final List<String> viaHistory =
+        new PulumiCellar(Optional.of(backend), () -> true, line -> {})
+            .fetch(PARCEL).stream().map(SeedEnvelope::coordinate).sorted().toList();
+    assertEquals(
+        List.of("a", "b"), viaHistory, "the history-walk fold resurrects the clobbered entry");
+
+    // Reader WITH the run-stack identity (F2): reads the CURRENT state regardless of thread → only
+    // the last up's entry, the true live state — the resurrected 'a' is gone.
+    final List<String> viaIdentity =
+        new PulumiCellar(Optional.of(backend), () -> true, line -> {}, Optional.of(PARCEL))
+            .fetch(PARCEL).stream().map(SeedEnvelope::coordinate).sorted().toList();
+    assertEquals(
+        List.of("b"), viaIdentity, "identity reads current-state — no history resurrection");
   }
 }

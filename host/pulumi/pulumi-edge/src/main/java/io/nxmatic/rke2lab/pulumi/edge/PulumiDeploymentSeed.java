@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.pulumi.edge;
 
 import com.pulumi.deployment.DeploymentInstance;
 import com.pulumi.deployment.internal.DeploymentInstanceHolder;
+import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -58,15 +60,27 @@ public final class PulumiDeploymentSeed implements BeforeEachCallback {
   }
 
   /**
-   * Whether the live deployment on THIS thread targets {@code project/stack} — the discriminant the
-   * cellar uses to tell its OWN run stack (which it must write INTO this one deployment, the "one
-   * history" path) from a side stack like the doctor's ledger (a separate out-of-run {@code up}).
-   * Keeps the {@code com.pulumi.deployment.internal} coupling confined to this seed, the one class
-   * that already owns the deployment handle. False when no deployment is installed.
+   * The {@link Parcel} the live deployment on THIS thread targets — the RUN's own stack identity.
+   * Read ONCE host-side (in the GIVEN, where the deployment is installed) and captured by {@code
+   * PulumiCellar}, so a READER can tell the run stack from a side stack by IDENTITY, WITHOUT the
+   * thread-local — a scion plays off the deployment thread, yet must still read the run stack's
+   * current state. Empty when no deployment is installed (a standalone/preview run). Confines the
+   * {@code com.pulumi.deployment.internal} coupling here, the one class that owns the handle.
+   */
+  public static Optional<Parcel> runStack() {
+    return DeploymentInstanceHolder.getInstanceOptional()
+        .map(d -> new Parcel(d.getProjectName(), d.getStackName()));
+  }
+
+  /**
+   * Whether the live deployment on THIS thread targets {@code project/stack} — the discriminant a
+   * WRITE uses (staging into the one live deployment needs it on this very thread; a side stack
+   * like the doctor's ledger files eagerly via its own out-of-run {@code up}). A READ tells the run
+   * stack by identity instead (see {@link #runStack}). False when no deployment is installed.
    */
   public static boolean targets(String project, String stack) {
-    return DeploymentInstanceHolder.getInstanceOptional()
-        .map(d -> project.equals(d.getProjectName()) && stack.equals(d.getStackName()))
+    return runStack()
+        .map(p -> project.equals(p.project()) && stack.equals(p.stack()))
         .orElse(false);
   }
 }
