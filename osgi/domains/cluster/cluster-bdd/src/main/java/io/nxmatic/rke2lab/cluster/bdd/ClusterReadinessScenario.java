@@ -116,6 +116,11 @@ public class ClusterReadinessScenario
   }
 
   @Override
+  public String readinessCheckpoint() {
+    return Checkpoint.CLUSTER_READINESS.slug();
+  }
+
+  @Override
   public void receiveBudget(ReadinessBudget budget) {
     this.budget = budget;
   }

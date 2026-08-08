@@ -211,6 +211,29 @@ public final class ConfigLoader {
   }
 
   /**
+   * The child keys of {@code section} whose value is itself an object — e.g. the per-checkpoint
+   * blocks under {@code readiness} ({@code systemd-adapter}, {@code cluster-readiness}), as opposed
+   * to the section's scalar knobs ({@code connectTimeout}, {@code timeout}). Empty when the section
+   * is absent. Lets a caller discover a dynamic set of sub-sections without naming each.
+   */
+  public List<String> objectKeys(String section) {
+    final Optional<JsonNode> node = sectionReader.read(section);
+    if (node.isEmpty()) {
+      return List.of();
+    }
+    final List<String> keys = new ArrayList<>();
+    node.get()
+        .properties()
+        .forEach(
+            entry -> {
+              if (entry.getValue().isObject()) {
+                keys.add(entry.getKey());
+              }
+            });
+    return keys;
+  }
+
+  /**
    * Reads a nested string list (e.g. {@code entryGate.cleanWorktree.tolerated} = {@code
    * [".secrets", "Pulumi.dev.yaml"]}). Empty list when the key is absent or not an array.
    */

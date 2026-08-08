@@ -44,6 +44,7 @@ import io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -245,6 +246,16 @@ public class ClusterSeedScenario
       // not a handler: the run-condition is a service the whole run shares (§ RunGate).
       final RunGate runGate = run.runMode()::playsLive;
       gardening.connection().context().registerService(RunGate.class, runGate, new Hashtable<>());
+
+      // Publish the ambient readiness deadlines (projected from rke2lab:readiness:) the readiness
+      // scions resolve to bound their awaitReady — the RunGate shape: a fact of the WHOLE run,
+      // keyed
+      // per checkpoint, resolved from the registry, not carried on an envelope.
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              ReadinessOverrides.class, run.config().readinessOverrides(), new Hashtable<>());
 
       // The two ambient facts a scion needs to STORE its own harvest (§ host-cellar-realisation,
       // every-scion-contributes): the Cellar (the neutral furniture the host lays into Felix) and

@@ -116,6 +116,11 @@ public class SystemdAdapterScenario
   }
 
   @Override
+  public String readinessCheckpoint() {
+    return Checkpoint.SYSTEMD_ADAPTER.slug();
+  }
+
+  @Override
   public void receiveBudget(ReadinessBudget budget) {
     this.budget = budget;
   }

@@ -8,9 +8,10 @@ import java.lang.annotation.Target;
 /**
  * The two readiness deadlines a scenario's {@code @Test} carries, DECLARED where they read — beside
  * the readiness checkpoint they bound, so the patience is visible in the code and not buried in a
- * config file. The stack config may still override either ({@link ReadinessDeadlineOverride}); the
- * {@link ReadinessBudgetExtension} resolves {@code effective = override.orElse(this-default)} and
- * hands the scenario a {@link io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget}.
+ * config file. The stack config may still override either (via {@code
+ * io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides}, keyed per checkpoint); the {@link
+ * ReadinessBudgetExtension} resolves {@code effective = override.orElse(this-default)} and hands
+ * the scenario a {@link io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget}.
  *
  * <p>ISO-8601 strings because an annotation cannot hold a {@code Duration}; parsed with {@code
  * Duration.parse}. A {@code ReadinessBudgetReceiver} scenario MUST carry this on its {@code @Test}

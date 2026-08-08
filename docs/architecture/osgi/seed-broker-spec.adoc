@@ -1890,6 +1890,22 @@ run, not a property of any seed — so it is published ONCE as a neutral ambient
 Felix at boot. Its VALUE depends on `pulumi-edge` (projected from `RunMode.detect()` → Pulumi's
 `isDryRun`), so the HOST publishes it live; a test `registerService`s its own.
 
+[NOTE]
+.Sibling ambient service: `ReadinessOverrides` (readiness deadlines, keyed per checkpoint)
+====
+`ReadinessOverrides` is the `RunGate`'s twin — another fact of the WHOLE run, published ONCE into
+Felix at boot (the host projects it from `rke2lab:readiness:`; a test `registerService`s its own or
+none). It carries the operator's readiness deadlines at two levels: a global default and a
+per-checkpoint map of `ReadinessDeadlineOverride` (two optional durations — `connect`, `ready` —
+keyed by the checkpoint slug, e.g. `systemd-adapter` / `cluster-readiness`). A readiness scion
+resolves it from its own registry (the same `resolve*` route as `RunGate`), calls
+`forCheckpoint(slug)` to fold its per-checkpoint entry over the global, and the
+`ReadinessBudgetExtension` folds THAT over the scenario's `@ReadinessDeadlines` annotation default —
+so a deadline the operator leaves unset stays the value declared in code. Both types live in this
+seam (a single system-exported copy) so the host-flat publisher and the in-container scion share one
+class, never a dual-realm split. See `docs/architecture/osgi/cluster-edge-spec.adoc` (§ readiness-await).
+====
+
 *The FRONTIER selects; the scenario is mode-blind (reverses "the scion consults it per-step").*
 The mode is no longer read inside a scenario. The `@OsgiService` bridge reads the ambient `RunGate` ONCE
 and resolves every collaborator with an LDAP filter that picks the right implementation:

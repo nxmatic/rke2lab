@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,6 +66,27 @@ public record Rke2labConfig(
     return build(loader, true);
   }
 
+  /**
+   * The per-checkpoint readiness overrides — one {@link ReadinessConfig.CheckpointDeadlines} for
+   * each child object under {@code readiness} (the scalar knobs {@code connectTimeout}/{@code
+   * timeout} are the global level, not objects, so {@code objectKeys} leaves them out). Keyed by
+   * the checkpoint slug the operator names, matched later to a scenario's {@code
+   * readinessCheckpoint()}.
+   */
+  private static Map<String, ReadinessConfig.CheckpointDeadlines> readinessCheckpoints(
+      ConfigLoader loader) {
+    final LinkedHashMap<String, ReadinessConfig.CheckpointDeadlines> byCheckpoint =
+        new LinkedHashMap<>();
+    for (final String slug : loader.objectKeys("readiness")) {
+      byCheckpoint.put(
+          slug,
+          new ReadinessConfig.CheckpointDeadlines(
+              loader.optionalDuration("readiness." + slug, "connectTimeout"),
+              loader.optionalDuration("readiness." + slug, "timeout")));
+    }
+    return Map.copyOf(byCheckpoint);
+  }
+
   private static Rke2labConfig build(ConfigLoader loader, boolean validate) {
     final InfraConfigRegistry infra = InfraConfigRegistry.from(loader);
 
@@ -81,7 +103,9 @@ public record Rke2labConfig(
                 loader.optionalBoolean("policy.gitDirtyCheck", "enabled")),
             new ReadinessConfig(
                 loader.optionalBoolean("readiness", "enabled"),
-                loader.optionalDuration("readiness", "timeout")),
+                loader.optionalDuration("readiness", "connectTimeout"),
+                loader.optionalDuration("readiness", "timeout"),
+                readinessCheckpoints(loader)),
             new EntryGateConfig(
                 loader.optionalBoolean("entryGate.cleanWorktree", "required"),
                 loader.stringList("entryGate.cleanWorktree", "tolerated"),
@@ -157,7 +181,29 @@ public record Rke2labConfig(
   public record ProvisioningPolicyConfig(
       Optional<Boolean> lanBinding, Optional<Boolean> gitDirtyCheck) {}
 
-  public record ReadinessConfig(Optional<Boolean> enabled, Optional<Duration> timeout) {}
+  /**
+   * The readiness deadlines the operator tunes under {@code rke2lab:readiness:}. Two levels: {@code
+   * connectTimeout}/{@code timeout} are the GLOBAL defaults (every checkpoint), and {@link
+   * #checkpoints} carries per-checkpoint overrides keyed by the checkpoint slug ({@code
+   * systemd-adapter}, {@code cluster-readiness}) — a per-checkpoint half wins over the global, and
+   * whatever both leave empty falls to the scenario's {@code @ReadinessDeadlines} annotation.
+   * {@code enabled} is the pre-existing on/off knob. Absent everywhere ⇒ the annotation defaults
+   * stand.
+   */
+  public record ReadinessConfig(
+      Optional<Boolean> enabled,
+      Optional<Duration> connectTimeout,
+      Optional<Duration> timeout,
+      Map<String, CheckpointDeadlines> checkpoints) {
+
+    public ReadinessConfig {
+      checkpoints = checkpoints == null ? Map.of() : Map.copyOf(checkpoints);
+    }
+
+    /** One checkpoint's override of the two deadlines — each half optional. */
+    public record CheckpointDeadlines(
+        Optional<Duration> connectTimeout, Optional<Duration> timeout) {}
+  }
 
   /**
    * The worktree entry gate. {@code cleanWorktreeRequired} arms the clean-worktree sub-gate and

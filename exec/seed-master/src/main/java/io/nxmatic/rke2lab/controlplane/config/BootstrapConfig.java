@@ -1,8 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessDeadlineOverride;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides;
 import java.net.URI;
 import java.nio.file.Path;
-import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.osgi.service.log.LogLevel;
 
@@ -29,7 +32,7 @@ public record BootstrapConfig(
     String systemdAdapterDbusHost,
     int systemdAdapterDbusPort,
     int hostAssetRotationRetentionCount,
-    Duration readinessTimeout,
+    ReadinessOverrides readinessOverrides,
     Optional<LogLevel> logLevel) {
 
   // Defaults applied here, at the single derivation site — formerly the Builder field initializers
@@ -49,7 +52,6 @@ public record BootstrapConfig(
   private static final boolean DEFAULT_NFS_AUTOMOUNT = true;
   private static final int DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT = 12434;
   private static final int DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT = 3;
-  private static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofMinutes(10);
 
   /**
    * Derive the Stage A bootstrap config from the root DTO. The worktree root is NOT here: it is the
@@ -110,12 +112,37 @@ public record BootstrapConfig(
             .hostAsset()
             .rotationRetentionCount()
             .orElse(DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT),
-        config.readiness().timeout().orElse(DEFAULT_READINESS_TIMEOUT),
+        readinessOverridesFrom(config.readiness()),
         // No default: absent ⇒ no override — the boot keeps the Felix default and the generated pax
         // logback keeps its ${seed.log.level} default. A present value drives BOTH planes:
         // felix.log.level (Plane A) + the pax logback root via the seed.log.level property (Plane
         // B).
         config.logging().level());
+  }
+
+  /**
+   * Project the operator's {@code rke2lab:readiness:} config into the neutral {@link
+   * ReadinessOverrides} seam the host publishes for the readiness scions — the global default plus
+   * the per-checkpoint map, each an {@link ReadinessDeadlineOverride} of two optional durations.
+   * Absent everywhere ⇒ {@link ReadinessOverrides#NONE}, so every deadline stays the scenario's
+   * {@code @ReadinessDeadlines} annotation default (formerly the dead {@code
+   * DEFAULT_READINESS_TIMEOUT} this replaces — the deadline now lives in code, tuned here, not
+   * defaulted here).
+   */
+  private static ReadinessOverrides readinessOverridesFrom(
+      Rke2labConfig.ReadinessConfig readiness) {
+    final ReadinessDeadlineOverride global =
+        new ReadinessDeadlineOverride(readiness.connectTimeout(), readiness.timeout());
+    final LinkedHashMap<String, ReadinessDeadlineOverride> perCheckpoint = new LinkedHashMap<>();
+    readiness
+        .checkpoints()
+        .forEach(
+            (slug, deadlines) ->
+                perCheckpoint.put(
+                    slug,
+                    new ReadinessDeadlineOverride(
+                        deadlines.connectTimeout(), deadlines.timeout())));
+    return new ReadinessOverrides(global, Map.copyOf(perCheckpoint));
   }
 
   public String imageBuilderBinary() {

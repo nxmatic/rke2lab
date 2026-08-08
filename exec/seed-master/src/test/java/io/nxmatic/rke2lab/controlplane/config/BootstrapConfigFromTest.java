@@ -2,9 +2,9 @@ package io.nxmatic.rke2lab.controlplane.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides;
 import java.net.URI;
 import java.nio.file.Path;
-import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class BootstrapConfigFromTest {
@@ -42,7 +42,9 @@ class BootstrapConfigFromTest {
     assertEquals("bioskop-master.local", boot.systemdAdapterDbusHost());
     assertEquals(12434, boot.systemdAdapterDbusPort());
     assertEquals(3, boot.hostAssetRotationRetentionCount());
-    assertEquals(Duration.ofMinutes(10), boot.readinessTimeout());
+    // No readiness config ⇒ no overrides; every deadline stays the scenario's @ReadinessDeadlines
+    // annotation default (the host defaults nothing here anymore).
+    assertEquals(ReadinessOverrides.NONE, boot.readinessOverrides());
   }
 
   @Test

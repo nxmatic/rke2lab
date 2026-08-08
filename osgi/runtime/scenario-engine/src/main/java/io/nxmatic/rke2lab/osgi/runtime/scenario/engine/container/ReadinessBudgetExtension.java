@@ -1,26 +1,27 @@
 package io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container;
 
 import io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessDeadlineOverride;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides;
 import java.time.Duration;
-import java.util.Optional;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.platform.engine.support.store.Namespace;
-import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
+import org.osgi.framework.FrameworkUtil;
 
 /**
  * Resolves a readiness scenario's effective {@link ReadinessBudget} and hands it to the scenario
  * before the body — the readiness twin of {@link ScenarioInputSeed}, part of the
- * {@code @SeedScenario} socle. It folds two sources: the {@link ReadinessDeadlines} the
- * {@code @Test} DECLARES (the visible-in-code defaults) and the {@link ReadinessDeadlineOverride}
- * the host seeds from the stack config — {@code effective = override.orElse(annotation-default)}
- * per deadline.
+ * {@code @SeedScenario} socle. It folds two sources per checkpoint: the {@link ReadinessDeadlines}
+ * the {@code @Test} DECLARES (the visible-in-code defaults) and the stack {@link
+ * ReadinessOverrides} the host published as an ambient service — {@code effective =
+ * override.orElse(annotation-default)} per deadline, the override resolved for THIS scenario's
+ * {@link ReadinessBudgetReceiver#readinessCheckpoint()}.
  *
- * <p>Both halves ride the same store the seeds use: the host's {@link #into} puts the override into
- * the launcher session store, and {@code beforeTestExecution} reads it back through the parent
- * chain (empty ⇒ {@link ReadinessDeadlineOverride#NONE}, all annotation). A live object, in-realm
- * (two JDK {@code Duration}s, no codec) — the same crossing the input rides.
+ * <p>The override is read from the OSGi registry, exactly the way the ambient {@link
+ * io.nxmatic.rke2lab.seed.broker.port.RunGate} is read: the host publishes ONE {@link
+ * ReadinessOverrides} at boot (a single system-exported seam copy), every readiness scion resolves
+ * it from its own bundle registry. No override published (or a host-flat play not bundle-loaded) ⇒
+ * {@link ReadinessOverrides#NONE}, all annotation.
  *
  * <p>Opt-in by implementing {@link ReadinessBudgetReceiver}; a scenario that does not is left
  * untouched. A receiver that omits {@link ReadinessDeadlines} on its {@code @Test} is a wiring bug
@@ -28,24 +29,6 @@ import org.junit.platform.engine.support.store.NamespacedHierarchicalStore;
  * one.
  */
 public final class ReadinessBudgetExtension implements BeforeTestExecutionCallback {
-
-  private static final String KEY = "readiness-deadline-override";
-
-  private static String[] nsParts() {
-    return new String[] {ReadinessBudgetExtension.class.getName(), KEY};
-  }
-
-  /**
-   * The host's seeding consumer, handed to the launcher's session-store seed: put {@code override}
-   * under this extension's namespace + key. {@code beforeTestExecution} reads exactly it back. The
-   * host builds the override from Pulumi ({@code rke2lab:readiness:connectTimeout} / {@code
-   * :timeout}); seeding nothing leaves every deadline at the annotation default.
-   */
-  public static Consumer<NamespacedHierarchicalStore<Namespace>> into(
-      ReadinessDeadlineOverride override) {
-    final Namespace ns = Namespace.create((Object[]) nsParts());
-    return store -> store.put(ns, KEY, override);
-  }
 
   @Override
   public void beforeTestExecution(ExtensionContext context) {
@@ -60,20 +43,33 @@ public final class ReadinessBudgetExtension implements BeforeTestExecutionCallba
               + " is a ReadinessBudgetReceiver but its @Test carries no @ReadinessDeadlines —"
               + " declare the connect/ready defaults where they read");
     }
-    receiver.receiveBudget(resolve(deadlines, readOverride(context)));
+    final ReadinessDeadlineOverride override =
+        resolveOverrides(receiver).forCheckpoint(receiver.readinessCheckpoint());
+    receiver.receiveBudget(fold(deadlines, override));
   }
 
-  private static ReadinessBudget resolve(
+  /**
+   * The ambient {@link ReadinessOverrides} the host published — resolved from the scion's OWN
+   * bundle registry (the {@link io.nxmatic.rke2lab.seed.broker.port.RunGate} route). A host-flat
+   * instance (not bundle-loaded) has no bundle registry and receives no override — {@link
+   * ReadinessOverrides#NONE}. The registry is released at once (a one-shot lookup of a
+   * host-registered service, not a delayed SCR component), the {@code ScenarioCellarExtension}
+   * durable-lookup shape.
+   */
+  private static ReadinessOverrides resolveOverrides(ReadinessBudgetReceiver receiver) {
+    if (FrameworkUtil.getBundle(receiver.getClass()) == null) {
+      return ReadinessOverrides.NONE;
+    }
+    try (ScenarioRegistry registry = ScenarioRegistry.of(receiver)) {
+      return registry.optional(ReadinessOverrides.class).orElse(ReadinessOverrides.NONE);
+    }
+  }
+
+  private static ReadinessBudget fold(
       ReadinessDeadlines deadlines, ReadinessDeadlineOverride override) {
     final Duration connect =
         override.connect().orElseGet(() -> Duration.parse(deadlines.connect()));
     final Duration ready = override.ready().orElseGet(() -> Duration.parse(deadlines.ready()));
     return ReadinessBudget.of(connect, ready);
-  }
-
-  private static ReadinessDeadlineOverride readOverride(ExtensionContext context) {
-    final ExtensionContext.Namespace ns = ExtensionContext.Namespace.create((Object[]) nsParts());
-    return Optional.ofNullable(context.getStore(ns).get(KEY, ReadinessDeadlineOverride.class))
-        .orElse(ReadinessDeadlineOverride.NONE);
   }
 }
