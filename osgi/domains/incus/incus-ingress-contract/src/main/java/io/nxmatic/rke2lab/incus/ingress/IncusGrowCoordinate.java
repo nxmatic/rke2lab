@@ -15,7 +15,14 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
  * this is the incus domain speaking to itself across the realm boundary, not a second domain.
  */
 public enum IncusGrowCoordinate implements SeedCoordinate {
-  INSTANCE_GROW_PLAN("instance-grow-plan");
+  INSTANCE_GROW_PLAN("instance-grow-plan"),
+
+  /**
+   * The grow's produced fact ({@link GrowOutcome}) — stored on the run's TRANSIENT bus by the host
+   * grow step, read by the readiness-budget tuning. Same domain, the incus grow speaking its
+   * outcome forward within the run.
+   */
+  GROW_OUTCOME("grow-outcome");
 
   private static final String DOMAIN = "incus";
 

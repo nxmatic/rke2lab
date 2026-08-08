@@ -7,6 +7,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.Persistence;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.LinkedHashSet;
@@ -93,6 +94,10 @@ public class ScenarioCellarExtension
     final LinkedHashSet<Parcel> parcels = new LinkedHashSet<>();
     for (ScenarioCellar.Entry entry : ScenarioCellar.entriesOf(model)) {
       parcels.add(entry.parcel());
+      if (entry.persistence() == Persistence.TRANSIENT) {
+        continue; // the within-run bus — read this run (overlay + inheritance), evicted at the
+        // drain
+      }
       if (entry.tombstone()) {
         durable.withdraw(entry.parcel(), coordinateOf(entry.envelope()));
       } else {

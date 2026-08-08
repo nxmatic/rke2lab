@@ -323,7 +323,7 @@ sequenceDiagram
   L->>S: play — a post-processor sets SeedRun before GIVEN
   Note over S: GIVEN bootstraps (narrated) — consumes the connection, does NOT open it
   S->>S: registerService(RunGate/OpaqueCellar/Parcel) — the RUN layer, from SeedRun
-  Note over S: WHEN — worktree(survey→facts, entry gate enforced here) · fetch · bbox · incus-prepare · incus-RECONCILE · host GROW (gated on a live deployment) · systemd · cluster — THEN store→tag [+VISION: post-GROW verify]
+  Note over S: WHEN — worktree(survey→facts, entry gate) · fetch · bbox · incus-prepare · incus-RECONCILE · host GROW (gated on a live deployment; reads cold/warm Growth, files GrowOutcome on the TRANSIENT bus) · kubeconfig · readiness budget tuned to growth (WARM⇒fail-fast, COLD⇒patient) · systemd + cluster (AWAIT convergence, not one-shot) — THEN store→tag
   S->>Sc: broker.sow(RunbookCoordinate(soil), txId + writeSetOf(trunk)) — the ALLER sense
   Note over Sc: scion CE poses the write-set as Entry(inherited=true), scion reads own>inherited>durable
   Sc->>Sc: scion CE AfterTestExecution — STRIP the inherited before the front-door serializes
@@ -337,6 +337,19 @@ graph cannot enter Felix and `isDryRun()` is only knowable there. Layer 2 (the G
 gardening as narration. Only the `RunMode` crosses, through the launcher's designed inbound channel — NOT
 the former `HostSeeder` (one value set, none of the executor-swap / model-injection / probe-fan-out
 machinery). Opening the gardening is the GIVEN, never a WHEN; the eight WHENs are the map's runbook.
+
+*The readiness beat — cold/warm conditioned (2026-08-08).* The host GROW does more than actualise the
+plan. At its ENTRY it reads the cold/warm `Growth` from the prior stack state (WARM = a `seed-instance`
+already `Running`, COLD = absent or stopped) and files it as `GrowOutcome` on the cellar's TRANSIENT
+bus — captured once, before the grow starts the instance and the observation is lost, and never
+conserved (§ host-cellar-realisation-spec, the reverse channel; § seed-broker-spec, the transient
+tier). A post-GROW WHEN then tunes the readiness budget to it: WARM ⇒ a short fail-fast
+`ReadinessOverrides` (a live master answers at once, so a stall is a fault to surface NOW), COLD ⇒ the
+patient config-derived one. The systemd and cluster crossings that follow no longer probe ONE-SHOT:
+they AWAIT convergence within that budget (§ cluster-edge-spec, readiness-await), so a gate probed
+during grow no longer fails the instant the node is not yet up. The distinction is principled — the
+warm/cold fact CONDITIONS the run (it feeds the budget through a JUnit extension), it is not a domain
+input, so it rides the ambient `ReadinessOverrides` seam like `RunGate`, never the facet.
 
 *The transaction crosses BOTH ways.* The RETURN sense (a scion's tags fold UP into the trunk, the root
 drains) was the original design; the ALLER sense (the root hands DOWN the in-flight write-set so a

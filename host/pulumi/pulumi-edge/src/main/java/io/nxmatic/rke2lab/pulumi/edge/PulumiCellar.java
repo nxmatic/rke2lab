@@ -155,6 +155,27 @@ public final class PulumiCellar implements OpaqueCellar {
     return backendDir;
   }
 
+  /**
+   * The stack's CURRENT snapshot — the last-committed deployment state. During the run's own {@code
+   * up} this is the state BEFORE this up commits (the prior state), so a host reader sees the world
+   * as it was at grow entry. Exposed for a resource the cellar does not model as a coquille (the
+   * grow reads {@code seed-instance}'s prior running state to tell WARM from COLD). Empty when no
+   * file:// backend is configured or the stack has no state yet; a present-but-unreadable state is
+   * corruption, propagated.
+   */
+  public Optional<StackSnapshot> currentSnapshot(Parcel parcel) {
+    if (backendDir.isEmpty()) {
+      return Optional.empty();
+    }
+    final StackHandle handle =
+        StackHandle.forBackend(backendDir.orElseThrow(), parcel.project(), parcel.stack());
+    try {
+      return handle.currentSnapshot();
+    } catch (StackException e) {
+      throw new RuntimeException("stack state present but unreadable under " + backendDir, e);
+    }
+  }
+
   @Override
   public void store(Parcel parcel, SeedEnvelope vegetal) {
     // A store files a self-characterising coquille: the CLEAR shell (domain, trail, tombstone)

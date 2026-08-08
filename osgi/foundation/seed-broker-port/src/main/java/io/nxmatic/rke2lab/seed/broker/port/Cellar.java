@@ -42,6 +42,33 @@ public interface Cellar {
   }
 
   /**
+   * File a decoded value with an explicit {@link Persistence} tier — the within-run bus overload.
+   * {@link Persistence#DURABLE} is the ordinary store (drained and conserved); {@link
+   * Persistence#TRANSIENT} rides the run's overlay and inheritance but is evicted at the drain, so
+   * it never reaches the durable backend. A capability, not a core verb — hence a default: only the
+   * transactional cellar has a drain to skip and overrides this; a plain durable backend has none,
+   * so it honestly treats every store as durable (§ cellar-transactional, the transient tier).
+   */
+  default <T> void store(
+      Parcel parcel,
+      SeedCoordinate coordinate,
+      T value,
+      Sensitivity sensitivity,
+      Persistence persistence) {
+    store(parcel, coordinate, value, sensitivity);
+  }
+
+  /**
+   * File a value on the within-run bus — the {@link Persistence#TRANSIENT} convenience over the
+   * five-arg form, filed {@link Sensitivity#PLAIN} (a transient fact is a produced observation, not
+   * a secret at rest). Readable this run (overlay + inheritance), evicted at the drain — it never
+   * reaches the durable backend. A transient SECRET, were one ever needed, uses the five-arg form.
+   */
+  default <T> void storeTransient(Parcel parcel, SeedCoordinate coordinate, T value) {
+    store(parcel, coordinate, value, Sensitivity.PLAIN, Persistence.TRANSIENT);
+  }
+
+  /**
    * The whole timeline DECODED into {@code type} — one {@code T} per readable entry, oldest first
    * (the doctor's medical record, the ledger). Fail-at-end: an entry the codec cannot read into
    * {@code type} is SKIPPED, the fold continues on the rest. Tombstones (a withdrawn case's marker)

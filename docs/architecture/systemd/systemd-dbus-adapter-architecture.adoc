@@ -196,6 +196,25 @@ wired bundle-to-bundle inside the OSGi world, so neither side leaks its own conf
   EMPTY is the honest model of an unamended (offline) play — the scenario then falls to the marker.
 |===
 
+== Readiness — awaiting convergence, not a one-shot probe (2026-08)
+
+`SystemdRuntimeProbe.awaitReady(request, budget)` is the systemd twin of the cluster's
+`ClusterReadinessContact.awaitReady` (§ link:../osgi/cluster-edge-spec.adoc[cluster-edge-spec],
+readiness-await). It does NOT snapshot the adapter once; it AWAITS convergence over the shared
+`ReadinessAwait` driver (`osgi/runtime/readiness-await`): a two-tier `ReadinessBudget` — a CONNECT
+deadline to reach the dbus-over-TCP endpoint (absorbing a cold boot), then a READY deadline to
+converge once reachable. The edge opens ONE dbus connection, subscribes the manager's `JobRemoved`
+signal, and wakes on each job completion to re-check the target's state rather than polling blind —
+falling back to a bounded poll if no signal arrives. On the connect deadline it throws, surfaced as an
+adapter-not-ready snapshot. This is what fixed the regression where a checkpoint probed DURING the grow
+failed the instant the node was not yet up.
+
+The budget is CONDITIONED by the grow's cold/warm `Growth` (§ link:../atlas/seed.adoc[atlas/seed], the
+readiness beat): a WARM master gets a short fail-fast budget, a COLD bring-up the patient one. The
+deadline VALUE lives in code (`@ReadinessDeadlines` on the scenario `@Test`, the visible default) and is
+tuned per checkpoint from `rke2lab:readiness:` under the `systemd-adapter` checkpoint slug (§
+link:../osgi/seed-broker-spec.adoc[seed-broker-spec], `ReadinessOverrides`).
+
 == Review and evolution policy
 
 For large updates, prefer one PR per diagram concern:

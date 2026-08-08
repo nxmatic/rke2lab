@@ -663,6 +663,19 @@ disk mounts and the plan carries none: `BootstrapPaths` stays OSGi-side (the sta
 host GROW derives no path, holds no `BootstrapPaths` and no worktree root — the
 scion-projects/host-actualises rule, so the GROW actualises the plan ALONE.
 
+*The reverse channel — `GrowOutcome`, the grow's produced fact (2026-08-08).* The plan flows
+scion→host (projected, then actualised); one fact flows the OTHER way, host→run. At grow ENTRY the
+host reads the cold/warm `Growth` from the prior stack state — `GrowthCondition` over the
+`seed-instance` resource: `Running` in the last-committed deployment ⇒ `WARM` (a re-run against a
+live master), absent or stopped ⇒ `COLD`. It is filed as `GrowOutcome` under
+`IncusGrowCoordinate.GROW_OUTCOME`, dual-realm exactly like `InstanceGrowPlan` (the host produces it,
+a consumer decodes it), but on the cellar's TRANSIENT tier (§ seed-broker-spec, the transient tier):
+the fact's truth evaporates the instant the grow starts the instance, so it is captured ONCE and NOT
+conserved — the drain evicts it, it never lands in the stack state. Its sole consumer today is the
+readiness-budget tuning (a post-grow WHEN of `ClusterSeedScenario` folds `WARM` into a short
+fail-fast `ReadinessOverrides`, `COLD` keeps the patient config-derived one), but the transient bus
+is general — any scion of the run can read the frozen fact.
+
 *The scion-side producers (incus-core, OSGi-only).* Collaborators assemble the plan, each named
 by `IncusProvisionScenario`'s PREPARE beats: `GrowNetworkResolver` (resolves `NetplanSynthesisService`
 → the `GrowNetworkView`), `GrowIdentityResolver` (same blueprint → the `GrowIdentityView`, the four

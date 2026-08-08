@@ -22,6 +22,8 @@ import io.nxmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
 import io.nxmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.InstanceGrow;
+import io.nxmatic.rke2lab.incus.ingress.GrowOutcome;
+import io.nxmatic.rke2lab.incus.ingress.Growth;
 import io.nxmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
 import io.nxmatic.rke2lab.incus.ingress.IngressConfig;
 import io.nxmatic.rke2lab.incus.ingress.InstanceGrowPlan;
@@ -44,6 +46,7 @@ import io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.ReadinessDeadlineOverride;
 import io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import java.io.IOException;
@@ -51,10 +54,12 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
@@ -182,6 +187,8 @@ public class ClusterSeedScenario
         .and()
         .the_operator_kubeconfig_is_published()
         .and()
+        .the_readiness_budget_is_tuned_to_the_growth()
+        .and()
         .the_systemd_adapter_is_launched(hostScenario, hostTree)
         .and()
         .the_cluster_becomes_ready(hostScenario, hostTree);
@@ -247,15 +254,11 @@ public class ClusterSeedScenario
       final RunGate runGate = run.runMode()::playsLive;
       gardening.connection().context().registerService(RunGate.class, runGate, new Hashtable<>());
 
-      // Publish the ambient readiness deadlines (projected from rke2lab:readiness:) the readiness
-      // scions resolve to bound their awaitReady — the RunGate shape: a fact of the WHOLE run,
-      // keyed
-      // per checkpoint, resolved from the registry, not carried on an envelope.
-      gardening
-          .connection()
-          .context()
-          .registerService(
-              ReadinessOverrides.class, run.config().readinessOverrides(), new Hashtable<>());
+      // The ambient ReadinessOverrides is NOT published here: it is tuned to the grow's cold/warm
+      // condition, which is unknown until the grow runs. The host publishes it in the post-grow
+      // WHEN
+      // "the readiness budget is tuned to the growth", before the readiness scions are sown — the
+      // scions read it lazily as they play, so the later registration is the one they see.
 
       // The two ambient facts a scion needs to STORE its own harvest (§ host-cellar-realisation,
       // every-scion-contributes): the Cellar (the neutral furniture the host lays into Felix) and
@@ -405,6 +408,17 @@ public class ClusterSeedScenario
 
     @ScenarioState BootstrapConfig config;
 
+    // The WARM fail-fast budget — a live master should answer at once, so a re-run against one that
+    // does not is a fault to surface NOW, not a boot to wait out. Short, global (both checkpoints),
+    // fixed in code: it OVERRIDES the annotation's patient defaults (both halves present) when the
+    // grow read WARM. COLD keeps the config-derived overrides (rke2lab:readiness:), the annotation
+    // patient defaults standing under them.
+    private static final ReadinessOverrides WARM_FAILFAST =
+        new ReadinessOverrides(
+            new ReadinessDeadlineOverride(
+                Optional.of(Duration.ofSeconds(5)), Optional.of(Duration.ofSeconds(10))),
+            Map.of());
+
     @NestedSteps
     @As("the worktree is surveyed")
     public When the_worktree_is_surveyed(
@@ -539,9 +553,21 @@ public class ClusterSeedScenario
       workingCellar
           .fetch(parcel, ClusterPkiCoordinate.CLUSTER_AGE_KEY, ClusterAgeKey.class)
           .ifPresent(ageKey -> clusterPki.put("user.rke2lab.sops-age-key", ageKey.identity()));
+      // The cold/warm condition, READ NOW from the prior stack state — before the grow starts the
+      // instance and the observation is lost. Frozen on the run's TRANSIENT bus as the GrowOutcome
+      // fact (evicted at the drain, never conserved): the readiness-budget tuning reads it a few
+      // steps on to pick a short fail-fast deadline for a live master, the patient one for a boot.
+      final Growth growth =
+          cellarRealisation
+              .currentSnapshot(parcel)
+              .map(GrowthCondition::new)
+              .map(GrowthCondition::growth)
+              .orElse(Growth.COLD);
       workingCellar
           .fetch(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
           .ifPresent(plan -> new InstanceGrow(ingress, line -> {}).grow(plan, clusterPki));
+      workingCellar.storeTransient(
+          parcel, IncusGrowCoordinate.GROW_OUTCOME, new GrowOutcome(growth));
       return self();
     }
 
@@ -581,6 +607,28 @@ public class ClusterSeedScenario
       } catch (IOException ex) {
         throw new UncheckedIOException("failed to publish the operator kubeconfig to " + ref, ex);
       }
+    }
+
+    @As("the readiness budget is tuned to the growth")
+    public When the_readiness_budget_is_tuned_to_the_growth() {
+      // Resolve the ambient ReadinessOverrides from the grow's cold/warm fact and publish it for
+      // the
+      // readiness scions (the RunGate route — a whole-run service they resolve from the registry,
+      // not an envelope). WARM ⇒ the short fail-fast budget; COLD, or no grow at all (preview /
+      // offline, absent GrowOutcome) ⇒ the config-derived overrides (#6, the annotation patient
+      // defaults standing under them).
+      final ReadinessOverrides overrides =
+          workingCellar
+              .fetch(parcel, IncusGrowCoordinate.GROW_OUTCOME, GrowOutcome.class)
+              .map(GrowOutcome::growth)
+              .filter(condition -> condition == Growth.WARM)
+              .map(warm -> WARM_FAILFAST)
+              .orElseGet(config::readinessOverrides);
+      gardening
+          .connection()
+          .context()
+          .registerService(ReadinessOverrides.class, overrides, new Hashtable<>());
+      return self();
     }
 
     @NestedSteps

@@ -1648,6 +1648,18 @@ the infra. Atomicity is then the outer `up` itself (commit all-or-nothing); the 
 registrations are part of that single `up`. This replaces the old separate-`up`-per-entry design, whose
 collision with the run's own stack (lock + reading the co-resident incus provider's non-shell outputs) was
 the fatal bug (§ host-cellar-realisation-spec, one-history).
+
+*The TRANSIENT tier — the within-run bus.* A store carries a `Persistence` (a seam enum, peer to
+`Sensitivity` — lifetime, not secrecy): `DURABLE` is the default drained above; `TRANSIENT` rides the
+transactional overlay (read-your-writes) and descends to sown sub-scions (the inheritance) EXACTLY like a
+durable entry, but the drain SKIPS it — it never reaches the durable backend, so it never lands as an
+`rke2lab:cellar:Entry` in the stack state. It exists for a fact PRODUCED and CONSUMED within one run that
+must not be conserved — canonically one whose truth evaporates once the run acts on it (the cold/warm
+growth condition, read at grow ENTRY from the prior stack state: the grow then starts the instance, so the
+prior state is no longer observable and the fact is frozen on the bus for the rest of the run). The tier is
+a capability-default on `Cellar.store(…, Sensitivity, Persistence)` (only `ScenarioCellar` has a drain to
+skip and overrides it); the drain still `conserve`s the parcel, so a transient store alongside durable ones
+does not suppress their flush.
 --
 . *The root/fragment role comes from the LAUNCHER, not the type.* A given scenario is a FRAGMENT when
   sown by the host, a ROOT when played alone (`IncusProvisionScenario` in its own in-container test) — so

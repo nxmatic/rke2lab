@@ -23,7 +23,6 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.RunGate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
-import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -252,13 +251,13 @@ public class IncusReconcileScenarioInContainerTest {
       final HostStagingEntry source =
           HostStagingEntry.of(
               sourceRoot.toString(), sourceChecksums, new Provenance("head", false));
-      final ScenarioCellar.Entry entry =
-          new ScenarioCellar.Entry(
-              PARCEL,
-              SeedEnvelope.of(IncusCoordinate.HOST_STAGING, CODEC.encode(source)),
-              false,
-              false);
-      return List.of(CODEC.encode(entry));
+      // Produce the descending entry the way a parent crossing does — a transactional cellar's own
+      // store, exported through entriesEncoded — rather than fabricating the wire Entry by hand.
+      final ReportModel model = new ReportModel();
+      final ScenarioCellar cellar =
+          new ScenarioCellar(() -> model, StubCellar::empty, Optional.empty());
+      cellar.store(PARCEL, IncusCoordinate.HOST_STAGING, source, Sensitivity.PLAIN);
+      return cellar.entriesEncoded(IncusCoordinate.HOST_STAGING);
     }
 
     /** The durable read side carrying the pivot — the {@code host-live} + its staging checksums. */

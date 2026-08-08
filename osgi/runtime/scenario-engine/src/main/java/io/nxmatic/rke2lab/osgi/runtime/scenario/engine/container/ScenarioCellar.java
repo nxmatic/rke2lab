@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.CellarCipher;
 import io.nxmatic.rke2lab.seed.broker.port.CellarCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.Persistence;
 import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.nxmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.nxmatic.rke2lab.seed.broker.port.Sensitivity;
@@ -127,7 +128,8 @@ public final class ScenarioCellar implements TransactionalCellar {
     final SeedEnvelope extended =
         new SeedEnvelope(
             env.domain(), env.coordinate(), codec.encode(path.push(crossing)), env.trail());
-    return new Entry(entry.parcel(), extended, entry.tombstone(), entry.inherited());
+    return new Entry(
+        entry.parcel(), extended, entry.tombstone(), entry.inherited(), entry.persistence());
   }
 
   /**
@@ -137,19 +139,27 @@ public final class ScenarioCellar implements TransactionalCellar {
    * {@code withdraw} that empties the case. Flat (the codec serialises it to the tag's value
    * String). Entries ride in store ORDER, so the drain replays each in turn: a store re-stores the
    * envelope, a tombstone withdraws the case (a store→withdraw→store sequence lands the case
-   * present, as it must).
+   * present, as it must). Its {@code persistence} is the drain verdict: a {@link
+   * Persistence#TRANSIENT} entry rides the overlay and inheritance like any other but the drain
+   * SKIPS it (the within-run bus, § cellar-transactional), so it never reaches the durable backend.
    */
-  public record Entry(Parcel parcel, SeedEnvelope envelope, boolean tombstone, boolean inherited) {
+  public record Entry(
+      Parcel parcel,
+      SeedEnvelope envelope,
+      boolean tombstone,
+      boolean inherited,
+      Persistence persistence) {
 
     /**
      * The same operation seen from a CHILD crossing — marked {@code inherited} so the overlay reads
      * it (read-your-parent's-writes) but the child's graft does NOT fold it back up into the trunk
      * (the trunk already holds it; the extension strips it first). Orthogonal to {@code tombstone}:
      * a parent's WITHDRAW descends as an inherited tombstone (else the child re-reads a durable
-     * case the parent emptied in-flight).
+     * case the parent emptied in-flight). Persistence rides down unchanged — a transient store the
+     * parent made is transient for the child too (the child reads it, the drain still skips it).
      */
     Entry asInherited() {
-      return new Entry(parcel, envelope, tombstone, true);
+      return new Entry(parcel, envelope, tombstone, true, persistence);
     }
   }
 
@@ -235,11 +245,21 @@ public final class ScenarioCellar implements TransactionalCellar {
   @Override
   public <T> void store(
       Parcel parcel, SeedCoordinate coordinate, T value, Sensitivity sensitivity) {
+    store(parcel, coordinate, value, sensitivity, Persistence.DURABLE);
+  }
+
+  @Override
+  public <T> void store(
+      Parcel parcel,
+      SeedCoordinate coordinate,
+      T value,
+      Sensitivity sensitivity,
+      Persistence persistence) {
     final String encoded = codec.encode(value);
     final String payload = sensitivity == Sensitivity.SEALED ? cipher.seal(encoded) : encoded;
     final SeedEnvelope envelope =
         SeedEnvelope.of(coordinate, payload).withTrail(trailFor(parcel, coordinate));
-    append(new Entry(parcel, envelope, false, false));
+    append(new Entry(parcel, envelope, false, false, persistence));
   }
 
   /**
@@ -347,7 +367,7 @@ public final class ScenarioCellar implements TransactionalCellar {
   @Override
   public <T> Optional<T> withdraw(Parcel parcel, SeedCoordinate coordinate, Class<T> type) {
     final Optional<T> current = fetch(parcel, coordinate, type);
-    append(new Entry(parcel, SeedEnvelope.of(coordinate, ""), true, false));
+    append(new Entry(parcel, SeedEnvelope.of(coordinate, ""), true, false, Persistence.DURABLE));
     return current;
   }
 
