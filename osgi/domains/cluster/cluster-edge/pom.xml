@@ -47,6 +47,18 @@
       <artifactId>kubernetes-httpclient-jdk</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- The edge's source names fabric8 model + client-api types directly (KubernetesClient, the
+         model DTOs it reads); provided like the client umbrella — imported as bundles at runtime. -->
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-client-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-model-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header -->
     <dependency>

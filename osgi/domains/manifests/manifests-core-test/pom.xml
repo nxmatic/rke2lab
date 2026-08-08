@@ -54,6 +54,13 @@
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- the fragment's src/main entry names the in-container runner (JUnitLauncherCore/
+         InContainerJUnitRunner) directly; provided — resolved through the manifests-core host. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <!-- victools-wrap on the test classpath so installImportClosureOf can install it: manifests-core
          (via seed-broker-shape's RecordSchemaProjector) imports com.github.victools.*, whose only
          exporter is this wrap bundle. Without it the whole synthesis graph fails to resolve. The

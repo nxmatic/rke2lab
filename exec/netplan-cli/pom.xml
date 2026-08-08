@@ -29,6 +29,14 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
 
     <!-- BDD-as-engine: the CLI drives NetplanCliScenario on the embedded JUnit launcher, sowing the
          `netplan` coordinate through the broker instead of referencing a type=contract bundle record

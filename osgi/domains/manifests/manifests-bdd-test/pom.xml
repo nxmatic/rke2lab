@@ -77,6 +77,18 @@
       <artifactId>scenario-engine</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- the fragment's src/main entry names framework types + the in-container runner directly;
+         provided — resolved through the manifests-bdd host at runtime. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- Jupiter, the engine, jgiven-junit5, junit-platform-launcher are inherited from
          bundle-test-parent. osgi.core (test): the passenger + proxy name framework types directly. -->

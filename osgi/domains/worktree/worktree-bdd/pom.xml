@@ -59,6 +59,16 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
+    <!-- The scenario's main code names the platform engine's namespaced store directly (the value-DAG
+         carrier) and decodes payloads with jackson — both compile deps of the scenario. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- bnd-consumed construction annotations: WorktreeRunbookHandler (@Component) publishes the
          runbook SeedHandler that plays this bundle's scenario in-container. provided — SCR supplies
          the runtime, bnd only needs them to emit the descriptor + the extender requirement. -->

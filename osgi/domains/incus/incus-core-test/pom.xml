@@ -51,6 +51,19 @@
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- the fragment's src/main entry drives an in-container run through the runner (JUnitLauncherCore/
+         InContainerJUnitRunner) on the booted Felix; provided — both resolved through the incus-core
+         host at runtime (same fragment pattern as incus-bdd-test). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- The src/test harness boots Felix via ScenarioTestkit.felix() and installs the JUnit + jGiven
          bundle worlds by classpath substring, so they must be on the TEST classpath. -->

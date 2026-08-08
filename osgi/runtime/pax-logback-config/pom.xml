@@ -37,6 +37,13 @@
       <artifactId>osgi.core</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- LoggerFactory: the configurer logs its own progress through slf4j. provided — at runtime the
+         fragment links against pax-logging-api's org.slf4j, never its own copy. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

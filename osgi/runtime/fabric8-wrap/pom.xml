@@ -66,6 +66,49 @@
         <groupId>biz.aQute.bnd</groupId>
         <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
+      <!-- -includeresource nests the fabric8 closure INTO this bundle jar, so analyze sees the whole
+           kubernetes-model-* set + client-api + zjsonpatch + jackson + slf4j as "used undeclared".
+           The wrap declares only the kubernetes-client umbrella (provided) and embeds its closure by
+           design — the individual jars are not direct dependencies of this module (declaring them
+           would resurrect the split-package this wrap exists to avoid). append keeps parent ignores. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUsedUndeclaredDependencies combine.children="append">
+            <dep>com.fasterxml.jackson.core:jackson-core</dep>
+            <dep>com.fasterxml.jackson.core:jackson-databind</dep>
+            <dep>com.fasterxml.jackson.core:jackson-annotations</dep>
+            <dep>com.fasterxml.jackson.dataformat:jackson-dataformat-yaml</dep>
+            <dep>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</dep>
+            <dep>org.slf4j:slf4j-api</dep>
+            <dep>io.fabric8:kubernetes-client-api</dep>
+            <dep>io.fabric8:zjsonpatch</dep>
+            <dep>io.fabric8:kubernetes-model-common</dep>
+            <dep>io.fabric8:kubernetes-model-core</dep>
+            <dep>io.fabric8:kubernetes-model-apps</dep>
+            <dep>io.fabric8:kubernetes-model-apiextensions</dep>
+            <dep>io.fabric8:kubernetes-model-admissionregistration</dep>
+            <dep>io.fabric8:kubernetes-model-autoscaling</dep>
+            <dep>io.fabric8:kubernetes-model-batch</dep>
+            <dep>io.fabric8:kubernetes-model-certificates</dep>
+            <dep>io.fabric8:kubernetes-model-coordination</dep>
+            <dep>io.fabric8:kubernetes-model-discovery</dep>
+            <dep>io.fabric8:kubernetes-model-events</dep>
+            <dep>io.fabric8:kubernetes-model-extensions</dep>
+            <dep>io.fabric8:kubernetes-model-flowcontrol</dep>
+            <dep>io.fabric8:kubernetes-model-gatewayapi</dep>
+            <dep>io.fabric8:kubernetes-model-metrics</dep>
+            <dep>io.fabric8:kubernetes-model-networking</dep>
+            <dep>io.fabric8:kubernetes-model-node</dep>
+            <dep>io.fabric8:kubernetes-model-policy</dep>
+            <dep>io.fabric8:kubernetes-model-rbac</dep>
+            <dep>io.fabric8:kubernetes-model-resource</dep>
+            <dep>io.fabric8:kubernetes-model-scheduling</dep>
+            <dep>io.fabric8:kubernetes-model-storageclass</dep>
+          </ignoredUsedUndeclaredDependencies>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

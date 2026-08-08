@@ -117,6 +117,12 @@
       <artifactId>osgi.core</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The suite boots a real Felix out-of-container and names framework types directly. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.apache.felix.scr</artifactId>

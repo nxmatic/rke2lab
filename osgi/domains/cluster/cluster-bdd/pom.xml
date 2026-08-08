@@ -71,6 +71,16 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
+    <!-- The scenario's main code names the platform engine's namespaced store directly (the
+         value-DAG carrier) and decodes payloads with jackson — both compile deps of the scenario. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- osgi.core: the scenario resolves its collaborators from the BundleContext (the contact +
          the doctor), the connection carrying the registry. -->
     <dependency>

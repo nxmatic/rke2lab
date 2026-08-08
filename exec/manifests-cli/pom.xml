@@ -27,12 +27,17 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+    </dependency>
     <!-- The seam contract the CLI consumes, kept flat on the host classpath as the SINGLE exporter
          (manifests-core imports but does not export it); OsgiRuntime mirrors it onto the system
          bundle so the embedded manifests-core resolves against this one copy — typed access. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
          installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade). runtime

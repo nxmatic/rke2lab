@@ -43,6 +43,11 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
+    <!-- the enumerator reads its blueprint input as a jackson JsonNode. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- @Component on the reflector: bnd emits the SCR descriptor + extender requirement. provided —
          SCR supplies the runtime. -->
     <dependency>

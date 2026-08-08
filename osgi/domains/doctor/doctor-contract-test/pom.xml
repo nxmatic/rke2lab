@@ -45,6 +45,24 @@
       <artifactId>systemd-contract</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- The fragment's src/main test bytecode names framework types + the in-container runner
+         directly (Bundle/BundleContext, JUnitLauncherCore); provided — resolved through the host at
+         runtime. Direct here, not merely transitive from bundle-test-parent's scenario-engine. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

@@ -101,6 +101,13 @@
       <artifactId>jackson-databind</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- the fragment's src/main entry names the in-container runner (JUnitLauncherCore/
+         InContainerJUnitRunner) directly; provided — resolved through the doctor-core host at runtime. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- bnd-consumed DS annotations: the dsproof @Component fakes (FakeDiagnostician + the EHR/ledger
          ports) so SCR activates DefaultHealthSystem and binds its tier-scoped roster in the boot test. -->

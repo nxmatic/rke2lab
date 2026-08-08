@@ -621,6 +621,8 @@
       <artifactId>jgiven-junit5</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Not yet used by any module (no org.mockito imports), kept as inherited test infra for
+         future use; analyze's "unused declared" is silenced in the dependency-plugin config. -->
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
@@ -779,6 +781,37 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
           <version>${maven.dependency.plugin.version}</version>
+          <!-- analyze reports three classes of noise that are NOT real gaps:
+               (1) aggregator→leaf: modules declare the aggregator (junit-jupiter here at parent
+                   scope, jgiven-junit5) and the source imports the leaf package, so analyze names
+                   the leaf artifact as "used undeclared" and the aggregator as "unused declared";
+               (2) attribution shadow: the code imports org.osgi.service.component.annotations.*
+                   (declared granularly as org.osgi.service.component.annotations), but the fat
+                   org.osgi:osgi.annotation jar exports the same package transitively and analyze
+                   credits it instead;
+               (3) compile-only annotations: jspecify + checker-qual are provided annotation jars
+                   inherited from this parent, applied via package-info (@NullMarked) — analyze
+                   never sees bytecode use, so it flags them "unused declared" on every module.
+               None warrant a POM change — silence them once here. mockito is kept inherited for
+               future use and shares category (3)'s unused-declared shape until a test uses it. -->
+          <configuration>
+            <ignoredUsedUndeclaredDependencies>
+              <dep>org.junit.jupiter:junit-jupiter-api</dep>
+              <dep>org.junit.jupiter:junit-jupiter-params</dep>
+              <dep>com.tngtech.jgiven:jgiven-core</dep>
+              <dep>org.osgi:osgi.annotation</dep>
+            </ignoredUsedUndeclaredDependencies>
+            <ignoredUnusedDeclaredDependencies>
+              <dep>org.junit.jupiter:junit-jupiter</dep>
+              <dep>com.tngtech.jgiven:jgiven-junit5</dep>
+              <dep>org.mockito:mockito-core</dep>
+              <dep>org.mockito:mockito-junit-jupiter</dep>
+              <dep>org.jspecify:jspecify</dep>
+              <dep>org.checkerframework:checker-qual</dep>
+              <dep>org.osgi:org.osgi.annotation.versioning</dep>
+              <dep>io.nxmatic.rke2lab:domain-annotations</dep>
+            </ignoredUnusedDeclaredDependencies>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

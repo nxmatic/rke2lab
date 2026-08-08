@@ -41,5 +41,11 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
     </dependency>
+    <!-- the main-scope fixtures name the seed-broker seam (SeedEnvelope/Document) directly; compile,
+         same main-scope-fixture rationale as the extension above. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
   </dependencies>
 </project>

@@ -42,6 +42,10 @@
     <!-- Read keys.yaml + .sops.yaml (structured YAML, no regex) and render the 11-key bundle YAML. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>

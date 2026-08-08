@@ -40,6 +40,18 @@
       <artifactId>scenario-engine</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- the fragment's src/main entry names framework types + the in-container runner directly;
+         provided — resolved through the cluster-edge host at runtime. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- fabric8-wrap + its hard import closure, on the TEST classpath so installImportClosureOf can
          install them into the boot Felix: cluster-edge now imports io.fabric8.* (exported by the

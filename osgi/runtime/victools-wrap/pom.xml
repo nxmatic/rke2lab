@@ -44,6 +44,23 @@
         <groupId>biz.aQute.bnd</groupId>
         <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
+      <!-- Export-Package pulls victools' bytecode into this bundle jar, so analyze sees its
+           transitive tail (classmate, jackson core/databind/annotations, slf4j) as "used
+           undeclared". The wrap declares only the victools umbrella and imports the tail as
+           pre-existing bundles — not direct dependencies. append keeps the parent's global ignores. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUsedUndeclaredDependencies combine.children="append">
+            <dep>com.fasterxml.jackson.core:jackson-core</dep>
+            <dep>com.fasterxml.jackson.core:jackson-databind</dep>
+            <dep>com.fasterxml.jackson.core:jackson-annotations</dep>
+            <dep>com.fasterxml:classmate</dep>
+            <dep>org.slf4j:slf4j-api</dep>
+          </ignoredUsedUndeclaredDependencies>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

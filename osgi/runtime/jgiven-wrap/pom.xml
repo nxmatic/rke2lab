@@ -46,6 +46,26 @@
         <groupId>biz.aQute.bnd</groupId>
         <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
+      <!-- Export-Package pulls jgiven's own bytecode into this bundle jar, so analyze sees its
+           whole transitive tail (guava, gson, paranamer, jansi, jakarta.annotation, byte-buddy,
+           slf4j) as "used undeclared". The wrap deliberately declares only the jgiven umbrella and
+           imports the tail as pre-existing bundles (see the description) — the tail is not a direct
+           dependency of this module. Silence it here; append keeps the parent's global ignores. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUsedUndeclaredDependencies combine.children="append">
+            <dep>com.google.code.gson:gson</dep>
+            <dep>com.google.guava:guava</dep>
+            <dep>org.slf4j:slf4j-api</dep>
+            <dep>com.thoughtworks.paranamer:paranamer</dep>
+            <dep>org.fusesource.jansi:jansi</dep>
+            <dep>jakarta.annotation:jakarta.annotation-api</dep>
+            <dep>net.bytebuddy:byte-buddy</dep>
+          </ignoredUsedUndeclaredDependencies>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

@@ -45,6 +45,23 @@
         <groupId>biz.aQute.bnd</groupId>
         <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
+      <!-- -includeresource nests the cdk8s closure INTACT into the Bundle-ClassPath, so analyze sees
+           cdk8s's transitive tail (jackson core/databind, jsii-runtime, jetbrains annotations) as
+           "used undeclared". This module's own source imports none of them (they arrive through the
+           cdk8s/constructs umbrellas declared above); the carrier embeds and re-exports them. Silence
+           the closure here; append keeps the parent's global ignores. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUsedUndeclaredDependencies combine.children="append">
+            <dep>com.fasterxml.jackson.core:jackson-core</dep>
+            <dep>com.fasterxml.jackson.core:jackson-databind</dep>
+            <dep>software.amazon.jsii:jsii-runtime</dep>
+            <dep>org.jetbrains:annotations</dep>
+          </ignoredUsedUndeclaredDependencies>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

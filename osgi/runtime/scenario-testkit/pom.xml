@@ -34,6 +34,17 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
+    <!-- ScenarioTestkit (src/main) names framework + launcher types directly: it boots Felix through
+         FrameworkLauncher and reads the BundleContext, so felix.framework + framework-launcher are
+         compile deps, not merely transitive of scenario-engine. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>framework-launcher</artifactId>
+    </dependency>
 
     <!--
       The non-regression guard (src/test) boots a real Felix via ScenarioTestkit.felix() and walks

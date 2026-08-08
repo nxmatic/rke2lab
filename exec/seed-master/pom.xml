@@ -105,6 +105,31 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
+    <!-- Runtime-engine infra the host reaches directly in src/main: it boots Felix flat
+         (felix.framework), drives the JUnit Platform (junit-platform-engine/launcher), and plays
+         scenarios through the launcher core (junit-launcher). Compile — this is the playable's
+         runtime, not a test tool; they arrive transitively today but are used first-hand here. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-launcher</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+    </dependency>
+    <!-- The runbook renderer names jackson annotations directly on its serialized model. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
