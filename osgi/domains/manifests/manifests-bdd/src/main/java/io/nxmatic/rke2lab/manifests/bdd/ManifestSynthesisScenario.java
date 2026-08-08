@@ -7,8 +7,6 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import io.nxmatic.rke2lab.clusterpki.contract.AdminCredentials;
-import io.nxmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
@@ -26,6 +24,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSe
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
+import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -98,8 +97,9 @@ public class ManifestSynthesisScenario
   @MonotonicNonNull private ManifestsRunbookInput input;
 
   // The shared in-container cellar (injected by ScenarioCellarExtension before the body) + the
-  // current plot — the seam through which the sealed AdminCredentials the seal scion filed are
-  // revealed, in-container, never crossing the host membrane.
+  // current plot — the seam through which the sealed admin-credentials case the seal scion filed is
+  // revealed (decoded into OperatorPkiMaterial via a neutral wire coordinate), in-container, never
+  // crossing the host membrane.
   @MonotonicNonNull private ScenarioCellar cellar;
 
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
@@ -119,16 +119,42 @@ public class ManifestSynthesisScenario
     this.cellar = cellar;
   }
 
-  // Reveal the operator's admin PKI from the cellar and translate it into the manifests-side
-  // OperatorPkiMaterial — the ONLY place a cluster-pki type is touched, so manifests-core stays
-  // gate-clean. Empty when no cellar/plot (a bare survey) or the seal has not filed yet.
+  // Reveal the operator's admin PKI straight into the manifests-side OperatorPkiMaterial: its three
+  // PEM fields mirror the cluster-pki AdminCredentials record exactly, so the codec's structural
+  // decode reads the sealed case 1:1. Addressed by the NEUTRAL wire coordinate (see
+  // ClusterPkiCase),
+  // so no cluster-pki type is ever touched and manifests-bdd carries no cluster-pki-contract
+  // dependency — the standalone manifests-cli assembly never drags that domain's dual-realm flat
+  // copy. Empty when no cellar/plot (a bare survey) or the seal has not filed yet.
   private Optional<OperatorPkiMaterial> revealOperatorPki() {
     if (cellar == null || parcel.isEmpty()) {
       return Optional.empty();
     }
-    return cellar
-        .fetch(parcel.orElseThrow(), ClusterPkiCoordinate.ADMIN_CREDENTIALS, AdminCredentials.class)
-        .map(ac -> new OperatorPkiMaterial(ac.clientCertPem(), ac.clientKeyPem(), ac.caCertPem()));
+    return cellar.fetch(
+        parcel.orElseThrow(), ClusterPkiCase.ADMIN_CREDENTIALS, OperatorPkiMaterial.class);
+  }
+
+  /**
+   * The cluster-pki seal's {@code admin-credentials} cellar case, addressed by its NEUTRAL wire
+   * coordinate so the manifests realm reveals it without a compile link to {@code
+   * cluster-pki-contract}. Naming that domain's {@code ClusterPkiCoordinate} enum would drag its
+   * {@code type=dual-realm} flat copy into the standalone {@code manifests-cli} assembly — a dead
+   * flat copy the staging gate rightly flags. The membrane speaks slugs; the {@code slug}/{@code
+   * domain} here MUST match {@code ClusterPkiCoordinate.ADMIN_CREDENTIALS}. This is the one place
+   * the manifests realm knows that cross-realm wire name (the cellar matches a read case by slug).
+   */
+  private enum ClusterPkiCase implements SeedCoordinate {
+    ADMIN_CREDENTIALS;
+
+    @Override
+    public String slug() {
+      return "admin-credentials";
+    }
+
+    @Override
+    public String domain() {
+      return "cluster-pki";
+    }
   }
 
   @Test
