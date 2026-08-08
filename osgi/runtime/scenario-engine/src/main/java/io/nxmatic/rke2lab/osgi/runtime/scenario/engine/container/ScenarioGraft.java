@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -112,14 +113,32 @@ public final class ScenarioGraft {
       rootstock.setStatus(StepStatus.FAILED);
       // jGiven stores the failure text (errorMessage + stackTrace) only on the CASE, never on a
       // step — so the FAILED status alone would reach the host runbook with no reason. Carry the
-      // scion case's failure onto the host case (first-wins: an earlier crossing's cause is not
-      // overwritten by a later SKIPPED one) so the operator descends from the seed to the scion's
-      // actual error, and it bubbles up through each graft level to the root runbook.
+      // scion case's failure onto the host case so the operator descends from the seed to the
+      // scion's actual error. ACCUMULATE, not first-wins: sibling crossings fail INDEPENDENTLY (the
+      // graft does not abort the host — systemd AND cluster can both fail in one run), and jGiven's
+      // case holds a single error slot, so each failed crossing's cause is APPENDED under a header
+      // naming the crossing. First-wins would keep only systemd and silently drop cluster, leaving
+      // its ❌ icon with no reason — the very "two conditions failed, one stacktrace" defect.
       final ScenarioCaseModel scionCase = scionScenario.getScenarioCases().get(0);
       final ScenarioCaseModel hostCase = hostScenario.getScenarioCases().get(0);
-      if (scionCase.getErrorMessage() != null && hostCase.getErrorMessage() == null) {
-        hostCase.setErrorMessage(scionCase.getErrorMessage());
-        hostCase.setStackTrace(scionCase.getStackTrace());
+      if (scionCase.getErrorMessage() != null) {
+        final String header = "═══ " + rootstockStepName + " ═══";
+        final boolean firstFailure = hostCase.getErrorMessage() == null;
+        hostCase.setErrorMessage(
+            (firstFailure ? "" : hostCase.getErrorMessage() + "\n\n")
+                + header
+                + "\n"
+                + scionCase.getErrorMessage());
+        final List<String> mergedStack = new ArrayList<>();
+        if (!firstFailure) {
+          mergedStack.addAll(hostCase.getStackTrace());
+          mergedStack.add("");
+        }
+        mergedStack.add(header);
+        if (scionCase.getStackTrace() != null) {
+          mergedStack.addAll(scionCase.getStackTrace());
+        }
+        hostCase.setStackTrace(mergedStack);
       }
       for (int i = rootstockIndex + 1; i < hostSteps.size(); i++) {
         hostSteps.get(i).setStatus(StepStatus.SKIPPED);

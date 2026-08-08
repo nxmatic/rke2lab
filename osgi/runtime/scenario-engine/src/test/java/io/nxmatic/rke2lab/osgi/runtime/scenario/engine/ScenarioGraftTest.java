@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.osgi.runtime.scenario.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.As;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 class ScenarioGraftTest {
 
   private static final String ROOTSTOCK = "the scion world is consulted";
+  private static final String ROOTSTOCK2 = "the second scion world is consulted";
 
   private final ScenarioGraft graft = new ScenarioGraft();
 
@@ -73,6 +75,45 @@ class ScenarioGraftTest {
         StepStatus.SKIPPED,
         stepAfter(host, ROOTSTOCK).getStatus(),
         "the host phase after a failed rootstock is skipped (fail-fast across the frontier)");
+  }
+
+  @Test
+  void two_failing_scions_each_surface_their_own_error_under_their_crossing() {
+    // Two sibling crossings fail INDEPENDENTLY in one run (the graft does not abort the host
+    // between
+    // them). The defect was first-wins: only the earliest cause was carried and the rest dropped,
+    // leaving the later ❌ with no reason — "two conditions failed, one stacktrace". The graft now
+    // ACCUMULATES each crossing's cause under a header naming it.
+    final ReportModel host =
+        play(
+            HostStage.class,
+            h -> h.the_scion_is_grafted().the_second_scion_is_grafted().the_host_finishes());
+    final ReportModel firstFailure = play(ScionStage.class, r -> r.the_scion_scenario_fails());
+    final ReportModel secondFailure = play(ScionStage.class, r -> r.the_scion_scenario_fails());
+
+    graft.graftUnder(
+        host.getScenarios().get(0),
+        host,
+        ROOTSTOCK,
+        graft.rebuild(new ScenarioJsonWriter(firstFailure).toString()));
+    graft.graftUnder(
+        host.getScenarios().get(0),
+        host,
+        ROOTSTOCK2,
+        graft.rebuild(new ScenarioJsonWriter(secondFailure).toString()));
+
+    assertEquals(
+        StepStatus.FAILED, stepNamed(host, ROOTSTOCK).getStatus(), "the first crossing failed");
+    assertEquals(
+        StepStatus.FAILED,
+        stepNamed(host, ROOTSTOCK2).getStatus(),
+        "the second crossing also failed (its SKIPPED-by-the-first status is overridden)");
+
+    final String error = host.getScenarios().get(0).getScenarioCases().get(0).getErrorMessage();
+    assertTrue(error.contains(ROOTSTOCK), "the first crossing's error section is present");
+    assertTrue(
+        error.contains(ROOTSTOCK2),
+        "the SECOND crossing's error survives too — not dropped by first-wins");
   }
 
   @Test
@@ -199,6 +240,11 @@ class ScenarioGraftTest {
   public static class HostStage extends Stage<HostStage> {
     @As("the scion world is consulted")
     public HostStage the_scion_is_grafted() {
+      return self();
+    }
+
+    @As("the second scion world is consulted")
+    public HostStage the_second_scion_is_grafted() {
       return self();
     }
 
