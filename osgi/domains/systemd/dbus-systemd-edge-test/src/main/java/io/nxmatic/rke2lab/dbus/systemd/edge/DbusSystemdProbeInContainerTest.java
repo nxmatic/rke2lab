@@ -5,10 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget;
 import io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest;
 import io.nxmatic.rke2lab.systemd.contract.SystemdRuntimeProbe;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.time.Duration;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
@@ -60,11 +62,17 @@ public class DbusSystemdProbeInContainerTest {
     final SystemdProbeRequest request =
         new SystemdProbeRequest("127.0.0.1", deadPort, "boot-test-node", "boot-test-host");
 
-    final IllegalStateException failure =
+    // A TINY connect budget: the reach retries a few times over ~800ms then gives up, throwing a
+    // ReadinessAwaitException CARRYING the last connect failure — the proof's cause chain rides on
+    // it, so a short budget keeps the test fast without losing what it exists to catch.
+    final ReadinessBudget budget =
+        new ReadinessBudget(Duration.ofMillis(200), Duration.ofMillis(800), Duration.ofMillis(200));
+
+    final RuntimeException failure =
         assertThrows(
-            IllegalStateException.class,
-            () -> probe.probe(request),
-            "no systemd is reachable, so the probe must fail — the WHICH failure is the proof");
+            RuntimeException.class,
+            () -> probe.awaitReady(request, budget),
+            "no systemd is reachable, so the reach must give up — the WHICH failure is the proof");
 
     final String chain = causeChainLower(failure);
     assertFalse(

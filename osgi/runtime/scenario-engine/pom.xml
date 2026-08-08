@@ -100,6 +100,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>boot-discovery</artifactId>
     </dependency>
+    <!-- The readiness VALUE (ReadinessBudget) the ReadinessBudgetExtension resolves from a scenario's
+         @ReadinessDeadlines + the stack override and hands to the ReadinessBudgetReceiver. The driver
+         itself lives there too, but only the edges reference it — the engine touches the value only. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>readiness-await</artifactId>
+    </dependency>
 
     <!-- slf4j-api for the resolution-failure diagnostic (OutOfContainerFrameworkExtension.resolve()
          logs the unsatisfied requirements rather than returning a blind false). API façade only —

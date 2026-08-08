@@ -2,11 +2,13 @@ package io.nxmatic.rke2lab.cluster.edge;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessContact;
+import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessSnapshot;
 import io.nxmatic.rke2lab.cluster.contract.ControllerRef;
+import io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
@@ -43,19 +45,23 @@ public class ClusterEdgeContactInContainerTest {
 
     final Path bogusKubeconfig = Path.of("/nonexistent/cluster-edge-boot-test/kubeconfig");
 
-    assertFalse(
-        contact.isApiReady(bogusKubeconfig),
-        "no cluster is reachable, so the API-readiness contact must return false");
+    // A TINY connect budget: the reach retries a few times over ~800ms then gives up — the edge
+    // converts that to a not-ready snapshot rather than hanging on the default 2-minute deadline.
+    final ReadinessBudget budget =
+        new ReadinessBudget(Duration.ofMillis(200), Duration.ofMillis(800), Duration.ofMillis(200));
 
-    assertTrue(
-        contact.areControllersEffective(bogusKubeconfig, List.of()),
-        "an empty controller list is vacuously effective — no contact is even made");
-
-    assertFalse(
-        contact.areControllersEffective(
+    final ClusterReadinessSnapshot snapshot =
+        contact.awaitReady(
             bogusKubeconfig,
-            List.of(new ControllerRef("deployment", "cilium-operator", "kube-system"))),
-        "no cluster is reachable, so a required controller cannot be effective");
+            List.of(new ControllerRef("deployment", "cilium-operator", "kube-system")),
+            budget);
+
+    assertFalse(
+        snapshot.apiReady(),
+        "no cluster is reachable, so the kube-apiserver never becomes ready within the budget");
+    assertFalse(
+        snapshot.controllersEffective(),
+        "with no reachable API, a required controller cannot be effective");
   }
 
   /**

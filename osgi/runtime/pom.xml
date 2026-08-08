@@ -21,6 +21,7 @@
     <module>pax-logback-config</module>
     <module>junit-launcher</module>
     <module>scenario-engine</module>
+    <module>readiness-await</module>
     <module>jgiven-wrap</module>
     <module>scenario-testkit</module>
     <module>scenario-probe</module>

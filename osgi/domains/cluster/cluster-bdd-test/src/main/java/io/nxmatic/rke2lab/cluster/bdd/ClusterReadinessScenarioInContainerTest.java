@@ -8,11 +8,13 @@ import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessContact;
+import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessSnapshot;
 import io.nxmatic.rke2lab.cluster.contract.ControllerRef;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.Consultation;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
 import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
+import io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcome;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.seed.broker.codec.SeedCodec;
@@ -167,13 +169,9 @@ public class ClusterReadinessScenarioInContainerTest {
       implements ClusterReadinessContact {
 
     @Override
-    public boolean isApiReady(Path kubeconfig) {
-      return apiReady;
-    }
-
-    @Override
-    public boolean areControllersEffective(Path kubeconfig, List<ControllerRef> controllers) {
-      return controllersEffective;
+    public ClusterReadinessSnapshot awaitReady(
+        Path kubeconfig, List<ControllerRef> controllers, ReadinessBudget budget) {
+      return new ClusterReadinessSnapshot(apiReady, controllersEffective, "fake");
     }
   }
 
@@ -182,15 +180,10 @@ public class ClusterReadinessScenarioInContainerTest {
     boolean probed;
 
     @Override
-    public boolean isApiReady(Path kubeconfig) {
+    public ClusterReadinessSnapshot awaitReady(
+        Path kubeconfig, List<ControllerRef> controllers, ReadinessBudget budget) {
       this.probed = true;
-      return true;
-    }
-
-    @Override
-    public boolean areControllersEffective(Path kubeconfig, List<ControllerRef> controllers) {
-      this.probed = true;
-      return true;
+      return ClusterReadinessSnapshot.ready();
     }
   }
 

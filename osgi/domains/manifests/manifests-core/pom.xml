@@ -174,10 +174,12 @@
                 <arg>-S</arg>
                 <arg>warning</arg>
                 <arg>-s</arg>
-                <arg>bash</arg>
+                <arg>--format=tty</arg>
                 <arg>--norc</arg>
               </args>
               <failBuildIfWarnings>false</failBuildIfWarnings>
+              <capturedStdoutFileName>@executionId@.stdout</capturedStdoutFileName>
+              <capturedStderrFileName>@executionId@.stderr</capturedStderrFileName>
               <binaryResolutionMethod>external</binaryResolutionMethod>
               <externalBinaryPath>${maven.multiModuleProjectDirectory}/.flox/run/aarch64-darwin.rke2lab-run/bin/shellcheck</externalBinaryPath>
             </configuration>

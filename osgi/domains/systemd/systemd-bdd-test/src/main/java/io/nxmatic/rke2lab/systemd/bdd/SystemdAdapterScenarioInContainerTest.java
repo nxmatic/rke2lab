@@ -160,7 +160,7 @@ public class SystemdAdapterScenarioInContainerTest {
   }
 
   private static SystemdRuntimeProbe healthy() {
-    return request ->
+    return (request, budget) ->
         SystemdStatusSnapshot.builder()
             .runtimePrecheckReady(true)
             .mandatoryTargetHealthy(true)
@@ -171,7 +171,7 @@ public class SystemdAdapterScenarioInContainerTest {
   }
 
   private static SystemdRuntimeProbe unhealthyTarget() {
-    return request ->
+    return (request, budget) ->
         SystemdStatusSnapshot.builder()
             .runtimePrecheckReady(true)
             .mandatoryTargetHealthy(false)
@@ -186,8 +186,9 @@ public class SystemdAdapterScenarioInContainerTest {
     boolean probed;
 
     @Override
-    public SystemdStatusSnapshot probe(
-        io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest request) {
+    public SystemdStatusSnapshot awaitReady(
+        io.nxmatic.rke2lab.systemd.contract.SystemdProbeRequest request,
+        io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget budget) {
       this.probed = true;
       return SystemdStatusSnapshot.builder()
           .runtimePrecheckReady(true)

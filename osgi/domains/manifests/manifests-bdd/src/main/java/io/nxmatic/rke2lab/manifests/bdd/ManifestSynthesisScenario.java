@@ -102,7 +102,12 @@ public class ManifestSynthesisScenario
   // crossing the host membrane.
   @MonotonicNonNull private ScenarioCellar cellar;
 
-  @OsgiService private Optional<Parcel> parcel = Optional.empty();
+  // await=false: the parcel is genuinely OPTIONAL — a bare survey or a run before the seal filed
+  // has
+  // none, and revealOperatorPki() guards on parcel.isEmpty() for exactly that. A required (await)
+  // injection would contradict that guard, throwing before the body on any parcel-less play.
+  @OsgiService(await = false)
+  private Optional<Parcel> parcel = Optional.empty();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {

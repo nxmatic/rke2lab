@@ -13,9 +13,12 @@ import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
 import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ReadinessBudgetReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ReadinessDeadlines;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
@@ -29,6 +32,7 @@ import io.nxmatic.rke2lab.systemd.contract.SystemdStatusSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -63,6 +67,7 @@ public class SystemdAdapterScenario
     extends ScenarioTestBase<
         SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then>
     implements InputReceiver<SystemdRunbookInput>,
+        ReadinessBudgetReceiver,
         ConsultationSource,
         ScenarioPlayer.Playable,
         SurveyInert {
@@ -83,6 +88,11 @@ public class SystemdAdapterScenario
   // The activation input the front-door seeds before the body (InputReceiver) — its FACET identity
   // is what the probe endpoint derives from. @MonotonicNonNull: null until receiveInput sets it.
   @MonotonicNonNull private SystemdRunbookInput input;
+
+  // The two-tier readiness budget the ReadinessBudgetExtension resolves from the @Test's
+  // @ReadinessDeadlines (folded with the stack override) before the body — threaded into the probe
+  // so awaitReady bounds the reach + convergence. @MonotonicNonNull: null until receiveBudget sets.
+  @MonotonicNonNull private ReadinessBudget budget;
 
   // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The probe
   // moved to the When stage (@OsgiService there, filled by the stage creator); the doctor stays
@@ -106,15 +116,27 @@ public class SystemdAdapterScenario
   }
 
   @Override
+  public void receiveBudget(ReadinessBudget budget) {
+    this.budget = budget;
+  }
+
+  @Override
   public List<SeedEnvelope> consultations() {
     return consultations;
   }
 
   @Test
+  @ReadinessDeadlines(connect = "PT2M", ready = "PT1M")
   void the_systemd_adapter_becomes_reachable() {
     final List<ObservationWire> observations = new ArrayList<>();
     final SystemdProbeRequest endpoint = endpointFrom(input);
-    given().the_seed_node(endpoint.nodeName()).and().probed_through(observations, endpoint);
+    final ReadinessBudget resolvedBudget =
+        Objects.requireNonNull(
+            budget, "the ReadinessBudgetExtension must inject the budget before the body");
+    given()
+        .the_seed_node(endpoint.nodeName())
+        .and()
+        .probed_through(observations, endpoint, resolvedBudget);
     when()
         .the_systemd_endpoint_is_probed()
         .and()
@@ -216,14 +238,19 @@ public class SystemdAdapterScenario
     /** The endpoint the When probes — derived from the identity FACET (or the marker offline). */
     @ProvidedScenarioState SystemdProbeRequest endpoint;
 
+    /** The two-tier readiness budget the When hands the probe's awaitReady. */
+    @ProvidedScenarioState ReadinessBudget budget;
+
     public Given the_seed_node(String name) {
       return self();
     }
 
     @Hidden
-    public Given probed_through(List<ObservationWire> observations, SystemdProbeRequest endpoint) {
+    public Given probed_through(
+        List<ObservationWire> observations, SystemdProbeRequest endpoint, ReadinessBudget budget) {
       this.observations = observations;
       this.endpoint = endpoint;
+      this.budget = budget;
       return self();
     }
   }
@@ -246,11 +273,13 @@ public class SystemdAdapterScenario
 
     @ExpectedScenarioState SystemdProbeRequest endpoint;
 
+    @ExpectedScenarioState ReadinessBudget budget;
+
     @ProvidedScenarioState SystemdStatusSnapshot snapshot;
 
     public When the_systemd_endpoint_is_probed() {
       try {
-        this.snapshot = probe.orElseThrow().probe(endpoint);
+        this.snapshot = probe.orElseThrow().awaitReady(endpoint, budget);
       } catch (RuntimeException unreachable) {
         record("systemd endpoint", false, SymptomKind.CONNECTION_REFUSED);
         throw new SystemdNotReadyError("systemd endpoint", unreachable);

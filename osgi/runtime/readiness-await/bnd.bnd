@@ -1,0 +1,4 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
+Bundle-SymbolicName: io.nxmatic.rke2lab.osgi.runtime.readiness
+Export-Package: io.nxmatic.rke2lab.osgi.runtime.readiness

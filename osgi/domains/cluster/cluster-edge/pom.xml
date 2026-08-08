@@ -26,6 +26,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cluster-contract</artifactId>
     </dependency>
+    <!-- The connect-retry + two-tier-deadline driver awaitReady runs on. A real OSGi bundle staged
+         in-container (Import-Package). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>readiness-await</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>

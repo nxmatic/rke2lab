@@ -40,5 +40,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(SurveyRenderExtension.class)
 @ExtendWith(ScenarioCellarExtension.class)
 @ExtendWith(OsgiServiceExtension.class)
+@ExtendWith(ReadinessBudgetExtension.class)
 @ExtendWith(ScenarioOutcomeExtension.class)
 public @interface SeedScenario {}

@@ -26,6 +26,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
+    <!-- The two-tier readiness budget the awaitReady seam takes — a pure-JDK value from the runtime
+         readiness home (below the domains, so this is with the grain). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>readiness-await</artifactId>
+    </dependency>
   </dependencies>
 
   <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare

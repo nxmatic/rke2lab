@@ -9,6 +9,7 @@ import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.cluster.contract.ClusterReadinessSnapshot;
 import io.nxmatic.rke2lab.cluster.contract.ControllerRef;
 import io.nxmatic.rke2lab.doctor.contract.Checkpoint;
 import io.nxmatic.rke2lab.doctor.contract.ConsultingService;
@@ -16,9 +17,12 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
+import io.nxmatic.rke2lab.osgi.runtime.readiness.ReadinessBudget;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ConsultationSource;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ReadinessBudgetReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ReadinessDeadlines;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
@@ -29,6 +33,7 @@ import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
@@ -57,6 +62,7 @@ public class ClusterReadinessScenario
     implements ConsultationSource,
         ScenarioPlayer.Playable,
         SurveyInert,
+        ReadinessBudgetReceiver,
         InputReceiver<ReadinessInput> {
 
   /**
@@ -76,6 +82,12 @@ public class ClusterReadinessScenario
   // until receiveInput sets it (before the body) — and legitimately null in an offline play (no
   // input seeded), where the marker path suffices because the mock contact ignores it.
   @MonotonicNonNull private ReadinessInput input;
+
+  // The two-tier readiness budget the ReadinessBudgetExtension resolves from the @Test's
+  // @ReadinessDeadlines (folded with the stack override) before the body — threaded into the
+  // contact
+  // so awaitReady bounds the API reach + controller convergence. Null until receiveBudget sets it.
+  @MonotonicNonNull private ReadinessBudget budget;
 
   // Injected by the OsgiServiceExtension from THIS bundle's registry before the body. The contact
   // moved to the When stage (@OsgiService there, filled by the stage creator); the doctor stays
@@ -103,11 +115,20 @@ public class ClusterReadinessScenario
     this.input = input;
   }
 
+  @Override
+  public void receiveBudget(ReadinessBudget budget) {
+    this.budget = budget;
+  }
+
   @Test
+  @ReadinessDeadlines(connect = "PT2M", ready = "PT1M")
   void the_cluster_becomes_ready() {
     final Map<ClusterReadinessPhase, ObservationWire> observations =
         new EnumMap<>(ClusterReadinessPhase.class);
-    given().the_cluster("seed", kubeconfig()).and().probed_through(observations);
+    final ReadinessBudget resolvedBudget =
+        Objects.requireNonNull(
+            budget, "the ReadinessBudgetExtension must inject the budget before the body");
+    given().the_cluster("seed", kubeconfig()).and().probed_through(observations, resolvedBudget);
     when()
         .the_kubeconfig_is_published()
         .and()
@@ -182,14 +203,19 @@ public class ClusterReadinessScenario
      */
     @ProvidedScenarioState Map<ClusterReadinessPhase, ObservationWire> observations;
 
+    /** The two-tier readiness budget the When hands the contact's awaitReady. */
+    @ProvidedScenarioState ReadinessBudget budget;
+
     public Given the_cluster(@Quoted String name, @Hidden Path kubeconfig) {
       this.kubeconfig = kubeconfig;
       return self();
     }
 
     @Hidden
-    public Given probed_through(Map<ClusterReadinessPhase, ObservationWire> observations) {
+    public Given probed_through(
+        Map<ClusterReadinessPhase, ObservationWire> observations, ReadinessBudget budget) {
       this.observations = observations;
+      this.budget = budget;
       return self();
     }
   }
@@ -206,6 +232,13 @@ public class ClusterReadinessScenario
     @ExpectedScenarioState Path kubeconfig;
     @ExpectedScenarioState List<ControllerRef> controllers;
     @ExpectedScenarioState Map<ClusterReadinessPhase, ObservationWire> observations;
+    @ExpectedScenarioState ReadinessBudget budget;
+
+    // The snapshot the single awaitReady contact produced — captured by the api-ready step (the
+    // reach + convergence run inside it), then READ by the controllers step. The twin of the
+    // systemd
+    // snapshot: one contact, the phases read its facts rather than each making a contact.
+    @ProvidedScenarioState ClusterReadinessSnapshot snapshot;
 
     // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
     // not threaded from the scenario through the Given as a step param.
@@ -219,16 +252,18 @@ public class ClusterReadinessScenario
     }
 
     public When the_api_is_ready() {
-      return check(
-          ClusterReadinessPhase.API_READY,
-          contact.orElseThrow().isApiReady(kubeconfig),
-          SymptomKind.API_NOT_READY);
+      // The CAPTURE: one awaitReady bounds the API reach AND the controller convergence within the
+      // budget, producing the snapshot both phases read. A never-ready API is a false apiReady
+      // facet
+      // (the edge does not throw), so this phase fails fast and the controllers step is skipped.
+      this.snapshot = contact.orElseThrow().awaitReady(kubeconfig, controllers, budget);
+      return check(ClusterReadinessPhase.API_READY, snapshot.apiReady(), SymptomKind.API_NOT_READY);
     }
 
     public When the_required_controllers_are_effective() {
       return check(
           ClusterReadinessPhase.CONTROLLERS_EFFECTIVE,
-          contact.orElseThrow().areControllersEffective(kubeconfig, controllers),
+          snapshot.controllersEffective(),
           SymptomKind.CONTROLLER_NOT_READY);
     }
 

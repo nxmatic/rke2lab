@@ -186,6 +186,28 @@ the contact vocabulary, free of any policy type. `isApiReady` needs only the kub
 the clean single-door edge: it imports one port, contacts one target, and carries no host type.
 ====
 
+[NOTE]
+.Update (readiness-await, 2026-08): the contact AWAITS, and the wait moved into the edge
+====
+The two point-in-time booleans (`isApiReady` / `areControllersEffective`) collapsed into ONE
+awaiting call — `ClusterReadinessSnapshot awaitReady(kubeconfig, List<ControllerRef>,
+ReadinessBudget)`. The reason: the BDD migration had left the checkpoint one-shot (the host's retry
+loop was cut), so a gate probed during `grow` failed the instant the cluster was not yet up. The
+patience now lives in the edge, bounded by a two-tier `ReadinessBudget` (a pure-JDK value from
+`osgi/runtime/readiness-await`): the reach retries `/readyz` until the *connect* deadline (a cold
+boot / fresh image re-seed lives here), then — once the API answers — fabric8
+`waitUntilCondition` awaits every required controller rolling out until the *ready* deadline. The
+shared `ReadinessAwait` skeleton owns the connect-retry + two-deadline control flow (the systemd
+edge uses it too, over dbus `JobRemoved`); the edge injects only its connect + convergence.
+
+`awaitReady` returns a `ClusterReadinessSnapshot` (`apiReady`, `controllersEffective`) rather than
+throwing for a not-ready cluster — the twin of `SystemdStatusSnapshot`: the checkpoint's phase steps
+READ the snapshot's facts (fail-fast on the api phase, then the controllers phase) instead of each
+making a contact. The deadlines are declared where they read, on the `@Test`
+(`@ReadinessDeadlines(connect, ready)`), and are overridable from the stack config; the
+`ReadinessBudgetExtension` resolves the effective budget and injects it before the body.
+====
+
 [mermaid]
 ....
 flowchart LR
