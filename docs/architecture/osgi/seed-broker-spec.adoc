@@ -1629,10 +1629,14 @@ turns; the debunked framings are recorded so they are not re-attempted:
   model (the within-run write set); `fetch`/`neighbours` delegate to the durable backend directly. The
   cellar is INJECTED by the extension into a scenario field — NOT resolved from the registry (that
   registry-resolution was the source of the identity ambiguity).
-. *Tags only, the ROOT drains.* A fragment never touches the durable backend: it posts tags, and the graft
-  folds each scion's tags into the host trunk (`ScenarioGraft`, the `getTagMap` merge — already exists). At
-  the boundary only the root drains — a single all-or-nothing flush. Isolation (A), not sub-transactions;
-  the spec's atomicity, kept.
+. *Tags only, the ROOT drains — pass OR fail.* A fragment never touches the durable backend: it posts tags,
+  and the graft folds each scion's tags into the host trunk (`ScenarioGraft`, the `getTagMap` merge —
+  already exists). At the boundary only the root drains — a single ordered, batched flush. The batch is
+  atomic (it lands in the run's one `up`, § one-history), but it is NOT gated on the run's success: the
+  world this cellar mirrors is NON-transactional, so a run that fails part-way leaves real mutations behind
+  (the stack, the instance, the sealed CA on disk) and the harvest attesting them must persist too — else
+  the cellar lies about the world and the next run re-derives what already exists. A failed run drops only
+  the TRANSIENT bus. Isolation (A) between crossings, kept; success-gating, dropped.
 +
 --
 *How the root drains onto the RUN's own stack (§ one-history).* The drain replays the write-set onto the
@@ -1725,11 +1729,14 @@ store/fetch/neighbours):
   `ParameterResolver`: jGiven reads every `@Test` PARAMETER as a narrated scenario argument
   (`ArgumentReflectionUtil.getNamedArgs` → `startScenario`, verified in 2.0.3), so a parameter would be
   narrated and could collide with jGiven's own param-reading; a field puts no parameter on the `@Test`.
-* `AfterTestExecutionCallback` — reads `getExecutionException()`: success + ROLE=ROOT ⇒ DRAIN — resolve the
+* `AfterTestExecutionCallback` — ROLE=ROOT ⇒ DRAIN, whether the run PASSED or FAILED — resolve the
   `OpaqueCellar` from the REGISTRY (via the connection in the class-`Store` `BaseWorldExtension.CONNECTION`,
   the SAME path the scions resolve their collaborators — one resolution route), read the folded
   tag-envelopes off the trunk, re-`store` them opaquely (the host never decodes, a tag-envelope is already
-  an encoded `SeedEnvelope`); failure ⇒ nothing (the model dies with the run — atomicity); FRAGMENT ⇒ no
+  an encoded `SeedEnvelope`). The drain is NOT gated on success: the world is non-transactional (a failed
+  run leaves the stack/instance/filesystem where it stopped), so a harvest filed before the failure point
+  is a fact that really happened and must persist — the only thing a failed run drops is the TRANSIENT bus,
+  evicted by the drain itself (§ the TRANSIENT tier). FRAGMENT ⇒ no
   drain, but STRIP the inherited entries (`ScenarioCellar.stripInherited`) before the front-door serialises
   the model, so the write-set it inherited from its parent does not fold up into the trunk a SECOND time (§
   the write-set descends).
@@ -1871,6 +1878,69 @@ cellar re-posts them LOCALLY via `inheritWriteSet` — decoding each string into
 then re-appending it as a tag on ITS OWN model. Each realm holds its own `Entry` class; none travels. The
 rule that keeps it safe: the channel carries FLAT (encoded strings), the typed `Entry` is born downstream of
 the read, per realm. Never `store.put(aCellar)` nor put a live `Entry` in the session store.
+
+[[failure-handling]]
+===== Failure handling — the crossing verdict, the closing gate, and the harvest
+
+Three coupled decisions govern what happens when a crossing (or a host step) FAILS mid-run. Together
+they make a failed bootstrap read HONESTLY (a red runbook, a non-zero `pulumi up`) while KEEPING the
+real harvest a partial run produced — the non-transactional mirror.
+
+. *The sow's default THROWS (fail-fast).* `SowAndGraftStage.the_scion_is_sown_and_grafted` grafts the
+  scion's verdict into the runbook, then `assertPassed` PROPAGATES a FAILED scion as a throw. A crossing
+  whose failure makes the rest meaningless (worktree · bbox · cluster-pki seal · incus-provision ·
+  incus-reconcile) uses this default — no point growing an instance whose provisioning failed.
+. *A tolerating variant lets the SOWER keep the hand.* `…_tolerating_failure` grafts the verdict but does
+  NOT throw, so the crossings AFTER it still run and their failures ACCUMULATE in the one runbook (§ the
+  graft, ACCUMULATE not first-wins). For the TERMINAL independent crossings a sower wants to report
+  together — systemd AND cluster — so an operator sees both causes, not just the first.
+. *The root's closing gate seals the verdict (fail-at-end).* The THEN calls
+  `ScenarioGraft.assertNoCrossingFailed(hostScenario)`: if any tolerated crossing left an error on the host
+  case, it throws the accumulated reason. So JUnit's verdict AGREES with the runbook without the fail-fast
+  having discarded the sibling diagnostics.
+
+And on EVERY exit path — pass, fail-fast, fail-at-end — the root DRAINS (§ cellar-transactional, the drain
+is NOT gated on success): the harvest filed before the failure point is real (the world is not
+transactional — a failed run leaves the stack, the instance, the sealed CA on disk), so it must persist;
+only the `TRANSIENT` bus is evicted. A run that seals the CA then fails at cluster-readiness still persists
+the CA — the next run is warm.
+
+.The crossing verdict: default fail-fast, tolerating + closing gate, and the drain on every path
+[mermaid]
+....
+flowchart TB
+  sow["a crossing is sown & grafted"] --> q{"scion verdict"}
+  q -->|PASSED| cont["host continues"]
+  q -->|"FAILED · default sow"| throwfast["throw NOW — fail-fast<br/>(worktree · bbox · seal · provision · reconcile)"]
+  q -->|"FAILED · tolerating sow"| aggr["graft verdict, do NOT throw<br/>siblings run & aggregate<br/>(systemd · cluster)"]
+  cont --> gate{"closing gate (THEN):<br/>any crossing FAILED?"}
+  aggr --> gate
+  gate -->|no| pass["run PASSES"]
+  gate -->|yes| throwend["throw the aggregated reason — fail-at-end"]
+  throwfast --> drain["drain (afterTestExecution):<br/>persist the harvest so far<br/>TRANSIENT evicted"]
+  throwend --> drain
+  pass --> drain
+....
+
+.A run that seals the CA then fails at cluster-readiness — the gate fails it, the drain keeps the CA
+[mermaid]
+....
+sequenceDiagram
+  participant Root as ClusterSeedScenario (root)
+  participant Graft as ScenarioGraft
+  participant Overlay as ScenarioCellar (overlay)
+  participant Drain as ScenarioCellarExtension
+  participant Durable as PulumiCellar (current-state)
+  Root->>Overlay: seal → store CA
+  Note over Root: … grow · systemd sown (tolerating) …
+  Root->>Graft: sow cluster (tolerating)
+  Graft-->>Root: scion FAILED → rootstock FAILED,<br/>error on host case (NO throw)
+  Root->>Graft: closing gate: assertNoCrossingFailed
+  Graft-->>Root: throw (aggregated reason)
+  Root->>Drain: afterTestExecution (executionException present)
+  Drain->>Durable: drain — persist DURABLE entries (CA …), skip TRANSIENT
+  Note over Durable: the sealed CA survives the failed run → next run is WARM
+....
 
 [[edge-reaches-osgi]]
 === How the host EDGE reaches an OSGi consumer — registerService, not a handler

@@ -158,7 +158,16 @@ public final class ScenarioGraft {
    * @param label how the operator names the sow (e.g. {@code "the manifests synthesis"})
    */
   public void assertPassed(String runbookJson, String label) {
-    final ReportModel model = rebuild(runbookJson);
+    assertPassed(rebuild(runbookJson), label);
+  }
+
+  /**
+   * The model overload — assert an already-rebuilt scion {@code model} PASSED, else throw its
+   * failure reason (the case errorMessage + stackTrace, folded into one {@link AssertionError}).
+   * The grafting sower uses this on the scion it just grafted to PROPAGATE a FAILED verdict as a
+   * throw — the honest fail-fast default of {@code the_scion_is_sown_and_grafted}.
+   */
+  public void assertPassed(ReportModel model, String label) {
     if (model.getScenarios().isEmpty()) {
       throw new AssertionError(label + " reaped a runbook with no scenario");
     }
@@ -172,6 +181,27 @@ public final class ScenarioGraft {
             ? ""
             : "\n" + String.join("\n", failed.getStackTrace());
     throw new AssertionError(label + " failed in-container: " + failed.getErrorMessage() + stack);
+  }
+
+  /**
+   * The sower's CLOSING GATE — fail the host run if any TOLERATED crossing ended FAILED. A crossing
+   * grafted with the tolerating sow ({@code the_scion_is_sown_and_grafted_tolerating_failure})
+   * folds its FAILED verdict + error text onto the host case WITHOUT throwing, so its siblings run
+   * and aggregate. Called from the root's closing THEN, this throws the accumulated failure off the
+   * host case — so the overall verdict is honest ({@code pulumi up} exits non-zero, JUnit agrees
+   * with the runbook) without the fail-fast having discarded the sibling diagnostics. A no-op when
+   * every crossing passed (the host case carries no error).
+   */
+  public void assertNoCrossingFailed(ScenarioModel hostScenario) {
+    final ScenarioCaseModel hostCase = hostScenario.getScenarioCases().get(0);
+    if (hostCase.getErrorMessage() == null) {
+      return;
+    }
+    final String stack =
+        hostCase.getStackTrace() == null || hostCase.getStackTrace().isEmpty()
+            ? ""
+            : "\n" + String.join("\n", hostCase.getStackTrace());
+    throw new AssertionError(hostCase.getErrorMessage() + stack);
   }
 
   /**

@@ -18,11 +18,16 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
  * The transactional-cellar bracket: injects the run's {@link ScenarioCellar} before the body, and
- * at the boundary DRAINS the accumulated tags to the durable backend — but only for a {@link
- * RunRole#ROOT} run that succeeded. A {@link RunRole#FRAGMENT} is inert (its tags ride the graft up
- * to the root); a failure drains nothing (the model dies with the run — atomicity is free, the
- * disposable model IS the buffer). See docs/architecture/osgi/seed-broker-spec.adoc (§
- * cellar-transactional).
+ * at the boundary DRAINS the accumulated tags to the durable backend — for ANY {@link RunRole#ROOT}
+ * run, whether it PASSED or FAILED. A {@link RunRole#FRAGMENT} is inert (its tags ride the graft up
+ * to the root, which drains for all of them). The drain is NOT gated on success: the world this
+ * cellar mirrors is non-transactional (a failed run leaves the stack, the instance, the host
+ * filesystem where it stopped), so the harvest filed before the failure point is real and must
+ * persist — else the cellar diverges from reality and the next run re-derives a fact that already
+ * exists. "Transactional" here names the DRAIN mechanics — one ordered, batched flush at the
+ * boundary (§ one-history) — not an all-or-nothing success gate. The only thing a failed run drops
+ * is the within-run bus ({@link Persistence#TRANSIENT}), evicted by the drain itself. See
+ * docs/architecture/osgi/seed-broker-spec.adoc (§ cellar-transactional).
  *
  * <p>Dual-loaded (host-flat + one copy per bundle), and the OWNER of the cellar's lifecycle: it
  * builds the {@link ScenarioCellar}, hands it the durable-read {@code Supplier}, and drains at the
@@ -78,9 +83,20 @@ public class ScenarioCellarExtension
       ScenarioCellar.stripInherited(currentModel());
       return;
     }
-    if (context.getExecutionException().isPresent()) {
-      return; // failure → nothing persisted (the disposable model IS the transaction)
-    }
+    // The root drains REGARDLESS of the verdict — the world this cellar mirrors is NOT
+    // transactional
+    // (a failed run leaves the Pulumi stack, the incus instance, the host filesystem in the state
+    // it
+    // reached), so a harvest filed before the failure point attests to a fact that really happened
+    // (the sealed CA is on disk) and must survive to the durable backend — else the cellar diverges
+    // from reality and the next run re-derives a fact that already exists. The within-run bus is
+    // the
+    // only thing a failed run drops, and the drain SKIPS it by its Persistence, so a failure
+    // persists
+    // exactly the durable harvest. Draining cannot mask the reason: the jGiven model already
+    // recorded
+    // the step failure before this callback, and JUnit keeps the body's exception primary over any
+    // the drain raises.
     drain(currentModel(), resolve(context, OpaqueCellar.class));
   }
 

@@ -89,12 +89,39 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
   }
 
   /**
-   * Sow the soil's runbook through the gardening and graft the reaped scion under {@code
-   * rootStepName} — the name of the root step that stands for this crossing.
+   * Sow the soil's runbook through the gardening, graft the reaped scion under {@code
+   * rootStepName}, then PROPAGATE its verdict: a FAILED scion THROWS, failing the sower (fail-fast
+   * across the frontier — the honest default, so a failed crossing never reads as a green run and
+   * {@code pulumi up} exits non-zero). A sower that wants the crossings AFTER this one to still run
+   * and aggregate their failures in one runbook (systemd AND cluster) keeps the hand with {@link
+   * #the_scion_is_sown_and_grafted_tolerating_failure}, and enforces the overall verdict from its
+   * own closing gate ({@link ScenarioGraft#assertNoCrossingFailed}).
    */
   public SowAndGraftStage the_scion_is_sown_and_grafted(@Hidden String rootStepName) {
-    final String runbookJson = gardening.sow(soil, amendments, cellar);
-    graft.graftUnder(hostScenario, hostTree, rootStepName, graft.rebuild(runbookJson));
+    final ReportModel scion = sowAndGraft(rootStepName);
+    graft.assertPassed(scion, rootStepName);
     return self();
+  }
+
+  /**
+   * The tolerating variant — the sower KEEPS THE HAND. Graft the scion's verdict into the runbook
+   * (its steps, its FAILED status, its error text carried onto the host case) but do NOT throw, so
+   * the crossings that follow still run and their failures ACCUMULATE in the one runbook. For the
+   * terminal, independent crossings a sower wants to report together; the sower fails the run
+   * overall from its closing gate, not here. NOT the default — a crossing whose failure makes the
+   * rest meaningless uses {@link #the_scion_is_sown_and_grafted}.
+   */
+  public SowAndGraftStage the_scion_is_sown_and_grafted_tolerating_failure(
+      @Hidden String rootStepName) {
+    sowAndGraft(rootStepName);
+    return self();
+  }
+
+  /** Sow the soil and graft the reaped scion under {@code rootStepName}; return the scion model. */
+  private ReportModel sowAndGraft(String rootStepName) {
+    final String runbookJson = gardening.sow(soil, amendments, cellar);
+    final ReportModel scion = graft.rebuild(runbookJson);
+    graft.graftUnder(hostScenario, hostTree, rootStepName, scion);
+    return scion;
   }
 }

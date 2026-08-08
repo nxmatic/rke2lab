@@ -32,6 +32,7 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.SeedRuntime;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioGraft;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiCellar;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiDeploymentSeed;
@@ -192,7 +193,7 @@ public class ClusterSeedScenario
         .the_systemd_adapter_is_launched(hostScenario, hostTree)
         .and()
         .the_cluster_becomes_ready(hostScenario, hostTree);
-    then().the_harvest_is_stored();
+    then().the_harvest_is_stored().the_run_fails_if_any_crossing_failed(hostScenario);
   }
 
   /**
@@ -635,9 +636,12 @@ public class ClusterSeedScenario
     @As("the systemd adapter is launched")
     public When the_systemd_adapter_is_launched(
         @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // Tolerating: systemd and cluster are the TERMINAL independent crossings — a systemd failure
+      // must NOT fail-fast, so cluster still runs and both failures aggregate in one runbook. The
+      // closing gate (the THEN) fails the run overall if either ended FAILED.
       sowAndGraft
           .sowing("systemd", gardening, hostScenario, hostTree)
-          .the_scion_is_sown_and_grafted("the systemd adapter is launched");
+          .the_scion_is_sown_and_grafted_tolerating_failure("the systemd adapter is launched");
       return self();
     }
 
@@ -645,22 +649,40 @@ public class ClusterSeedScenario
     @As("the cluster becomes ready")
     public When the_cluster_becomes_ready(
         @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // Tolerating (see the systemd crossing): the last crossing, aggregated with systemd; the
+      // closing gate in the THEN enforces the overall verdict.
       sowAndGraft
           .sowing("cluster", gardening, hostScenario, hostTree)
-          .the_scion_is_sown_and_grafted("the cluster becomes ready");
+          .the_scion_is_sown_and_grafted_tolerating_failure("the cluster becomes ready");
       return self();
     }
   }
 
-  /** The closing THEN — the harvest is filed to its parcel's cellar. */
+  /** The closing THEN — the harvest is filed to its parcel's cellar, then the verdict is sealed. */
   public static class Then extends Stage<Then> {
 
     @ScenarioStage CellarStage cellar;
+
+    private final ScenarioGraft graft = new ScenarioGraft();
 
     @As("the harvest is stored")
     public Then the_harvest_is_stored() {
       // The cellar bookend closes the run; the végétaux cultivated fresh this run are filed to the
       // parcel. (What exactly is stored is the harvest-shaping task; the bookend is here.)
+      return self();
+    }
+
+    @As("the run fails if any crossing failed")
+    public Then the_run_fails_if_any_crossing_failed(@Hidden ScenarioModel hostScenario) {
+      // The closing gate: the tolerating crossings (systemd, cluster) grafted their FAILED verdict
+      // WITHOUT throwing, so their siblings ran and aggregated in the one runbook. Here — after the
+      // harvest is filed — fail the whole run if any crossing left an error on the host case, so
+      // the
+      // verdict is honest (pulumi up exits non-zero, JUnit agrees with the runbook) without the
+      // fail-fast having discarded the sibling diagnostics. The drain (afterTestExecution) still
+      // runs
+      // and persists the real harvest despite this throw — the non-transactional mirror.
+      graft.assertNoCrossingFailed(hostScenario);
       return self();
     }
   }

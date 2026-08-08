@@ -194,6 +194,46 @@ class ScenarioGraftTest {
             + " yet (the live mid-run condition)");
   }
 
+  @Test
+  void the_default_propagates_a_failed_scion_as_a_throw_and_a_green_one_passes() {
+    // assertPassed(model, label) is what the DEFAULT sow calls to PROPAGATE the scion verdict: a
+    // FAILED scion throws its reason (fail-fast across the frontier); a green scion is a no-op.
+    final ReportModel failing = play(ScionStage.class, r -> r.the_scion_scenario_fails());
+    final AssertionError thrown =
+        assertThrows(
+            AssertionError.class,
+            () -> graft.assertPassed(failing, ROOTSTOCK),
+            "a failed scion propagates as a throw");
+    assertTrue(thrown.getMessage().contains(ROOTSTOCK), "the throw names the crossing");
+
+    final ReportModel green = play(ScionStage.class, r -> r.the_scion_scenario_runs_green());
+    graft.assertPassed(green, ROOTSTOCK); // a green scion does not throw
+  }
+
+  @Test
+  void the_closing_gate_fails_on_a_tolerated_failure_and_passes_when_clean() {
+    // assertNoCrossingFailed is the sower's CLOSING GATE: after a TOLERATED crossing grafted a
+    // FAILED verdict onto the host case WITHOUT throwing (so its siblings ran), the gate throws the
+    // accumulated reason so the run fails overall. A clean host passes the gate.
+    final ReportModel cleanHost = playHost();
+    graft.assertNoCrossingFailed(cleanHost.getScenarios().get(0)); // nothing failed → no throw
+
+    final ReportModel host = playHost();
+    final ReportModel failing = play(ScionStage.class, r -> r.the_scion_scenario_fails());
+    graft.graftUnder(
+        host.getScenarios().get(0),
+        host,
+        ROOTSTOCK,
+        graft.rebuild(new ScenarioJsonWriter(failing).toString()));
+
+    final AssertionError thrown =
+        assertThrows(
+            AssertionError.class,
+            () -> graft.assertNoCrossingFailed(host.getScenarios().get(0)),
+            "the gate throws when a tolerated crossing left an error on the host case");
+    assertTrue(thrown.getMessage().contains(ROOTSTOCK), "the gate carries the crossing's reason");
+  }
+
   /** The host runbook: a rootstock step (the crossing) followed by a downstream phase. */
   private static ReportModel playHost() {
     return play(HostStage.class, h -> h.the_scion_is_grafted().the_host_finishes());

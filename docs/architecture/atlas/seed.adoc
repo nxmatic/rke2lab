@@ -323,12 +323,12 @@ sequenceDiagram
   L->>S: play — a post-processor sets SeedRun before GIVEN
   Note over S: GIVEN bootstraps (narrated) — consumes the connection, does NOT open it
   S->>S: registerService(RunGate/OpaqueCellar/Parcel) — the RUN layer, from SeedRun
-  Note over S: WHEN — worktree(survey→facts, entry gate) · fetch · bbox · incus-prepare · incus-RECONCILE · host GROW (gated on a live deployment; reads cold/warm Growth, files GrowOutcome on the TRANSIENT bus) · kubeconfig · readiness budget tuned to growth (WARM⇒fail-fast, COLD⇒patient) · systemd + cluster (AWAIT convergence, not one-shot) — THEN store→tag
+  Note over S: WHEN — worktree(survey→facts, entry gate) · fetch · bbox · incus-prepare · incus-RECONCILE · host GROW (gated on a live deployment; reads cold/warm Growth, files GrowOutcome on the TRANSIENT bus) · kubeconfig · readiness budget tuned to growth (WARM⇒fail-fast, COLD⇒patient) · systemd + cluster (AWAIT convergence; TOLERATING sows, aggregated) — THEN store→tag, then the closing gate fails the run if any crossing FAILED
   S->>Sc: broker.sow(RunbookCoordinate(soil), txId + writeSetOf(trunk)) — the ALLER sense
   Note over Sc: scion CE poses the write-set as Entry(inherited=true), scion reads own>inherited>durable
   Sc->>Sc: scion CE AfterTestExecution — STRIP the inherited before the front-door serializes
   Sc-->>S: runbook JSON → ScenarioGraft grafts it (scion's OWN tags fold into the trunk)
-  CE->>CE: AfterTestExecution — ROLE=ROOT + success ⇒ drain trunk tags → OpaqueCellar
+  CE->>CE: AfterTestExecution — ROLE=ROOT ⇒ drain trunk tags → OpaqueCellar (pass OR fail; TRANSIENT evicted)
   WE->>WE: afterAll — close the connection (ownsLifecycle)
 ----
 
@@ -350,6 +350,19 @@ they AWAIT convergence within that budget (§ cluster-edge-spec, readiness-await
 during grow no longer fails the instant the node is not yet up. The distinction is principled — the
 warm/cold fact CONDITIONS the run (it feeds the budget through a JUnit extension), it is not a domain
 input, so it rides the ambient `ReadinessOverrides` seam like `RunGate`, never the facet.
+
+*The failure beat — honest verdict, kept harvest (2026-08-08).* Two coupled changes make a failed run
+read HONESTLY without losing what it produced. First, the crossing verdict: a sow THROWS by default on a
+FAILED scion (fail-fast — worktree/bbox/seal/provision/reconcile), but systemd and cluster use a
+TOLERATING variant that grafts the verdict without throwing, so both report in one runbook; the root's
+closing THEN then fails the run if any crossing FAILED (fail-at-end), so `pulumi up` exits non-zero and
+JUnit agrees with the runbook (§ link:../osgi/seed-broker-spec.adoc#failure-handling[seed-broker-spec,
+failure handling]). Second, the drain is NO LONGER gated on success: the world is non-transactional, so
+the harvest filed before the failure point (the sealed CA) persists — the TRANSIENT bus alone is evicted —
+and the next run is warm. And the READ the seal's idempotency depends on is now decided by the run stack's
+IDENTITY, not the thread-local deployment, so the off-thread seal reads the same current-state the grow
+does (§ link:../osgi/host-cellar-realisation-spec.adoc[host-cellar-realisation, the read forks by
+identity]) — closing the seal-vs-grow divergence where the history-walk resurrected a destroyed CA.
 
 *The transaction crosses BOTH ways.* The RETURN sense (a scion's tags fold UP into the trunk, the root
 drains) was the original design; the ALLER sense (the root hands DOWN the in-flight write-set so a
