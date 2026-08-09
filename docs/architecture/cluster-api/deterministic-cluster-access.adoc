@@ -6,6 +6,18 @@ toc::[]
 
 == Overview — the result we want
 
+[IMPORTANT]
+====
+Read against the management/workload separation (see the anchor,
+link:management-workload-topology.adoc[Management / Workload Topology]). This deterministic pre-seeded
+PKI is a *pillar of function-of-git*: because the kubeconfig is a pure function of the deterministic
+mDNS name + a pre-seeded root of trust, it is stable across destroy/re-grow — exactly the "deterministic
+identities" the function-of-git invariant needs. It applies at both levels: `seed-mgmt` reaches the
+*management* cluster it seeds, and the same BYO-CA scheme gives deterministic access to each *workload*
+cluster the management cluster greenfields. "The master it bootstrapped" below means the *management
+node* `seed-mgmt` seeds; CAPI greenfields the workload clusters' own nodes.
+====
+
 The seed-master must reach the live cluster's kube-apiserver to verify readiness. The result this
 document fixes as the target: **the operator's machine holds a valid admin kubeconfig for a cluster
 the instant that cluster is grown — built entirely on the host, from material the operator already
@@ -171,7 +183,7 @@ a systemd unit did not).
 material, discriminated by `local-config`:
 
 * **The operator kubeconfig** — endpoint the node's mDNS name (`<cluster>-<node>.local`), the endpoint
-  seed-master reaches the master it bootstrapped over. Carried in a `local-config` Secret so the
+  seed-master reaches the management node it seeded over. Carried in a `local-config` Secret so the
   exploder lands it as a hidden dotfile RKE2 never applies; it is meant for host-side consumption (the
   readiness probe's kubeconfig). Until that sink is wired (below), this dotfile is redundant with the
   host runbook's own render of the same kubeconfig to `kubeconfigRef` — the render the synthesis path
@@ -181,8 +193,9 @@ material, discriminated by `local-config`:
   (data key `value`, type `cluster.x-k8s.io/secret`, `cluster.x-k8s.io/cluster-name` label) that
   CAPI reads in-cluster to seed the OTHER nodes (further control-plane + workers). It lives in the
   cluster's own namespace (`<cluster>`, CAPI's one-namespace-per-managed-cluster convention),
-  materialized alongside the (future) `Cluster` CR. seed-master itself bootstraps only the master
-  control node; CAPI reconciles the rest.
+  materialized alongside the (future) `Cluster` CR. seed-master itself seeds only the *management*
+  node; CAPI (in the management cluster) greenfield-creates each workload cluster's own nodes
+  (master + peers + workers).
 
 The material crosses the gate boundary cleanly: `AdminCredentials` (cluster-pki) is revealed from the
 cellar in-container by the manifests scion and translated to `OperatorPkiMaterial` — the manifests

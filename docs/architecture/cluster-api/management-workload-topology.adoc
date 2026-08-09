@@ -1,0 +1,392 @@
+= Management / Workload Topology
+:toc: left
+:toclevels: 3
+
+This is the anchor document for rke2lab's cluster topology. It defines the separation
+between the *management cluster* (which runs Cluster API) and the *workload clusters*
+(which run the actual applications), the naming convention that binds clusters to the
+bare-metal hosts they live on, and the reasoning that led here.
+
+It supersedes the earlier *self-managed / dual-role* model (a single `bioskop` cluster that
+was both the management plane and the workload, scaled in place by in-cluster CAPI). Every
+Stage A/B contract and in-cluster-ownership note that still encodes that older model is being
+reframed to point at this document.
+
+== Overview
+
+We run *three* Kubernetes clusters across *two* bare-metal hosts:
+
+* one *management cluster* — nix-seeded, single node, *reconstructible from git* (see
+  <<function-of-git>>), that runs CAPI + CAPN (the Incus infrastructure provider) + CAPRKE2 (the RKE2
+  control-plane and bootstrap providers). Its job is to *reconcile* the workload clusters — and only
+  for machine-lifecycle changes; day-to-day app/config is GitOps-pull inside each workload (see
+  <<operating-model>>).
+* two *workload clusters* — one per bare-metal host — each a full HA control plane
+  (master + peer1 + peer2 = three etcd members) plus workers, running the application stack.
+
+The management cluster **greenfield-creates** the workload clusters. It never scales itself,
+never adopts an externally-bootstrapped node, and holds no application workloads. This is the
+textbook Cluster API management/workload split, and it is what makes the whole design tractable
+(see <<why-separation>>).
+
+== System context
+
+[mermaid,topology-system-context,svg]
+----
+flowchart TB
+  OP["Operator"]
+  GH[("git / GitHub<br/>desired state + sops secrets")]
+  subgraph BM1["bioskop bare-metal · bioskop-nixos (incus)"]
+    MG["MANAGEMENT cluster<br/>CAPI · CAPN · CAPRKE2<br/>single node · on-demand"]
+    BW["bioskop-wrkld<br/>Flux + apps"]
+  end
+  subgraph BM2["vz.nikopol bare-metal · nikopol-nixos (incus)"]
+    NW["nikopol-wrkld<br/>Flux + apps"]
+  end
+  OP -->|"commits desired state"| GH
+  MG -->|"reads CRs + secrets"| GH
+  BW -->|"Flux pulls"| GH
+  NW -->|"Flux pulls"| GH
+  MG -->|"reconciles greenfield"| BW
+  MG ==>|"reconciles over tailnet"| NW
+  classDef ext stroke:#888,stroke-dasharray:4 3;
+  classDef mgmt stroke:#2f6f8f,stroke-width:1.6px;
+  classDef wl stroke:#2e7d5b,stroke-width:1.2px;
+  class OP,GH ext; class MG mgmt; class BW,NW wl;
+----
+
+*Legend*: dashed grey = external (operator, git); blue = management cluster; green = workload
+clusters. Thin arrow = local reconcile / read; heavy arrow = cross-bare-metal reconcile over the
+tailnet. the mesh itself (a Tailscale/Headscale virtual network — see <<mesh>>) is omitted here to keep the
+context uncluttered.
+
+== Naming convention
+
+A cluster is named `<bare-metal-host>-<role>`, with `role ∈ { mgmt, wrkld }`:
+
+[cols="1,2,3",options="header"]
+|===
+|Cluster |Role |Runs on
+
+|`bioskop-mgmt` / `nikopol-mgmt`
+|Management (CAPI/CAPN/CAPRKE2)
+|The bare-metal host it is currently placed on — it *travels*
+|`bioskop-wrkld`
+|Workload
+|The `bioskop` bare-metal host
+|`nikopol-wrkld`
+|Workload
+|The `nikopol` bare-metal host
+|===
+
+The management cluster carries the name of *its current host* because it can move between
+bare-metals (the cellar travels with it — see the cellar-secrets atlas). A node's full identity
+is `<cluster>-<node>`, e.g. `nikopol-mgmt-master`, `bioskop-wrkld-peer1`.
+
+* *Target placement*: `bioskop-mgmt` · `bioskop-wrkld` · `nikopol-wrkld` (management on `bioskop`).
+* *Current placement*: `nikopol-mgmt` · `bioskop-wrkld` · `nikopol-wrkld` (management on `nikopol`,
+  which is what `Pulumi.dev.yaml` currently seeds — `cluster=nikopol`, `node=master`).
+
+NOTE: `nikopol` was formerly `alcide`; `alcide` is retired (`ClusterNetworkBlueprint` keeps the
+cluster id, renamed the name). Use `nikopol`.
+
+== Logical topology
+
+CAPI/CAPN/CAPRKE2 live **only** in the management cluster. The workloads do not run them.
+
+[mermaid,topology-logical,svg]
+----
+flowchart TB
+  subgraph MGMT["management cluster — single node, run-on-demand"]
+    CAPI["CAPI · CAPN · CAPRKE2"]
+  end
+  BWL["bioskop-wrkld<br/>master + peer1 + peer2 (+ workers)"]
+  NWL["nikopol-wrkld<br/>master + peer1 + peer2 (+ workers)"]
+  CAPI -->|"reconciles GREENFIELD<br/>RKE2ControlPlane init + scaleUp<br/>CAPN provisions from node-base"| BWL
+  CAPI -->|"reconciles GREENFIELD"| NWL
+----
+
+Each workload is created from scratch: CAPRKE2's `RKE2ControlPlane` initialises its own first
+replica (`cluster-init`) and scales up the peers that join it; CAPN provisions the Incus
+instances from the shared `node-base` image. No node of a workload is ever the management
+cluster's node, so there is no adoption and no "mixed management mode".
+
+== Physical placement
+
+The two bare-metal hosts each run a NixOS hypervisor (`<host>-nixos`) that hosts Incus; the
+clusters are Incus instances on those hypervisors. The management cluster co-locates with a
+workload on whichever host it is placed, and reaches the *other* host over the mesh.
+
+[mermaid,topology-physical-placement,svg]
+----
+flowchart TB
+  subgraph BM1["bare-metal: bioskop → bioskop-nixos (incus)"]
+    MG["bioskop-mgmt<br/>(target placement)"]
+    B1["bioskop-wrkld"]
+  end
+  subgraph BM2["bare-metal: vz.nikopol → nikopol-nixos (incus)"]
+    N1["nikopol-wrkld"]
+  end
+  MG -.->|"reconciles (same host)"| B1
+  MG ==>|"reconciles OVER THE MESH<br/>(cross bare-metal)"| N1
+----
+
+The <<mesh,virtual network (the mesh)>> is the *transport* that lets the management cluster reach a
+workload on a different bare-metal. The relevant plane here is the *node* plane — `Tailscale`'s
+`mammoth-skate` tailnet, on which every node is a permanent member — so this hop works at bootstrap and
+in steady state alike, independent of whether any Headscale workload plane exists yet. Without it, a
+management cluster on one host cannot reach a workload's API or the Incus host on another.
+
+[[mesh]]
+== The mesh — a virtual network (detail deferred)
+
+The clusters reach each other over a *virtual network* that abstracts the physical one — the
+node/cluster-reachability counterpart of what kube-vip does for the control-plane endpoint (kube-vip
+stabilises the apiserver address; the mesh stabilises reachability across bare-metals, independent of
+the physical network).
+
+It is *not* one mesh but *two planes that stack*, at two different levels — this is the key
+distinction, and it is not a migration where one replaces the other:
+
+* *Node plane — `Tailscale`, tailnet `mammoth-skate`.* Every *node* is a member: the bare-metal NixOS
+  hosts, the management control node, every workload control node. This plane is *always* present,
+  independent of any running cluster, so it is the *bootstrap-time* transport (the management cluster's
+  first cross-host reconciliation rides it) and the path for external access. It is the machine-level
+  address plane.
+* *Workload plane — `Headscale` (self-hosted control-server + DERP).* The *workloads inside* the
+  clusters (pods / services) are members of a *distinct* tailnet defined by Headscale. Headscale is
+  itself deployed *as a workload-cluster service*, so this plane exists only *after* a workload cluster
+  is up — today, with no workload running yet, there is no Headscale at all. It is hosted on the
+  *always-live* `bioskop-wrkld` (never on the on-demand management cluster).
+
+The two coexist by design, each at its own level: nodes stay on `mammoth-skate` permanently; the
+Headscale tailnet is layered on top for workload-to-workload reachability once the workloads exist.
+
+This also dissolves the obvious chicken-and-egg: the management cluster's first cross-host
+reconciliation is node-level, so it rides the `mammoth-skate` node plane (or the LAN) and cannot need
+Headscale (nothing hosts it yet). And because Headscale lives on a *workload*, it is never on the
+on-demand management cluster — stopping that cluster cannot take the workload plane with it.
+
+.Deferred — do not over-specify here
+[NOTE]
+====
+The two-plane split (nodes on `mammoth-skate` / workloads on Headscale) and Headscale's host (the
+always-live `bioskop-wrkld`) are decided. What remains a separate concern, not yet fixed in the specs,
+is the internal/LAN vs external split (self-hosted Headscale for internal, Tailscale for outside) and
+whether a given bare-metal is LAN-local or remote. It gets its own refinement. This document relies
+only on the *property*: every node is reachable on the `mammoth-skate` node plane, so the management
+cluster can reach each workload node regardless of host.
+====
+
+[[why-separation]]
+== Why separation, not self-management
+
+The earlier model tried to bootstrap `bioskop` with nix, then install CAPI *inside it* and have
+`RKE2ControlPlane` add control-plane peers to that same cluster. That does not work, and the
+reason is structural, verified against CAPRKE2 `v0.24.4`:
+
+* `RKE2ControlPlane` **owns** the whole control plane. Its `initializeControlPlane` counts only
+  the machines it owns; a nix-seeded master is invisible to it, so it would `cluster-init` a
+  *second*, separate cluster with a fresh CA.
+* There is no adopt/join-existing field — `reconcileNormal` has no `adoptMachines` (unlike
+  KubeadmControlPlane) and outright *refuses* to operate in "mixed management mode" if any
+  control-plane machine is not owned by it. `RegistrationMethod` only selects which address the
+  replicas use; it is not a way to join a foreign cluster.
+* The standalone `RKE2Config` bootstrap carries `agentConfig` only (no `serverConfig`), so a bare
+  `Machine` bootstraps an *agent*, never an etcd-member server.
+
+.Anti-pattern — do NOT
+[WARNING]
+====
+Do not point an `RKE2ControlPlane` at a cluster whose first node was bootstrapped outside CAPI
+expecting it to "add peers". It will either refuse (mixed-mode) or initialise a rival control
+plane. Adopting an external master is manual surgery (hand-built owned `Machine` + `LXCMachine`
+with a matching `providerID`, a satisfied bootstrap, and pre-seeded cert Secrets) with no
+turnkey path.
+====
+
+Greenfield creation from a *separate* management cluster sidesteps all of this: `RKE2ControlPlane`
+is on its clean init path, and the management cluster's own single node is never something CAPI
+has to manage.
+
+[[operating-model]]
+== Operating model — GitOps pull, management on demand
+
+Changes to a workload split into two tiers, with very different reliability:
+
+*Tier 1 — application / config changes (the common case): GitOps pull, in the workload.* Each
+workload runs Flux, which *pulls* its desired state from git and applies it to itself (Deployments,
+ConfigMaps, HelmReleases, CRs, …). This needs no management cluster, no tailnet, and no other host —
+the workload depends only on git. For everything Flux can reconcile, each workload is fully
+autonomous.
+
+*Tier 2 — machine-lifecycle changes (rare: scale / replace / add a node → needs CAPI/CAPN).* Only
+here is a management cluster required. It is single node (see <<seeding-management>>), *on-demand*
+(stopped when idle; its state persists on its zfs dataset — stop, not destroy), and because it is a
+<<function-of-git,function of git>> it can be run either as:
+
+* a *fixed* `bioskop-mgmt` that reconciles both workloads remotely over the tailnet, or
+* a *transient, host-local* management — seeded on the host that owns the workload, fed from git,
+  reconciling the local workload, then discarded.
+
+The transient host-local shape is the more reliable way to make a host independent: it removes the
+cross-host and tailnet dependencies entirely (a fresh local management + git is all it needs).
+
+The two tiers and the seed, as a sequence:
+
+[mermaid,topology-operating-model,svg]
+----
+sequenceDiagram
+  participant OP as Operator
+  participant SM as seed-mgmt (nix)
+  participant GH as git / GitHub
+  participant MG as management (CAPI)
+  participant IX as incus host
+  participant WL as workload
+  participant FX as Flux (in workload)
+  SM->>MG: nix-seed the single mgmt node (cluster-init)
+  OP->>GH: commit desired state (CAPI CRs + sops secrets)
+  rect rgb(224,238,245)
+  Note over MG,WL: Tier 2 — machine lifecycle (rare)
+  MG->>GH: read CRs + CAs / tokens
+  MG->>IX: CAPN provisions instances from node-base
+  MG->>WL: CAPRKE2 bootstraps → control plane up (CA reused via LookupOrGenerate)
+  end
+  rect rgb(232,244,238)
+  Note over WL,FX: Tier 1 — app / config (common, autonomous)
+  OP->>GH: commit app / config
+  FX->>GH: pull desired state
+  FX->>WL: apply (no management cluster involved)
+  end
+----
+
+*Reliability consequence.* The common case (Tier 1) depends only on git — not on the other host, the
+management cluster, or the mesh. The rare case (Tier 2) is either local or a short remote reconcile.
+The tailnet is therefore never a single point of fragility for a workload's own operations.
+
+*Mesh placement.* `Headscale` is a *workload-cluster service* (see <<mesh>>), so it is naturally
+never on the management cluster, and not a bootstrap dependency — bootstrap rides `Tailscale`.
+Stopping the on-demand management cluster therefore cannot take the mesh with it.
+
+[[function-of-git]]
+== The management cluster is a function of git
+
+Single-node management is safe *only* if the management cluster can be thrown away and re-seeded —
+anywhere — into the same state, from git alone. That invariant dictates what must be persisted:
+
+* *Desired state (GitOps source).* The CAPI/CAPN/CAPRKE2 resource set per workload (`Cluster`,
+  `RKE2ControlPlane`, `RKE2ConfigTemplate`, `LXCCluster`, `LXCMachineTemplate`, `MachineDeployment`).
+* *Deterministic secrets (sops-in-git) — the inputs that make the GENERATED Secrets reproducible.*
+  Per-workload cluster CAs (so `certificates.LookupOrGenerate` reuses them → same trust domain), join
+  tokens, the CAPN→incus identity, the management cluster's own CA/token, and the sops age key that
+  decrypts them.
+* *Deterministic identities (code-in-git).* `ClusterNetworkBlueprint` (cluster/node names,
+  addressing) and the `node-base` image reference — which also let CAPN adopt instances by name.
+
+The one piece of state that is *not* naturally git-persistable — the runtime link between a CAPI
+`Machine.providerID` and the running Incus instance — is *re-derivable* from deterministic instance
+names **iff** CAPN adopts an existing instance by name (to verify in the `LXCMachine` controller).
+
+.Required, not optional
+[IMPORTANT]
+====
+This forces where the durable secrets live: they must be in *git (sops-encrypted)*, not only in the
+cellar's Pulumi state. A transient, host-local management fed from git must obtain the CAs and tokens
+*from git* — it cannot reach a cellar hosted on the other host's Pulumi state. Host-level secrets
+already live in `.secrets` sops; the cluster PKI from the cellar must join them in git.
+====
+
+[[seeding-management]]
+== Seeding the management cluster
+
+The management cluster's single control node is always *nix-seeded* by seed-master — CAPI cannot
+create the cluster that runs CAPI (a chicken-and-egg), so the management tier is the one place the
+seed-master path stays load-bearing. In this model seed-master *is* the management-cluster seeder:
+`seed-master` becomes `seed-mgmt` in effect — it seeds the cluster that holds the *global vision*
+(the CAPI resources for every workload), not "the master node of a cluster" (a leftover of the
+dual-role model).
+
+* *Today*: a single control node, currently placed on `nikopol` (this is what `Pulumi.dev.yaml`
+  seeds — `cluster=nikopol`, `node=master`). It `cluster-init`s and is the whole management cluster.
+* *Single node — not per-host.* A node per bare-metal was considered and rejected: two etcd members
+  is an *even* quorum (tolerates zero failures, needs both hosts up) — *less* available than one node
+  — and two bare-metals cannot give etcd fault-tolerance regardless. Resilience comes instead from
+  the <<function-of-git,function-of-git invariant>>: re-seed a fresh single node, on any available
+  host, and it converges to the prior state from git.
+* *Naming*: the single node is `<host>-mgmt`, named by the host it currently sits on (`bioskop-mgmt`
+  when fixed on `bioskop`, or the host it is transiently seeded on). Workloads always stay
+  `<host>-wrkld`.
+
+== Operator experience — host-indifferent
+
+From the operator's side, one `pulumi up` of the `seed-mgmt` stack provisions the management cluster
+and — through its CAPI — the workload's master control node (greenfield), then the peers. The same
+command runs *indifferently on `bioskop` or `nikopol`*, with identical expected behavior.
+
+[mermaid,topology-operator-experience,svg]
+----
+sequenceDiagram
+  actor OP as Operator
+  participant PU as pulumi seed-mgmt (on bioskop OR nikopol)
+  participant MG as management cluster (CAPI)
+  participant GH as git
+  participant WL as workload
+  OP->>PU: pulumi up
+  PU->>MG: nix-seed / update the single management node
+  MG->>GH: read desired state (CRs) + secrets (CAs / tokens)
+  MG->>WL: CAPI greenfield-creates the workload MASTER (cluster-init), then peers
+  Note over OP,WL: host-indifferent — same expected behavior on either bare-metal
+----
+
+Host-indifference is not luck; it rests on three invariants from above: the *homogeneous*
+`node-base` image (every node boots the same substrate), the *deterministic* `ClusterNetworkBlueprint`
+(names/addressing are a pure function of cluster + node), and the <<function-of-git,function-of-git>>
+invariant (all desired state and secrets come from git, so no host carries hidden state). And because
+the workload master is *CAPI-created* — not nix-seeded on the host — nothing about a workload is
+pinned to the bare-metal the operator happened to run `pulumi up` on.
+
+== Materialization consequences
+
+This topology changes three materialization surfaces:
+
+. *Manifests — three sets, synthesized together.* Synthesis moves from one `clusterName` to
+  per-cluster/role: the management cluster gets `cluster-api` (operator + CAPN + CAPRKE2) + a
+  minimal base + a Tailscale client; each workload gets the application stack (gitops · storage ·
+  mesh · cicd · cilium) but **not** `cluster-api`. The `manifests.publish.{domain}` toggles become
+  per-cluster. The CAPI/CAPN/CAPRKE2 resource set for a workload is a CDK8s `ManifestsUnit` applied
+  *in the management cluster*, its values (`${cluster}`, VIP, CIDRs, token, tls-san) drawn from the
+  synthesis context / scenario states.
+. *Disko — per-host, across two bare-metals.* `nix-darwin-home`'s `zfs-disko-config.nix` is
+  currently a single-cluster, hand-listed tree (`rke2/control-nodes/{master,peer1,peer2,peer3}/containerd`,
+  `mountpoint=legacy`; the guest *mounts* it, it does not create it). It must gain a cluster
+  dimension (`rke2/<cluster>/<node>/containerd`) and split per host — `bioskop-nixos` carries the
+  management node's dataset + the `bioskop-wrkld` datasets; `nikopol-nixos` carries the
+  `nikopol-wrkld` datasets — ideally projected from `ClusterNetworkBlueprint` rather than
+  hand-listed. `peer3` is dropped (three etcd members, odd quorum).
+. *CAPN — two incus remotes (one per host).* CAPN in the management cluster provisions instances on
+  *both* hypervisors — `bioskop-nixos`'s incus and `nikopol-nixos`'s incus — so each workload's
+  `LXCCluster.secretRef` points at its own incus-identity Secret (`server`/`server-crt` per remote;
+  the `client-crt`/`client-key` CAPN identity can be shared, trusted by both hypervisors). The
+  cross-host remote (`nikopol-nixos`) is reached over the tailnet at a stable address. Today's
+  `IncusIdentitySecretManifestsUnit` renders a single `<cluster>-incus-identity`; it must become
+  per-workload / per-remote. (`bootstrap-identity-provider.adoc` already models this — separate
+  clusters, each its own remote, one shared CAPN identity.)
+. *Scenarios.* The seed scenario changes from "seed the master" to "seed the management cluster,
+  which then greenfield-creates the workload clusters" — the management cluster on its host, one
+  workload beside it, and the other workload across the mesh.
+
+== Related documentation
+
+* link:../bootstrap/bootstrap-contract.adoc[Stage A Bootstrap Contract] — being reframed: Stage A
+  seeds the dedicated management cluster (not a workload named `bioskop`).
+* link:../bootstrap/stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] — being
+  reframed: the handoff feeds the management cluster's CAPI, which creates separate workloads.
+* link:cluster-workload-completion-plan.adoc[Cluster Workload Completion Plan] — peers belong to the
+  workload clusters now, not "the management cluster itself".
+* link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership] — being reframed off
+  the in-cluster self-management model.
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] — already models
+  `bioskop`/`nikopol` as separate clusters sharing one CAPN identity; the shape this document
+  generalises.
+* link:../atlas/cellar-secrets.adoc[Cellar Secrets] — the travelling cellar that lets the
+  management cluster (and its sealed CAs) move between hosts and seed each workload.

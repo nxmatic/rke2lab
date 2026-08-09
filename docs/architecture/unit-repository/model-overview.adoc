@@ -14,14 +14,27 @@ This doc carries the thesis, the shipped-vs-design state, and the settled decisi
 docs elaborate each concern; the atlas proves the whole is additive.
 ====
 
+[IMPORTANT]
+====
+Read against the management/workload separation (see the anchor,
+link:../cluster-api/management-workload-topology.adoc[Management / Workload Topology]). "The cluster the
+orchestrator bootstrapped" is the *management* cluster: `seed-mgmt` seeds it, and the reflexive closure
+is `seed-mgmt` becoming a *unit-node served by the management cluster's own DAG* rather than code baked
+flat in an exec-jar. The "mesh of peer super-nodes, each bootstrapped the same way" is *compatible with*
+— indeed a natural fit for — the separation: the management cluster and each workload cluster is a
+super-node serving its own unit-DAG (the federation horizon). What is NOT meant is the old self-managed
+picture of the seeder dissolving into a workload cluster it grows in place — the management cluster runs
+no workloads.
+====
+
 == The objective — why a unit repository at all
 
 Before the thesis, the goal that gives every piece its meaning. Today seed-master is a *transient
-orchestrator*: it runs on the physical host, boots the framework, provisions a cluster, then dies. It
-is a special node — it holds the amount, its code is baked flat in the exec-jar, the cluster it makes
-is an output, not a peer. The objective is to dissolve that asymmetry: a unit repository where the
-orchestrator becomes an ordinary peer in the cluster it bootstrapped, and everything — data and code —
-lives in the DAG.
+orchestrator*: it runs on the physical host, boots the framework, seeds the management cluster, then
+dies. It is a special node — it holds the amount, its code is baked flat in the exec-jar, the cluster
+it makes is an output, not a peer. The objective is to dissolve that asymmetry: a unit repository where
+the orchestrator becomes an ordinary unit-node in the management cluster it seeded, and everything —
+data and code — lives in the DAG.
 
 === Before — level-0: seed-master is the transient orchestrator
 
@@ -43,7 +56,7 @@ flowchart TB
   class rke,wl out;
 ....
 
-=== After — level-x: seed-master is an ordinary peer in the mesh
+=== After — level-x: seed-master is an ordinary unit-node in the management cluster's DAG
 
 [mermaid]
 ....
@@ -51,7 +64,7 @@ flowchart TB
   boot["throwaway bootstrapper<br/>creates empty cluster, seeds first pull<br/>the irreducible level-0, then erases"]
   subgraph "the cluster — a node serving its own DAG"
     store["unit store — units incl. code, content-addressed"]
-    smp["seed-master — now an ordinary workload-peer"]
+    smp["seed-master — now an ordinary unit-node"]
     n1["unit-node A — scale-from-zero workload"]
     n2["unit-node B — scale-from-zero workload"]
   end
@@ -68,10 +81,11 @@ flowchart TB
 ....
 
 The move is monotone: nothing in BEFORE is erased. The cluster grows from an output into a node;
-seed-master is not deleted, it MOVES from transient orchestrator to workload-peer (a changed role,
-named, not a rewrite); the kernel level-0 shrinks from "holds everything" to a throwaway bootstrapper
-that creates the empty cluster, seeds the first pull, and erases — nobody depends on it
-(alive-iff-required). At steady state EVERYTHING is a workload-node: total homogeneity. seed-master
+seed-master is not deleted, it MOVES from transient orchestrator to unit-node in the management
+cluster's DAG (a changed role, named, not a rewrite); the kernel level-0 shrinks from "holds
+everything" to a throwaway bootstrapper that creates the empty cluster, seeds the first pull, and
+erases — nobody depends on it (alive-iff-required). At steady state every node — the seeder included —
+is a unit-node served by its cluster's DAG: total homogeneity of substrate. seed-master
 migrates in by a *pull* — a `git clone` of its DAG — which is exactly a unit changing its manifestation
 from one substrate to another (the mechanism is the resolution + transport below).
 

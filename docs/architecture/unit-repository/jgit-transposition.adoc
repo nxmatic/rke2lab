@@ -1,7 +1,7 @@
 = JGit <-> unitrepo — model transposition
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 :kroki-fetch-diagram:
 
 NOTE: This is *design*, folded into rke2lab. It records a chosen-but-unbuilt

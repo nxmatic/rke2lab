@@ -1,7 +1,7 @@
 = Netplan Blueprint as Cross-Repo Single Source of Truth
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 
 == Overview
 

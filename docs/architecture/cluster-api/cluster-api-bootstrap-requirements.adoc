@@ -14,6 +14,19 @@ This document covers what remains: (1) remove the old imperative clusterctl-base
 the flox-environment architecture for pod-level executable injection, (3) validating bootstrap with no
 clusterctl dependency.
 
+[IMPORTANT]
+====
+Read against the management/workload separation (see the anchor,
+link:management-workload-topology.adoc[Management / Workload Topology]). Under the separation the
+`cluster-api` domain (operator + provider CRs + Incus identity + image-state ConfigMap) publishes to
+the *management* cluster *only* — that is where CAPI/CAPN/CAPRKE2 live. The `gitops` domain (Flux + the
+vCluster operator) publishes to the *workload* clusters. Two consequences for the units below: the
+`IncusIdentitySecretManifestUnit` becomes *per-remote* (one identity secret per bare-metal — bioskop +
+nikopol — since CAPN drives two remotes), and the flox pod-injection architecture applies to *any*
+cluster, not one named host. Porch is *descoped* (see
+link:cluster-workload-completion-plan.adoc[Cluster Workload Completion Plan]).
+====
+
 == Current State
 
 === Old Imperative Installation (TO REMOVE)
@@ -66,7 +79,7 @@ See link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] for ident
 
 === Three-Tier Environment Model
 
-**Goal**: Pods in bioskop use flox-provided executables from nix store via annotation-based injection.
+**Goal**: Pods in any rke2lab cluster use flox-provided executables from nix store via annotation-based injection.
 
 [mermaid]
 ----
@@ -274,7 +287,7 @@ From `DefaultManifestSynthesisService`:
 |cluster |kube-vip, namespaces |Required
 |storage |OpenEBS ZFS |Required
 |replication |kubernetes-replicator |Required
-|gitops |Flux, Porch |Required
+|gitops |Flux, vCluster operator |Required (publishes to *workloads*)
 |runtime |flox NRI plugin |Required
 |networking |Cilium, Multus |Required
 |mesh |Istio, Tailscale, Headscale |⚠️ Review

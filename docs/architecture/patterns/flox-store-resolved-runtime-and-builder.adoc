@@ -1,7 +1,7 @@
 = Flox Store-Resolved Runtime + Remote Nix Builder
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 
 == Overview
 

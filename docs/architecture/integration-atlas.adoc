@@ -290,7 +290,9 @@ case named before the general one was written. Recorded here so the contradictio
 
 *Value that emerges from the integration* (not from any one model): *storage portability* (switch
 environment by cloning units, no model change), *self-hosting* (the orchestrator becomes a unit in the
-cluster it created — the reflexive bootstrap), and *one source, several packagings*
+management cluster it seeded — the reflexive bootstrap; the management/workload separation it rides is
+the link:cluster-api/management-workload-topology.adoc[Management / Workload Topology] anchor), and
+*one source, several packagings*
 (bootstrap-exec ↔ cluster-workload from the same unit). None of these is visible in a single
 subsystem's spec; all three are the payoff of the four models being additive.
 

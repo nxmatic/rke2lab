@@ -1,7 +1,7 @@
 = Systemd D-Bus Adapter Architecture (Split Review Set)
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 :plantuml-server-url: {kroki-server-url}/plantuml
 
 This document defines the architecture for the new `systemd-adapter` module and intentionally splits diagrams into small reviewable units.
@@ -11,7 +11,7 @@ Shell-backed probing is legacy and no longer the canonical runtime path.
 
 == Runtime placement and Pulumi ownership
 
-The `systemd-adapter` is designed to run on the master node itself (inside the management-cluster node runtime),
+The `systemd-adapter` is designed to run on the management node itself (inside the management-cluster node runtime),
 not on the operator workstation and not inside the Pulumi controlplane process.
 
 Its architectural role is a node-local proxy/adapter boundary:

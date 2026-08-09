@@ -61,9 +61,9 @@ config:
     # preview:
     #   simulate:
     #     systemd-adapter: connection-refused
-  rke2lab:readiness:
-    enabled: "true"
-    timeout: PT1M
+  # rke2lab:readiness:
+  #   enabled: "true"
+  #   timeout: PT1M
   rke2lab:entryGate:
     cleanWorktree:
       required: "false"

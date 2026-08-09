@@ -37,6 +37,20 @@ Throughout this document, color coding indicates component ownership:
 
 **Solution**: Defer the resource creation to a systemd oneshot unit that runs AFTER the cluster is up, applying a CDK8s-synthesized manifest written during Pulumi apply.
 
+[IMPORTANT]
+====
+Read against the management/workload separation (see the anchor,
+link:management-workload-topology.adoc[Management / Workload Topology]). This pattern is
+*mechanism-level* — dependency-cycle resolution between Pulumi provider data and in-cluster resources —
+and it is unchanged by the separation. What it now scopes to: *Stage A* seeds the *management* cluster,
+and *Stage B* is that management cluster's CAPI/CAPN/CAPRKE2 greenfield-creating the *workload*
+clusters. So "resources that must exist in-cluster before Stage B workloads run" means resources that
+must exist *in the management cluster* before its controllers greenfield the workloads — e.g. the
+image-state ConfigMap that hands the baked-image identity to CAPN. The staged-resource mechanism
+(defer to a oneshot that applies a CDK8s manifest carrying provider data) is identical; only the
+cluster it targets is named precisely now (the management cluster).
+====
+
 == When to Use This Pattern
 
 === Decision Tree

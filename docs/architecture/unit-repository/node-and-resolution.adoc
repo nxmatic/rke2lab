@@ -1,7 +1,7 @@
 = unitrepo — node & resolution
 :toc: left
 :toclevels: 2
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 :kroki-fetch-diagram:
 
 NOTE: This is a *design* document folded into rke2lab. It describes the

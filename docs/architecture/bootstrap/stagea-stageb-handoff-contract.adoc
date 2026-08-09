@@ -4,31 +4,69 @@
 
 This document defines the normalized output contract between:
 
-* *Stage A* (Pulumi bootstrap outside cluster)
-* *Stage B* (CAPI reconciliation with CAPN + CAPRKE2 inside cluster)
+* *Stage A* — Pulumi bootstrap (host-side, via `seed-mgmt`) that seeds the *management cluster*.
+* *Stage B* — CAPI + CAPN + CAPRKE2 running *inside the management cluster*, greenfield-creating the
+  *separate* workload clusters.
 
-The objective is to avoid drift between bootstrap assumptions and CAPI templates.
+The objective is to avoid drift between bootstrap assumptions (Stage A) and the CAPI templates that
+create the workload clusters (Stage B).
+
+[IMPORTANT]
+====
+Rewritten for the *management/workload separation*. Read
+link:../cluster-api/management-workload-topology.adoc[Management / Workload Topology] (the anchor)
+first. Under the old self-managed model, "Stage B inside cluster" meant CAPI scaling the *seed* cluster
+in place. It no longer does: Stage B's CAPI lives in the dedicated management cluster and creates
+*separate* workload clusters — the handoff kubeconfig is the *management* cluster's, and the CAPN
+resources target *workload* clusters on possibly-different bare-metals.
+====
+
+[[handoff-sequence]]
+== The handoff at a glance
+
+[mermaid,stagea-stageb-handoff-sequence,svg]
+----
+sequenceDiagram
+  autonumber
+  participant SM as seed-mgmt (host)
+  participant MG as management cluster
+  participant CAPI as CAPI/CAPN/CAPRKE2<br/>(in management cluster)
+  participant WL as workload cluster<br/>(bioskop-wrkld / nikopol-wrkld)
+
+  SM->>MG: Stage A — nix-seed + validate single node
+  MG-->>SM: handoff assets (mgmt kubeconfig, identity, checksums, 2 CAPN identity secrets)
+  SM->>CAPI: Stage B — install controllers into management cluster
+  SM->>CAPI: apply workload CRs (Cluster / LXCCluster / RKE2ControlPlane / LXCMachineTemplate)
+  CAPI->>WL: greenfield-create over the node mesh (mammoth-skate)
+  WL-->>CAPI: control-plane ready → kubeconfig for the workload cluster
+----
+
+The handoff assets flow *from* the management cluster (Stage A output) *into* the Stage B install that
+runs against that same management cluster. The workload clusters are the *product* of Stage B, not a
+party to the handoff.
 
 == Related plans
 
-The detailed seed-peers + Tekton-reactive design (peer1 and beyond) is a memory record (`gitops-cluster-api-transition-plan`, re-homed pending the seed-peers module); for the current roadmap see link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan].
+For the current roadmap see link:../cluster-api/management-workload-topology.adoc[Management / Workload
+Topology] (the anchor) and link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation
+Plan]. The old "seed-peers + Tekton-reactive" design (peers *of the seed*) is superseded by greenfield
+workload creation and survives only as a memory record (`gitops-cluster-api-transition-plan`).
 
 == Ownership boundary
 
 Stage ownership is strict:
 
-* Stage A creates and validates only the seed control-plane node(s) required to establish management API reachability.
-* Stage B owns all ongoing node lifecycle (scale, replacement, rollout, remediation) through Kubernetes controllers.
-
-== Delivery sequencing note (Mar 2026)
-
-Current implementation focus is to finish and validate Stage A bootstrap behavior before implementing additional Stage B requirements.
-
-Stage B enablement is not blocked: Stage A already exports the planned handoff entry points (`nextStep`, readiness outputs, registry summary, image build summary), which will be consumed by a later Stage B manifest publication/application flow.
+* Stage A creates and validates only the *management* control node required to establish the
+  management API's reachability.
+* Stage B owns all *workload-cluster* lifecycle (creation, scale, replacement, rollout, remediation)
+  through the Kubernetes controllers running *in the management cluster*. It never scales the
+  management cluster itself.
 
 == Required handoff assets
 
-The following assets are considered the minimum shared contract.
+The following assets are the minimum shared contract. Unless noted, they describe the *management*
+cluster (the target of the Stage B install); the machine-class and identity-secret surfaces describe
+the *workload* resources Stage B will render.
 
 [cols="1,2,3",options="header"]
 |===
@@ -36,23 +74,23 @@ The following assets are considered the minimum shared contract.
 
 |Management identity
 |`managementClusterName`
-|Binds all Stage B resources and naming to the same management cluster identity.
+|Binds the Stage B controller install and its GitOps state to the management cluster identity.
 
-|API endpoint
+|Management API endpoint
 |`apiEndpoint`
-|Required for management-plane controller install and health checks.
+|Required for the management-plane controller install and health checks.
 
-|Bootstrap kubeconfig reference
+|Management kubeconfig reference
 |`kubeconfigRef`
-|Allows Stage B installer/job to authenticate against the newly bootstrapped cluster.
+|Lets the Stage B installer authenticate against the newly bootstrapped *management* cluster.
 
-|Seed provider identity
+|Management node provider identity
 |`seedNodeId`
-|Traceability of the bootstrap machine instance and break-glass operations.
+|Traceability of the management control node and break-glass operations.
 
 |Incus project scope
 |`incusProject`
-|Ensures CAPN resources target the same tenancy/project scope as bootstrap.
+|Ensures management-node provisioning and CAPN resources target the intended tenancy/project scope.
 
 |Image alias
 |`imageAlias`
@@ -64,19 +102,19 @@ The following assets are considered the minimum shared contract.
 
 |Provisioning checksum
 |`seedProvisioningChecksum`
-|Deterministic fingerprint of Stage A materialized provisioning inputs; drives seed replacement when changed.
+|Deterministic fingerprint of Stage A materialized provisioning inputs; drives node replacement when changed.
 
 |Image build checksum
 |`seedImageBuildChecksum`
-|Deterministic fingerprint of image build inputs; drives seed replacement when changed.
+|Deterministic fingerprint of image build inputs; drives node replacement when changed.
 
 |Default machine class
 |`machineClassRef` (or equivalent)
-|Maps bootstrap assumptions to CAPN `LXCMachineTemplate` fields.
+|Maps bootstrap assumptions to the *workload* CAPN `LXCMachineTemplate` fields.
 
 |Load balancer mode
 |`loadBalancerMode`
-|Must match control-plane endpoint strategy (`lxc`, `oci`, `ovn`, `kube-vip`, `external`).
+|Must match the workload control-plane endpoint strategy (`lxc`, `oci`, `ovn`, `kube-vip`, `external`).
 
 |Handoff readiness marker
 |`handoffReady`
@@ -84,12 +122,12 @@ The following assets are considered the minimum shared contract.
 
 |Systemd runtime status summary
 |`systemdRuntimeStatusSummary`
-|Operator-facing runtime signal for Stage A convergence diagnostics (pending jobs, failed units, seed service state).
+|Operator-facing runtime signal for Stage A convergence diagnostics (pending jobs, failed units, node service state).
 |===
 
 == CAPN-aligned machine class surface
 
-The machine class published by Stage A should be translatable to CAPN fields in
+The machine class published by Stage A should be translatable to CAPN fields in the *workload*
 `LXCMachineTemplate.spec.template.spec`:
 
 * `instanceType` (for current parity: `container`)
@@ -99,15 +137,19 @@ The machine class published by Stage A should be translatable to CAPN fields in
 * `target`
 * `image` (`name` and optionally `fingerprint`/`server`/`protocol`)
 
-== Identity secret compatibility
+== Identity secret compatibility (one per incus remote)
 
-Stage B requires an identity secret referenced by `LXCCluster.spec.secretRef`.
-The following keys are required by CAPN and should be validated during handoff preparation:
+Because the management cluster drives *two* bare-metals, CAPN needs *two* identity secrets — one per
+incus remote — each referenced by that workload's `LXCCluster.spec.secretRef`. The endpoint keys
+(`server`, `server-crt`) differ per remote; the CAPN client identity (`client-crt`, `client-key`) is
+the same across both.
 
-* `server`
-* `server-crt`
-* `client-crt`
-* `client-key`
+Required keys (validated during handoff preparation):
+
+* `server` — *per remote*
+* `server-crt` — *per remote*
+* `client-crt` — *shared* (single CAPN client identity)
+* `client-key` — *shared*
 
 Optional keys:
 
@@ -120,10 +162,10 @@ Optional keys:
 ----
 # @codebase
 handoff:
-  managementClusterName: bioskop
-  apiEndpoint: https://10.66.106.10:6443
+  managementClusterName: bioskop-mgmt        # <host>-mgmt, host-indifferent
+  apiEndpoint: https://10.66.106.10:6443     # the MANAGEMENT cluster's API
   kubeconfigRef: /srv/host/rke2lab-kube.d/kubeconfig.yaml
-  seedNodeId: incus://rke2lab/master
+  seedNodeId: incus://rke2lab/bioskop-mgmt-master
   incusProject: rke2lab
   imageAlias: control-node
   seedImageFingerprint: sha256:TODO
@@ -132,12 +174,30 @@ handoff:
   machineClassRef: lxc-control-default-v1
   loadBalancerMode: kube-vip
   handoffReady: false
+  # Stage B targets — the separate workload clusters CAPI will greenfield-create,
+  # one CAPN identity secret per incus remote (server/server-crt differ; client shared).
+  workloadTargets:
+    - clusterName: bioskop-wrkld
+      incusRemote: bioskop
+      identitySecretRef: capn-identity-bioskop
+    - clusterName: nikopol-wrkld
+      incusRemote: nikopol
+      identitySecretRef: capn-identity-nikopol
 ----
 
 == Acceptance criteria
 
-* Stage A emits all required handoff fields.
-* Stage B can render CAPI/CAPN resources without external discovery of missing data.
-* Handoff fields are stable across idempotent Stage A re-runs.
-* Seed image fingerprint and provider identity are auditable.
+* Stage A emits all required handoff fields describing the *management* cluster.
+* Stage B can render CAPI/CAPN resources for *both* workload clusters without external discovery of
+  missing data.
+* Handoff fields are stable across idempotent Stage A re-runs (function-of-git: a re-seed lands in the
+  same functional state).
+* Management node image fingerprint and provider identity are auditable.
 * Seed checksum fields are auditable and change when Stage A provisioning/image inputs change.
+
+== Related Documentation
+
+* link:../cluster-api/management-workload-topology.adoc[Management / Workload Topology] — 🎯 the anchor
+* link:bootstrap-contract.adoc[Stage A Bootstrap Contract] — what Stage A seeds and the outputs it emits
+* link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan] — Stage B / workload provisioning roadmap
+* link:../bdd/bdd.adoc[BDD-as-engine] — how the seeding is verified

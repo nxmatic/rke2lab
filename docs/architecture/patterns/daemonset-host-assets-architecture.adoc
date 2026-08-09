@@ -1,7 +1,7 @@
 = Daemonless Host Assets Architecture
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 
 This note captures the current daemonset runtime pattern for host-mutating workflows that begin in a Kubernetes pod and complete on the node host.
 

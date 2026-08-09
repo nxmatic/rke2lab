@@ -1,7 +1,6 @@
 = NixOS node substrate — target vision
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
 
 [NOTE]
 ====
@@ -10,6 +9,18 @@ It keeps only the converged end-state; the alternatives explored and discarded o
 way (Talos as node OS, running master bare on the NixOS host, per-node hand-rolled
 cloud-init) are deliberately absent. A migration plan will be fitted into this vision
 as a second step.
+====
+
+[IMPORTANT]
+====
+This substrate is *shared across the management/workload separation* (see the anchor,
+link:../cluster-api/management-workload-topology.adoc[Management / Workload Topology]). The
+homogeneous NixOS image, the role-is-config thesis, and the image factoring below are
+*orthogonal* to which cluster a node belongs to — every node runs the same substrate. One
+consequence, applied throughout this document: the *only* imperatively-seeded node is the
+single management-cluster control node; *every* workload node — including each workload
+cluster's own first control-plane node — is grown greenfield by CAPN + CAPRKE2. "Master seeds
+itself then grows peers" was the old self-managed model and is gone.
 ====
 
 == The vision in one paragraph
@@ -23,9 +34,11 @@ joins* is baked declaratively into the image; everything *after it joins* leaves
 — cluster-level delivery (manifests, secrets, ordering) becomes Flux GitOps, and the
 residual host-mutating work (the flox containerd runtime, day-2 reconfiguration) is a
 DaemonSet today and a Kubernetes controller (Go) tomorrow. Workloads run on the *flox
-containerd runtime*, baked into the base image as a nix derivation. `nikopol-nixos` is the
-Incus hypervisor host; master is seeded imperatively (Pulumi); peers and workers are grown
-by CAPI/CAPN from the same images. Each concern sits in its own realm — *chacun son rôle*.
+containerd runtime*, baked into the base image as a nix derivation. Each bare-metal runs an
+Incus hypervisor (`bioskop-nixos`, `nikopol-nixos`); the single management-cluster node is
+seeded imperatively (Pulumi), and every workload node — each workload's own master included —
+is grown by CAPI/CAPN/CAPRKE2 from the same images. Each concern sits in its own realm —
+*chacun son rôle*.
 
 == Founding principle — chacun son rôle
 
@@ -40,7 +53,7 @@ exactly one home, chosen by *when* it must happen and *what* it mutates.
 | the immutable homogeneous substrate + everything needed *before cluster join*
 | declarative, baked, reproducible
 
-| *Bootstrap config* (CAPRKE2 for peers/workers; seed for master)
+| *Bootstrap config* (CAPRKE2 for every workload node; a thin seed for the management node)
 | RKE2 role (server/agent), cluster-init vs join, per-node identity, join token, labels/taints
 | per-node, generated at provisioning
 
@@ -53,8 +66,8 @@ exactly one home, chosen by *when* it must happen and *what* it mutates.
 | post-join, mutates the node host
 
 | *Provisioning engine* (Pulumi + Incus provider, host-side)
-| the VM/instance graph: Project·Network·Profile·Image·Instance for master; CAPN for the rest
-| imperative for master, declarative CAPI for peers/workers
+| the VM/instance graph: Project·Network·Profile·Image·Instance for the management node; CAPN for every workload node
+| imperative for the management node, declarative CAPI for all workload nodes
 |===
 
 The rule that decides the boundary: *a responsibility that must exist before the kubelet
@@ -86,8 +99,10 @@ of those axes touches the OS.
 
 Consequences:
 
-* *master and peers are the same OS.* What makes master "master" — being first, hosting the
-  CAPI operators and Flux — is bootstrap-order and cluster-level (pods), never the image.
+* *master and peers are the same OS.* Within a workload cluster, what makes its master "master"
+  — being first (`cluster-init`), the others joining — is bootstrap-order and cluster-level
+  (pods), never the image. CAPI/CAPN/CAPRKE2 run in the *management* cluster's node; each
+  workload master hosts only its own Flux (Tier 1). None of that forks the OS.
 * the image split follows the *RKE2 role* (server/agent), not the master/peer distinction.
 
 === Image factoring
@@ -130,39 +145,47 @@ flowchart TB
     imgstore["Incus image store<br/>control-node · worker-node"]
     gen --> imgstore
   end
-  subgraph host["nikopol-nixos — Incus hypervisor"]
-    daemon["Incus daemon<br/>HTTPS 8443 · ZFS pool"]
+  mgmt["management node<br/>seeded by Pulumi (thin)<br/>hosts CAPI + CAPN + CAPRKE2"]
+  subgraph h1["bioskop-nixos — Incus hypervisor"]
+    d1["Incus daemon<br/>HTTPS 8443 · ZFS pool"]
+    bw["bioskop-wrkld<br/>master + peer1 + peer2 + workers<br/>(greenfield · each hosts its Flux)"]
   end
-  seed["master<br/>seeded by Pulumi · hosts CAPI + Flux"]
-  capn["peers + workers<br/>grown by CAPN"]
+  subgraph h2["nikopol-nixos — Incus hypervisor"]
+    d2["Incus daemon<br/>HTTPS 8443 · ZFS pool"]
+    nw["nikopol-wrkld<br/>master + peer1 + peer2 + workers<br/>(greenfield · each hosts its Flux)"]
+  end
 
   op --> gen
-  imgstore --> seed
-  imgstore --> capn
-  seed -->|"CAPN drives Incus via identity secret"| daemon
-  capn --> daemon
-  daemon --> seed
-  daemon --> capn
-  seed -->|"join kube-vip endpoint"| capn
+  imgstore --> mgmt
+  imgstore --> bw
+  imgstore --> nw
+  mgmt -->|"CAPN drives Incus via identity secret (per remote)"| d1
+  mgmt ==>|"CAPN over the node mesh"| d2
+  d1 --> bw
+  d2 --> nw
 
   classDef new fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef keep fill:#eef,stroke:#446,stroke-width:1px;
-  class gen,imgstore,daemon new;
-  class seed,capn keep;
+  class gen,imgstore,d1,d2 new;
+  class mgmt,bw,nw keep;
 ----
 
-* *master* is the bootstrap/management node: seeded imperatively (the Pulumi Incus graph
-  stays host-side), references `rke2lab-control-node`. It hosts CAPI/CAPN/CAPRKE2 and Flux.
-* *peers* (control-plane HA) and *workers* are grown by CAPN, which *consumes* the published
-  images (it never builds them) via its `IncusMachineTemplate`, and joins them to master's
-  kube-vip-fronted endpoint.
+* the *management node* is the only imperatively-seeded node: the Pulumi Incus graph stays
+  host-side and references `rke2lab-control-node`. It hosts CAPI/CAPN/CAPRKE2 — and *only*
+  those. It is single-node and holds no workload.
+* *every workload node* — each workload cluster's own master (`cluster-init`), its peers, and
+  its workers — is grown greenfield by CAPN + CAPRKE2, which *consume* the published images
+  (they never build them) via `LXCMachineTemplate`. There is no join against a pre-existing
+  master: each workload initialises its own control-plane endpoint (kube-vip on its
+  `LXCCluster.spec.loadBalancer`).
 * the image reference is exactly the kind of import-lookup the Incus provider already does
   (`IncusImportLookup`); CAPN differentiates control vs worker by pointing its templates at
-  the two images.
+  the two images. CAPN drives *two* incus remotes (one per bare-metal), each with its own
+  identity secret.
 
-The NixOS host already declares the Incus server + the Pulumi-provider trust path — see
+Each NixOS host already declares the Incus server + the Pulumi-provider trust path — see
 `incus.nix` (server, `core.https_address`, ZFS pool) and `incus-remote.nix` (the operator
-`~/.config/incus` the seed-master provider rides).
+`~/.config/incus` the `seed-mgmt` provider rides).
 
 == Where each concern lives (the payoff of the systemd-scripts review)
 
@@ -286,8 +309,8 @@ flowchart TB
   end
   subgraph AFTER[After — build once, reference, split by realm]
     a1["rke2lab flake<br/>nixos-generators, into Incus image store"]
-    a2["master seeded by Pulumi thin<br/>peers/workers grown by CAPN, same images"]
-    a3["Flux for the cluster · controller for host mutation<br/>flox runtime baked in the image"]
+    a2["management node seeded by Pulumi thin<br/>all workload nodes grown greenfield by CAPN, same images"]
+    a3["Flux in each workload · controller for host mutation<br/>flox runtime baked in the image"]
     a1 --> a2 --> a3
   end
   BEFORE -.the layer underneath is removed.-> AFTER
@@ -379,12 +402,14 @@ The simplification, stated as removals — each of these is a red box above that
 | the shim baked into the base image at build time
 |===
 
-What *survives*, unchanged in role: the Pulumi Incus graph for master (thin, host-side), and
-CAPN + CAPRKE2 + Flux for the fleet. The vision does not rebuild these — it *removes the layer
-underneath them*.
+What *survives*, unchanged in role: the Pulumi Incus graph for the management node (thin,
+host-side), and CAPN + CAPRKE2 + Flux for the fleet. The vision does not rebuild these — it
+*removes the layer underneath them*.
 
 == Related documentation
 
+* link:../cluster-api/management-workload-topology.adoc[Management / Workload Topology] — 🎯 the
+  anchor: the separation this substrate is shared across (management node seeded; workload nodes greenfield)
 * link:../bootstrap/provisioning-slice-architecture.adoc[Provisioning slice architecture] —
   the current imperative seed this vision supersedes for the node OS
 * link:../patterns/daemonset-host-assets-architecture.adoc[Daemonset host-assets] — the

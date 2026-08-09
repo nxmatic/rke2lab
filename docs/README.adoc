@@ -92,6 +92,7 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 
 == GitOps & Cluster API
 
+* link:architecture/cluster-api/management-workload-topology.adoc[Management / Workload Topology] (🎯 anchor — current architecture) - The management/workload cluster separation: a permanent, run-on-demand management cluster (CAPI/CAPN/CAPRKE2) greenfield-creates the workload clusters (`bioskop-wrkld`, `nikopol-wrkld`) across two bare-metals. The reference the other cluster-api/bootstrap docs are being reframed against; explains why self-management was rejected (the CAPRKE2 adoption wall).
 * link:architecture/cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan] (📋 future — outdated, to be revised) - The phased roadmap for the gitops-mgmt vCluster pattern. Not yet built; the plan predates recent work and needs a full review before execution.
 * link:architecture/cluster-api/vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] (📋 Architecture Reference) - Architecture decisions, C4 diagrams, and Option A/B/C/D analysis for management vCluster pattern. Implementation details in plan above.
 * link:architecture/cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup plan & flox webhook injection architecture (⚠️ Design Only)

@@ -1,138 +1,131 @@
 = Post-Bootstrap In-Cluster Ownership Plan
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
 
-This note replaces the earlier operator-centered next-plan note with the current intended in-cluster ownership model.
+This note defines who owns what *after* Stage A, under the management/workload separation. It keeps
+one canonical owner per concern and records earlier wrong assumptions only as footnotes, not as the
+active design.
 
-It keeps one canonical owner per concern and records earlier wrong assumptions only as footnotes, not as the active design.
+[IMPORTANT]
+====
+Rewritten for the *management/workload separation*. Read
+link:management-workload-topology.adoc[Management / Workload Topology] (the anchor) first. Under the
+old self-managed model, "the management cluster" *was* the seed (`bioskop`), scaled in place, and it
+held every in-cluster controller at once. That is gone: the management cluster is dedicated,
+single-node, on-demand, and holds *only* CAPI/CAPN/CAPRKE2; the GitOps / workflow / node-local
+controllers live *inside each workload cluster*.
+====
 
 == Current intent
 
 The active plan after Stage A is:
 
-* keep `controlplane` as the external bootstrap authority for the seed management cluster
-* hand off non-seed machine lifecycle to CAPI + CAPN + CAPRKE2 inside the management cluster
-* install GitOps controllers for declarative cluster add-on reconciliation
-* install a workflow/pipeline controller inside the cluster for build, promotion, and delivery workflows
-* move long-lived host-local runtime mutation out of staged bootstrap/systemd flows and into node-local reconcilers
+* keep `seed-mgmt` (the host-side Stage A seeder) as the external bootstrap authority for the
+  *management* cluster only;
+* let CAPI + CAPN + CAPRKE2, running *in the management cluster*, own the machine lifecycle of the
+  *separate workload clusters* they greenfield-create — this is Tier 2 in the anchor's operating model;
+* let each workload cluster run its own GitOps controller (Flux) that pulls its declarative add-ons
+  directly from git — Tier 1, autonomous, no management cluster needed;
+* run a workflow/pipeline controller *inside the workload clusters* for build, promotion, and delivery;
+* run node-local reconcilers *on the workload nodes* for long-lived host-local runtime mutation.
 
-This means the target in-cluster control plane is not “Pulumi Operator plus everything else”.footnote:[Earlier planning treated the Pulumi Operator as the likely in-cluster provisioning brain after bootstrap. That assumption is no longer the active plan because it overlaps too broadly with the already-declared Stage B ownership of CAPI/CAPN/CAPRKE2 for ongoing machine lifecycle.] It is a split of specialized controllers with clearly separated ownership.
+This means the target control plane is not "one cluster with the Pulumi Operator plus everything
+else".footnote:[Earlier planning treated the Pulumi Operator as the likely in-cluster provisioning
+brain after bootstrap. That assumption is no longer the active plan because it overlaps too broadly
+with the Stage B ownership of CAPI/CAPN/CAPRKE2 for machine lifecycle.] It is a split of specialized
+controllers with clearly separated ownership, distributed across *two kinds* of cluster.
+
+== Where each concern lives
+
+The key change from the old model: the concerns no longer all live in one cluster. Machine lifecycle
+sits in the management cluster; everything a running application needs sits in the workload clusters.
+
+[cols="1,2,2",options="header"]
+|===
+| Concern | Canonical owner | Where it runs
+
+| Management-cluster seed + handoff outputs
+| `seed-mgmt` (Pulumi, host-side)
+| Outside any cluster (Stage A)
+
+| Workload-cluster machine lifecycle (create, scale, replace, rollout, remediation)
+| CAPI + CAPN + CAPRKE2
+| In the *management* cluster (Tier 2)
+
+| Declarative add-ons / desired cluster services
+| GitOps controller (Flux)
+| In *each workload* cluster, pull-based (Tier 1)
+
+| Build, promotion, delivery, workflow orchestration
+| workflow/pipeline controller
+| In *each workload* cluster
+
+| Ongoing host-local runtime mutation and node drift correction
+| node-local controller / privileged DaemonSet
+| On *each workload node*
+|===
+
+The core design rule is unchanged — one canonical owner per concern — but it now reads across the
+separation:
+
+* CAPI (in the management cluster) owns *workload* machine lifecycle; it never scales the management
+  cluster itself.
+* GitOps (in each workload) owns declarative add-ons; it needs neither the management cluster nor the
+  other host to reconcile — this is what makes a workload *autonomous* (anchor § _Operating model_).
+* The workflow/pipeline controller owns build and delivery workflows, inside the workload where they
+  belong.
+* Node-local reconcilers own host mutation on already-running workload nodes.
+
+That split is deliberate because CAPI is not the natural owner of ongoing host-local runtime
+mutationfootnote:[A second wrong assumption was that CAPI might absorb host-local runtime mutation
+expressed through staged systemd services. CAPI can create machines; the active plan treats ongoing
+host-runtime reconciliation as a node-local controller concern.] and the workflow/pipeline controller
+is not the natural owner of either node lifecycle or host drift correction.footnote:[A third wrong
+assumption was that the workflow/pipeline controller might become a general post-bootstrap
+orchestrator. The corrected plan keeps it focused on build, promotion, delivery, and workflow
+execution.]
 
 == Concrete environment anchors
 
-The current intended environment is not purely abstract; two named Darwin environments matter to the plan:
+Two named Darwin bare-metals matter to the plan. The seed is *host-indifferent* (anchor § _Operator
+experience_): either can be the Stage A seeding site; the management cluster travels.
 
-* `bioskop` — the Darwin bare-metal host on the home network (`mac-mini m4 pro`)
-** runs the NixOS Tart/VZ VM that hosts the Incus server used for Stage A seed bootstrap
-** is the place where `controlplane` bootstraps the seed management cluster
-** owns the seed management cluster bootstrap path
-* the Hyland enterprise MacBook Pro bare-metal host — the enterprise-managed Darwin laptop (`macos m4 pro`)
-** remains a separate Darwin host boundary outside the managed-cluster guest
-** runs the Tart/VZ guest named `nikopol`
-* `nikopol` — the isolated NixOS Tart/VZ guest running inside the enterprise-managed Darwin MacBook Pro host
-** provides the required Incus server inside that guest boundary
-** is intended to host a managed cluster whose lifecycle is owned by the management cluster bootstrapped from `bioskop`
+* `bioskop` — Darwin bare-metal on the home LAN (`mac-mini m4 pro`)
+** runs the NixOS Tart/VZ VM (`bioskop-nixos`) hosting the Incus server;
+** hosts the *always-live* `bioskop-wrkld` (and Headscale, the workload mesh plane);
+** target placement for the management cluster (`bioskop-mgmt`).
+* the Hyland enterprise MacBook Pro (`macos m4 pro`) — a separate Darwin host boundary
+** runs the isolated NixOS Tart/VZ guest `nikopol-nixos`;
+** hosts `nikopol-wrkld`.
+* `nikopol` — the isolated NixOS guest inside the enterprise MacBook Pro
+** provides the Incus server for `nikopol-wrkld`;
+** reachable from the management cluster over the node mesh plane (`mammoth-skate`).
 
-In other words:
+== Worktree distribution path (substrate source input)
 
-* `bioskop` is the concrete Stage A bootstrap site for the seed management cluster
-* the enterprise-managed MacBook Pro is a separate Darwin host boundary and should not be conflated with the guest
-* `nikopol` is the concrete downstream NixOS guest site that should be reconciled by the in-cluster control plane after handoff
+The `rke2lab` git worktree is projected to the *seeding host* as a source input — orthogonal to the
+management/workload split, but part of the concrete substrate:
 
-== Worktree distribution path
-
-The `rke2lab` Git worktree is also part of the concrete system shape.
-
-Current intent:
-
-* `bioskop` holds an `rke2lab` worktree on the Darwin host side
-* the enterprise-managed MacBook Pro also holds an `rke2lab` worktree on the Darwin host side
-* each Darwin host projects that worktree into its NixOS Tart/VZ guest via NFS
-* the NixOS guests consume that projected worktree as a source input rather than as a generated runtime asset
-* Incus instances and cluster nodes then receive access to selected worktree folders through bind mounts sourced from the projected worktree inside the NixOS guest
-
-That gives the system a layered path:
-
-. Darwin host worktree
+. Darwin host worktree (source checkout)
 . NFS-mounted worktree inside the NixOS Tart/VZ guest
-. bind-mounted worktree folders inside Incus instances or nodes
+. selected worktree folders bind-mounted where a guest process needs them
 
-This matters because the worktree is neither a cluster-owned runtime output nor a daemonset host-asset root. It is an upstream source input projected across multiple boundaries.
+This matters because the worktree is neither a cluster-owned runtime output nor a daemonset host-asset
+root — it is an upstream source input for the seeding host. Under the greenfield model, *workload*
+node config is delivered by CAPN cloud-init from the baked `node-base` image, not by bind-mounting the
+worktree into workload nodes.
 
-== Canonical ownership split
-
-[cols="1,3",options="header"]
-|===
-| Concern | Canonical owner
-
-| Seed bootstrap and handoff outputs
-| `controlplane` outside cluster
-
-| Non-seed machine lifecycle (scale, replacement, rollout, remediation)
-| CAPI + CAPN + CAPRKE2
-
-| Declarative in-cluster add-ons and desired cluster services
-| GitOps controllers
-
-| Build, promotion, delivery, and workflow orchestration
-| workflow/pipeline controller
-
-| Ongoing host-local runtime mutation and node drift correction
-| node-local controller / privileged DaemonSet patterns
-|===
-
-This is the core design rule:
-
-* CAPI owns machine lifecycle.
-* GitOps owns declarative add-ons.
-* The workflow/pipeline controller owns build and delivery workflows.
-* Node-local reconcilers own host mutation on already-running nodes.
-
-That split is deliberate because CAPI is not the natural owner of ongoing host-local runtime mutationfootnote:[A second wrong assumption was that CAPI might absorb the host-local runtime mutation currently expressed through staged systemd services and daemonset host workflows. CAPI can bootstrap machines, but the active plan treats ongoing host-runtime reconciliation as a node-local controller concern, not as generic machine lifecycle.] and the workflow/pipeline controller is not the natural owner of either node lifecycle or host drift correction.footnote:[A third wrong assumption was that the workflow/pipeline controller might become a general post-bootstrap orchestrator. The corrected plan keeps it focused on build, promotion, delivery, and workflow execution, not node reconciliation or bootstrap authority.]
-
-== Role of the workflow/pipeline controller
-
-The workflow/pipeline controller is part of the real plan, but its role is intentionally narrow.
-
-It should own:
-
-* build/test/package workflows
-* promotion workflows across environments or artifact states
-* delivery workflows that prepare artifacts or manifests for GitOps consumption
-* explicit multi-step operational workflows that are reviewable as pipelines
-
-It should not own:
-
-* machine lifecycle already owned by CAPI
-* declarative steady-state reconciliation already owned by GitOps
-* long-lived host-local reconciliation already owned by node-local controllers
-* seed bootstrap authority already owned by `controlplane`
-
-The workflow/pipeline controller sits in the flow as the system that produces or promotes deployable outputs; GitOps consumes those outputs to reconcile cluster state.
-
-== Bootstrap-to-handoff flow
-
-The active sequence is:
-
-. `controlplane` provisions the seed management cluster and emits the Stage A -> Stage B handoff assets.
-. The cluster becomes healthy enough to host in-cluster controllers.
-. CAPI + CAPN + CAPRKE2 are installed and become the only owners of non-seed machine lifecycle.
-. GitOps controllers are installed and become the owners of declarative add-on state.
-. The workflow/pipeline controller is installed and becomes the owner of build/promotion/delivery workflows.
-. Node-local reconcilers gradually replace staged systemd/bootstrap host mutation for long-lived runtime concerns.
-
-The bootstrap layer should become smaller over time; it should not remain the permanent owner of everything.
-
-== Design guardrails
+== Canonical ownership split — guardrails
 
 The following guardrails remain strict:
 
-* no overlapping controller ownership for the same concern
-* no backward-compatibility orchestration aliases just to bridge old assumptions
-* one canonical owner per lifecycle surface
-* systemd is a current bootstrap backend, not the long-term architecture concept
-* node-local reconciliation should replace durable host-mutation shell flows once the cluster can host that control loop
+* no overlapping controller ownership for the same concern;
+* no backward-compatibility orchestration aliases just to bridge the old self-managed assumptions;
+* one canonical owner per lifecycle surface;
+* CAPI/CAPN/CAPRKE2 exist *only* in the management cluster; a workload never runs them;
+* systemd is a current bootstrap backend, not the long-term architecture concept;
+* node-local reconciliation replaces durable host-mutation shell flows once a workload can host that
+  control loop.
 
 == C4 context view
 
@@ -140,39 +133,30 @@ The following guardrails remain strict:
 ----
 flowchart LR
     operator[Operator]
-    bioskop[bioskop<br/>Darwin bare-metal host<br/>mac-mini m4 pro]
-    bioskopTree[bioskop rke2lab worktree<br/>Darwin-side source checkout]
-    bioskopVm[bioskop NixOS Tart/VZ VM<br/>Incus server + seed bootstrap site]
-    bioskopNfs[bioskop guest worktree<br/>NFS-mounted source input]
-    controlplane[controlplane<br/>Stage A external bootstrap]
-    cluster[Management cluster<br/>Seed cluster bootstrapped from bioskop]
-    enterpriseHost[Enterprise MacBook Pro<br/>Darwin bare-metal host<br/>macos m4 pro]
-    enterpriseTree[enterprise rke2lab worktree<br/>Darwin-side source checkout]
-    nikopol[nikopol<br/>Isolated NixOS Tart/VZ guest<br/>Incus server for managed cluster]
-    nikopolNfs[nikopol guest worktree<br/>NFS-mounted source input]
-    artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
-    nodeHosts[Managed node hosts<br/>Bind-mounted worktree folders + host-local runtime surface]
+    git[(git / GitHub<br/>desired CRs + sops secrets)]
+    seedmgmt[seed-mgmt<br/>Stage A host-side seeder]
 
-    operator --> bioskop
-    bioskop --> bioskopTree
-    bioskop --> bioskopVm
-    bioskopTree --> bioskopNfs
-    bioskopVm --> bioskopNfs
-    bioskop --> controlplane
-    controlplane --> bioskopVm
-    controlplane --> bioskopNfs
-    bioskopVm --> cluster
-    cluster --> artifactStore
-    cluster --> enterpriseHost
-    enterpriseHost --> enterpriseTree
-    enterpriseHost --> nikopol
-    enterpriseTree --> nikopolNfs
-    nikopol --> nikopolNfs
-    nikopolNfs --> nodeHosts
-    cluster --> nodeHosts
+    subgraph BM1[bioskop bare-metal · bioskop-nixos incus]
+        mgmt[Management cluster<br/>CAPI · CAPN · CAPRKE2<br/>single node · on-demand]
+        bwrkld[bioskop-wrkld<br/>always-live · Flux + apps + Headscale]
+    end
+    subgraph BM2[vz.nikopol bare-metal · nikopol-nixos incus]
+        nwrkld[nikopol-wrkld<br/>Flux + apps]
+    end
+
+    operator --> git
+    operator --> seedmgmt
+    seedmgmt --> mgmt
+    mgmt --> git
+    mgmt -->|greenfield, same host| bwrkld
+    mgmt ==>|greenfield, over mesh| nwrkld
+    bwrkld --> git
+    nwrkld --> git
 ----
 
-At the context level, the important point is that `bioskop` is the concrete Stage A bootstrap site, while both Darwin hosts project the `rke2lab` worktree into their NixOS guests via NFS and the downstream nodes consume selected folders from that projected worktree through bind mounts.
+At the context level: `seed-mgmt` seeds the management cluster on whichever host the operator runs it;
+the management cluster reads desired CRs + sops secrets from git and greenfield-creates the two
+workload clusters (one local, one across the node mesh). Each workload pulls its own add-ons from git.
 
 == C4 container view
 
@@ -180,90 +164,80 @@ At the context level, the important point is that `bioskop` is the concrete Stag
 ----
 flowchart LR
     operator[Operator]
-    bioskop[bioskop<br/>Darwin bare-metal host<br/>mac-mini m4 pro]
-    bioskopTree[bioskop rke2lab worktree<br/>Darwin-side source checkout]
-    bioskopVm[bioskop NixOS Tart/VZ VM<br/>Incus server + seed cluster host]
-    bioskopNfs[bioskop guest worktree<br/>NFS-mounted source input]
-    controlplane[controlplane<br/>Stage A external bootstrap]
-    artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
-    enterpriseHost[Enterprise MacBook Pro<br/>Darwin bare-metal host<br/>macos m4 pro]
-    enterpriseTree[enterprise rke2lab worktree<br/>Darwin-side source checkout]
-    nikopol[nikopol<br/>Isolated NixOS Tart/VZ guest<br/>Incus server for downstream managed cluster]
-    nikopolNfs[nikopol guest worktree<br/>NFS-mounted source input]
-    managedCluster[Managed cluster inside nikopol<br/>Owned by bioskop management cluster]
-    nodeWorktree[Incus node worktree folders<br/>Bind-mounted from guest worktree]
+    git[(git / GitHub)]
+    seedmgmt[seed-mgmt<br/>Stage A host-side seeder]
 
-    subgraph Cluster[Management cluster]
-            capi[CAPI + CAPN + CAPRKE2<br/>Non-seed machine lifecycle]
-            gitops[GitOps controller<br/>Declarative add-on reconciliation]
-            workflows[Workflow/pipeline controller<br/>Build, promotion, delivery workflows]
-            nodelocal[Node-local reconcilers<br/>Host-local runtime reconciliation]
+    subgraph Mgmt[Management cluster — single node, on-demand]
+        capi[CAPI + CAPN + CAPRKE2<br/>workload machine lifecycle]
     end
 
-    operator --> controlplane
-    bioskop --> bioskopTree
-    bioskop --> bioskopVm
-    bioskopTree --> bioskopNfs
-    bioskopVm --> bioskopNfs
-    bioskop --> controlplane
-    controlplane --> bioskopVm
-    controlplane --> bioskopNfs
-    controlplane --> capi
-    controlplane --> gitops
-    controlplane --> workflows
-    controlplane --> nodelocal
-    bioskopVm --> capi
-    bioskopVm --> gitops
-    bioskopVm --> workflows
-    bioskopVm --> nodelocal
-    gitops --> artifactStore
-    workflows --> artifactStore
-    workflows --> gitops
-    capi --> nodelocal
-    capi --> managedCluster
-    gitops --> managedCluster
-    workflows --> managedCluster
-    managedCluster --> enterpriseHost
-    enterpriseHost --> enterpriseTree
-    enterpriseHost --> nikopol
-    enterpriseTree --> nikopolNfs
-    nikopol --> nikopolNfs
-    nikopolNfs --> nodeWorktree
-    nodeWorktree --> managedCluster
+    subgraph BWrkld[bioskop-wrkld — always-live]
+        bflux[GitOps / Flux<br/>declarative add-ons]
+        bwf[workflow controller<br/>build · promotion · delivery]
+        bnode[node-local reconcilers]
+        bhead[Headscale<br/>workload mesh plane]
+    end
+
+    subgraph NWrkld[nikopol-wrkld]
+        nflux[GitOps / Flux]
+        nwf[workflow controller]
+        nnode[node-local reconcilers]
+    end
+
+    operator --> seedmgmt
+    seedmgmt --> capi
+    capi -->|reads CRs + 2 CAPN identities| git
+    capi -->|greenfield + reconcile| BWrkld
+    capi ==>|greenfield + reconcile, over mesh| NWrkld
+    bflux --> git
+    nflux --> git
+    bwf --> bflux
+    nwf --> nflux
 ----
 
-This container view keeps the same ownership logic used elsewhere in the repo: `bioskop` hosts the seed management cluster bootstrap path, both Darwin hosts project their `rke2lab` worktrees into the NixOS guests via NFS, and the Incus-managed nodes receive selected worktree folders through guest-side bind mounts rather than by owning the worktree directly.
+The container view makes the redistribution explicit: the management cluster holds *only* CAPI/CAPN/
+CAPRKE2; each workload holds its own Flux + workflow + node-local reconcilers; Headscale (the workload
+mesh plane) lives on the always-live `bioskop-wrkld`. CAPN reads *two* incus identities from git — one
+per remote/bare-metal.
 
 == C4 dynamic view
 
 [mermaid,post-bootstrap-ownership-dynamic,svg]
 ----
 flowchart TD
-    step1[1. Operator runs Stage A bootstrap on bioskop<br/>through controlplane]
-    step2[2. bioskop projects the rke2lab worktree<br/>into its NixOS guest via NFS]
-    step3[3. bioskop provisions the seed management cluster<br/>inside its NixOS Tart/VZ VM and emits handoff outputs]
-    step4[4. CAPI + CAPN + CAPRKE2 take over<br/>non-seed machine lifecycle]
-    step5[5. GitOps controllers take over<br/>declarative add-on reconciliation]
-    step6[6. Workflow/pipeline controller takes over<br/>build, promotion, and delivery workflows]
-    step7[7. The management cluster starts owning<br/>downstream guests such as nikopol]
-    step8[8. nikopol receives the rke2lab worktree<br/>inside its guest via NFS from the enterprise Darwin host]
-    step9[9. Incus nodes receive selected worktree folders<br/>through bind mounts from the guest worktree]
-    step10[10. Node-local reconcilers replace durable<br/>host-mutation shell flows over time]
-    step11[11. Workflow outputs feed GitOps and<br/>GitOps policy shapes node-local behavior]
+    step1[1. Operator commits desired CRs + sops secrets to git]
+    step2[2. Operator runs pulumi up via seed-mgmt on EITHER host]
+    step3[3. seed-mgmt nix-seeds the single-node management cluster<br/>and installs CAPI + CAPN + CAPRKE2]
+    step4[4. seed-mgmt applies the workload CRs from git<br/>to the management cluster]
+    step5[5. CAPI/CAPN/CAPRKE2 greenfield-create bioskop-wrkld local<br/>and nikopol-wrkld over the node mesh]
+    step6[6. Each workload's Flux pulls its add-ons from git<br/>Tier 1, autonomous]
+    step7[7. workflow controllers own build/delivery inside each workload<br/>node-local reconcilers own host mutation]
+    step8[8. Management cluster may be stopped when idle<br/>workloads keep running from git]
 
-    step1 --> step2 --> step3 --> step4 --> step5 --> step6 --> step7 --> step8 --> step9 --> step10 --> step11
+    step1 --> step2 --> step3 --> step4 --> step5 --> step6 --> step7 --> step8
 ----
 
-The dynamic view is intentionally simple: bootstrap the seed on `bioskop` first, project the `rke2lab` worktree into the NixOS guests via NFS, hand off ongoing lifecycle to in-cluster controllers, then let downstream Incus nodes consume selected worktree folders through bind mounts while the Darwin hosts remain the source-of-truth worktree owners.
+The dynamic view is intentionally simple: seed the management cluster on either host, greenfield the
+two workloads (one local, one over the mesh), then let each workload's own pull loop take over. Because
+Tier 1 is autonomous, the on-demand management cluster can be stopped once machine lifecycle is
+quiescent without touching the running workloads.
 
 == Summary
 
 The real plan is now:
 
-* external `controlplane` for seed bootstrap only
-* CAPI + CAPN + CAPRKE2 for non-seed machine lifecycle
-* GitOps for declarative cluster add-ons
-* workflow/pipeline controller for build, promotion, and delivery workflows
-* node-local reconcilers for ongoing host-local runtime mutation
+* external `seed-mgmt` for the *management-cluster* seed only;
+* CAPI + CAPN + CAPRKE2 in the management cluster for *workload* machine lifecycle (Tier 2);
+* GitOps/Flux in *each workload* for declarative add-ons (Tier 1, autonomous);
+* workflow/pipeline controller in *each workload* for build/promotion/delivery;
+* node-local reconcilers on *each workload node* for host-local runtime mutation.
 
-The earlier Pulumi-operator-centered idea remains only as historical context in footnotes, not as the active architecture.
+The earlier one-cluster, Pulumi-operator-centered idea remains only as historical context in
+footnotes, not as the active architecture.
+
+== Related Documentation
+
+* link:management-workload-topology.adoc[Management / Workload Topology] — 🎯 the anchor
+* link:../bootstrap/bootstrap-contract.adoc[Stage A Bootstrap Contract] — what `seed-mgmt` seeds
+* link:../bootstrap/stagea-stageb-handoff-contract.adoc[Stage A → Stage B Handoff] — installing CAPI into the management cluster
+* link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] — workload provisioning roadmap

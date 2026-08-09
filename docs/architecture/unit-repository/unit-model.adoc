@@ -1,7 +1,7 @@
 = unitrepo — the unit model
 :toc: left
 :toclevels: 3
-:kroki-server-url: https://kroki.io
+# :kroki-server-url: https://kroki.io
 :kroki-fetch-diagram:
 
 [NOTE]
