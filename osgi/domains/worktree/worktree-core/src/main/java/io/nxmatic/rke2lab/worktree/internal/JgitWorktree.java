@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.worktree.internal;
 
+import io.nxmatic.rke2lab.worktree.GitIdentity;
 import io.nxmatic.rke2lab.worktree.Provenance;
 import io.nxmatic.rke2lab.worktree.WorkingState;
 import io.nxmatic.rke2lab.worktree.Worktree;
@@ -7,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -21,6 +23,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -88,6 +91,41 @@ public final class JgitWorktree implements Worktree {
       return violatingFlakeDirs(repository, oldTree, newTree).isEmpty();
     } catch (IOException ex) {
       throw new UncheckedIOException("cannot read the flake-lock coherence of " + root, ex);
+    }
+  }
+
+  @Override
+  public void stage(List<Path> paths) {
+    try (Repository repository = open();
+        Git git = new Git(repository)) {
+      for (Path path : paths) {
+        final Path absolute = (path.isAbsolute() ? path : root.resolve(path)).normalize();
+        final String pattern =
+            root.relativize(absolute).toString().replace(File.separatorChar, '/');
+        if (Files.exists(absolute)) {
+          git.add().addFilepattern(pattern).call();
+        } else {
+          git.rm().setCached(true).addFilepattern(pattern).call();
+        }
+      }
+    } catch (GitAPIException ex) {
+      throw new IllegalStateException("cannot stage paths in " + root, ex);
+    }
+  }
+
+  @Override
+  public String commit(String message, GitIdentity identity) {
+    try (Repository repository = open();
+        Git git = new Git(repository)) {
+      final RevCommit commit =
+          git.commit()
+              .setMessage(message)
+              .setAuthor(identity.name(), identity.email())
+              .setCommitter(identity.name(), identity.email())
+              .call();
+      return commit.getName();
+    } catch (GitAPIException ex) {
+      throw new IllegalStateException("cannot commit in " + root, ex);
     }
   }
 

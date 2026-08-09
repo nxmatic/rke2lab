@@ -20,6 +20,14 @@ public interface NdhKeystoreReader {
   String authorityCert(String authority);
 
   /**
+   * The domain a TLS authority is scoped to — {@code authorities.<authority>.domain} (e.g. {@code
+   * mammoth-skate.ts.net}). The single source of truth for the tailnet/cert domain: the authority
+   * signs {@code *.<domain>} certs, so the domain lives with it. Consumers (the manifests version
+   * bumper's git-bot email, …) import it here rather than re-typing the literal.
+   */
+  String authorityDomain(String authority);
+
+  /**
    * The private key of a TLS authority — {@code authorities.<authority>.private} (PEM or OpenSSH).
    */
   String authorityPrivate(String authority);

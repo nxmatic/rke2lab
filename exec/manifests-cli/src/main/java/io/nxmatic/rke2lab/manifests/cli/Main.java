@@ -74,12 +74,13 @@ public final class Main {
         return commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties()));
       }
       case "versions" -> {
+        final java.util.Map<String, String> options = optionArgs(args);
         return commandOf(
             new VersionsCommand.Builder(this)
-                .level(levelFromSystemProperties())
-                .apply(applyFromSystemProperties())
-                .component(componentFromSystemProperties())
-                .repoRoot(repoRootFromSystemProperties()));
+                .level(SemanticVersion.Level.parse(versionsOption(options, "level").orElse(null)))
+                .apply(versionsOption(options, "apply").map(Boolean::parseBoolean).orElse(false))
+                .component(versionsOption(options, "component"))
+                .repoRoot(resolveRepoRoot(versionsOption(options, "repoRoot"))));
       }
       default ->
           throw new IllegalArgumentException(
@@ -90,39 +91,48 @@ public final class Main {
   private List<CliCommand> availableCommands() {
     return List.of(
         commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties())),
-        commandOf(new VersionsCommand.Builder(this).level(levelFromSystemProperties())),
+        commandOf(new VersionsCommand.Builder(this)),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
 
   /**
-   * The authorised bump level for the {@code versions} report, from {@code
-   * -Drke2lab.manifests.versions.level} (major|minor|micro). Absent or unrecognised → minor.
+   * Parse the verb's trailing {@code key=value} arguments (everything after {@code args[0]}) into a
+   * map, so {@code versions apply=true level=major} works as typed — alongside the {@code
+   * -Drke2lab.manifests.versions.<key>} system-property form.
    */
-  private SemanticVersion.Level levelFromSystemProperties() {
-    return SemanticVersion.Level.parse(System.getProperty("rke2lab.manifests.versions.level"));
-  }
-
-  /** Whether the {@code versions} verb writes the bump in place, from {@code …versions.apply}. */
-  private boolean applyFromSystemProperties() {
-    return Boolean.parseBoolean(System.getProperty("rke2lab.manifests.versions.apply", "false"));
-  }
-
-  /** Restrict the {@code versions} verb to one component, from {@code …versions.component}. */
-  private Optional<String> componentFromSystemProperties() {
-    return Optional.ofNullable(System.getProperty("rke2lab.manifests.versions.component"))
-        .map(String::trim)
-        .filter(id -> !id.isEmpty());
+  private static java.util.Map<String, String> optionArgs(String[] args) {
+    final java.util.Map<String, String> options = new java.util.LinkedHashMap<>();
+    for (int i = 1; i < args.length; i++) {
+      final int eq = args[i].indexOf('=');
+      if (eq > 0) {
+        options.put(args[i].substring(0, eq).trim(), args[i].substring(eq + 1).trim());
+      }
+    }
+    return options;
   }
 
   /**
-   * The repository checkout the {@code versions apply} verb writes into — from {@code
-   * …versions.repoRoot} if set, else discovered by walking up from the working directory to the dir
-   * that holds {@code osgi/domains/manifests/manifests-ingress-contract}. Empty when neither hits.
+   * A {@code versions} option: the trailing {@code key=value} arg wins, else the {@code
+   * -Drke2lab.manifests.versions.<key>} system property, else empty.
    */
-  private Optional<Path> repoRootFromSystemProperties() {
-    final String explicit = System.getProperty("rke2lab.manifests.versions.repoRoot");
-    if (explicit != null && !explicit.isBlank()) {
-      return Optional.of(Path.of(explicit.trim()).toAbsolutePath().normalize());
+  private Optional<String> versionsOption(java.util.Map<String, String> options, String key) {
+    final String fromArg = options.get(key);
+    if (fromArg != null && !fromArg.isBlank()) {
+      return Optional.of(fromArg.trim());
+    }
+    return Optional.ofNullable(System.getProperty("rke2lab.manifests.versions." + key))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty());
+  }
+
+  /**
+   * The repository checkout the {@code versions apply} verb writes into — the explicit value if
+   * given, else discovered by walking up from the working directory to the dir that holds {@code
+   * osgi/domains/manifests/manifests-ingress-contract}. Empty when neither hits.
+   */
+  private Optional<Path> resolveRepoRoot(Optional<String> explicit) {
+    if (explicit.isPresent()) {
+      return explicit.map(root -> Path.of(root).toAbsolutePath().normalize());
     }
     Path dir = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
     while (dir != null) {

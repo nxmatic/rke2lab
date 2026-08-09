@@ -35,6 +35,11 @@ public final class DefaultNdhKeystoreReader implements NdhKeystoreReader {
   }
 
   @Override
+  public String authorityDomain(String authority) {
+    return text("authorities", authority, "domain");
+  }
+
+  @Override
   public String authorityPrivate(String authority) {
     return text("authorities", authority, "private");
   }

@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.worktree;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * The worktree the seed cultivates, as ONE OSGi service — it KNOWS its own git facts. The seed
@@ -33,4 +34,24 @@ public interface Worktree {
    * incoherence a clean worktree does NOT catch. jgit stays sealed behind the implementation.
    */
   boolean flakeLockCoherent();
+
+  /**
+   * Stage the given worktree paths for the next commit — additions/modifications for paths that
+   * exist, removals for paths that no longer do. Each path may be absolute or worktree-relative and
+   * is resolved against {@link #root()}. The first WRITE verb of this domain (survey stayed
+   * read-only until a consumer needed to cultivate the tree); jgit stays sealed behind the
+   * implementation, so only JDK types cross.
+   */
+  void stage(List<Path> paths);
+
+  /**
+   * Commit the staged changes with {@code message}, authored AND committed as {@code identity} — an
+   * automated commit carries an explicit per-tool bot identity (minted by the caller from the PKI
+   * keystore's tailnet domain), never the ambient {@code user.name} of whoever ran the tool. Returns
+   * the new commit sha. Local
+   * only — no push (that is where a remote credential, and thus the auth edge, would enter;
+   * deliberately out of scope here). jgit stays sealed. The worktree stays domain-neutral: the tool
+   * identity is the CALLER's value.
+   */
+  String commit(String message, GitIdentity identity);
 }
