@@ -13,7 +13,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import org.eclipse.jgit.api.CommitCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -23,7 +25,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -114,16 +115,23 @@ public final class JgitWorktree implements Worktree {
   }
 
   @Override
-  public String commit(String message, GitIdentity identity) {
+  public String commit(String message, GitIdentity identity, Optional<String> sshSigningKey) {
     try (Repository repository = open();
         Git git = new Git(repository)) {
-      final RevCommit commit =
+      final CommitCommand commit =
           git.commit()
               .setMessage(message)
               .setAuthor(identity.name(), identity.email())
-              .setCommitter(identity.name(), identity.email())
-              .call();
-      return commit.getName();
+              .setCommitter(identity.name(), identity.email());
+      // Sign with the caller's OWN key when supplied (git SSHSIG via ssh-keygen — jgit ships no ssh
+      // signer, so we inject one), else force signing OFF so a repo `commit.gpgsign=true` /
+      // `gpg.format=ssh` does not fail an unsigned bot commit.
+      sshSigningKey
+          .filter(key -> !key.isBlank())
+          .ifPresentOrElse(
+              key -> commit.setSign(true).setSigner(new SshCommitSigner(key)),
+              () -> commit.setSign(false));
+      return commit.call().getName();
     } catch (GitAPIException ex) {
       throw new IllegalStateException("cannot commit in " + root, ex);
     }

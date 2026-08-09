@@ -3,11 +3,13 @@ package io.nxmatic.rke2lab.manifests.cli;
 
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.text.PlainTextScenarioWriter;
 import io.nxmatic.rke2lab.manifests.cli.bdd.ManifestsCliRun;
 import io.nxmatic.rke2lab.manifests.cli.bdd.ManifestsCliScenario;
-import io.nxmatic.rke2lab.manifests.cli.versions.SemanticVersion;
-import io.nxmatic.rke2lab.manifests.cli.versions.VersionBumper;
-import io.nxmatic.rke2lab.manifests.cli.versions.VersionReport;
+import io.nxmatic.rke2lab.manifests.cli.bdd.VersionsCliRun;
+import io.nxmatic.rke2lab.manifests.cli.bdd.VersionsCliScenario;
+import io.nxmatic.rke2lab.manifests.ingress.BumpLevel;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.LogFileSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
@@ -15,11 +17,11 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRoleSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioOutcomeSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.TxIdSeed;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -77,10 +79,9 @@ public final class Main {
         final java.util.Map<String, String> options = optionArgs(args);
         return commandOf(
             new VersionsCommand.Builder(this)
-                .level(SemanticVersion.Level.parse(versionsOption(options, "level").orElse(null)))
+                .level(versionsOption(options, "level").orElse("minor"))
                 .apply(versionsOption(options, "apply").map(Boolean::parseBoolean).orElse(false))
-                .component(versionsOption(options, "component"))
-                .repoRoot(resolveRepoRoot(versionsOption(options, "repoRoot"))));
+                .component(versionsOption(options, "component")));
       }
       default ->
           throw new IllegalArgumentException(
@@ -123,25 +124,6 @@ public final class Main {
     return Optional.ofNullable(System.getProperty("rke2lab.manifests.versions." + key))
         .map(String::trim)
         .filter(value -> !value.isEmpty());
-  }
-
-  /**
-   * The repository checkout the {@code versions apply} verb writes into — the explicit value if
-   * given, else discovered by walking up from the working directory to the dir that holds {@code
-   * osgi/domains/manifests/manifests-ingress-contract}. Empty when neither hits.
-   */
-  private Optional<Path> resolveRepoRoot(Optional<String> explicit) {
-    if (explicit.isPresent()) {
-      return explicit.map(root -> Path.of(root).toAbsolutePath().normalize());
-    }
-    Path dir = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
-    while (dir != null) {
-      if (Files.isDirectory(dir.resolve("osgi/domains/manifests/manifests-ingress-contract"))) {
-        return Optional.of(dir);
-      }
-      dir = dir.getParent();
-    }
-    return Optional.empty();
   }
 
   /**
@@ -311,23 +293,15 @@ public final class Main {
 
   private final class VersionsCommand implements CliCommand {
 
-    private static final String INGRESS_SOURCE =
-        "osgi/domains/manifests/manifests-ingress-contract/src/main/java/io/nxmatic/rke2lab/"
-            + "manifests/ingress/ComponentVersions.java";
-    private static final String CORE_RESOURCES =
-        "osgi/domains/manifests/manifests-core/src/main/resources";
-
-    final SemanticVersion.Level level;
+    final String level;
     final boolean apply;
     final Optional<String> component;
-    final Optional<Path> repoRoot;
 
     @SuppressWarnings("unused")
     VersionsCommand(Builder builder) {
       this.level = builder.level;
       this.apply = builder.apply;
       this.component = builder.component;
-      this.repoRoot = builder.repoRoot;
     }
 
     @Override
@@ -337,91 +311,110 @@ public final class Main {
 
     @Override
     public String description() {
-      return "Report — or with -Drke2lab.manifests.versions.apply=true, apply — the pinned"
-          + " component versions against their latest upstream GitHub release";
+      return "Report — or with apply=true, apply — the pinned component versions against their"
+          + " latest upstream GitHub release, bumping (and committing as the rke2lab bot) in place";
     }
 
     @Override
     public String usage() {
-      return "versions";
+      return "versions [level=major|minor|micro] [apply=true] [component=<id>]";
+    }
+
+    /**
+     * Resolve the {@code component=<slug>} filter to a typed {@link Component} — fail-loud on an
+     * unknown slug (listing the valid ids) rather than silently bumping everything. Empty = all.
+     */
+    private Optional<Component> resolveComponent() {
+      if (component.isEmpty()) {
+        return Optional.empty();
+      }
+      final String slug = component.orElseThrow();
+      return Optional.of(
+          Component.fromSlug(slug)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "unknown component '"
+                              + slug
+                              + "'; valid: "
+                              + java.util.Arrays.stream(Component.values())
+                                  .map(Component::slug)
+                                  .toList())));
     }
 
     @Override
     public void run() {
-      final VersionBumper bumper = new VersionBumper(level);
-      if (apply) {
-        runApply(bumper);
-      } else {
-        runReport(bumper);
-      }
-    }
-
-    private void runReport(VersionBumper bumper) {
-      logger.info(
-          "Component versions — bump gate: {} "
-              + "(-Drke2lab.manifests.versions.level=major|minor|micro, default minor; "
-              + "-Drke2lab.manifests.versions.apply=true to write)",
-          level);
-      logger.info(
-          "{}",
-          String.format(
-              "  %-22s %-12s %-12s %s", "component", "pinned", "bump-to", "upstream / note"));
-      for (final VersionReport report : bumper.report()) {
-        if (component.isPresent() && !component.get().equals(report.componentId())) {
-          continue;
+      // The bump is a scion: this host root scenario sows the `manifests-versions` coordinate
+      // through the broker and grows VersionBumpScenario in-container (where Worktree /
+      // AuthTokenContact / NdhKeystoreReader resolve bundle-side, unreachable to the flat host).
+      // The reaped runbook — the per-component report, and on apply the bumps + the bot commit — is
+      // grafted into this host runbook and rendered to the console below.
+      final VersionsCliRun cliRun =
+          VersionsCliRun.of(BumpLevel.fromSlug(level), apply, resolveComponent());
+      final String txId = UUID.randomUUID().toString();
+      try {
+        final ReportModel runbook =
+            new JUnitLauncherCore<ReportModel>()
+                .run(
+                    Main.class.getClassLoader(),
+                    JupiterTestEngine.class,
+                    wiring -> List.of(DiscoverySelectors.selectClass(VersionsCliScenario.class)),
+                    (launcher, request, sessionStore) -> {
+                      final SummaryGeneratingListener listener = new SummaryGeneratingListener();
+                      launcher.execute(request, listener);
+                      final var summary = listener.getSummary();
+                      if (summary.getTotalFailureCount() > 0) {
+                        final var first = summary.getFailures().get(0);
+                        throw new IllegalStateException(
+                            "the versions scenario failed: "
+                                + first.getTestIdentifier().getDisplayName(),
+                            first.getException());
+                      }
+                      return new ScenarioOutcomeSeed().read(sessionStore).runbook();
+                    },
+                    VersionsCliScenario.SEED
+                        .into(cliRun)
+                        .andThen(RunRoleSeed.into(RunRole.ROOT))
+                        .andThen(TxIdSeed.into(txId))
+                        .andThen(LogFileSeed.into(".local.d/manifests-versions.log")));
+        renderRunbook(runbook);
+        final List<?> broken =
+            runbook.getScenariosWithStatus(ExecutionStatus.FAILED, ExecutionStatus.ABORTED);
+        if (!broken.isEmpty()) {
+          throw new IllegalStateException(
+              "the version bump did not complete (" + broken.size() + " failed/aborted)");
         }
-        logger.info("{}", formatRow(report));
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("the versions run was interrupted", interrupted);
       }
     }
 
-    private void runApply(VersionBumper bumper) {
-      if (repoRoot.isEmpty()) {
-        logger.error(
-            "versions apply: repository root not found — run from the checkout or pass"
-                + " -Drke2lab.manifests.versions.repoRoot=<checkout>");
-        return;
-      }
-      final Path root = repoRoot.orElseThrow();
-      final Path source = root.resolve(INGRESS_SOURCE);
-      final Path resources = root.resolve(CORE_RESOURCES);
-      logger.info(
-          "Bumping component versions in place — gate: {}, {}",
-          level,
-          component.map(id -> "component " + id).orElse("all components"));
-      for (final String outcome : bumper.apply(component, source, resources)) {
-        logger.info("  {}", outcome);
-      }
-      logger.info("Review the changes (git diff) before committing.");
-    }
-
-    private String formatRow(VersionReport report) {
-      final String bumpTo =
-          report.bumpAvailable() ? report.allowedTarget().orElseThrow().toString() : "—";
-      final String tail;
-      if (!report.note().isEmpty()) {
-        tail = report.note();
-      } else if (report.heldByGate()) {
-        tail = "latest " + report.upstreamLatest().orElseThrow() + " (beyond " + level + " gate)";
-      } else {
-        tail = report.upstreamLatest().map(latest -> "latest " + latest).orElse("");
-      }
-      return String.format(
-          "  %-22s %-12s %-12s %s", report.componentId(), report.currentPin(), bumpTo, tail);
+    /**
+     * Render the reaped runbook to the console with jGiven's own plain-text writer, on {@code
+     * System.out} — NOT the SLF4J logger, which rides the JUL bus pax-logging drains into a file
+     * once the scenario boots the framework (that is why the report was invisible). A CLI's
+     * user-facing report belongs on stdout; {@code System.out} is not flushed-closed (it is the
+     * process stream).
+     */
+    private void renderRunbook(ReportModel runbook) {
+      final PrintWriter out = new PrintWriter(System.out, true, StandardCharsets.UTF_8);
+      runbook.accept(new PlainTextScenarioWriter(out, false));
+      out.flush();
     }
 
     static final class Builder implements CommandBuilder<VersionsCommand> {
       private final Main main;
 
-      private SemanticVersion.Level level = SemanticVersion.Level.MINOR;
+      private String level = "minor";
       private boolean apply = false;
       private Optional<String> component = Optional.empty();
-      private Optional<Path> repoRoot = Optional.empty();
 
       Builder(Main main) {
         this.main = main;
       }
 
-      Builder level(SemanticVersion.Level level) {
+      Builder level(String level) {
         this.level = level;
         return this;
       }
@@ -433,11 +426,6 @@ public final class Main {
 
       Builder component(Optional<String> component) {
         this.component = component;
-        return this;
-      }
-
-      Builder repoRoot(Optional<Path> repoRoot) {
-        this.repoRoot = repoRoot;
         return this;
       }
 

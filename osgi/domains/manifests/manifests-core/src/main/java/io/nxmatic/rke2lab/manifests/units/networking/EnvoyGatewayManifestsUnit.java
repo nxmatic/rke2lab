@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,7 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String envoyGatewayVersion =
-        ManifestSynthesisContext.current().componentVersions().envoyGateway();
+        ManifestSynthesisContext.current().componentVersions().of(Component.ENVOY_GATEWAY);
 
     ApiObject namespace = createNamespace(scope);
     ApiObject serviceAccount = createServiceAccount(scope, namespace);

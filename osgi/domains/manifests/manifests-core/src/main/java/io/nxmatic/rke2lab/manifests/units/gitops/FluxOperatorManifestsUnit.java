@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,8 @@ public final class FluxOperatorManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createManifests(final Construct scope) {
-    final String version = ManifestSynthesisContext.current().componentVersions().fluxOperator();
+    final String version =
+        ManifestSynthesisContext.current().componentVersions().of(Component.FLUX_OPERATOR);
 
     // flux-system namespace
     ApiObject namespace =

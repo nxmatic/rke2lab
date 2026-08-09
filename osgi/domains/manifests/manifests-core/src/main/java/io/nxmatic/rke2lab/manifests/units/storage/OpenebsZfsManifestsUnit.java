@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -30,7 +31,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String chartVersion =
-        ManifestSynthesisContext.current().componentVersions().openebsZfsChart();
+        ManifestSynthesisContext.current().componentVersions().of(Component.OPENEBS_ZFS_CHART);
     ApiObject namespace = createNamespace(scope);
     createStorageClass(scope);
     createHelmChart(scope, namespace, chartVersion);

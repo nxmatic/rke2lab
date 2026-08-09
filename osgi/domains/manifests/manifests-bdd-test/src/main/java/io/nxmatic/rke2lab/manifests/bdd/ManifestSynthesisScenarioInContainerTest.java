@@ -160,6 +160,12 @@ public class ManifestSynthesisScenarioInContainerTest {
       }
 
       @Override
+      public String authorityDomain(String authority) {
+        throw new AssertionError(
+            "the in-container synthesis read the ndh key-store, but none seeded");
+      }
+
+      @Override
       public String authorityPrivate(String authority) {
         throw new AssertionError(
             "the in-container synthesis read the ndh key-store, but none seeded");

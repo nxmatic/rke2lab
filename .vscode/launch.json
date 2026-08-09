@@ -6,9 +6,24 @@
     "configurations": [
         {
             "type": "java",
-            "name": "Attach to Pulumi RKE2Lab Program",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "io.nxmatic.rke2lab.manifests.cli.Main",
+            "projectName": "manifests-cli"
+        },
+        {
+            "type": "java",
+            "name": "Attach to Pulumi RKE2Lab",
             "request": "attach",
             "projectName": "seed-master",
+            "hostName": "localhost",
+            "port": "8000"
+        },
+        {
+            "type": "java",
+            "name": "Attach to RKE2Lab Manifests CLI",
+            "request": "attach",
+            "projectName": "manifests-cli",
             "hostName": "localhost",
             "port": "8000"
         },

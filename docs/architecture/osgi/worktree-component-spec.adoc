@@ -74,6 +74,21 @@ amend door that binds the injected `GatePolicy` FACET — the twin of `IncusAmen
 * **`WorkingState`** — `clean` plus `uncommittedPaths` when it is not. *The worktree owns the fact;
   the gate owns the policy (which paths matter)* — a neutral facts record with no consumer-specific
   knowledge.
+* **`GitIdentity`** — the author/committer a `commit` stamps onto an automated change: a bot identity
+  (name + email), so a machine-made commit is attributable to the tool, never the ambient
+  `user.name`/`user.email` of whoever ran it. Domain-neutral — the worktree carries no specific
+  identity; the caller supplies one (the manifests version bumper mints `rke2lab:manifests-bumper` /
+  `manifests-bumper@<tailnet-domain>`, the domain single-sourced from the PKI keystore).
+
+The service also carries TWO write verbs — the first the domain gained (survey stayed read-only until
+a consumer needed to cultivate the tree), jgit still sealed behind the implementation so only JDK
+types cross:
+
+* **`stage(List<Path>)`** — stage additions/modifications for paths that exist, removals for paths
+  that no longer do; each path absolute or worktree-relative, resolved against `root()`.
+* **`commit(String message, GitIdentity identity)`** — commit the staged changes authored AND
+  committed as `identity`, returning the new commit sha. LOCAL only — no push (that is where a remote
+  credential, hence the auth edge, would enter; deliberately out of scope here).
 
 == The soil crossing — harvest, not push
 

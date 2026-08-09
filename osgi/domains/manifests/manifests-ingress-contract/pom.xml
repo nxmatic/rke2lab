@@ -30,6 +30,15 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <!-- WireEnum: Component/BumpLevel are seam WireEnums so the codec maps them ↔ slug generically
+         and the bump facet carries them TYPED across the membrane. seed-broker-port is type=seam
+         (present in BOTH realms), so the dual-realm red line — "no dependency absent from either
+         realm" — holds; the same dep the dual-realm seed-broker-codec / incus-ingress-contract
+         carry. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

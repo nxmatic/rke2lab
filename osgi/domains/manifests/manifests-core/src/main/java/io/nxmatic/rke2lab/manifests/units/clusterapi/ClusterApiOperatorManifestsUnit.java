@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.manifests.upstream.UpstreamYamlInclusion;
 import java.util.List;
@@ -36,12 +37,13 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String operatorVersion =
-        ManifestSynthesisContext.current().componentVersions().clusterApiOperator();
-    final String coreVersion = ManifestSynthesisContext.current().componentVersions().capiCore();
+        ManifestSynthesisContext.current().componentVersions().of(Component.CLUSTER_API_OPERATOR);
+    final String coreVersion =
+        ManifestSynthesisContext.current().componentVersions().of(Component.CAPI_CORE);
     final String incusProviderVersion =
-        ManifestSynthesisContext.current().componentVersions().capiIncusProvider();
+        ManifestSynthesisContext.current().componentVersions().of(Component.CAPI_INCUS_PROVIDER);
     final String rke2ProviderVersion =
-        ManifestSynthesisContext.current().componentVersions().capiRke2Provider();
+        ManifestSynthesisContext.current().componentVersions().of(Component.CAPI_RKE2_PROVIDER);
 
     final String operatorReleaseResource =
         "/upstream/clusterapi/operator/release-" + operatorVersion + ".yaml";

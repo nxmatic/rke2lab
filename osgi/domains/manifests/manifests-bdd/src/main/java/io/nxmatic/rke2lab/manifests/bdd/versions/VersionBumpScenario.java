@@ -1,0 +1,274 @@
+package io.nxmatic.rke2lab.manifests.bdd.versions;
+
+import com.tngtech.jgiven.Stage;
+import com.tngtech.jgiven.annotation.As;
+import com.tngtech.jgiven.annotation.ExpectedScenarioState;
+import com.tngtech.jgiven.annotation.NestedSteps;
+import com.tngtech.jgiven.annotation.ProvidedScenarioState;
+import com.tngtech.jgiven.annotation.Quoted;
+import com.tngtech.jgiven.annotation.ScenarioStage;
+import com.tngtech.jgiven.base.ScenarioTestBase;
+import com.tngtech.jgiven.impl.Scenario;
+import io.nxmatic.rke2lab.auth.contract.AuthTokenContact;
+import io.nxmatic.rke2lab.auth.contract.AuthTokenSource;
+import io.nxmatic.rke2lab.manifests.contract.ManifestVersionsBumpInput;
+import io.nxmatic.rke2lab.manifests.ingress.BumpLevel;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
+import io.nxmatic.rke2lab.ndh.contract.NdhKeystoreReader;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
+import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.nxmatic.rke2lab.worktree.GitIdentity;
+import io.nxmatic.rke2lab.worktree.Worktree;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+/**
+ * The component-version bump scenario — a production jGiven scenario told in the MANIFESTS DOMAIN's
+ * own vocabulary, played IN-CONTAINER on its own {@link
+ * io.nxmatic.rke2lab.manifests.contract.ManifestsCoordinate#VERSIONS} coordinate. Its own plant,
+ * NOT a fork of the synthesis: it READS the pins (the {@link Component} SSOT enum), queries the
+ * upstream GitHub releases, and — on {@code apply} — rewrites the source pin literals, refreshes
+ * the vendored {@code release-<version>.yaml} manifests, and COMMITS the change to the worktree as
+ * the rke2lab bot.
+ *
+ * <p>The report IS the runbook: each component is narrated as a nested step ({@code @NestedSteps} +
+ * a {@link Narration} sub-stage), so the operator reads the diff — and, on apply, the bumps, the
+ * staging and the bot commit — from the rendered runbook itself, never a side-channel log.
+ *
+ * <p>Its collaborators are INJECTED from the framework registry by the {@link OsgiService} bridge,
+ * all bundle-side (unreachable to the flat host, which is exactly why the bump is a scion): the
+ * {@link Worktree} (jgit stage/commit), the optional {@link AuthTokenContact} (the GitHub token,
+ * {@code await = false} — the env var is the higher-precedence fallback), and the {@link
+ * NdhKeystoreReader} (the tailnet {@code authorityDomain} the bot email is minted from).
+ */
+@SeedScenario
+public class VersionBumpScenario
+    extends ScenarioTestBase<
+        VersionBumpScenario.Given, VersionBumpScenario.When, VersionBumpScenario.Then>
+    implements InputReceiver<ManifestVersionsBumpInput>, ScenarioPlayer.Playable {
+
+  /** The inbound channel the {@code VersionsRunbookHandler} seeds the bump facet through. */
+  @RegisterExtension
+  public static final ScenarioInputSeed<ManifestVersionsBumpInput> INPUT =
+      new ScenarioInputSeed<>(ManifestVersionsBumpInput.class, "manifests-versions-input");
+
+  private final Scenario<Given, When, Then> scenario = createScenario();
+
+  @MonotonicNonNull private ManifestVersionsBumpInput input;
+
+  @Override
+  public Scenario<Given, When, Then> getScenario() {
+    return scenario;
+  }
+
+  @Override
+  public void receiveInput(ManifestVersionsBumpInput input) {
+    this.input = input;
+  }
+
+  @Test
+  void the_component_versions_are_bumped() {
+    final ManifestVersionsBumpInput.BumpFacet facet =
+        Objects.requireNonNull(input, "the bump facet was not seeded before the body").facet();
+    given().the_bump_policy(facet.level(), facet.apply(), facet.component());
+    when().the_component_versions_are_processed();
+    then().the_pins_are_current_within_the_gate();
+  }
+
+  /**
+   * Given: the operator's bump policy — the level ceiling, the apply flag, the component filter.
+   */
+  public static class Given extends Stage<Given> {
+
+    @ProvidedScenarioState BumpLevel level;
+    @ProvidedScenarioState boolean apply;
+    @ProvidedScenarioState Optional<Component> component;
+
+    public Given the_bump_policy(BumpLevel level, boolean apply, Optional<Component> component) {
+      this.level = level;
+      this.apply = apply;
+      this.component = component;
+      return self();
+    }
+  }
+
+  /** When: query upstream and report — or, on apply, rewrite the pins and commit as the bot. */
+  public static class When extends Stage<When> {
+
+    /** The tailnet authority whose {@code domain} scopes the bot email (single source of trust). */
+    private static final String TAILNET_AUTHORITY = "mammoth-skate";
+
+    /** The per-tool discriminator — the SUFFIX the minter appends to the rke2lab bot base. */
+    private static final String TOOL = "manifests-bumper";
+
+    /** The ndh SSH key the bot SSH-signs its commit with (git SSHSIG) — rke2lab's own key. */
+    private static final String SIGNING_KEY = "github-signing";
+
+    @ExpectedScenarioState BumpLevel level;
+    @ExpectedScenarioState boolean apply;
+    @ExpectedScenarioState Optional<Component> component;
+
+    @OsgiService private Optional<Worktree> worktree = Optional.empty();
+
+    @OsgiService(await = false)
+    private Optional<AuthTokenContact> authToken = Optional.empty();
+
+    @OsgiService private Optional<NdhKeystoreReader> ndh = Optional.empty();
+
+    @ScenarioStage Narration narration;
+
+    @NestedSteps
+    @As("the component versions are processed")
+    public When the_component_versions_are_processed() {
+      final VersionBumper bumper = new VersionBumper(level, resolveGithubToken());
+      if (apply) {
+        applyBump(bumper);
+      } else {
+        reportBump(bumper);
+      }
+      return self();
+    }
+
+    private void reportBump(VersionBumper bumper) {
+      for (VersionReport row : bumper.report()) {
+        if (component.isPresent() && component.get() != row.component()) {
+          continue;
+        }
+        narration.the_pin_$_reports_$(row.component().slug(), verdict(row, bumper.level()));
+      }
+    }
+
+    private void applyBump(VersionBumper bumper) {
+      final Worktree tree =
+          worktree.orElseThrow(
+              () -> new IllegalStateException("no Worktree service — cannot apply a bump"));
+      final VersionBumper.BumpApplication application = bumper.apply(component, tree.root());
+      for (VersionBumper.AppliedBump bump : application.bumps()) {
+        narration.the_pin_$_is_$(bump.component().slug(), change(bump));
+      }
+      if (!application.anyChanged()) {
+        narration.there_is_nothing_to_commit();
+        return;
+      }
+      final NdhKeystoreReader keystore =
+          ndh.orElseThrow(
+              () -> new IllegalStateException("no ndh key-store — cannot mint the bot"));
+      tree.stage(application.changedPaths());
+      final GitIdentity identity =
+          new GitBotIdentities(keystore.authorityDomain(TAILNET_AUTHORITY)).forTool(TOOL);
+      // rke2lab signs its own bot commit with the ndh github-signing key (git SSHSIG).
+      final String sha =
+          tree.commit(
+              commitMessage(application), identity, Optional.of(keystore.sshPrivate(SIGNING_KEY)));
+      narration.the_change_is_committed_as_$_at_$(
+          identity.name() + " <" + identity.email() + ">", sha);
+    }
+
+    /**
+     * Env {@code GITHUB_TOKEN}/{@code GH_TOKEN} first, else the auth edge ({@code gh auth token}).
+     */
+    private Optional<String> resolveGithubToken() {
+      for (String name : List.of("GITHUB_TOKEN", "GH_TOKEN")) {
+        final String value = System.getenv(name);
+        if (value != null && !value.isBlank()) {
+          return Optional.of(value.trim());
+        }
+      }
+      return authToken.flatMap(contact -> contact.tokenFor(AuthTokenSource.GITHUB));
+    }
+
+    private String commitMessage(VersionBumper.BumpApplication application) {
+      final StringBuilder body = new StringBuilder();
+      body.append("chore(manifests): bump component versions (")
+          .append(level.slug())
+          .append(")\n\n");
+      for (VersionBumper.AppliedBump bump : application.bumps()) {
+        bump.newPin()
+            .ifPresent(
+                pin ->
+                    body.append("* ")
+                        .append(bump.component().slug())
+                        .append(' ')
+                        .append(bump.oldPin())
+                        .append(" -> ")
+                        .append(pin)
+                        .append(bump.assetRefreshed() ? "  [pin + asset]" : "  [pin]")
+                        .append('\n'));
+      }
+      return body.toString().stripTrailing() + "\n";
+    }
+
+    private static String verdict(VersionReport report, BumpLevel level) {
+      if (report.bumpAvailable()) {
+        return "pinned "
+            + report.currentPin()
+            + " -> bump to "
+            + report.allowedTarget().orElseThrow();
+      }
+      if (!report.note().isEmpty()) {
+        return "pinned " + report.currentPin() + " (" + report.note() + ")";
+      }
+      if (report.heldByGate()) {
+        return "pinned "
+            + report.currentPin()
+            + " (latest "
+            + report.upstreamLatest().orElseThrow()
+            + " beyond the "
+            + level.slug()
+            + " gate)";
+      }
+      return "pinned " + report.currentPin() + " (current)";
+    }
+
+    private static String change(VersionBumper.AppliedBump bump) {
+      return bump.newPin()
+          .map(
+              pin ->
+                  bump.oldPin()
+                      + " -> "
+                      + pin
+                      + (bump.assetRefreshed() ? " (pin + asset)" : " (pin)"))
+          .orElse(bump.oldPin() + " unchanged (" + bump.note() + ")");
+    }
+  }
+
+  /** The per-component narration — each call renders a nested step under the processing step. */
+  public static class Narration extends Stage<Narration> {
+
+    @As("$ $")
+    public Narration the_pin_$_reports_$(@Quoted String component, @Quoted String verdict) {
+      return self();
+    }
+
+    @As("$ $")
+    public Narration the_pin_$_is_$(@Quoted String component, @Quoted String change) {
+      return self();
+    }
+
+    @As("nothing to commit — every pin already current within the gate")
+    public Narration there_is_nothing_to_commit() {
+      return self();
+    }
+
+    @As("committed as $ at $")
+    public Narration the_change_is_committed_as_$_at_$(
+        @Quoted String identity, @Quoted String sha) {
+      return self();
+    }
+  }
+
+  /** Then: the run reached its verdict — the narrated report/commit is the outcome. */
+  public static class Then extends Stage<Then> {
+
+    public Then the_pins_are_current_within_the_gate() {
+      return self();
+    }
+  }
+}

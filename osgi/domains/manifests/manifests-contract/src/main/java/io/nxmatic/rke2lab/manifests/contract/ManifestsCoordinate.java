@@ -41,6 +41,14 @@ public enum ManifestsCoordinate implements SeedCoordinate {
   /** The activation coordinate: a sower plays the synthesis through it. */
   public static final RunbookCoordinate RUNBOOK = new RunbookCoordinate(DOMAIN);
 
+  /**
+   * The version-bump coordinate: a sower plays the component-version bump through it. Keyed by its
+   * OWN slug ({@code manifests-versions}), NOT {@link #DOMAIN} — the bump is a distinct plant from
+   * the synthesis (it mutates the worktree and commits), so it routes to its own runbook handler
+   * rather than colliding with {@link #RUNBOOK} on the shared {@code manifests} slug.
+   */
+  public static final RunbookCoordinate VERSIONS = new RunbookCoordinate("manifests-versions");
+
   // SeedCoordinate is implemented for family consistency, but this enum is EMPTY — it has no
   // instance, so slug()/domain() are never actually invoked. slug() has no answer (manifests owns
   // no

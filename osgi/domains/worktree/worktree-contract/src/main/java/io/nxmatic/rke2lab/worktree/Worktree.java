@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.worktree;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The worktree the seed cultivates, as ONE OSGi service — it KNOWS its own git facts. The seed
@@ -47,11 +48,16 @@ public interface Worktree {
   /**
    * Commit the staged changes with {@code message}, authored AND committed as {@code identity} — an
    * automated commit carries an explicit per-tool bot identity (minted by the caller from the PKI
-   * keystore's tailnet domain), never the ambient {@code user.name} of whoever ran the tool. Returns
-   * the new commit sha. Local
-   * only — no push (that is where a remote credential, and thus the auth edge, would enter;
-   * deliberately out of scope here). jgit stays sealed. The worktree stays domain-neutral: the tool
-   * identity is the CALLER's value.
+   * keystore's tailnet domain), never the ambient {@code user.name} of whoever ran the tool.
+   * Returns the new commit sha. Local only — no push (that is where a remote credential, and thus
+   * the auth edge, would enter; deliberately out of scope here). jgit stays sealed. The worktree
+   * stays domain-neutral: the tool identity is the CALLER's value.
+   *
+   * <p>{@code sshSigningKey} is the caller's OpenSSH PRIVATE key (e.g. the ndh {@code
+   * github-signing} key) the commit is SSH-signed with (git SSHSIG, {@code git} namespace) — so the
+   * bot signs with its own imported key, the same way the operator's {@code gpg.format=ssh} config
+   * would. {@link Optional#empty()} commits unsigned. Only a JDK type crosses; the signing
+   * mechanism (jgit + {@code ssh-keygen}) stays sealed in the implementation.
    */
-  String commit(String message, GitIdentity identity);
+  String commit(String message, GitIdentity identity, Optional<String> sshSigningKey);
 }

@@ -55,6 +55,32 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
+    <!-- The version-bump plant's own collaborators. manifests-ingress-contract carries the pins
+         (ComponentVersions.defaults()) the bumper reads/rewrites; the three type=contract domains
+         are what the VersionBumpScenario @OsgiService-injects, bundle-side (unreachable to the flat
+         host — which is exactly why the bump is a scion): worktree (jgit stage/commit + GitIdentity),
+         auth (the GitHub token), ndh (the tailnet authorityDomain the bot email is minted from). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-ingress-contract</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>worktree-contract</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>auth-contract</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>ndh-contract</artifactId>
+    </dependency>
+    <!-- jackson-databind: the bumper reads the GitHub releases JSON directly (ObjectMapper). -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
          the jgiven-wrap bundle, pulled into the live world by this bundle's import closure. -->
     <dependency>

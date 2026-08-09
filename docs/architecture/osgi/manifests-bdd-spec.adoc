@@ -394,9 +394,56 @@ projecting it) gives the runbook input its typed home — its top-level componen
 the yaml concern keys (design constraint above), so the pluck stays generic. Until
 piece 2 ships the shape is known a priori (a temporary coupling, not the end state).
 
+== The version-bump scion — a second plant on the manifests domain
+
+The `manifests-cli versions` verb is a SECOND scion of this domain, on its OWN coordinate
+`ManifestsCoordinate.VERSIONS` (slug `manifests-versions`) — deliberately NOT a fork of the
+synthesis runbook. Where the synthesis materialises into a soil, the bump READS the version pins,
+queries the upstream GitHub releases, and — on `apply` — rewrites the source pin literals, refreshes
+the vendored `release-<version>.yaml` manifests, and COMMITS the change to the worktree as the
+rke2lab bot. It exists as a scion for the same structural reason the synthesis does: its
+collaborators (`Worktree`, `AuthTokenContact`, `NdhKeystoreReader`) register with their `type=contract`
+bundle's class copy, so a flat host `awaitService` never matches — sowing through the broker grows
+the work in-container where the `@OsgiService` injections resolve bundle-side.
+
+=== The `Component` SSOT enum (dual-realm ingress)
+
+A component's whole identity lives in ONE place: the `Component` enum (`manifests-ingress-contract`,
+`type=dual-realm`), one constant per bootstrap component, carrying its wire `slug()`, its baseline
+`defaultVersion()` pin, and its `Optional<ComponentSource>` provenance. It is a `WireEnum`, so the
+codec maps it ↔ slug and the bump facet carries a typed `Optional<Component>` filter that crosses the
+host↔OSGi membrane by slug — typed in BOTH realms because ingress is dual-realm. `ComponentSource`
+(the GitHub `owner/repo` + optional release-asset + optional vendored-dir) is the provenance the
+bumper reads to query GitHub and refresh the vendored asset; a component with an empty source (an
+openebs chart, a container tag) is reported `manual`. `ComponentVersions` is now a thin resolved
+holder over the enum (`of(Component)`), its baseline `defaults()` built from each
+`Component.defaultVersion()` — the literal the bumper rewrites. `BumpLevel` (a `WireEnum`:
+major/minor/micro) is the bump CEILING the operator authorises; the highest release the level admits
+is taken, so `major` degrades to a minor/micro when that is all that is newer. The enum is passive —
+it holds identity, provenance and the default pin and does NO network I/O; discovery is computed
+OSGi-side by the bumper (a `VersionReport` keyed by `Component`).
+
+=== The crossing and the scion trio
+
+The host fills the operator's policy onto the neutral `FACET` role — the wire contract is
+`ManifestVersionsBumpInput` (`@SeedContract("runbook")`, its `@Amendment(FACET)` `BumpFacet` carrying
+`BumpLevel` + `apply` + `Optional<Component>`). `VersionsAmendReflector` binds that subtree at the
+`AmendCoordinate("manifests-versions")` door (the twin of `WorktreeAmendReflector`);
+`VersionsRunbookHandler` serves `ManifestsCoordinate.VERSIONS` and grows `VersionBumpScenario`
+in-container. The scenario `@OsgiService`-injects `Worktree` (jgit stage/commit), the optional
+`AuthTokenContact` (the GitHub token, else the `GITHUB_TOKEN` env), and `NdhKeystoreReader` (the
+tailnet `authorityDomain` the bot email is minted from). On `apply` it rewrites `Component.java`,
+stages the changed paths (including the deleted old `release-<oldPin>.yaml`) through `Worktree`, and
+commits as the identity `GitBotIdentities` mints — `rke2lab:manifests-bumper` /
+`manifests-bumper@<domain>`, the domain single-sourced from the PKI keystore. The report IS the
+runbook: each component is a nested step (`@NestedSteps`), so the host renders the diff — and, on
+apply, the bumps + the bot commit — straight from the reaped runbook (`VersionsCliScenario` sows the
+coordinate and grafts the scion under its step; `Main` prints it).
+
 == Related Documentation
 
 * link:../bootstrap/provisioning-slice-architecture.adoc[The incus bootstrap of master] — the constat this scion answers (deltas #2–6, the activation payload, the corroboration)
 * link:bbox-edge-spec.adoc[bbox-edge-spec] — the trio pattern this mirrors
 * link:seed-broker-spec.adoc#playing-a-scenario-is-a-sow[Seed broker spec § playing a scenario is a sow] — the broker door the scion sits behind
 * link:../bdd/bdd.adoc#clusterseed-scenario-map[The ClusterSeed scenario map] — where "the manifests synthesis is a graft cultivated fresh" is framed
+* link:../patterns/cli-scion-and-dual-realm-ingress.adoc[CLIs are scions — north-adapter + dual-realm ingress] — the two general laws these scions (synthesis + version-bump) are worked examples of

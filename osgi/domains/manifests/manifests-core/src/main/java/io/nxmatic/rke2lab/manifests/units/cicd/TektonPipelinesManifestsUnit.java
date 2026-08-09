@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.manifests.upstream.UpstreamYamlInclusion;
 import java.util.List;
@@ -29,7 +30,7 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String operatorVersion =
-        ManifestSynthesisContext.current().componentVersions().tektonOperator();
+        ManifestSynthesisContext.current().componentVersions().of(Component.TEKTON_OPERATOR);
 
     // Bundle the upstream operator release (Namespace, CRDs, RBAC, Service, Deployment,
     // ConfigMaps, webhooks). The bundle ships its own `tekton-operator` Namespace, so we no

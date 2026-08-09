@@ -1,5 +1,6 @@
-package io.nxmatic.rke2lab.manifests.cli.versions;
+package io.nxmatic.rke2lab.manifests.bdd.versions;
 
+import io.nxmatic.rke2lab.manifests.ingress.BumpLevel;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -7,25 +8,10 @@ import java.util.regex.Pattern;
 /**
  * Minimal semver for the version bumper: {@code major.minor.patch}, tolerant of an optional leading
  * {@code v} and of trailing pre-release/build metadata (which it ignores). Enough to rank GitHub
- * release tags and gate a bump to a {@link Level}.
+ * release tags and gate a bump to a {@link BumpLevel}.
  */
 public record SemanticVersion(int major, int minor, int patch)
     implements Comparable<SemanticVersion> {
-
-  /** The bump level the operator authorises. */
-  public enum Level {
-    MAJOR,
-    MINOR,
-    MICRO;
-
-    public static Level parse(final String raw) {
-      return switch (raw == null ? "" : raw.trim().toLowerCase()) {
-        case "major" -> MAJOR;
-        case "micro", "patch" -> MICRO;
-        default -> MINOR;
-      };
-    }
-  }
 
   private static final Pattern PATTERN =
       Pattern.compile("^v?(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:[-+].*)?$");
@@ -58,7 +44,7 @@ public record SemanticVersion(int major, int minor, int patch)
    * Is {@code candidate} a strictly-higher version reachable from {@code this} within {@code
    * level}?
    */
-  public boolean allows(final SemanticVersion candidate, final Level level) {
+  public boolean allows(final SemanticVersion candidate, final BumpLevel level) {
     if (candidate.compareTo(this) <= 0) {
       return false;
     }

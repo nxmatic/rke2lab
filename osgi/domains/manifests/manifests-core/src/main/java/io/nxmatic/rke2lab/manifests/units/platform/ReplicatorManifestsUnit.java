@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -29,7 +30,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String replicatorVersion =
-        ManifestSynthesisContext.current().componentVersions().kubernetesReplicator();
+        ManifestSynthesisContext.current().componentVersions().of(Component.KUBERNETES_REPLICATOR);
 
     createSourceNamespace(scope);
     ApiObject clusterRole = createClusterRole(scope, replicatorVersion);

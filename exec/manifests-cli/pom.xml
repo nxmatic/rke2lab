@@ -39,10 +39,10 @@
       <artifactId>manifests-contract</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- The dual-realm host face — COMPILE scope (unlike -contract/-core, held at runtime to forbid
-         the host->impl leak). The `versions` bumper reads ComponentVersions.defaults() FLAT here to
-         diff each pin against its upstream GitHub release. Staged as a bundle too (type=dual-realm),
-         so the in-container units resolve the SAME copy. -->
+    <!-- The dual-realm host face — COMPILE scope: the `versions` verb builds the bump facet TYPED
+         (Component / BumpLevel are WireEnums here), so the host names these ingress types directly.
+         A flat consumer references it again, so the demand-fold keeps it flat in this assembly AND
+         stages it as a bundle (type=dual-realm), the in-container scion resolving the SAME copy. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-ingress-contract</artifactId>
@@ -120,6 +120,26 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- The version-bump scion's service impls (embed type=model/edge), staged INTACT like the other
+         bundles so VersionBumpScenario's @OsgiService injections resolve bundle-side: worktree-core
+         (JgitWorktree — jgit stage/commit), auth-edge (CliAuthTokenContact — `gh auth token`),
+         ndh-core (DefaultNdhKeystoreReader — the tailnet authorityDomain). runtime scope: the host
+         never compiles against an impl, only stages it; the contracts arrive transitively. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>worktree-core</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>auth-edge</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>ndh-core</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- jGiven-in-OSGi wrap, dual-realm (staged as a bundle AND kept host-flat): the host root

@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +27,8 @@ public final class CertManagerManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final String version = ManifestSynthesisContext.current().componentVersions().certManager();
+    final String version =
+        ManifestSynthesisContext.current().componentVersions().of(Component.CERT_MANAGER);
 
     // RKE2 helm-controller watches HelmChart CRs in kube-system and installs the chart into
     // targetNamespace. cert-manager is cluster-wide infrastructure deployed to kube-system and

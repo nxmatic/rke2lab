@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ingress.Component;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,8 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final String kubeVipVersion = ManifestSynthesisContext.current().componentVersions().kubeVip();
+    final String kubeVipVersion =
+        ManifestSynthesisContext.current().componentVersions().of(Component.KUBE_VIP);
 
     ApiObject namespace = createNamespace(scope);
     ApiObject serviceAccount = createServiceAccount(scope, namespace);
