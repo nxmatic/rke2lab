@@ -1,10 +1,11 @@
 // @codebase
-package io.nxmatic.rke2lab.manifests.contract.profiles;
+package io.nxmatic.rke2lab.manifests.ingress;
 
 /**
- * Typed registry of bootstrap-layer component versions. Surfaced through {@link
- * io.nxmatic.rke2lab.manifests.ManifestSynthesisContext} and reachable by every manifest unit via
- * {@link io.nxmatic.rke2lab.manifests.AbstractManifestsUnit#componentVersions()}.
+ * Typed registry of bootstrap-layer component versions — the manifests domain's dual-realm host
+ * face. Surfaced OSGi-side through {@code ManifestSynthesisContext} and reachable by every manifest
+ * unit via {@code AbstractManifestsUnit#componentVersions()}; read host-side FLAT by the
+ * manifests-cli {@code versions} bumper, which diffs each pin against its upstream GitHub release.
  *
  * <p>Replaces both the kpt-setter {@code ${...-version}} placeholders the deprecated branch carried
  * (and which leaked unsubstituted into the cdk8s-rendered output, see {@code

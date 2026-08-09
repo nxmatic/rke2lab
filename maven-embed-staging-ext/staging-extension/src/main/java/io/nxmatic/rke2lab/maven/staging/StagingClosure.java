@@ -62,9 +62,18 @@ import java.util.stream.Collectors;
 public record StagingClosure(
     List<ResolvedBundle> staged, List<String> trace, Set<String> realmLibraryGas) {
 
-  /** Compute the staging closure over an exec-module's resolved dependency jars. */
-  public static StagingClosure compute(List<ResolvedBundle> resolved) {
-    return new Computation(resolved).run();
+  /**
+   * Compute the staging closure over an exec-module's resolved dependency jars. {@code
+   * flatReferencedDualRealmGas} is the demand switch: the {@code groupId:artifactId} of every
+   * {@code type=dual-realm} carrier a flat class of THIS assembly references (see {@link
+   * DualRealmFlatDemand}). A dual-realm carrier IN the set is kept flat (staged AND shaded flat);
+   * one NOT in it folds OSGi-only (staged as a plain bundle, excluded from the flat uber-jar). So
+   * the flat copy exists IFF the host uses it — the invariant that supersedes the old {@code
+   * DUAL_REALM_JUSTIFIED} gate.
+   */
+  public static StagingClosure compute(
+      List<ResolvedBundle> resolved, Set<String> flatReferencedDualRealmGas) {
+    return new Computation(resolved, flatReferencedDualRealmGas).run();
   }
 
   /** The {@code groupId:artifactId} keys of the staged jars, in discovery order. */
@@ -88,6 +97,7 @@ public record StagingClosure(
   private static final class Computation {
 
     private final List<ResolvedBundle> resolved;
+    private final Set<String> flatReferencedDualRealmGas;
     private final Map<String, List<ResolvedBundle>> exportersByPackage = new LinkedHashMap<>();
     private final Set<String> hostFlatPackages = new LinkedHashSet<>();
     private final Set<String> bootStackSymbolicNames =
@@ -101,8 +111,9 @@ public record StagingClosure(
     private final Deque<ResolvedBundle> frontier = new ArrayDeque<>();
     private final List<String> trace = new ArrayList<>();
 
-    Computation(List<ResolvedBundle> resolved) {
+    Computation(List<ResolvedBundle> resolved, Set<String> flatReferencedDualRealmGas) {
       this.resolved = resolved;
+      this.flatReferencedDualRealmGas = flatReferencedDualRealmGas;
       indexExporters();
       indexHostFlatPackages();
     }
@@ -144,11 +155,16 @@ public record StagingClosure(
       }
     }
 
-    /** Seed: our model/edge/runtime bundles (by capability) + the boot-stack (by symbolic name). */
+    /**
+     * Seed: our model/edge/runtime/dual-realm bundles (by capability) + the boot-stack (by symbolic
+     * name). Dual-realm carriers are seeded here so a FOLDED one (no flat consumer in this
+     * assembly) is still staged as a bundle — its realm-library (flat) marking, when it IS consumed
+     * flat, is added by {@link #seedRealmLibraries()} on top of this idempotent staging.
+     */
     private void seed() {
       for (ResolvedBundle bundle : resolved) {
         final Optional<EmbedCapability> embed = bundle.embed();
-        if (embed.map(e -> e.isDomain() || e.isRuntime()).orElse(false)) {
+        if (embed.map(e -> e.isDomain() || e.isRuntime() || e.isDualRealm()).orElse(false)) {
           stage(bundle, "seed: embed type=" + embed.orElseThrow().type());
         } else if (bundle.symbolicName().map(bootStackSymbolicNames::contains).orElse(false)) {
           stage(bundle, "seed: boot-stack");
@@ -252,15 +268,16 @@ public record StagingClosure(
      *       resolution.
      * </ul>
      */
-    private static boolean isRealmLibrary(
+    private boolean isRealmLibrary(
         ResolvedBundle b, Set<String> domainImports, Set<String> bootStackExports) {
       if (!b.isBundle() || b.launcher()) {
         return false;
       }
       if (b.embed().isPresent()) {
-        // Ours: only a type=dual-realm carrier lives in both realms (staged + flat);
-        // model/edge/record/seam are not.
-        return b.embed().orElseThrow().isDualRealm();
+        // Ours: only a type=dual-realm carrier CAN live in both realms (staged + flat);
+        // model/edge/record/seam never do. And a dual-realm one is kept flat ONLY where a flat
+        // class of THIS assembly references it (the demand switch) — elsewhere it folds OSGi-only.
+        return b.embed().orElseThrow().isDualRealm() && flatReferencedDualRealmGas.contains(b.ga());
       }
       // A third-party bundle whose exports the boot-stack already serves in-framework is never a
       // realm library — a second exporter would break resolution (slf4j). This guards BOTH signals.

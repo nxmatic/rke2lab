@@ -25,6 +25,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <!-- The dual-realm host face: ManifestSynthesisRequest embeds ComponentVersions (the version
+         pins). It lives in the ingress leaf, not here, because the host bumper reads it FLAT — a
+         type=contract package is bundle-wired only, never host-typed. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-ingress-contract</artifactId>
+    </dependency>
     <!-- The seed-broker seam: the runbook-input wire-record carries @SeedContract("runbook") so the
          shape reflector can project its schema. Like doctor-contract's Consultation. -->
     <dependency>

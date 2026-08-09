@@ -68,16 +68,6 @@ collides with the project's two *runtime* gate senses (readiness gates like
   codec) are EXEMPT — the exemption is *derived from the seam surface*, not a hand-list. (Read by
   `DuplicateRealmClass`.)
 
-| `DUAL_REALM_JUSTIFIED`
-| A `type=dual-realm` carrier (staged as a bundle AND kept flat host-side — a deliberate second copy)
-  is warranted ONLY when the flat/host realm actually references it. If zero flat-realm classes
-  reference any package it exports, the flat copy is dead weight → fold OSGi-only (drop the
-  `type=dual-realm` marker). A STATIC host-import count (via `ReferencedTypes`, so it sees an
-  unexercised reference a booted test could not), the library analogue of the `-port` host-import
-  rule. Distinct from `DUPLICATE_REALM_CLASS`: that one forbids an *unmarked* package living in two
-  realms; this one checks a *deliberately* dual-realm carrier earns its second copy. (Read by
-  `DualRealmJustified`.)
-
 | `REALM_WIRING_INTEGRITY`
 | The assembled uber-jar actually BOOTS: an embedded framework over the exec module's own `-exec.jar`
   resolves every staged bundle, and the flat (system-bundle) and installed-bundle export-sets stay
@@ -124,26 +114,31 @@ classes (`BootstrapConfig`, the host stages) — which live in the current proje
 dependency jars; `REALM_BOUNDARY`'s flat scan additionally reads the current project's build output
 directory.
 
-==== `DUAL_REALM_JUSTIFIED` — earning the second copy
+==== Dual-realm flat face — materialised on demand (was `DUAL_REALM_JUSTIFIED`)
 
-`DUPLICATE_REALM_CLASS` forbids a package from *accidentally* living in two realms;
-`DUAL_REALM_JUSTIFIED` audits the *deliberate* case. A `Provide-Capability:
-io.nxmatic.rke2lab.embed; type=dual-realm` carrier is staged as a bundle AND kept flat host-side on
-purpose — its export legitimately lives in both realms (so `DUPLICATE_REALM_CLASS` exempts it). But
-a second copy earns its keep only if the flat/host realm actually *uses* it. The law reads every
-flat-realm class (the exec's own `target/classes` + the flat dependency tail, the same input
-`REALM_BOUNDARY` scans), skips the carrier's own classes (a package references itself trivially),
-and asks whether any remaining flat class references a package the carrier exports. Zero references
-⇒ the flat copy is dead weight and the split is a lie: the module should fold OSGi-only.
+`DUPLICATE_REALM_CLASS` forbids a package from *accidentally* living in two realms; the dual-realm
+flat face is the *deliberate* case. A `Provide-Capability: io.nxmatic.rke2lab.embed; type=dual-realm`
+carrier is staged as a bundle AND *can* be kept flat host-side — its export legitimately lives in
+both realms (so `DUPLICATE_REALM_CLASS` exempts it). But "kept flat" is a property of the (carrier,
+exec-assembly) *pair*, not of the carrier alone: `manifests-ingress-contract` is consumed flat by
+`manifests-cli` (the version bumper reads `ComponentVersions.defaults()` flat) yet only OSGi-side by
+`seed-master` (which speaks the version pins as JSON through the broker). A carrier cannot know, at
+its own build time, which future host applications will consume it flat — so a per-carrier *gate* on
+a per-consumer fact is structurally in the wrong place.
 
-This is the *library analogue of the `-port` host-import rule* (a `-port` stops being `type=seam`
-once no host file imports it). The count is a STATIC bytecode reference count (via
-`ReferencedTypes`), deliberately — a booted test would miss an unexercised reference, so a
-genuinely both-realm carrier with only conditionally-taken host call-sites would false-flag. An
-earlier flat∩export attempt over-reported; the host-import count is the right signal — a genuinely
-both-realm carrier HAS host importers, so a correct count never flags it. The two current carriers
-(`seed-broker-codec`, the `incus-ingress-contract` incus host face) are both used flat, so both
-come back clean.
+There is therefore NO `DUAL_REALM_JUSTIFIED` law (it was retired). Instead the staging strategy
+MATERIALISES the flat copy on demand, per exec-assembly. `DualRealmFlatDemand` counts (a STATIC
+bytecode reference count via `ReferencedTypes`, so it sees an unexercised reference a booted test
+could not) the flat-realm classes — the exec's own `target/classes` + the flat dependency tail, the
+same input `REALM_BOUNDARY` scans, skipping the carrier's own classes — that reference a package the
+carrier exports. If any do, `StagingClosure` keeps the carrier flat (staged AND shaded flat); if none
+do, it folds the carrier OSGi-only (staged as a plain bundle, excluded from the flat uber-jar,
+exactly like a `type=contract`). "Flat copy present ⟺ a flat consumer references it" thus holds by
+*construction* — there is nothing left for a gate to catch, and the same carrier is handled correctly
+in every assembly (flat in `manifests-cli`, folded in `seed-master`). A flat consumer reachable only
+by reflection is not seen and folds OSGi-only — the same limitation the retired gate carried. The
+other carriers (`seed-broker-codec`, the `incus-ingress-contract` incus host face) are used flat in
+every assembly that stages them, so they stay flat there.
 
 ==== `REALM_WIRING_INTEGRITY` — the embedded-boot smoke test
 
@@ -249,7 +244,7 @@ flowchart TB
   subgraph anns["osgi/domain-annotations (dependency-free)"]
     gb["@GovernedBy(StagingGate, EnforcementLevel) @Repeatable"]
     en["EnforcementLevel {IGNORE,WARN,ERROR}"]
-    ga["StagingGate {CONTRACT_PURITY,SPEC_COVERAGE,INSTANCE_DISCIPLINE,<br/>REALM_BOUNDARY,DUPLICATE_REALM_CLASS,DUAL_REALM_JUSTIFIED,<br/>REALM_WIRING_INTEGRITY,SYNTHESIS_PATTERN}"]
+    ga["StagingGate {CONTRACT_PURITY,SPEC_COVERAGE,INSTANCE_DISCIPLINE,<br/>REALM_BOUNDARY,DUPLICATE_REALM_CLASS,<br/>REALM_WIRING_INTEGRITY,SYNTHESIS_PATTERN}"]
     ex["@Exempt(StagingGate, reason) @Repeatable<br/>TYPE / METHOD / FIELD"]
     tr["@Transitional(to, spec)"]
   end

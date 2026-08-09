@@ -5,6 +5,9 @@ import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.manifests.cli.bdd.ManifestsCliRun;
 import io.nxmatic.rke2lab.manifests.cli.bdd.ManifestsCliScenario;
+import io.nxmatic.rke2lab.manifests.cli.versions.SemanticVersion;
+import io.nxmatic.rke2lab.manifests.cli.versions.VersionBumper;
+import io.nxmatic.rke2lab.manifests.cli.versions.VersionReport;
 import io.nxmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.LogFileSeed;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.RunRole;
@@ -15,6 +18,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,6 +73,14 @@ public final class Main {
       case "synthesize" -> {
         return commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties()));
       }
+      case "versions" -> {
+        return commandOf(
+            new VersionsCommand.Builder(this)
+                .level(levelFromSystemProperties())
+                .apply(applyFromSystemProperties())
+                .component(componentFromSystemProperties())
+                .repoRoot(repoRootFromSystemProperties()));
+      }
       default ->
           throw new IllegalArgumentException(
               "Unknown command: " + command + ". Run with 'help' for available commands.");
@@ -77,7 +90,48 @@ public final class Main {
   private List<CliCommand> availableCommands() {
     return List.of(
         commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties())),
+        commandOf(new VersionsCommand.Builder(this).level(levelFromSystemProperties())),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
+  }
+
+  /**
+   * The authorised bump level for the {@code versions} report, from {@code
+   * -Drke2lab.manifests.versions.level} (major|minor|micro). Absent or unrecognised → minor.
+   */
+  private SemanticVersion.Level levelFromSystemProperties() {
+    return SemanticVersion.Level.parse(System.getProperty("rke2lab.manifests.versions.level"));
+  }
+
+  /** Whether the {@code versions} verb writes the bump in place, from {@code …versions.apply}. */
+  private boolean applyFromSystemProperties() {
+    return Boolean.parseBoolean(System.getProperty("rke2lab.manifests.versions.apply", "false"));
+  }
+
+  /** Restrict the {@code versions} verb to one component, from {@code …versions.component}. */
+  private Optional<String> componentFromSystemProperties() {
+    return Optional.ofNullable(System.getProperty("rke2lab.manifests.versions.component"))
+        .map(String::trim)
+        .filter(id -> !id.isEmpty());
+  }
+
+  /**
+   * The repository checkout the {@code versions apply} verb writes into — from {@code
+   * …versions.repoRoot} if set, else discovered by walking up from the working directory to the dir
+   * that holds {@code osgi/domains/manifests/manifests-ingress-contract}. Empty when neither hits.
+   */
+  private Optional<Path> repoRootFromSystemProperties() {
+    final String explicit = System.getProperty("rke2lab.manifests.versions.repoRoot");
+    if (explicit != null && !explicit.isBlank()) {
+      return Optional.of(Path.of(explicit.trim()).toAbsolutePath().normalize());
+    }
+    Path dir = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+    while (dir != null) {
+      if (Files.isDirectory(dir.resolve("osgi/domains/manifests/manifests-ingress-contract"))) {
+        return Optional.of(dir);
+      }
+      dir = dir.getParent();
+    }
+    return Optional.empty();
   }
 
   /**
@@ -241,6 +295,148 @@ public final class Main {
 
       public Class<SynthesizeCommand> commandClass() {
         return SynthesizeCommand.class;
+      }
+    }
+  }
+
+  private final class VersionsCommand implements CliCommand {
+
+    private static final String INGRESS_SOURCE =
+        "osgi/domains/manifests/manifests-ingress-contract/src/main/java/io/nxmatic/rke2lab/"
+            + "manifests/ingress/ComponentVersions.java";
+    private static final String CORE_RESOURCES =
+        "osgi/domains/manifests/manifests-core/src/main/resources";
+
+    final SemanticVersion.Level level;
+    final boolean apply;
+    final Optional<String> component;
+    final Optional<Path> repoRoot;
+
+    @SuppressWarnings("unused")
+    VersionsCommand(Builder builder) {
+      this.level = builder.level;
+      this.apply = builder.apply;
+      this.component = builder.component;
+      this.repoRoot = builder.repoRoot;
+    }
+
+    @Override
+    public String name() {
+      return "versions";
+    }
+
+    @Override
+    public String description() {
+      return "Report — or with -Drke2lab.manifests.versions.apply=true, apply — the pinned"
+          + " component versions against their latest upstream GitHub release";
+    }
+
+    @Override
+    public String usage() {
+      return "versions";
+    }
+
+    @Override
+    public void run() {
+      final VersionBumper bumper = new VersionBumper(level);
+      if (apply) {
+        runApply(bumper);
+      } else {
+        runReport(bumper);
+      }
+    }
+
+    private void runReport(VersionBumper bumper) {
+      logger.info(
+          "Component versions — bump gate: {} "
+              + "(-Drke2lab.manifests.versions.level=major|minor|micro, default minor; "
+              + "-Drke2lab.manifests.versions.apply=true to write)",
+          level);
+      logger.info(
+          "{}",
+          String.format(
+              "  %-22s %-12s %-12s %s", "component", "pinned", "bump-to", "upstream / note"));
+      for (final VersionReport report : bumper.report()) {
+        if (component.isPresent() && !component.get().equals(report.componentId())) {
+          continue;
+        }
+        logger.info("{}", formatRow(report));
+      }
+    }
+
+    private void runApply(VersionBumper bumper) {
+      if (repoRoot.isEmpty()) {
+        logger.error(
+            "versions apply: repository root not found — run from the checkout or pass"
+                + " -Drke2lab.manifests.versions.repoRoot=<checkout>");
+        return;
+      }
+      final Path root = repoRoot.orElseThrow();
+      final Path source = root.resolve(INGRESS_SOURCE);
+      final Path resources = root.resolve(CORE_RESOURCES);
+      logger.info(
+          "Bumping component versions in place — gate: {}, {}",
+          level,
+          component.map(id -> "component " + id).orElse("all components"));
+      for (final String outcome : bumper.apply(component, source, resources)) {
+        logger.info("  {}", outcome);
+      }
+      logger.info("Review the changes (git diff) before committing.");
+    }
+
+    private String formatRow(VersionReport report) {
+      final String bumpTo =
+          report.bumpAvailable() ? report.allowedTarget().orElseThrow().toString() : "—";
+      final String tail;
+      if (!report.note().isEmpty()) {
+        tail = report.note();
+      } else if (report.heldByGate()) {
+        tail = "latest " + report.upstreamLatest().orElseThrow() + " (beyond " + level + " gate)";
+      } else {
+        tail = report.upstreamLatest().map(latest -> "latest " + latest).orElse("");
+      }
+      return String.format(
+          "  %-22s %-12s %-12s %s", report.componentId(), report.currentPin(), bumpTo, tail);
+    }
+
+    static final class Builder implements CommandBuilder<VersionsCommand> {
+      private final Main main;
+
+      private SemanticVersion.Level level = SemanticVersion.Level.MINOR;
+      private boolean apply = false;
+      private Optional<String> component = Optional.empty();
+      private Optional<Path> repoRoot = Optional.empty();
+
+      Builder(Main main) {
+        this.main = main;
+      }
+
+      Builder level(SemanticVersion.Level level) {
+        this.level = level;
+        return this;
+      }
+
+      Builder apply(boolean apply) {
+        this.apply = apply;
+        return this;
+      }
+
+      Builder component(Optional<String> component) {
+        this.component = component;
+        return this;
+      }
+
+      Builder repoRoot(Optional<Path> repoRoot) {
+        this.repoRoot = repoRoot;
+        return this;
+      }
+
+      public VersionsCommand build() {
+        return main.commandOf(this);
+      }
+
+      public Class<VersionsCommand> commandClass() {
+        return VersionsCommand.class;
       }
     }
   }

@@ -39,6 +39,14 @@
       <artifactId>manifests-contract</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The dual-realm host face — COMPILE scope (unlike -contract/-core, held at runtime to forbid
+         the host->impl leak). The `versions` bumper reads ComponentVersions.defaults() FLAT here to
+         diff each pin against its upstream GitHub release. Staged as a bundle too (type=dual-realm),
+         so the in-container units resolve the SAME copy. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-ingress-contract</artifactId>
+    </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
          installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade). runtime
          scope MACHINE-ENFORCES path 2: the CLI compiles only against -port + OsgiRuntime, never

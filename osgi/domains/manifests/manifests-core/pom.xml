@@ -75,6 +75,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
     </dependency>
+    <!-- The dual-realm host face carrying ComponentVersions: ManifestSynthesisContext + every unit's
+         componentVersions() name it. Declared directly (not leaned on transitively via -contract). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-ingress-contract</artifactId>
+    </dependency>
     <!-- The seed-broker seam + the shape engine: manifests contributes its shape reflector (a
          @Component SeedHandler serving ShapeCoordinate("manifests")), decoding via the codec and
          projecting the runbook-input schema via seed-broker-shape's RecordSchemaProjector. -->

@@ -279,12 +279,15 @@ former `RECORD_PURITY`); `SPEC_COVERAGE` (every exported type is named in a `doc
 discipline this view is written under); `INSTANCE_DISCIPLINE` (no exported `public static` behaviour
 helper — ERROR, debt cleared); `REALM_BOUNDARY` (a class stays in its host/OSGi realm — ERROR, locked
 by 2C); `DUPLICATE_REALM_CLASS` (no class *accidentally* duplicated across realms — the jackson bug;
-exemptions derived from the seam surface); `DUAL_REALM_JUSTIFIED` (a *deliberately* dual-realm carrier
-must be referenced flat host-side, else fold OSGi-only — the library analogue of the `-port`
-host-import rule, static count via `ReferencedTypes`); `REALM_WIRING_INTEGRITY` (the assembled
+exemptions derived from the seam surface); `REALM_WIRING_INTEGRITY` (the assembled
 `seed-master` `-exec.jar` boots in-JVM — every staged bundle resolves, flat + bundle exports disjoint —
 the only *runtime* law, an embedded-boot smoke test); `SYNTHESIS_PATTERN` (a manifests synthesis phase
-`implements Phase.Execution` and pushes through its `Sink`). See
+`implements Phase.Execution` and pushes through its `Sink`). The former `DUAL_REALM_JUSTIFIED` gate
+was *retired*: whether a `type=dual-realm` carrier is kept flat is a property of the (carrier,
+exec-assembly) pair, not of the carrier — so it is no longer gated but *decided* per assembly by the
+staging strategy (`DualRealmFlatDemand`), which keeps the flat copy only where a flat class
+references it (`manifests-ingress-contract` is flat in `manifests-cli`, folded OSGi-only in
+`seed-master`), else folds it OSGi-only like a `type=contract`. See
 link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance].
 
 *Null-safety (2G, a javac gate — NOT a staging law):* JSpecify `@NullMarked` now covers doctor,

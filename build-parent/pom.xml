@@ -46,6 +46,7 @@
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
     <maven.dependency.plugin.version>3.11.0</maven.dependency.plugin.version>
     <maven.surefire.plugin.version>3.5.6</maven.surefire.plugin.version>
+    <sisu.maven.plugin.version>1.0.0</sisu.maven.plugin.version>
     <!-- Default test run excludes the slow/throwaway tests (JUnit5 tag expression).
          Orthogonal tags, mapped to the integration-atlas two spaces + cost/nature:
            host  = exercises host space (the Pulumi/gRPC engine);
@@ -430,6 +431,11 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests-ingress-contract</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>manifests-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -719,6 +725,14 @@
           <artifactId>maven-jar-plugin</artifactId>
           <version>${maven.jar.plugin.version}</version>
         </plugin>
+        <!-- Used only by maven-embed-staging-ext/staging-extension (it generates the sisu @Named
+             index so the running Maven discovers the core extension's MojoExecutionListener); the
+             version is single-sourced here like every other plugin. -->
+        <plugin>
+          <groupId>org.eclipse.sisu</groupId>
+          <artifactId>sisu-maven-plugin</artifactId>
+          <version>${sisu.maven.plugin.version}</version>
+        </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
@@ -800,12 +814,12 @@
                None warrant a POM change — silence them once here. mockito is kept inherited for
                future use and shares category (3)'s unused-declared shape until a test uses it. -->
           <configuration>
-            <ignoredUsedUndeclaredDependencies>
+            <!--ignoredUsedUndeclaredDependencies>
               <dep>org.junit.jupiter:junit-jupiter-api</dep>
               <dep>org.junit.jupiter:junit-jupiter-params</dep>
               <dep>com.tngtech.jgiven:jgiven-core</dep>
               <dep>org.osgi:osgi.annotation</dep>
-            </ignoredUsedUndeclaredDependencies>
+            </ignoredUsedUndeclaredDependencies>-->
             <ignoredUnusedDeclaredDependencies>
               <dep>org.junit.jupiter:junit-jupiter</dep>
               <dep>com.tngtech.jgiven:jgiven-junit5</dep>

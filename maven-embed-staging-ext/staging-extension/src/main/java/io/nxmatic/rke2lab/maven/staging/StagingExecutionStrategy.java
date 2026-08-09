@@ -106,7 +106,8 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   private void reconfigureStaging(
       MavenSession session, List<MojoExecution> mojoExecutions, List<ResolvedBundle> resolved) {
     final String module = session.getCurrentProject().getArtifactId();
-    final StagingClosure closure = StagingClosure.compute(resolved);
+    final StagingClosure closure =
+        StagingClosure.compute(resolved, flatReferencedDualRealmGas(session, resolved));
 
     int shadeAdded = 0;
     int stageAdded = 0;
@@ -251,7 +252,8 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     // (the same bundle in an exec without the flat copy would not collide), so it is governed by
     // the
     // exec's package-info — exactly as REALM_BOUNDARY attributes its flat-realm leaks to the exec.
-    final StagingClosure closure = StagingClosure.compute(resolved);
+    final StagingClosure closure =
+        StagingClosure.compute(resolved, flatReferencedDualRealmGas(session, resolved));
     final Set<String> stagedGas = closure.stagedGas();
     final Set<String> flatPackages = new java.util.LinkedHashSet<>();
     final java.nio.file.Path execClasses =
@@ -288,27 +290,14 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         "staged bundles export packages that ALSO live flat in this assembly (one class in two"
             + " realms → LinkageError)");
 
-    // ---- DUAL_REALM_JUSTIFIED: a type=dual-realm carrier must be USED by the flat/host realm ----
-    // A dual-realm library is staged AND kept flat — a deliberate second copy, justified only when
-    // the host actually references it. Count (statically, so unexercised references still count)
+    // DUAL_REALM_JUSTIFIED is retired: a dual-realm carrier's flat copy is no longer gated after
     // the
-    // flat-realm classes that reference the carrier's exports; zero → the flat copy is dead weight,
-    // fold it OSGi-only. Attributed to the carrier (its own package-info governs it), like the
-    // other
-    // per-bundle laws. The host-import count is the RIGHT signal — a genuine both-realm library HAS
-    // host importers, so it never false-flags (unlike the earlier flat∩export attempt).
-    final DualRealmJustified dualRealmJustified =
-        new DualRealmJustified(flatRealmClasses(session, resolved));
-    for (ResolvedBundle b : resolved) {
-      if (b.embed().map(EmbedCapability::isDualRealm).orElse(false)) {
-        report.record(
-            StagingGate.DUAL_REALM_JUSTIFIED,
-            b.governance().levels(),
-            b,
-            dualRealmJustified.violations(b),
-            "type=dual-realm but no flat/host class references its exports (fold OSGi-only)");
-      }
-    }
+    // fact — the staging closure MATERIALISES it only where a flat class references it (the demand
+    // switch, DualRealmFlatDemand → StagingClosure.compute). "Flat copy present ⟺ flat consumer
+    // present" now holds by construction, per (carrier, exec-assembly) pair, so a carrier consumed
+    // flat by one exec (manifests-cli) and OSGi-only by another (seed-master) is each handled
+    // right,
+    // and there is nothing left for a gate to catch.
 
     // ---- SYNTHESIS_PATTERN: a synthesis phase implements Phase.Execution and pushes via its Sink.
     // Phases live in the manifests-core bundle (its internal.synthesis *Phase classes); the scan
@@ -377,10 +366,26 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   }
 
   /**
+   * The dual-realm carriers THIS exec's flat/host realm actually references — the demand switch
+   * {@link StagingClosure#compute} turns on to keep a dual-realm carrier flat (referenced) or fold
+   * it OSGi-only (not). Computed from {@link #flatRealmClasses}, the one view that can see the
+   * exec's own {@code target/classes} (a flat consumer like the manifests-cli version bumper lives
+   * THERE, not in a resolved dependency).
+   */
+  private Set<String> flatReferencedDualRealmGas(
+      MavenSession session, List<ResolvedBundle> resolved) {
+    final List<ResolvedBundle> dualRealms =
+        resolved.stream()
+            .filter(b -> b.embed().map(EmbedCapability::isDualRealm).orElse(false))
+            .toList();
+    return DualRealmFlatDemand.flatReferencedGas(dualRealms, flatRealmClasses(session, resolved));
+  }
+
+  /**
    * The flat/host realm's compiled classes: the exec's own {@code target/classes} PLUS every
    * non-launcher, non-bundle-side dependency's classes (the flat tail + the seams). The set a
-   * host/seam leak is scanned in ({@code REALM_BOUNDARY}), and the set whose references JUSTIFY a
-   * {@code type=dual-realm} library's flat copy ({@code DUAL_REALM_JUSTIFIED}).
+   * host/seam leak is scanned in ({@code REALM_BOUNDARY}), and the set whose references drive the
+   * demand switch for a {@code type=dual-realm} library's flat copy ({@link DualRealmFlatDemand}).
    */
   private static List<ResolvedBundle.ClassEntry> flatRealmClasses(
       MavenSession session, List<ResolvedBundle> resolved) {

@@ -8,8 +8,8 @@
  * <ul>
  *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity} — cluster + node
  *       identity (clusterName, clusterId, clusterToken, incusRemoteName, …).
- *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.ComponentVersions} — version pins
- *       (cilium, flux, cluster-api operators, …).
+ *   <li>{@link io.nxmatic.rke2lab.manifests.ingress.ComponentVersions} — version pins (cilium,
+ *       flux, cluster-api operators, …).
  *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology} — CIDRs, interface
  *       names, gateway addresses.
  *   <li>{@link io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy} — per-domain flox

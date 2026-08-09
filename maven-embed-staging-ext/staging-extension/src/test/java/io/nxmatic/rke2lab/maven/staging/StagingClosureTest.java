@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import io.nxmatic.rke2lab.osgi.bnd.OsgiHeader;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class StagingClosureTest {
@@ -78,7 +79,7 @@ class StagingClosureTest {
             "jackson-databind",
             /*exports*/ "com.fasterxml.jackson.databind");
 
-    final StagingClosure closure = StagingClosure.compute(List.of(model, jackson));
+    final StagingClosure closure = StagingClosure.compute(List.of(model, jackson), Set.of());
 
     assertTrue(
         closure.stagedGas().contains("com.fasterxml.jackson.core:jackson-databind"),
@@ -109,7 +110,7 @@ class StagingClosureTest {
             "org.ops4j.pax.logging.pax-logging-api",
             /*exports*/ "org.slf4j");
 
-    final StagingClosure closure = StagingClosure.compute(List.of(model, slf4j, pax));
+    final StagingClosure closure = StagingClosure.compute(List.of(model, slf4j, pax), Set.of());
 
     assertTrue(
         !closure.realmLibraryGas().contains("org.slf4j:slf4j-api"),
@@ -135,7 +136,7 @@ class StagingClosureTest {
     final ResolvedBundle gson =
         directThirdParty("com.google.code.gson", "gson", /*exports*/ "com.google.gson");
 
-    final StagingClosure closure = StagingClosure.compute(List.of(edge, gson));
+    final StagingClosure closure = StagingClosure.compute(List.of(edge, gson), Set.of());
 
     assertTrue(
         closure.realmLibraryGas().contains("com.google.code.gson:gson"),
@@ -159,7 +160,7 @@ class StagingClosureTest {
             "org.ops4j.pax.logging.pax-logging-api",
             /*exports*/ "org.slf4j");
 
-    final StagingClosure closure = StagingClosure.compute(List.of(slf4j, pax));
+    final StagingClosure closure = StagingClosure.compute(List.of(slf4j, pax), Set.of());
 
     assertTrue(
         !closure.realmLibraryGas().contains("org.slf4j:slf4j-api"),
@@ -182,7 +183,7 @@ class StagingClosureTest {
             "seam",
             null,
             "io.nxmatic.rke2lab.seed.broker.port");
-    final StagingClosure closure = StagingClosure.compute(List.of(model, seam));
+    final StagingClosure closure = StagingClosure.compute(List.of(model, seam), Set.of());
     assertTrue(closure.realmLibraryGas().isEmpty(), "a seam is host-flat, never a realm library");
   }
 }

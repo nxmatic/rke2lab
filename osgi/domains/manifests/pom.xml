@@ -20,6 +20,7 @@
     their own cdk8s rendering as fragments of the carrier (e.g. systemd-cdk8s-manifests).</description>
 
   <modules>
+    <module>manifests-ingress-contract</module>
     <module>manifests-contract</module>
     <module>manifests-cdk8s</module>
     <module>manifests-core</module>

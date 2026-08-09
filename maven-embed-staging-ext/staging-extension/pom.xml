@@ -25,15 +25,11 @@
     project.getModel() at prepare-package is NOT honoured (proven). The listener mutates the live
     MojoExecution, the same hook the nxmatic build-cache patch uses.</description>
 
-  <properties>
-    <maven.api.version>3.9.6</maven.api.version>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bnd-read</artifactId>
-      <version>1.0.0</version>
+      <version>${project.version}</version>
     </dependency>
     <!-- ASM (versions from the asm-bom imported in bom/pom.xml): the record-purity / realm gates read
          bytecode via the core visitor; the PIPELINE_PATTERN read-face check runs a SourceInterpreter
@@ -54,23 +50,21 @@
     </dependency>
     <!-- The SCHEMA_CONCORD gate validates each Document coordinate's <slug>.schema.json against the
          JSON-Schema meta-schema. networknt is jackson-based; this is build-tooling only (no runtime
-         bundle imports it in 2D — DocumentCodec.validate is off until the remote capstone). Explicit
-         version: this aggregator has its own lifecycle and does not import the project BOM. -->
+         bundle imports it in 2D — DocumentCodec.validate is off until the remote capstone). Version
+         from ${networknt.json-schema.version} in the project BOM, imported via build-parent (same as
+         the ASM deps above) — single source of truth, no inline pin. -->
     <dependency>
       <groupId>com.networknt</groupId>
       <artifactId>json-schema-validator</artifactId>
-      <version>1.5.6</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-core</artifactId>
-      <version>${maven.api.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>javax.inject</groupId>
       <artifactId>javax.inject</artifactId>
-      <version>1</version>
       <scope>provided</scope>
     </dependency>
     <!-- The strategy logs its staging summary through slf4j; the running Maven core provides the
@@ -89,7 +83,6 @@
       <plugin>
         <groupId>org.eclipse.sisu</groupId>
         <artifactId>sisu-maven-plugin</artifactId>
-        <version>1.0.0</version>
         <executions>
           <execution>
             <id>index-project</id>

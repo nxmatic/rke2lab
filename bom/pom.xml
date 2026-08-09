@@ -23,21 +23,38 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <dbus.java.version>5.2.0</dbus.java.version>
     <java-systemd.version>3.0.0-rc.2</java-systemd.version>
-    <grpc.version>1.82.0</grpc.version>
+    <grpc.version>1.83.1</grpc.version>
     <pulumi.version>1.35.0</pulumi.version>
     <pulumi.command.version>1.2.1</pulumi.command.version>
     <spring.boot.version>4.1.0</spring.boot.version>
     <jsr305.version>3.0.2</jsr305.version>
-    <jspecify.version>1.0.0</jspecify.version>
-    <checker-qual.version>4.2.1</checker-qual.version>
+    <!-- Build-platform API the staging-extension core extension compiles against (provided; supplied
+         by the running Maven). Third-party, so its version lives here like every other external dep.
+         javax.inject only ever shipped version 1 — the @Inject annotations the Maven component uses. -->
+    <maven.core.version>3.9.6</maven.core.version>
+    <javax.inject.version>1</javax.inject.version>
+    <jspecify.version>1.0.1</jspecify.version>
+    <checker-qual.version>4.2.2</checker-qual.version>
+    <!-- jetbrains annotations: the compile-only @Nullable/@NotNull set jsii + constructs reference in
+         their bytecode. manifests-cdk8s embeds it (bnd -includeresource: annotations-*.jar;lib:=true)
+         to give the nested cdk8s closure a real classloader. Once a transitive of software.constructs;
+         constructs 10.8.0 dropped it, so it is declared EXPLICITLY (constructs is no longer a source
+         for it) and pinned here. -->
+    <jetbrains.annotations.version>19.0.0</jetbrains.annotations.version>
     <gson.version>2.14.0</gson.version>
     <!-- guava-bom version — see the dependencyManagement import below for the transitive-conflict
          rationale (pulumi 32.1.2 vs jGiven 33.4.8). -->
-    <guava.version>33.5.0-jre</guava.version>
+    <guava.version>33.6.0-jre</guava.version>
     <java-bbox-api-client.version>0.2.1</java-bbox-api-client.version>
-    <jackson.version>2.22.0</jackson.version>
+    <jackson.version>2.22.1</jackson.version>
     <asm.version>9.10.1</asm.version>
-    <networknt.json-schema.version>1.5.6</networknt.json-schema.version>
+    <!-- networknt is the schema-conformance half of the broker contract (victools generates the
+         schema, networknt validates payloads against it — SeedCodec.validate, still inert until the
+         capstone). Held on the 2.x line: it is the last major on jackson 2 (com.fasterxml); 3.x moved
+         to jackson 3 (tools.jackson) and needs a whole-project jackson-3 migration first. This is the
+         sole source — the staging-extension consumes it version-less through build-parent's BOM
+         import (its SCHEMA_CONCORD gate is the only user). -->
+    <networknt.json-schema.version>2.0.4</networknt.json-schema.version>
     <!-- BouncyCastle: the pure-Java CA-hierarchy generator for the deterministic cluster PKI
          (cluster-pki-core). bc-jdk18on-bom keeps bcprov/bcpkix/bcutil in step (prov has a .2 patch
          pkix/util do not — the BOM resolves each to its right version). 1.78.1+ ships proper OSGi
@@ -54,19 +71,23 @@
          org.snakeyaml:snakeyaml-engine, a first-class OSGi bundle (BSN org.snakeyaml.engine). It is
          the only NOT-yet-staged transitive the fabric8 wrap needs (jackson + BouncyCastle are
          already staged); declared here so the wrap can pin it and seed-master stage it. -->
-    <snakeyaml-engine.version>3.0.1</snakeyaml-engine.version>
+    <snakeyaml-engine.version>3.1.1</snakeyaml-engine.version>
+    <!-- victools 5.x migrated to jackson 3 (tools.jackson.* package); the project is on jackson 2
+         (${jackson.version}), so the 4.x line is the ceiling — 5.0.0 makes generateSchema return a
+         tools.jackson ObjectNode that will not satisfy a com.fasterxml JsonNode. Bump only with a
+         whole-project jackson-3 migration. -->
     <victools.version>4.38.0</victools.version>
     <java-diff-utils.version>4.17</java-diff-utils.version>
     <jsync.version>1.5.0</jsync.version>
-    <jgit.version>7.7.0.202606012155-r</jgit.version>
-    <software.constructs.version>10.6.0</software.constructs.version>
-    <cdk8s.version>2.70.76</cdk8s.version>
-    <cdk8s.plus33.version>2.5.28</cdk8s.plus33.version>
+    <jgit.version>7.7.1.202607240634-r</jgit.version>
+    <software.constructs.version>10.8.1</software.constructs.version>
+    <cdk8s.version>2.70.90</cdk8s.version>
+    <cdk8s.plus33.version>2.5.47</cdk8s.plus33.version>
     <slf4j.version>2.0.18</slf4j.version>
     <!-- Aligned with the logback pax-logging-logback ${pax.logging.version} pulls (2.3.4 → 1.5.34):
          StaticLogbackContext shares ONE LoggerContext between the host and pax, so both must be the
          same logback. On a pax bump, re-check `mvn -pl :runtime dependency:tree -Dincludes=ch.qos.logback`. -->
-    <logback.version>1.5.34</logback.version>
+    <logback.version>1.6.1</logback.version>
     <ipaddress.version>5.6.2</ipaddress.version>
     <commons.compress.version>1.28.0</commons.compress.version>
     <jgiven.version>2.0.3</jgiven.version>
@@ -74,7 +95,7 @@
     <osgi.core.version>8.0.0</osgi.core.version>
     <felix.framework.version>7.0.5</felix.framework.version>
     <felix.metatype.version>1.2.4</felix.metatype.version>
-    <felix.log.version>1.3.0</felix.log.version>
+    <felix.log.version>1.3.2</felix.log.version>
     <felix.configadmin.version>1.9.26</felix.configadmin.version>
     <felix.scr.version>2.2.18</felix.scr.version>
     <!--
@@ -232,6 +253,21 @@
         <version>${checker-qual.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>${jetbrains.annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-core</artifactId>
+        <version>${maven.core.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>javax.inject</groupId>
+        <artifactId>javax.inject</artifactId>
+        <version>${javax.inject.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
         <version>${gson.version}</version>
@@ -292,9 +328,18 @@
         <artifactId>commons-compress</artifactId>
         <version>${commons.compress.version}</version>
       </dependency>
+      <!-- logback-classic + logback-core are versioned in lock-step (classic binds core's internal
+           API at its own version); pin BOTH here or spring-boot-dependencies wins for core and
+           splits the pair (classic ${logback.version} over a stale core → LinkageError in the shared
+           StaticLogbackContext). -->
       <dependency>
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
+        <version>${logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-core</artifactId>
         <version>${logback.version}</version>
       </dependency>
       <dependency>

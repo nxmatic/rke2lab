@@ -3,13 +3,13 @@ package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.contract.profiles.ComponentVersions;
 import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.nxmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.nxmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
+import io.nxmatic.rke2lab.manifests.ingress.ComponentVersions;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;

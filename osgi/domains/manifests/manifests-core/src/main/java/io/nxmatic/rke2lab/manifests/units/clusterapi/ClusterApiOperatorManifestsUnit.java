@@ -51,6 +51,7 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
     createCoreProvider(scope, coreVersion);
     createInfrastructureProvider(scope, incusProviderVersion);
     createControlPlaneProvider(scope, rke2ProviderVersion);
+    createBootstrapProvider(scope, rke2ProviderVersion);
   }
 
   private void createProviderNamespaces(final Construct scope) {
@@ -116,7 +117,7 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                 "version",
                 version,
                 "fetchConfig",
-                Map.of("url", "https://github.com/nxmatic/cluster-api-provider-incus/releases"))));
+                Map.of("url", "https://github.com/lxc/cluster-api-provider-incus/releases"))));
   }
 
   private void createControlPlaneProvider(final Construct scope, final String version) {
@@ -134,6 +135,29 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "operator.cluster.x-k8s.io|ControlPlaneProvider|caprke2-system|rke2"))
+                        .build())
+                .build());
+
+    provider.addJsonPatch(
+        JsonPatch.add(
+            "/spec", Map.of("version", version, "configSecret", Map.of("name", "rke2-config"))));
+  }
+
+  private void createBootstrapProvider(final Construct scope, final String version) {
+    ApiObject provider =
+        new ApiObject(
+            scope,
+            "bootstrapprovider-rke2",
+            ApiObjectProps.builder()
+                .apiVersion("operator.cluster.x-k8s.io/v1alpha2")
+                .kind("BootstrapProvider")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name("rke2")
+                        .namespace("caprke2-system")
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "operator.cluster.x-k8s.io|BootstrapProvider|caprke2-system|rke2"))
                         .build())
                 .build());
 

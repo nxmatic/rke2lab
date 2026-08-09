@@ -628,6 +628,9 @@ cross-domain ordering.
 
 | `HighAvailabilityDomainRegistrar`
 | The high-availability domain — the KubeVip unit.
+
+| `CicdDomainRegistrar`
+| The cicd domain — the Tekton pipelines + dashboard units (published to workload clusters).
 |===
 
 === Node environment
