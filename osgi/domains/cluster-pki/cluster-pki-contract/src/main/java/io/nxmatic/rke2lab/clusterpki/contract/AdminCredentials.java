@@ -17,8 +17,8 @@ import java.util.Base64;
  * <p>Secret (it carries the admin private key): the seal WHEN files it in the cellar {@link
  * ClusterPkiCoordinate#ADMIN_CREDENTIALS} SEALED ({@code Sensitivity.SEALED}, CellarCipher at
  * rest). The host reveals it after the grow and writes the operator kubeconfig to {@code
- * kubeconfigRef} ({@code .local.d/<cluster>/kubeconfig.yaml}) with the mDNS endpoint — the path the
- * readiness probe reads; the manifests layer reveals it again to render the in-cluster {@code
+ * kubeconfigRef} ({@code .local.d/kubeconfig.yaml}) with the mDNS endpoint — the path the readiness
+ * probe reads; the manifests layer reveals it again to render the in-cluster {@code
  * <cluster>-kubeconfig} Secret with the VIP endpoint. A {@code type=dual-realm} record: minted +
  * filed OSGi-side by the seal scion, fetched host-side and manifests-side. {@link SeedContract}
  * binds it to the {@code admin-credentials} coordinate for the codec's decode guard. See

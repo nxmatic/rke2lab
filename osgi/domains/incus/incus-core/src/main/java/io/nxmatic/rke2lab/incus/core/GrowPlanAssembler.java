@@ -124,31 +124,32 @@ public final class GrowPlanAssembler {
   }
 
   /**
-   * The artifact dir {@code <sharedFolder>/<alias>} the {@code new Image} sources from, resolved to
-   * the readable copy — probes canonical path and its {@code .nfs} sibling (a mirror may live there
-   * for NFS-exported directories). The scion sees the same filesystem as the host (Felix embedded
-   * in the host JVM), so it probes and projects the resolved path; the host only reads it. Falls
-   * back to the canonical dir when no candidate holds both artifacts (the plan still names it; a
-   * preview run has no artifacts yet). The root is canonicalised at the source (JgitWorktree), so
-   * no need to probe multiple forms (e.g., with/without {@code /private/} prefixes).
+   * The artifact dir {@code <sharedFolder>} the {@code new Image} sources from (flat — one image,
+   * so no per-alias subdir), resolved to the readable copy — probes canonical path and its {@code
+   * .automount} sibling (a mirror may live there behind the sshfs automount). The scion sees the
+   * same filesystem as the host (Felix embedded in the host JVM), so it probes and projects the
+   * resolved path; the host only reads it. Falls back to the canonical dir when no candidate holds
+   * both artifacts (the plan still names it; a preview run has no artifacts yet). The root is
+   * canonicalised at the source (JgitWorktree), so no need to probe multiple forms (e.g.,
+   * with/without {@code /private/} prefixes).
    */
   private Path resolveReadableArtifactDir() {
-    final Path canonical = sharedFolder.resolve(imageAlias).toAbsolutePath().normalize();
+    final Path canonical = sharedFolder.toAbsolutePath().normalize();
     if (Files.exists(canonical.resolve(METADATA_FILENAME))
         && Files.exists(canonical.resolve(ROOTFS_FILENAME))) {
       return canonical;
     }
-    final Path nfsCandidate = nfsSibling(canonical);
-    if (Files.exists(nfsCandidate.resolve(METADATA_FILENAME))
-        && Files.exists(nfsCandidate.resolve(ROOTFS_FILENAME))) {
-      return nfsCandidate;
+    final Path automountCandidate = automountSibling(canonical);
+    if (Files.exists(automountCandidate.resolve(METADATA_FILENAME))
+        && Files.exists(automountCandidate.resolve(ROOTFS_FILENAME))) {
+      return automountCandidate;
     }
     return canonical;
   }
 
-  private Path nfsSibling(Path path) {
+  private Path automountSibling(Path path) {
     final Path name = path.getFileName();
-    return name == null ? path : path.resolveSibling(name + ".nfs").normalize();
+    return name == null ? path : path.resolveSibling(name + ".automount").normalize();
   }
 
   private byte[] readAll(Path file) {

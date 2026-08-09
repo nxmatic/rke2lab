@@ -26,10 +26,7 @@ public enum InfraDomain {
   IMAGE(InfraDomainCatalog.IMAGE) {
     @Override
     InfraConfigFragment contribute(ConfigLoader loader) {
-      return new Rke2labConfig.ImageConfig(
-          loader.optional(domainId(), "alias"),
-          loader.optional(domainId(), "builderHost"),
-          loader.requirePath(domainId(), "sharedFolder"));
+      return new Rke2labConfig.ImageConfig(loader.optional(domainId(), "builderHost"));
     }
   },
 
@@ -39,7 +36,7 @@ public enum InfraDomain {
       return new Rke2labConfig.NetworkConfig(
           loader.optional(domainId(), "lanBridgeParent"),
           loader.optional(domainId(), "vmnetNetworkName"),
-          loader.optionalBoolean(domainId(), "nfsAutomount"),
+          loader.optionalBoolean(domainId(), "automount"),
           loader.optional(domainId(), "tailnet"));
     }
   },

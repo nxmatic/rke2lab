@@ -245,7 +245,6 @@ public class ClusterSeedScenario
       imageScalars.put("alias", run.config().imageAlias());
       imageScalars.put("builderBinary", run.config().imageBuilderBinary());
       imageScalars.put("builderHost", run.config().imageBuilderHost());
-      imageScalars.put("sharedFolder", run.config().imageSharedFolder().toString());
       this.imageScalars = imageScalars;
       // The host GROW derives the instance mounts + provider context from the run's config.
       this.config = run.config();
@@ -305,7 +304,7 @@ public class ClusterSeedScenario
               AmendmentContributor.class,
               new FacetContributor(new AmendCoordinate("bbox"), run.facet("bbox")),
               new Hashtable<>());
-      // The incus FACET — the stable provisioning identity (cluster/node, NFS automount, netPrefix)
+      // The incus FACET — the stable provisioning identity (cluster/node, automount, netPrefix)
       // the scion combines with the worktree root it reads from its Worktree component. A FACET,
       // not
       // a per-consult ROW: the value never changes across the run, so it is contributed AMBIENT
@@ -316,7 +315,7 @@ public class ClusterSeedScenario
       final ObjectNode incusFacet = JsonNodeFactory.instance.objectNode();
       incusFacet.put("clusterName", run.config().clusterName());
       incusFacet.put("nodeName", run.config().nodeName());
-      incusFacet.put("nfsAutomount", run.config().nfsAutomount());
+      incusFacet.put("automount", run.config().automount());
       incusFacet.put("netPrefix", run.config().netPrefix());
       incusFacet.put("incusProject", run.config().incusProject());
       gardening
@@ -535,7 +534,7 @@ public class ClusterSeedScenario
               config.incusProject(),
               config.incusDefaultRemote(),
               config.incusRemoteAddress().toString(),
-              config.incusConfigDir() == null ? "" : config.incusConfigDir().toString(),
+              config.incusConfigFolder() == null ? "" : config.incusConfigFolder().toString(),
               config.nodeName(),
               config.profileName(),
               config.lanBridgeParent(),
@@ -580,8 +579,7 @@ public class ClusterSeedScenario
       // here:
       // the apiserver's deterministic mDNS SAN <cluster>-<node>.local (nixos/rke2.nix's tls-san
       // drop-in), so TLS verifies against the embedded server-ca chain rooted at mammoth-skate-tls.
-      // Written to kubeconfigRef (.local.d/<cluster>/kubeconfig.yaml) — the stable path the
-      // operator
+      // Written to kubeconfigRef (.local.d/kubeconfig.yaml) — the stable path the operator
       // and the readiness probe read. Live-only: absent a deployment there is nothing to access
       // yet.
       if (!PulumiDeploymentSeed.isDeploymentPresent()) {

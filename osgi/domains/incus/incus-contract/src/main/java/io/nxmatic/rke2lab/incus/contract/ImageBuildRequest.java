@@ -9,9 +9,9 @@ package io.nxmatic.rke2lab.incus.contract;
  * incus} both resolve on {@code PATH}); the {@code remote*} paths drive the ssh script on {@code
  * remoteHost} (when they do not). The edge decides which by probing for the binaries. {@code
  * remoteHost} may be blank — the edge then requires them locally or fails. {@code
- * remoteWorkspaceDir} is the worktree root rebased onto the builder's NFS automount view (the dir
- * the script {@code cd}s into, and the flake it builds); {@code remoteArtifactDir} is RELATIVE to
- * it — the script joins the two, so the host never second-translates the artifact subpath.
+ * remoteWorkspaceDir} is the worktree root rebased onto the builder's automount view (the dir the
+ * script {@code cd}s into, and the flake it builds); {@code remoteArtifactDir} is RELATIVE to it —
+ * the script joins the two, so the host never second-translates the artifact subpath.
  *
  * <p>The build SCRIPT is NOT a coordinate here: the edge owns it as a bundle resource (the single
  * source of the recipe, folded into {@code recipeDigest()}), so it materialises the script itself —

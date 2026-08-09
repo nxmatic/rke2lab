@@ -24,7 +24,6 @@ class ConfigEntryGateScenarioTest
   private static Map<String, Map<String, Object>> completeConfiguration() {
     final Map<String, Map<String, Object>> sections = new HashMap<>();
     sections.put("incus", Map.of("configDir", "/Users/nxmatic/.config/incus"));
-    sections.put("image", Map.of("sharedFolder", "/srv/distrobuilder"));
     return sections;
   }
 
@@ -37,9 +36,9 @@ class ConfigEntryGateScenarioTest
 
   @Test
   void missing_mandatory_inputs_are_reported() {
-    // Empty configuration: every mandatory input absent, in InfraDomain.values() order.
+    // Empty configuration: the mandatory input absent.
     given().the_operator_configuration(loaderOf(Map.of()));
     when().the_configuration_is_loaded();
-    then().the_missing_inputs_are("incus.configDir", "image.sharedFolder");
+    then().the_missing_inputs_are("incus.configDir");
   }
 }

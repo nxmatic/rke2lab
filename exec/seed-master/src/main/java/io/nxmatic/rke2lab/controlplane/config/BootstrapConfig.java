@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
+import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
 import io.nxmatic.rke2lab.seed.broker.port.ReadinessDeadlineOverride;
 import io.nxmatic.rke2lab.seed.broker.port.ReadinessOverrides;
 import java.net.URI;
@@ -18,17 +19,16 @@ public record BootstrapConfig(
     String incusProject,
     String incusDefaultRemote,
     URI incusRemoteAddress,
-    Path incusConfigDir,
+    Path incusConfigFolder,
     String imageAlias,
     String imageBuilderHost,
-    Path imageSharedFolder,
     String profileName,
     String lanBridgeParent,
     String vmnetNetworkName,
     String tailnet,
     URI apiEndpoint,
     Path kubeconfigRef,
-    boolean nfsAutomount,
+    boolean automount,
     String systemdAdapterDbusHost,
     int systemdAdapterDbusPort,
     int hostAssetRotationRetentionCount,
@@ -40,7 +40,9 @@ public record BootstrapConfig(
   private static final String DEFAULT_CLUSTER_NAME = "bioskop";
   private static final String DEFAULT_NODE_NAME = "master";
   private static final String DEFAULT_INCUS_PROJECT = "rke2lab";
-  private static final String DEFAULT_IMAGE_ALIAS = "control-node-base";
+  // The one seed image's incus alias — the host adopts the built image by it. Single source here;
+  // the build script (build-node-base-image.sh) hardcodes the SAME literal on the import side.
+  private static final String IMAGE_ALIAS = "node-base";
   private static final String DEFAULT_PROFILE_NAME = "rke2lab";
   private static final String DEFAULT_LAN_BRIDGE_PARENT = "lan-br";
   private static final String DEFAULT_VMNET_NETWORK_NAME = "vmnet-br";
@@ -49,16 +51,16 @@ public record BootstrapConfig(
   // rather than the LAN mDNS <host>.local.
   private static final String DEFAULT_TAILNET = "mammoth-skate.ts.net";
   private static final URI DEFAULT_API_ENDPOINT = URI.create("https://10.66.106.10:6443");
-  private static final boolean DEFAULT_NFS_AUTOMOUNT = true;
+  private static final boolean DEFAULT_AUTOMOUNT = true;
   private static final int DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT = 12434;
   private static final int DEFAULT_HOST_ASSET_ROTATION_RETENTION_COUNT = 3;
 
   /**
    * Derive the Stage A bootstrap config from the root DTO. The worktree root is NOT here: it is the
    * worktree soil's harvest (its {@code Worktree} component self-locates it), fetched from the
-   * cellar by whoever needs it — storing it in config would only collide across worktrees.
-   * Mandatory config values ({@code incus.configDir}, {@code image.sharedFolder}) are already
-   * validated at load, so they arrive non-null; optional values get their default here.
+   * cellar by whoever needs it — storing it in config would only collide across worktrees. The
+   * mandatory config value ({@code incus.configDir}) is already validated at load, so it arrives
+   * non-null; optional values get their default here.
    */
   public static BootstrapConfig from(Rke2labConfig config) {
     final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
@@ -75,12 +77,12 @@ public record BootstrapConfig(
     final String nixosHost = clusterName + "-nixos";
     final String nixosMdnsHost = nixosHost + ".local";
 
-    // Cluster-scoped kubeconfig: one file per cluster at .local.d/<cluster>/kubeconfig.yaml.
+    // Flat kubeconfig at .local.d/kubeconfig.yaml — one single-node management cluster.
     final Path kubeconfigRef =
         config
             .kubeconfig()
             .ref()
-            .orElseGet(() -> Path.of(".local.d", clusterName, "kubeconfig.yaml").normalize());
+            .orElseGet(() -> Path.of(BootstrapPaths.STATE_DIR, "kubeconfig.yaml").normalize());
 
     return new BootstrapConfig(
         clusterName,
@@ -92,16 +94,15 @@ public record BootstrapConfig(
             .remoteAddress()
             .orElseGet(() -> URI.create("https://" + nixosMdnsHost + ":8443")),
         config.incus().configDir(),
-        config.image().alias().orElse(DEFAULT_IMAGE_ALIAS),
+        IMAGE_ALIAS,
         config.image().builderHost().orElseGet(() -> nixosMdnsHost),
-        config.image().sharedFolder(),
         config.profile().name().orElse(DEFAULT_PROFILE_NAME),
         config.network().lanBridgeParent().orElse(DEFAULT_LAN_BRIDGE_PARENT),
         config.network().vmnetNetworkName().orElse(DEFAULT_VMNET_NETWORK_NAME),
         config.network().tailnet().orElse(DEFAULT_TAILNET),
         config.api().endpoint().orElse(DEFAULT_API_ENDPOINT),
         kubeconfigRef,
-        config.network().nfsAutomount().orElse(DEFAULT_NFS_AUTOMOUNT),
+        config.network().automount().orElse(DEFAULT_AUTOMOUNT),
         // The systemd adapter runs INSIDE the master container, whose dbus-over-TCP endpoint the
         // host probes over mDNS (avahi on the LAN). The container is NOT on the tailnet, so a bare
         // <cluster>-<node> does not resolve from the host (getaddrinfo fails before the port); the

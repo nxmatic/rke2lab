@@ -229,7 +229,7 @@ public class IncusProvisionScenario
         .the_staging_is_published(resolved, cellar, parcel)
         .and()
         .the_instance_grow_plan_is_published(
-            resolved, input.image().orElse(new Image("", "", "", "")), cellar, parcel);
+            resolved, input.image().orElse(new Image("", "", "")), cellar, parcel);
     // Pose the live root the host renders the runbook into — a within-run fact whose layout
     // convention lives only here (§ seed-broker-spec, two cellars: the ephemeral cellar). The graft
     // merges this tag into the host tree; the host reads it via ScenarioGraft.graftedValue. Posed
@@ -273,11 +273,11 @@ public class IncusProvisionScenario
    * run) it is derived from them: the incus daemon lives only on the remote {@code builderHost}
    * ({@code bioskop-nixos}), so from the seed-master host the edge streams the nix build over ssh
    * (nix alone resolves on the Mac, but no local daemon to import into). The workspace it {@code
-   * cd}s into is the worktree root rebased onto the NFS automount view ({@code
+   * cd}s into is the worktree root rebased onto the automount view ({@code
    * BootstrapPaths.asAutomountView}, e.g. {@code /net/bioskop.local/private/ …}), the SAME view the
    * Mac reads the artifacts back through. The artifact dir is that root's OWN subpath, so it rides
-   * as a path RELATIVE to the workspace and the recipe joins the two — no second translation, and
-   * the host's absolutised {@code sharedFolder} is relativised back against the worktree root.
+   * as a path RELATIVE to the workspace and the recipe joins the two — no second translation; the
+   * artifact dir is the flat state root {@code .local.d} ({@code BootstrapPaths.STATE_DIR}).
    * Unamended (a bare survey or the offline scenario) it falls to a blank marker the surveying/mock
    * builder ignores.
    */
@@ -290,13 +290,10 @@ public class IncusProvisionScenario
     final Image image = maybeImage.orElseThrow();
     final Path localRoot = worktreeRoot.orElseThrow();
     final Path remoteRoot =
-        BootstrapPaths.fromLocalWorktree(localRoot, facet.clusterName(), facet.nodeName())
-            .asAutomountView(facet.nfsAutomount(), facet.netPrefix())
+        BootstrapPaths.fromLocalWorktree(localRoot)
+            .asAutomountView(facet.automount(), facet.netPrefix())
             .worktreeRoot();
-    final Path artifactUnderWorktree =
-        localRoot
-            .relativize(localRoot.resolve(Path.of(image.sharedFolder())).normalize())
-            .resolve(image.alias());
+    final Path artifactUnderWorktree = Path.of(BootstrapPaths.STATE_DIR);
     return new ImageBuildRequest(
         image.builderBinary(),
         localRoot.toString(),
@@ -326,7 +323,7 @@ public class IncusProvisionScenario
       Path secretsFile,
       String clusterName,
       String nodeName,
-      boolean nfsAutomount,
+      boolean automount,
       String netPrefix) {
 
     static Optional<Resolved> from(
@@ -336,9 +333,8 @@ public class IncusProvisionScenario
       }
       final Facet facet = maybeFacet.orElseThrow();
       final Path root = worktreeRoot.orElseThrow();
-      final BootstrapPaths local =
-          BootstrapPaths.fromLocalWorktree(root, facet.clusterName(), facet.nodeName());
-      final Path slot = new HostSlotSelector(local.clusterNodeRoot(), cellar, parcel).nextStaging();
+      final BootstrapPaths local = BootstrapPaths.fromLocalWorktree(root);
+      final Path slot = new HostSlotSelector(local.stateRoot(), cellar, parcel).nextStaging();
       final BootstrapPaths staging = local.asStagingView(slot);
       return Optional.of(
           new Resolved(
@@ -349,7 +345,7 @@ public class IncusProvisionScenario
               staging.secretsFile(),
               facet.clusterName(),
               facet.nodeName(),
-              facet.nfsAutomount(),
+              facet.automount(),
               facet.netPrefix()));
     }
   }
@@ -655,7 +651,7 @@ public class IncusProvisionScenario
                   image.builderHost(),
                   imageBuilder.orElseThrow().recipeDigest(),
                   resolved.worktreeRoot(),
-                  Path.of(image.sharedFolder()))
+                  BootstrapPaths.fromLocalWorktree(resolved.worktreeRoot()).stateRoot())
               .assemble(networkView, identityView);
       cellar.store(parcel, IncusGrowCoordinate.INSTANCE_GROW_PLAN, plan);
       return self();

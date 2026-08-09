@@ -32,11 +32,9 @@ public final class OperatorConfiguration {
     return new OperatorConfiguration(new LinkedHashMap<>());
   }
 
-  /** The two mandatory inputs with the canonical paths the resolution tests assert. */
+  /** The single mandatory input with the canonical path the resolution tests assert. */
   public static OperatorConfiguration mandatory() {
-    return empty()
-        .with("incus", "configDir", "/Users/nxmatic/.config/incus")
-        .with("image", "sharedFolder", "/srv/distrobuilder");
+    return empty().with("incus", "configDir", "/Users/nxmatic/.config/incus");
   }
 
   /**

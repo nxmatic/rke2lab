@@ -29,18 +29,18 @@ class ConfigLoaderTest {
   void require_accumulates_without_throwing_mid_load() {
     final ConfigLoader loader = loaderOf(Map.of());
     loader.requirePath("incus", "configDir");
-    loader.requirePath("image", "sharedFolder");
-    assertEquals(List.of("incus.configDir", "image.sharedFolder"), loader.missingKeys());
+    loader.requirePath("incus", "remoteAddress");
+    assertEquals(List.of("incus.configDir", "incus.remoteAddress"), loader.missingKeys());
   }
 
   @Test
   void diagnose_throws_with_all_keys() {
     final ConfigLoader loader = loaderOf(Map.of());
     loader.requirePath("incus", "configDir");
-    loader.requirePath("image", "sharedFolder");
+    loader.requirePath("incus", "remoteAddress");
     final MissingRequiredConfiguration ex =
         assertThrows(MissingRequiredConfiguration.class, loader::diagnoseIfIncomplete);
-    assertEquals(List.of("incus.configDir", "image.sharedFolder"), ex.keys());
+    assertEquals(List.of("incus.configDir", "incus.remoteAddress"), ex.keys());
   }
 
   @Test

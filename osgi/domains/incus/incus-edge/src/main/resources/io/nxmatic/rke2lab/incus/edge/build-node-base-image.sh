@@ -42,7 +42,7 @@ source_tree="$(git -C "$workspace" write-tree)"
 # store-cached — but the git-archive tempdir gives a fresh flake path each run, so nix's own eval
 # cache never hits; this gate is what spares that seconds-long NixOS eval on an unchanged tree.)
 source_digest="$(git -C "$workspace" ls-tree -r "$source_tree" -- flake.lock flake.nix nixos | sha256sum | awk '{print $1}')"
-checksum_file="$artifact_dir/.build.checksum.sha256"
+checksum_file="$artifact_dir/.image.checksum.sha256"
 
 if [ -f "$checksum_file" ] && [ "$(cat "$checksum_file")" = "$source_digest" ] &&
     [ -f "$artifact_dir/$metadata_name" ] && [ -f "$artifact_dir/$rootfs_name" ]; then
@@ -95,9 +95,10 @@ fi
 
 # Register the freshly-built image in the incus daemon the operator's `incus` speaks to (its default
 # remote — on the Mac that is the LAN daemon reached over mDNS; the import uploads the artifacts to
-# it, a round-trip accepted on a LAN). The alias is the artifact dir's own leaf (the host lays
-# artifacts out as <sharedFolder>/<alias>); the host GROW then ADOPTS this image by alias.
-image_alias="$(basename "$artifact_dir")"
+# it, a round-trip accepted on a LAN). One image for now — the homogeneous node-base substrate every
+# node boots from — so the alias is hardcoded to node-base (the host GROW ADOPTS it by the SAME
+# alias; keep this in sync with rke2lab:image:alias in the stack config).
+image_alias="node-base"
 
 # incus derives a SPLIT image's fingerprint as sha256(metadata.tar.xz ++ rootfs.squashfs), metadata
 # first (verified empirically against a stored image — it is NOT the sha256 of either file alone).

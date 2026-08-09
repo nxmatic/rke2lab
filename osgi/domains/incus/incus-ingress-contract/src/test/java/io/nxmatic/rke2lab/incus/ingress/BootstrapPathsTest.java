@@ -8,9 +8,9 @@ import org.junit.jupiter.api.Test;
 class BootstrapPathsTest {
 
   private final BootstrapPaths bootstrapPaths =
-      BootstrapPaths.fromLocalWorktree(Path.of("/tmp/worktree"), "test-cluster", "test-node");
+      BootstrapPaths.fromLocalWorktree(Path.of("/tmp/worktree"));
 
-  // --- automountPath: rebase an absolute path under the NFS automount prefix (host-agnostic) ---
+  // --- automountPath: rebase an absolute path under the automount prefix (host-agnostic) ---
 
   @Test
   void automountPath_rebases_the_bioskop_private_layout_under_the_prefix() {

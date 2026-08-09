@@ -17,7 +17,6 @@ class Rke2labConfigTest {
     assertEquals(Optional.of("bioskop"), config.cluster().name());
     assertEquals(Optional.of("rke2lab"), config.incus().project());
     assertEquals(Path.of("/Users/nxmatic/.config/incus"), config.incus().configDir());
-    assertEquals(Path.of("/srv/distrobuilder"), config.image().sharedFolder());
     assertEquals(Optional.of("bioskop-master"), config.systemd().dbusHost());
     assertEquals(Optional.of(12434), config.systemd().dbusPort());
   }
@@ -37,16 +36,6 @@ class Rke2labConfigTest {
             MissingRequiredConfiguration.class,
             () -> OperatorConfiguration.full().without("incus.configDir").asDto());
     assertEquals(List.of("incus.configDir"), ex.keys());
-  }
-
-  @Test
-  void multiple_missing_mandatory_reported_together() {
-    // Empty config: both mandatory keys absent, in InfraDomain.values() order (worktree is no
-    // longer config — the root derives it at runtime via Worktree).
-    final MissingRequiredConfiguration ex =
-        assertThrows(
-            MissingRequiredConfiguration.class, () -> OperatorConfiguration.empty().asDto());
-    assertEquals(List.of("incus.configDir", "image.sharedFolder"), ex.keys());
   }
 
   @Test

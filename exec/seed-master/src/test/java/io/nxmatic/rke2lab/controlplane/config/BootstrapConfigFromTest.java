@@ -12,8 +12,7 @@ class BootstrapConfigFromTest {
   @Test
   void mandatory_values_pass_through() {
     final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
-    assertEquals(Path.of("/Users/nxmatic/.config/incus"), boot.incusConfigDir());
-    assertEquals(Path.of("/srv/distrobuilder"), boot.imageSharedFolder());
+    assertEquals(Path.of("/Users/nxmatic/.config/incus"), boot.incusConfigFolder());
   }
 
   @Test
@@ -27,16 +26,16 @@ class BootstrapConfigFromTest {
     // the operator's own ~/.config/incus channel — the bare tailnet name times out from here).
     assertEquals("bioskop-nixos", boot.incusDefaultRemote());
     assertEquals(URI.create("https://bioskop-nixos.local:8443"), boot.incusRemoteAddress());
-    assertEquals("control-node-base", boot.imageAlias());
+    assertEquals("node-base", boot.imageAlias());
     assertEquals("bioskop-nixos.local", boot.imageBuilderHost());
     assertEquals("rke2lab", boot.profileName());
     assertEquals("lan-br", boot.lanBridgeParent());
     assertEquals("vmnet-br", boot.vmnetNetworkName());
     assertEquals("mammoth-skate.ts.net", boot.tailnet());
-    // The NFS automount root routes over the tailscale MagicDNS FQDN, not the LAN mDNS .local.
+    // The automount root routes over the tailscale MagicDNS FQDN, not the LAN mDNS .local.
     assertEquals("/net/bioskop.local", boot.netPrefix());
     assertEquals(URI.create("https://10.66.106.10:6443"), boot.apiEndpoint());
-    assertEquals(true, boot.nfsAutomount());
+    assertEquals(true, boot.automount());
     // The master container is reached over mDNS (avahi/.local), not the tailnet — so the default
     // dbus host carries the .local FQDN; a bare <cluster>-<node> would not resolve from the host.
     assertEquals("bioskop-master.local", boot.systemdAdapterDbusHost());
@@ -48,8 +47,8 @@ class BootstrapConfigFromTest {
   }
 
   @Test
-  void kubeconfig_ref_defaults_to_cluster_scoped_path() {
+  void kubeconfig_ref_defaults_to_flat_state_dir_path() {
     final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
-    assertEquals(Path.of(".local.d/bioskop/kubeconfig.yaml"), boot.kubeconfigRef());
+    assertEquals(Path.of(".local.d/kubeconfig.yaml"), boot.kubeconfigRef());
   }
 }

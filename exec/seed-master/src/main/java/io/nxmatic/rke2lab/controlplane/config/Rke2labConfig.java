@@ -150,13 +150,12 @@ public record Rke2labConfig(
       Path configDir)
       implements InfraConfigFragment {}
 
-  public record ImageConfig(Optional<String> alias, Optional<String> builderHost, Path sharedFolder)
-      implements InfraConfigFragment {}
+  public record ImageConfig(Optional<String> builderHost) implements InfraConfigFragment {}
 
   public record NetworkConfig(
       Optional<String> lanBridgeParent,
       Optional<String> vmnetNetworkName,
-      Optional<Boolean> nfsAutomount,
+      Optional<Boolean> automount,
       Optional<String> tailnet)
       implements InfraConfigFragment {}
 
