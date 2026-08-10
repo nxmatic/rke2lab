@@ -23,5 +23,22 @@
         "panel": "dedicated",
         "showReuseMessage": false
     },
-    "asciidoc.extensions.enableKroki": true
+    "asciidoc.extensions.enableKroki": true,
+    "_comment_targetActors": "target~<actor> are per-actor Maven build outputs (target~nxmatic CLI, target~claude CLI); the IDE owns plain `target`. Keep the other actors' dirs out of the watcher/importer so a CLI build never floods FSEvents and stalls the extension host.",
+    "files.watcherExclude": {
+        "**/target~*/**": true
+    },
+    "search.exclude": {
+        "**/target~*/**": true
+    },
+    "files.exclude": {
+        "**/target~*": true
+    },
+    "java.import.exclusions": [
+        "**/node_modules/**",
+        "**/.metadata/**",
+        "**/archetype-resources/**",
+        "**/META-INF/maven/**",
+        "**/target~*/**"
+    ]
 }
