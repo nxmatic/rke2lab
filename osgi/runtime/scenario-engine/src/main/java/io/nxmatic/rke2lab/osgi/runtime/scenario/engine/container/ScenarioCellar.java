@@ -48,13 +48,18 @@ public final class ScenarioCellar implements TransactionalCellar {
   private final Supplier<Cellar> durableReads;
   private final Optional<String> txId;
   private final SeedCodec codec = new SeedCodec();
-  // The mono clean/smudge filter (§ cellar-secrets). A SEALED store is sealed HERE, so its sealed
-  // payload is what rides the run's write-set tag across the graft and drains to the durable
-  // backend
-  // — the harvest plaintext never crosses the seam.
-  private final CellarCipher cipher = new PassphraseCellarCipher();
+  // The clean/smudge filter (§ cellar-secrets). A SEALED store is sealed HERE, so its sealed
+  // payload
+  // is what rides the run's write-set tag across the graft and drains to the durable backend — the
+  // harvest plaintext never crosses the seam. The cipher is the injected CellarCipher (age) the
+  // extension resolves when its bundle is provisioned; where it is absent the mono passphrase
+  // stand-in fills in (the three-arg constructor the isolated tests use).
+  private final CellarCipher cipher;
 
   /**
+   * The passphrase-default construction — the mono clean/smudge filter for a run with no injected
+   * cipher (an isolated test, or a world where {@code cellar-cipher-age} is not provisioned).
+   *
    * @param model the run's {@link ReportModel} (read lazily, but live already when the extension
    *     constructs this — jGiven binds it before the body)
    * @param durableReads the durable read side, resolved on first fetch
@@ -65,9 +70,23 @@ public final class ScenarioCellar implements TransactionalCellar {
    */
   public ScenarioCellar(
       Supplier<ReportModel> model, Supplier<Cellar> durableReads, Optional<String> txId) {
+    this(model, durableReads, txId, new PassphraseCellarCipher());
+  }
+
+  /**
+   * As {@link #ScenarioCellar(Supplier, Supplier, Optional)}, with the {@link CellarCipher} the
+   * {@code ScenarioCellarExtension} resolved from the registry (the age impl where provisioned) —
+   * so a SEALED store is sealed with the real cellar cipher, not the passphrase stand-in.
+   */
+  public ScenarioCellar(
+      Supplier<ReportModel> model,
+      Supplier<Cellar> durableReads,
+      Optional<String> txId,
+      CellarCipher cipher) {
     this.model = model;
     this.durableReads = durableReads;
     this.txId = txId;
+    this.cipher = cipher;
     txId.ifPresent(id -> model.get().addTag(Tag.TRANSACTION.of(id)));
   }
 

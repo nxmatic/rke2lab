@@ -64,7 +64,7 @@ claude-code.pkg-path = "claude-code"
 ##  ... run by _bash_ shell when you run 'flox activate'.
 ## -------------------------------------------------------------------
 [hook]
-on-activate = '''
+on-activate = """
   mkdir -p "${PULUMI_HOME}"
   mkdir -p "${FLOX_ENV_PROJECT}/.pulumi-state"
   if command -v javac >/dev/null 2>&1; then
@@ -73,13 +73,24 @@ on-activate = '''
   if command -v gh >/dev/null 2>&1 && [ -z "${GH_TOKEN:-}" ]; then
     GH_TOKEN="$(gh auth token 2>/dev/null)" && export GH_TOKEN
   fi
-'''
+"""
 
 
 ## Profile script ----------------------------------------------------
 ## ... sourced by _your shell_ when you run 'flox activate'.
 ## -------------------------------------------------------------------
 [profile]
+  common = '''
+    GITHUB_SIGNING_KEYFILE="$HOME"/.ssh/keys.d/github-signing
+    if [[ -r "$GITHUB_SIGNING_KEYFILE" ]]; then
+      set -a
+      SOPS_AGE_KEY=$( ssh-to-age -private-key < "$GITHUB_SIGNING_KEYFILE" )
+      RKE2LAB_CELLAR_RECIPIENTS=$( ssh-to-age < "$GITHUB_SIGNING_KEYFILE".pub )
+      set +a
+    else
+      echo no signing key
+    fi
+  '''
 ## Shell-specific customizations such as setting aliases go here:
 # bash = ...
 # zsh  = ...

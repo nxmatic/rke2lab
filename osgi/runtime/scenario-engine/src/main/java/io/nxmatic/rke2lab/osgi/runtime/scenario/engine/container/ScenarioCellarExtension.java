@@ -4,7 +4,9 @@ import com.tngtech.jgiven.impl.ScenarioHolder;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.BaseWorldExtension;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.OsgiConnection;
+import io.nxmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
+import io.nxmatic.rke2lab.seed.broker.port.CellarCipher;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
 import io.nxmatic.rke2lab.seed.broker.port.Persistence;
@@ -15,6 +17,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceReference;
 
 /**
  * The transactional-cellar bracket: injects the run's {@link ScenarioCellar} before the body, and
@@ -62,7 +66,10 @@ public class ScenarioCellarExtension
     final Optional<String> txId = TxIdSeed.read(context);
     final ScenarioCellar cellar =
         new ScenarioCellar(
-            ScenarioCellarExtension::currentModel, () -> resolve(context, Cellar.class), txId);
+            ScenarioCellarExtension::currentModel,
+            () -> resolve(context, Cellar.class),
+            txId,
+            resolveCipher(context));
     // The ALLER sense of the transaction: re-post the parent's in-flight entries onto THIS model
     // (marked inherited), BEFORE the body, so the scion reads its parent's stores as its own
     // overlay
@@ -184,6 +191,43 @@ public class ScenarioCellarExtension
     // this one-shot durable lookup.
     try (ScenarioRegistry registry = ScenarioRegistry.of(context.getRequiredTestInstance())) {
       return registry.require(type, "no " + type.getSimpleName() + " in the scion's registry");
+    }
+  }
+
+  /**
+   * Resolve the run's {@link CellarCipher} — the age impl where {@code cellar-cipher-age} is
+   * provisioned, else the passphrase stand-in. NON-BLOCKING and OPTIONAL, unlike {@link #resolve}:
+   * the cipher is absent in every world that does not stage the age bundle (all the isolated
+   * tests), so a blocking await + throw would stall each root run for the timeout and then fail. A
+   * missing cipher is legitimate — the built-in {@link PassphraseCellarCipher} fills in. Dual-realm
+   * by the same discriminant as {@link #resolve}: a host-flat root looks up through the world
+   * connection's context, an in-container scion through its own registry. The age
+   * {@code @Component} is {@code immediate}, so it stays active for its bundle's whole life — a
+   * bare get/unget here hands back a live instance, not a use-count-deactivated one.
+   */
+  private static CellarCipher resolveCipher(ExtensionContext context) {
+    final OsgiConnection connection =
+        context
+            .getStore(BaseWorldExtension.NAMESPACE)
+            .get(BaseWorldExtension.CONNECTION, OsgiConnection.class);
+    if (connection != null) {
+      final BundleContext bundleContext = connection.context();
+      final ServiceReference<CellarCipher> reference =
+          bundleContext.getServiceReference(CellarCipher.class);
+      if (reference == null) {
+        return new PassphraseCellarCipher();
+      }
+      try {
+        final CellarCipher service = bundleContext.getService(reference);
+        return service != null ? service : new PassphraseCellarCipher();
+      } finally {
+        // The age component is immediate — active for the bundle's life — so ungetting now leaves
+        // the returned instance valid; it only drops this lookup's use-count.
+        bundleContext.ungetService(reference);
+      }
+    }
+    try (ScenarioRegistry registry = ScenarioRegistry.of(context.getRequiredTestInstance())) {
+      return registry.optional(CellarCipher.class).orElseGet(PassphraseCellarCipher::new);
     }
   }
 }

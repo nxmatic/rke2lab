@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
 import io.nxmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.nxmatic.rke2lab.seed.broker.port.Parcel;
@@ -46,7 +47,7 @@ class CodecCellarSealTest {
   @Test
   void aSealedStoreLeavesCiphertextInTheBackendAndFetchReveals() {
     final CapturingOpaque backend = new CapturingOpaque();
-    final CodecCellar cellar = new CodecCellar(backend);
+    final CodecCellar cellar = new CodecCellar(backend, new PassphraseCellarCipher());
     final Secret secret = new Secret("-----BEGIN KEY-----topsecret");
 
     cellar.store(PARCEL, Coord.SECRET, secret, Sensitivity.SEALED);
@@ -65,7 +66,7 @@ class CodecCellarSealTest {
   @Test
   void aPlainStoreLeavesTheHarvestInClear() {
     final CapturingOpaque backend = new CapturingOpaque();
-    final CodecCellar cellar = new CodecCellar(backend);
+    final CodecCellar cellar = new CodecCellar(backend, new PassphraseCellarCipher());
 
     cellar.store(PARCEL, Coord.SECRET, new Secret("reservations-summary"));
 
@@ -84,7 +85,7 @@ class CodecCellarSealTest {
     // trail off the envelope the opaque backend hands back — no decode, no reveal, so a SEALED
     // value's lineage is traceable without the passphrase (§ fil-d-ariane, the durable extension).
     final CapturingOpaque backend = new CapturingOpaque();
-    final CodecCellar cellar = new CodecCellar(backend);
+    final CodecCellar cellar = new CodecCellar(backend, new PassphraseCellarCipher());
     final Trail trail =
         new Trail(
             List.of(

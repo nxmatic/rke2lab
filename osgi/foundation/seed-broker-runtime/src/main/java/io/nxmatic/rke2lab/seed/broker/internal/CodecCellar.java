@@ -16,6 +16,7 @@ import java.util.Optional;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
 
 /**
  * The TYPED cellar realisation — a DECORATOR over the opaque one. It takes an {@link OpaqueCellar}
@@ -34,13 +35,21 @@ public final class CodecCellar implements Cellar {
 
   private final OpaqueCellar opaque;
   private final SeedCodec codec = new SeedCodec();
-  // The mono clean/smudge filter (§ cellar-secrets). Sealing happens HERE, OSGi-side, before the
-  // envelope crosses to the host backend — so a SEALED harvest's plaintext never leaves the realm.
-  private final CellarCipher cipher = new PassphraseCellarCipher();
+  // The clean/smudge filter (§ cellar-secrets). Sealing happens HERE, OSGi-side, before the
+  // envelope
+  // crosses to the host backend — so a SEALED harvest's plaintext never leaves the realm. The
+  // cipher
+  // is the injected CellarCipher service (age) when its bundle is provisioned; where it is absent
+  // the
+  // mono passphrase stand-in fills in.
+  private final CellarCipher cipher;
 
   @Activate
-  public CodecCellar(@Reference OpaqueCellar opaque) {
+  public CodecCellar(
+      @Reference OpaqueCellar opaque,
+      @Reference(cardinality = ReferenceCardinality.OPTIONAL) CellarCipher cipher) {
     this.opaque = opaque;
+    this.cipher = cipher != null ? cipher : new PassphraseCellarCipher();
   }
 
   @Override
