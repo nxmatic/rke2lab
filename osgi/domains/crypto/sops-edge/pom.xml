@@ -6,11 +6,11 @@
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
-    <relativePath>../../bundle-parent/pom.xml</relativePath>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>sops-edge</artifactId>
-  <name>osgi/domains/sops-edge</name>
+  <name>osgi/domains/crypto/sops-edge</name>
   <description>The sops external edge: the single door toward the sops CLI, sealing a plaintext YAML
     for a set of age recipients. A pure point of contact (it reasons over nothing, it shells the
     tool), TOP-LEVEL like ssh-to-age-edge because sops is a generic tool — its SopsEncryptor seam is

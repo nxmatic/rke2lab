@@ -34,4 +34,13 @@ public interface NdhKeystoreReader {
 
   /** The private key of an SSH key entry — {@code keys.<keyName>.private} (OpenSSH). */
   String sshPrivate(String keyName);
+
+  /**
+   * The public key of an SSH key entry — {@code keys.<keyName>.public} (the {@code ssh-ed25519
+   * AAAA…} authorized_keys line). The seal side of {@link #sshPrivate}: the cellar cipher seals an
+   * age SSH-recipient stanza TO this public key and reveals it with the matching private, so a
+   * harvest sealed by the seed is readable by whoever holds the key — no ssh-to-age, no separate
+   * age key.
+   */
+  String sshPublic(String keyName);
 }

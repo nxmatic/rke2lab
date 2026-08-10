@@ -49,6 +49,11 @@ public final class DefaultNdhKeystoreReader implements NdhKeystoreReader {
     return text("keys", keyName, "private");
   }
 
+  @Override
+  public String sshPublic(String keyName) {
+    return text("keys", keyName, "public");
+  }
+
   private String text(String... segments) {
     final JsonNode root = read();
     JsonNode node = root;

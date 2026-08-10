@@ -1,4 +1,4 @@
--include: ../../bundle-parent/annotations.bnd
+-include: ../../../bundle-parent/annotations.bnd
 Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.sops.edge
 # Self-declares this jar as an embeddable EDGE bundle (scanned + installed under META-INF/bundles by

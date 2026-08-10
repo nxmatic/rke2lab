@@ -20,8 +20,9 @@
     jgiven-wrap shape: put jagged-x25519 (which pulls jagged-framework/api/bech32 via jagged-bom) on
     the bnd classpath, export com.exceptionfactory.jagged.* — bnd copies jagged's own bytecode into
     this one bundle — and Import-Package only the JDK (java.*, javax.crypto.*), resolved from the
-    framework/boot. Only the x25519 recipient type is carried (asymmetric seal to age recipients);
-    scrypt/ssh are not pulled.</description>
+    framework/boot. The x25519 recipient type AND the ssh-ed25519 recipient type are carried (the
+    cellar seals to / reveals with the rke2-cluster OpenSSH key directly, jagged converting it
+    internally); scrypt is not pulled.</description>
 
   <dependencies>
     <!-- jagged-x25519 on the bnd classpath so Export-Package sees its packages; its transitive
@@ -31,6 +32,13 @@
     <dependency>
       <groupId>com.exceptionfactory.jagged</groupId>
       <artifactId>jagged-x25519</artifactId>
+    </dependency>
+    <!-- jagged-ssh on the bnd classpath so Export-Package sees com.exceptionfactory.jagged.ssh.* —
+         the SSH-recipient stanzas (ssh-ed25519) the cellar seals to / reveals with, using the
+         rke2-cluster OpenSSH key directly. Pulls jagged-x25519 (its internal ed25519→X25519). -->
+    <dependency>
+      <groupId>com.exceptionfactory.jagged</groupId>
+      <artifactId>jagged-ssh</artifactId>
     </dependency>
   </dependencies>
 

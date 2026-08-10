@@ -203,6 +203,15 @@
         <artifactId>jagged-x25519</artifactId>
         <version>${jagged.version}</version>
       </dependency>
+      <!-- jagged-ssh: the age SSH-recipient support (ssh-ed25519 / ssh-rsa stanzas). It converts an
+           OpenSSH key internally (StandardEd25519KeyConverter, ed25519→X25519), so the cellar seals
+           to / reveals with the rke2-cluster SSH key DIRECTLY — no ssh-to-age tool, no separate age
+           key. Pulls jagged-x25519 (the internal X25519 agreement). -->
+      <dependency>
+        <groupId>com.exceptionfactory.jagged</groupId>
+        <artifactId>jagged-ssh</artifactId>
+        <version>${jagged.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.exceptionfactory.jagged</groupId>
         <artifactId>jagged-framework</artifactId>

@@ -176,6 +176,12 @@ public class ManifestSynthesisScenarioInContainerTest {
         throw new AssertionError(
             "the in-container synthesis read the ndh key-store, but none seeded");
       }
+
+      @Override
+      public String sshPublic(String keyName) {
+        throw new AssertionError(
+            "the in-container synthesis read the ndh key-store, but none seeded");
+      }
     };
   }
 }

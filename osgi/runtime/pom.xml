@@ -29,7 +29,6 @@
     <module>victools-wrap</module>
     <module>fabric8-wrap</module>
     <module>jagged-wrap</module>
-    <module>cellar-cipher-age</module>
     <module>junit-testkit</module>
     <module>bench</module>
   </modules>
