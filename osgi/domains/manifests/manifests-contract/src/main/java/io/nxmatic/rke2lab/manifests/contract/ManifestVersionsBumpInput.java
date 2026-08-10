@@ -21,20 +21,12 @@ import java.util.Optional;
 @SeedContract("runbook")
 public record ManifestVersionsBumpInput(@Amendment(Amendment.FACET) BumpFacet facet) {
 
-  /** The default posture: report only ({@code apply=false}), a {@code minor} ceiling, all. */
-  public static ManifestVersionsBumpInput defaults() {
-    return new ManifestVersionsBumpInput(BumpFacet.defaults());
-  }
-
   /**
    * The bump policy the operator carries — the single {@link Amendment#FACET} component so the role
    * binds to ONE field. {@code level} is the bump CEILING; {@code apply} writes the change (else
-   * reports); {@code component} narrows to one {@link Component}, empty for all.
+   * reports); {@code component} narrows to one {@link Component}, empty for all. The sower (the
+   * {@code manifests-cli versions} verb) builds it and sows it — a mandatory FACET, no door
+   * default.
    */
-  public record BumpFacet(BumpLevel level, boolean apply, Optional<Component> component) {
-
-    public static BumpFacet defaults() {
-      return new BumpFacet(BumpLevel.MINOR, false, Optional.empty());
-    }
-  }
+  public record BumpFacet(BumpLevel level, boolean apply, Optional<Component> component) {}
 }

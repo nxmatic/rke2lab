@@ -24,10 +24,10 @@ import org.osgi.service.component.annotations.Reference;
  * the network blueprint from that identity and composes its probe endpoint (§ netplan the single
  * source of network-derived names; ports stay service-side).
  *
- * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes {@link
- * SystemdRunbookInput#defaults() defaults}, gathers the ambient FACET at the door, and hands both
- * to the foundation {@link AmendmentBinder}, which places the FACET role's value on the input's
- * {@code identity} field. The amended node returns under the {@code runbook} coordinate — ready to
+ * <p>The seed's payload is a {@code {role → value}} map; the reflector gathers the ambient FACET at
+ * the door and hands it to the foundation {@link AmendmentBinder}, which places the FACET role's
+ * value on the input's {@code identity} field ({@code identity} is {@code Optional} — absent binds
+ * empty, no door default). The amended node returns under the {@code runbook} coordinate — ready to
  * sow at {@code RunbookCoordinate("systemd")}, so the vocabulary reconciliation lives at the door.
  */
 @Component(service = SeedHandler.class)
@@ -66,8 +66,7 @@ public final class SystemdAmendReflector implements SeedHandler {
         .gather(new AmendCoordinate(DOMAIN))
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
-    final JsonNode defaults = codec.decode(codec.encode(SystemdRunbookInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));
   }
 

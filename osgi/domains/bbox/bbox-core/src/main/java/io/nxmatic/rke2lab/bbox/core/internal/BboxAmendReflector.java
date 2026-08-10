@@ -22,15 +22,14 @@ import org.osgi.service.component.annotations.Reference;
  * holding the router contact under the NEUTRAL {@link
  * io.nxmatic.rke2lab.seed.broker.port.Amendment#FACET} role — can fill the bbox runbook input
  * without naming the field ({@code router}). The exact twin of {@code ManifestsAmendReflector}: it
- * gathers the ambient contributions at the door and binds them onto {@link
- * BboxRunbookInput#defaults()}, so the vocabulary reconciliation lives at the door, never in the
- * runbook handler.
+ * gathers the ambient contributions at the door and binds them onto the bbox input, so the
+ * vocabulary reconciliation lives at the door, never in the runbook handler.
  *
- * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes this record's
- * {@code defaults()} and hands them + the roles to the foundation {@link AmendmentBinder}, which
- * reads the {@code @Amendment} components and places each role's value in its field. The amended
- * node is returned (opaque) under the {@code runbook} coordinate — ready to sow at {@link
- * BboxCoordinate#RUNBOOK}.
+ * <p>The seed's payload is a {@code {role → value}} map; the reflector hands the gathered + offered
+ * roles to the foundation {@link AmendmentBinder}, which places each role's value in its
+ * {@code @Amendment} field and FAILS if the mandatory {@code router} FACET was not offered (the
+ * door supplies no default). The amended node is returned (opaque) under the {@code runbook}
+ * coordinate — ready to sow at {@link BboxCoordinate#RUNBOOK}.
  */
 @Component(service = SeedHandler.class)
 public final class BboxAmendReflector implements SeedHandler {
@@ -69,8 +68,7 @@ public final class BboxAmendReflector implements SeedHandler {
         .gather(BboxCoordinate.AMEND)
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
-    final JsonNode defaults = codec.decode(codec.encode(BboxRunbookInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     // Returned under the runbook coordinate: the amended payload is ready to sow at
     // RunbookCoordinate("bbox"), the coordinate this input is the @SeedContract for.
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));

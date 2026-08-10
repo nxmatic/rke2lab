@@ -19,13 +19,5 @@ import java.util.Optional;
  * function), so this input carries no facet — where to write is the only host-held fact.
  */
 @SeedContract("runbook")
-public record NetplanRunbookInput(@Amendment(Amendment.SOIL) Optional<String> materializationRoot) {
-
-  /**
-   * The seed a scion holds before a sow arrives: an UNAMENDED soil ({@link Optional#empty()} → the
-   * scion writes into a temp dir). Never a partial instance.
-   */
-  public static NetplanRunbookInput defaults() {
-    return new NetplanRunbookInput(Optional.empty());
-  }
-}
+public record NetplanRunbookInput(
+    @Amendment(Amendment.SOIL) Optional<String> materializationRoot) {}

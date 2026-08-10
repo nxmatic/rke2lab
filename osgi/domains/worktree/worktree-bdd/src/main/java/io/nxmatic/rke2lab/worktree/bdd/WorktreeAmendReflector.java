@@ -21,12 +21,12 @@ import org.osgi.service.component.annotations.Component;
  * naming any worktree type — it hands in opaque JSON on the {@code FACET} role and the binder
  * places it in the field.
  *
- * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes {@link
- * WorktreeRunbookInput#defaults() defaults} and hands them + the roles to the foundation {@link
- * AmendmentBinder}, which reads the {@code @Amendment} components and places each role's value in
- * its field. The amended node is returned (opaque) under the {@code worktree} coordinate — ready to
- * sow at {@link io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate}. So the vocabulary
- * reconciliation lives at the door, never in the runbook handler.
+ * <p>The seed's payload is a {@code {role → value}} map; the reflector hands the offered roles to
+ * the foundation {@link AmendmentBinder}, which places each role's value in its {@code @Amendment}
+ * field ({@code gate} is {@code Optional} — absent binds empty, no door default). The amended node
+ * is returned (opaque) under the {@code worktree} coordinate — ready to sow at {@link
+ * io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate}. So the vocabulary reconciliation lives at
+ * the door, never in the runbook handler.
  */
 @Component(service = SeedHandler.class)
 public final class WorktreeAmendReflector implements SeedHandler {
@@ -54,8 +54,7 @@ public final class WorktreeAmendReflector implements SeedHandler {
           "worktree amends no input for coordinate '" + seed.coordinate() + "'");
     }
     final Map<String, JsonNode> roleValues = roleValues(codec.decode(seed.payload()));
-    final JsonNode defaults = codec.decode(codec.encode(WorktreeRunbookInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));
   }
 

@@ -21,11 +21,11 @@ import org.osgi.service.component.annotations.Reference;
  * it serves {@link AmendCoordinate}{@code ("cluster")} so the host's {@code FACET} (the published
  * kubeconfig path) fills the readiness runbook input without the host naming a cluster type.
  *
- * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes {@link
- * ReadinessInput#defaults() defaults}, gathers the ambient FACET at the door, merges the sower's
- * per-consult roles on top, and hands both to the foundation {@link AmendmentBinder}, which places
- * the FACET role's value on the input's {@code access} field. The amended node returns under the
- * {@code runbook} coordinate — ready to sow at {@code RunbookCoordinate("cluster")}.
+ * <p>The seed's payload is a {@code {role → value}} map; the reflector gathers the ambient FACET at
+ * the door, merges the sower's per-consult roles on top, and hands them to the foundation {@link
+ * AmendmentBinder}, which places the FACET role's value on the input's {@code access} field ({@code
+ * access} is {@code Optional} — absent binds empty, no door default). The amended node returns
+ * under the {@code runbook} coordinate — ready to sow at {@code RunbookCoordinate("cluster")}.
  */
 @Component(service = SeedHandler.class)
 public final class ClusterAmendReflector implements SeedHandler {
@@ -63,8 +63,7 @@ public final class ClusterAmendReflector implements SeedHandler {
         .gather(new AmendCoordinate(DOMAIN))
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
-    final JsonNode defaults = codec.decode(codec.encode(ReadinessInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));
   }
 

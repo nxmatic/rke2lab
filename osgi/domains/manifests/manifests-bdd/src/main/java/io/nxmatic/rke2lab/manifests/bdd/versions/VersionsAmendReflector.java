@@ -36,8 +36,7 @@ public final class VersionsAmendReflector implements SeedHandler {
   @Override
   public SeedEnvelope handle(Cellar cellar, SeedEnvelope seed) {
     final Map<String, JsonNode> roleValues = roleValues(codec.decode(seed.payload()));
-    final JsonNode defaults = codec.decode(codec.encode(ManifestVersionsBumpInput.defaults()));
-    final JsonNode amended = binder.bind(ManifestVersionsBumpInput.class, defaults, roleValues);
+    final JsonNode amended = binder.bind(ManifestVersionsBumpInput.class, roleValues);
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));
   }
 

@@ -21,11 +21,11 @@ import org.osgi.service.component.annotations.Reference;
  * Netplan's contribution of the amend verb: it serves {@code AmendCoordinate("netplan")} so a sower
  * — holding a value under a NEUTRAL role ({@code soil}) — can fill the netplan runbook input
  * without naming the field ({@code materializationRoot}). Mirrors {@code ManifestsAmendReflector}:
- * it serialises {@link NetplanRunbookInput#defaults()} and hands them + the sower's roles to the
- * foundation {@link AmendmentBinder}, which reads the {@code @Amendment} components and places each
- * role's value in its field. The amended node is returned under the {@code runbook} coordinate,
- * ready to sow at {@link NetplanCoordinate#RUNBOOK}. So the vocabulary reconciliation lives at the
- * door, never in the runbook handler.
+ * it hands the gathered + offered roles to the foundation {@link AmendmentBinder}, which places
+ * each role's value in its {@code @Amendment} field ({@code materializationRoot} is {@code
+ * Optional} — absent binds empty, no door default). The amended node is returned under the {@code
+ * runbook} coordinate, ready to sow at {@link NetplanCoordinate#RUNBOOK}. So the vocabulary
+ * reconciliation lives at the door, never in the runbook handler.
  */
 @Component(service = SeedHandler.class)
 public final class NetplanAmendReflector implements SeedHandler {
@@ -63,8 +63,7 @@ public final class NetplanAmendReflector implements SeedHandler {
         .gather(NetplanCoordinate.AMEND)
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
-    final JsonNode defaults = codec.decode(codec.encode(NetplanRunbookInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));
   }
 

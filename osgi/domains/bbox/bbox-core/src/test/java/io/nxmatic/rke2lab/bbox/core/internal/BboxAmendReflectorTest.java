@@ -52,18 +52,14 @@ class BboxAmendReflectorTest {
   }
 
   @Test
-  void an_unamended_input_keeps_the_default_router() {
+  void an_unamended_input_fails_because_the_router_facet_is_mandatory() {
     final BboxAmendReflector reflector = new BboxAmendReflector(ambient(Map.of()));
 
-    final BboxRunbookInput bound =
-        CODEC.decode(
-            reflector.handle(RefusingCellar.INSTANCE, trigger("runbook")).payload(),
-            BboxRunbookInput.class);
-
-    assertEquals(
-        BboxRunbookInput.defaults().router(),
-        bound.router(),
-        "an unamended input keeps its default router (public uri, absent password)");
+    // BboxRunbookInput.router is a non-Optional FACET — the door supplies no default, so a sower
+    // that offers no FACET fails loud rather than silently getting the public-uri marker.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> reflector.handle(RefusingCellar.INSTANCE, trigger("runbook")));
   }
 
   @Test

@@ -135,8 +135,8 @@ public class NetplanCliScenario
     @As("the blueprint is sown")
     public When the_blueprint_is_sown() {
       // The only amendment the CLI carries is the SOIL — the plot the scion writes blueprint.json
-      // into. The rest of NetplanRunbookInput falls to the scion's defaults() at the reconcile
-      // door.
+      // into, and NetplanRunbookInput's only component (an Optional; absent → the scion's temp
+      // dir). The blueprint itself is derived in-container, so there is nothing else to sow.
       final Map<String, JsonNode> amendments =
           materializationRoot
               .map(root -> Map.<String, JsonNode>of(Amendment.SOIL, TextNode.valueOf(root)))

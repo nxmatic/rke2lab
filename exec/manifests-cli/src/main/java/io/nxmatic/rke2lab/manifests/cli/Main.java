@@ -1,6 +1,9 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.cli;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextScenarioWriter;
@@ -127,15 +130,78 @@ public final class Main {
   }
 
   /**
-   * The one driver-captured fact: the plot to materialise into, from {@code
-   * -Drke2lab.manifests.outdir} (the SOIL the sow carries). Absent → an empty soil (the scion
-   * surveys into a temp dir). Every other input falls to {@code ManifestsRunbookInput.defaults()}.
+   * The facts the CLI seeds so it sows a COMPLETE manifests runbook input: the {@code SOIL} (from
+   * {@code -Drke2lab.manifests.outdir}, absent → a temp survey), the {@code IDENTITY}
+   * (cluster/node, absent → the blank {@code unknown} cluster), and the mandatory {@code FACET} —
+   * the CLI is the sower, so it builds the posture itself (no door default).
    */
   private ManifestsCliRun runFromSystemProperties() {
     return ManifestsCliRun.of(
-        Optional.ofNullable(System.getProperty("rke2lab.manifests.outdir"))
-            .map(String::trim)
-            .filter(root -> !root.isEmpty()));
+        sysProperty("rke2lab.manifests.outdir"),
+        identityFrom(
+            sysProperty("rke2lab.manifests.cluster"), sysProperty("rke2lab.manifests.node")),
+        manifestsFacet());
+  }
+
+  private static Optional<String> sysProperty(String key) {
+    return Optional.ofNullable(System.getProperty(key))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty());
+  }
+
+  /**
+   * The manifests {@code FACET} the CLI sows — the {@code {publish, debug}} concern the seed flow
+   * reads from Pulumi, built here instead. Publish defaults to the operator posture (every layer on
+   * except {@code mesh}); {@code debug} defaults off. Each toggle is overridable via {@code
+   * -Drke2lab.manifests.publish.<layer>} / {@code -Drke2lab.manifests.debug.<toggle>}, so a
+   * management render can e.g. sow {@code -Drke2lab.manifests.publish.mesh=true} for the Tailscale
+   * client. The shape mirrors {@code ManifestsRunbookInput.Facets} — the membrane carries only
+   * JSON.
+   */
+  private static JsonNode manifestsFacet() {
+    final ObjectNode facet = JsonNodeFactory.instance.objectNode();
+    final ObjectNode publish = facet.putObject("publish");
+    publish.put("gitops", publishToggle("gitops", true));
+    publish.put("networking", publishToggle("networking", true));
+    publish.put("clusterApi", publishToggle("clusterApi", true));
+    publish.put("storage", publishToggle("storage", true));
+    publish.put("mesh", publishToggle("mesh", false));
+    publish.put("highAvailability", publishToggle("highAvailability", true));
+    publish.put("cicd", publishToggle("cicd", true));
+    final ObjectNode debug = facet.putObject("debug");
+    debug.putObject("mesh").put("enabled", debugToggle("mesh"));
+    debug.putObject("networking").put("enabled", debugToggle("networking"));
+    debug.putObject("nriPlugins").putObject("flox").put("enabled", debugToggle("nriPlugins.flox"));
+    return facet;
+  }
+
+  private static boolean publishToggle(String layer, boolean fallback) {
+    return sysProperty("rke2lab.manifests.publish." + layer)
+        .map(Boolean::parseBoolean)
+        .orElse(fallback);
+  }
+
+  private static boolean debugToggle(String toggle) {
+    return sysProperty("rke2lab.manifests.debug." + toggle)
+        .map(Boolean::parseBoolean)
+        .orElse(false);
+  }
+
+  /**
+   * The cluster/node identity the render is keyed on — the CLI's alignment on {@code
+   * ClusterSeedScenario}, where the identity rides the incus FACET. Both {@code -D} properties or
+   * neither: a partial identity is a misuse, not a survey, so it fails loud rather than silently
+   * rendering the blank {@code unknown} cluster.
+   */
+  private static Optional<ManifestsCliRun.Identity> identityFrom(
+      Optional<String> clusterName, Optional<String> nodeName) {
+    if (clusterName.isPresent() != nodeName.isPresent()) {
+      throw new IllegalArgumentException(
+          "manifests identity needs BOTH -Drke2lab.manifests.cluster and"
+              + " -Drke2lab.manifests.node, or neither (a bare survey render)");
+    }
+    return clusterName.flatMap(
+        cluster -> nodeName.map(node -> new ManifestsCliRun.Identity(cluster, node)));
   }
 
   private final class HelpCommand implements CliCommand {
@@ -270,7 +336,8 @@ public final class Main {
     static final class Builder implements CommandBuilder<SynthesizeCommand> {
       private final Main main;
 
-      private ManifestsCliRun run = ManifestsCliRun.of(Optional.empty());
+      private ManifestsCliRun run =
+          ManifestsCliRun.of(Optional.empty(), Optional.empty(), manifestsFacet());
 
       Builder(Main main) {
         this.main = main;

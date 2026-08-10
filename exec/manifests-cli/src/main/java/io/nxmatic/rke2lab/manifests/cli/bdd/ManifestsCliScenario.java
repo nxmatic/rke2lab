@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.manifests.cli.bdd;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.As;
@@ -24,6 +26,7 @@ import io.nxmatic.rke2lab.seed.broker.port.Amendment;
 import io.nxmatic.rke2lab.seed.broker.port.Cellar;
 import io.nxmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -108,6 +111,8 @@ public class ManifestsCliScenario
     @ProvidedScenarioState Gardening gardening;
     @ProvidedScenarioState Cellar cellar;
     @ProvidedScenarioState Optional<String> materializationRoot;
+    @ProvidedScenarioState Optional<ManifestsCliRun.Identity> identity;
+    @ProvidedScenarioState JsonNode facet;
 
     public Given i_have_access_to_the_open_gardening(
         @Hidden ManifestsCliRun run, @Hidden OsgiConnection world, @Hidden ScenarioCellar cellar) {
@@ -117,6 +122,8 @@ public class ManifestsCliScenario
       this.gardening = Gardening.over(world);
       this.cellar = cellar;
       this.materializationRoot = run.materializationRoot();
+      this.identity = run.identity();
+      this.facet = run.facet();
       // Publish the run's durable backend for the ROOT drain ScenarioCellarExtension performs at
       // the
       // end. manifests-cli is a standalone synthesis with no persistent commissioner (no Pulumi),
@@ -136,22 +143,30 @@ public class ManifestsCliScenario
     @ScenarioState Gardening gardening;
     @ScenarioState Cellar cellar;
     @ScenarioState Optional<String> materializationRoot;
+    @ScenarioState Optional<ManifestsCliRun.Identity> identity;
+    @ScenarioState JsonNode facet;
     @ProvidedScenarioState String runbook;
 
     @As("the manifests are sown")
     public When the_manifests_are_sown() {
-      // The only amendment the CLI carries is the SOIL — the plot to materialise into. The rest of
-      // ManifestsRunbookInput (which layers publish, which debug) falls to the scion's defaults()
-      // at
-      // the reconcile door. An empty soil (no -Drke2lab.manifests.outdir) sows an empty trigger;
+      // The CLI sows a COMPLETE manifests input, honouring the contract the amend door enforces:
       // the
-      // scion materialises into a temp dir (a bare survey).
-      final Map<String, JsonNode> amendments =
-          materializationRoot
-              .map(root -> Map.<String, JsonNode>of(Amendment.SOIL, TextNode.valueOf(root)))
-              .orElseGet(Map::of);
+      // mandatory FACET (the CLI's own posture, always), plus the Optional SOIL (the plot; absent →
+      // a temp survey) and IDENTITY (the cluster/node; absent → the blank `unknown` cluster). No
+      // door default covers a missing FACET — the sower fills it.
+      final Map<String, JsonNode> amendments = new LinkedHashMap<>();
+      amendments.put(Amendment.FACET, facet);
+      materializationRoot.ifPresent(root -> amendments.put(Amendment.SOIL, TextNode.valueOf(root)));
+      identity.ifPresent(id -> amendments.put(Amendment.IDENTITY, identityNode(id)));
       this.runbook = gardening.sow("manifests", amendments, cellar);
       return self();
+    }
+
+    private static JsonNode identityNode(ManifestsCliRun.Identity identity) {
+      final ObjectNode node = JsonNodeFactory.instance.objectNode();
+      node.put("clusterName", identity.clusterName());
+      node.put("nodeName", identity.nodeName());
+      return node;
     }
   }
 

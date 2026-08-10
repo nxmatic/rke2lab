@@ -25,12 +25,14 @@ import org.osgi.service.component.annotations.Reference;
  * {role → value}} map onto it (fill it by role). Both reflect OSGi-side, where the wire-record's
  * class lives; the caller names only a role.
  *
- * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes this record's
- * {@code defaults()} and hands them + the roles to the foundation {@link AmendmentBinder}, which
- * reads the {@code @Amendment} components and places each role's value in its field. The amended
- * node is returned (opaque) under the {@code runbook} coordinate — ready to sow at {@link
- * io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate}. So the vocabulary reconciliation lives at
- * the door (the broker routes the amend verb here), never in the runbook handler.
+ * <p>The seed's payload is a {@code {role → value}} map; the reflector hands the gathered + offered
+ * roles to the foundation {@link AmendmentBinder}, which places each role's value in its
+ * {@code @Amendment} field and FAILS if the mandatory FACET ({@code facets}) was not offered by any
+ * sower (the door supplies no default — {@code SOIL} and {@code IDENTITY} are {@code Optional} and
+ * may be absent). The amended node is returned (opaque) under the {@code runbook} coordinate —
+ * ready to sow at {@link io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate}. So the vocabulary
+ * reconciliation lives at the door (the broker routes the amend verb here), never in the runbook
+ * handler.
  */
 @Component(service = SeedHandler.class)
 public final class ManifestsAmendReflector implements SeedHandler {
@@ -71,8 +73,7 @@ public final class ManifestsAmendReflector implements SeedHandler {
         .gather(ManifestsCoordinate.AMEND)
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
-    final JsonNode defaults = codec.decode(codec.encode(ManifestsRunbookInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     // Returned under the runbook coordinate: the amended payload is ready to sow at
     // RunbookCoordinate("manifests"), the coordinate this input is the @SeedContract for.
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));

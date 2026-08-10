@@ -25,12 +25,13 @@ import org.osgi.service.component.annotations.Reference;
  * BootstrapConfig}; the scion reconstructs the topology, picks its slot, and derives the manifests
  * SOIL itself (§ host-cellar-realisation, the whole topology computed OSGi-side).
  *
- * <p>The seed's payload is a {@code {role → value}} map; the reflector serializes {@link
- * IncusRunbookInput#defaults() defaults} and hands them + the roles to the foundation {@link
- * AmendmentBinder}, which reads the {@code @Amendment} components and places each role's value in
- * its field. The amended node is returned (opaque) under the {@code runbook} coordinate — ready to
- * sow at {@link io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate}. So the vocabulary
- * reconciliation lives at the door, never in the runbook handler.
+ * <p>The seed's payload is a {@code {role → value}} map; the reflector hands the gathered + offered
+ * roles to the foundation {@link AmendmentBinder}, which places each role's value in its
+ * {@code @Amendment} field. Both incus amendments ({@code facet}, {@code image}) are {@code
+ * Optional}, so an absent role binds empty — nothing here is mandatory. The amended node is
+ * returned (opaque) under the {@code runbook} coordinate — ready to sow at {@link
+ * io.nxmatic.rke2lab.seed.broker.port.RunbookCoordinate}. So the vocabulary reconciliation lives at
+ * the door, never in the runbook handler.
  */
 @Component(service = SeedHandler.class)
 public final class IncusAmendReflector implements SeedHandler {
@@ -70,8 +71,7 @@ public final class IncusAmendReflector implements SeedHandler {
         .gather(new AmendCoordinate(DOMAIN))
         .forEach((role, json) -> roleValues.put(role, codec.decode(json)));
     roleValues.putAll(roleValues(codec.decode(seed.payload())));
-    final JsonNode defaults = codec.decode(codec.encode(IncusRunbookInput.defaults()));
-    final JsonNode amended = binder.bind(bearer, defaults, roleValues);
+    final JsonNode amended = binder.bind(bearer, roleValues);
     // Returned under the runbook coordinate: the amended payload is ready to sow at
     // RunbookCoordinate("incus-provision"), the coordinate this input is the @SeedContract for.
     return new SeedEnvelope(DOMAIN, seed.coordinate(), codec.encode(amended));

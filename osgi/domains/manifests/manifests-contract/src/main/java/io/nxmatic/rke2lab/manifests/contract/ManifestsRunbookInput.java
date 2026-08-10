@@ -46,6 +46,10 @@ public record ManifestsRunbookInput(
     @Amendment(Amendment.SOIL) Optional<String> materializationRoot,
     @Amendment(Amendment.IDENTITY) Optional<Identity> identity) {
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /**
    * The complete facet with every concern at its default — the operator's usual posture, debug off,
    * and an UNAMENDED soil ({@link Optional#empty()} {@code materializationRoot} → the scion surveys
@@ -53,7 +57,39 @@ public record ManifestsRunbookInput(
    * component is a complete sub-facet, so no incomplete state ever exists.
    */
   public static ManifestsRunbookInput defaults() {
-    return new ManifestsRunbookInput(Facets.defaults(), Optional.empty(), Optional.empty());
+    return builder().build();
+  }
+
+  /**
+   * Named construction for the runbook input's three heterogeneous amendments. Field defaults are
+   * the seed a scion holds before a sow arrives — default facets, an UNAMENDED soil, no identity —
+   * so a caller names only the amendment it fills.
+   */
+  public static final class Builder {
+    private Facets facets = Facets.defaults();
+    private Optional<String> materializationRoot = Optional.empty();
+    private Optional<Identity> identity = Optional.empty();
+
+    private Builder() {}
+
+    public Builder facets(Facets facets) {
+      this.facets = facets;
+      return this;
+    }
+
+    public Builder materializationRoot(String materializationRoot) {
+      this.materializationRoot = Optional.of(materializationRoot);
+      return this;
+    }
+
+    public Builder identity(Identity identity) {
+      this.identity = Optional.of(identity);
+      return this;
+    }
+
+    public ManifestsRunbookInput build() {
+      return new ManifestsRunbookInput(facets, materializationRoot, identity);
+    }
   }
 
   /**
@@ -65,8 +101,33 @@ public record ManifestsRunbookInput(
    */
   public record Facets(PublishFacet publish, DebugFacet debug) {
 
+    public static Builder builder() {
+      return new Builder();
+    }
+
     public static Facets defaults() {
-      return new Facets(PublishFacet.defaults(), DebugFacet.disabled());
+      return builder().build();
+    }
+
+    public static final class Builder {
+      private PublishFacet publish = PublishFacet.defaults();
+      private DebugFacet debug = DebugFacet.disabled();
+
+      private Builder() {}
+
+      public Builder publish(PublishFacet publish) {
+        this.publish = publish;
+        return this;
+      }
+
+      public Builder debug(DebugFacet debug) {
+        this.debug = debug;
+        return this;
+      }
+
+      public Facets build() {
+        return new Facets(publish, debug);
+      }
     }
   }
 
@@ -98,8 +159,71 @@ public record ManifestsRunbookInput(
       boolean highAvailability,
       boolean cicd) {
 
+    public static Builder builder() {
+      return new Builder();
+    }
+
+    /** The operator's usual posture — every domain on except {@code mesh}. */
     public static PublishFacet defaults() {
-      return new PublishFacet(true, true, true, true, false, true, true);
+      return builder().build();
+    }
+
+    /**
+     * Named construction for the seven publish toggles: the canonical constructor's positional
+     * booleans do not say which flag is which, so every factory routes through here. Field defaults
+     * mirror {@link #defaults()} — all on except {@code mesh} — so a caller names only what
+     * diverges.
+     */
+    public static final class Builder {
+      private boolean gitops = true;
+      private boolean networking = true;
+      private boolean clusterApi = true;
+      private boolean storage = true;
+      private boolean mesh = false;
+      private boolean highAvailability = true;
+      private boolean cicd = true;
+
+      private Builder() {}
+
+      public Builder gitops(boolean gitops) {
+        this.gitops = gitops;
+        return this;
+      }
+
+      public Builder networking(boolean networking) {
+        this.networking = networking;
+        return this;
+      }
+
+      public Builder clusterApi(boolean clusterApi) {
+        this.clusterApi = clusterApi;
+        return this;
+      }
+
+      public Builder storage(boolean storage) {
+        this.storage = storage;
+        return this;
+      }
+
+      public Builder mesh(boolean mesh) {
+        this.mesh = mesh;
+        return this;
+      }
+
+      public Builder highAvailability(boolean highAvailability) {
+        this.highAvailability = highAvailability;
+        return this;
+      }
+
+      public Builder cicd(boolean cicd) {
+        this.cicd = cicd;
+        return this;
+      }
+
+      public PublishFacet build() {
+        return new PublishFacet(
+            gitops, networking, clusterApi, storage, mesh, highAvailability, cicd);
+      }
     }
   }
 
@@ -111,25 +235,52 @@ public record ManifestsRunbookInput(
    */
   public record DebugFacet(Toggle mesh, Toggle networking, NriPlugins nriPlugins) {
 
+    public static Builder builder() {
+      return new Builder();
+    }
+
     public static DebugFacet disabled() {
-      return new DebugFacet(Toggle.off(), Toggle.off(), NriPlugins.off());
+      return builder().build();
+    }
+
+    /**
+     * Named construction over the three debug switches as plain booleans — the caller says {@code
+     * mesh}/{@code networking}/{@code flox}, and the builder wraps them into the yaml-mirroring
+     * {@link Toggle}/{@link NriPlugins} wire records so no call site handles that nesting. Every
+     * switch defaults off.
+     */
+    public static final class Builder {
+      private boolean mesh = false;
+      private boolean networking = false;
+      private boolean flox = false;
+
+      private Builder() {}
+
+      public Builder mesh(boolean mesh) {
+        this.mesh = mesh;
+        return this;
+      }
+
+      public Builder networking(boolean networking) {
+        this.networking = networking;
+        return this;
+      }
+
+      public Builder flox(boolean flox) {
+        this.flox = flox;
+        return this;
+      }
+
+      public DebugFacet build() {
+        return new DebugFacet(
+            new Toggle(mesh), new Toggle(networking), new NriPlugins(new Toggle(flox)));
+      }
     }
   }
 
   /** The {@code {enabled: bool}} sub-object the yaml wraps each debug toggle in. */
-  public record Toggle(boolean enabled) {
-    private static final Toggle OFF = new Toggle(false);
-
-    public static Toggle off() {
-      return OFF;
-    }
-  }
+  public record Toggle(boolean enabled) {}
 
   /** The {@code debug.nriPlugins} sub-map — a single {@code flox} toggle. */
-  public record NriPlugins(Toggle flox) {
-
-    public static NriPlugins off() {
-      return new NriPlugins(Toggle.off());
-    }
-  }
+  public record NriPlugins(Toggle flox) {}
 }
