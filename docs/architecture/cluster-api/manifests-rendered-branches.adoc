@@ -1,0 +1,406 @@
+= Manifests Rendered Branches — the `manifests/*` GitOps delivery model
+:toc: left
+:toclevels: 3
+
+This document specifies HOW the manifests the `manifests` module synthesises reach the clusters
+that consume them. It is the missing companion to
+link:management-workload-topology.adoc[Management / Workload Topology] (the *what* — which clusters
+exist) and to link:vcluster-gitops-architecture.adoc[the vCluster GitOps Architecture] (the
+*per-cluster* Flux/vCluster pattern): this doc is the *delivery seam* between them.
+
+It supersedes the earlier assumptions that (a) the rendered manifests live under a `gitops/` *path*
+on `main`, (b) the management cluster runs no Flux, and (c) `seed-mgmt` imperatively `kubectl
+apply`s the workload CAPI CRs at a "Stage B". All three are revised here.
+
+== Overview
+
+`manifests` (the CDK8s Java module) is the *single source of truth* for manifest generation. But a
+source of truth is not a delivery mechanism: something has to carry the RENDERED YAML to each
+cluster and keep it reconciled. This doc defines that carrier.
+
+The shape is a *rendered-branch* GitOps model:
+
+* **`main`** holds the *source* — the CDK8s Java + the input config. Humans edit `main`; nothing
+  applies from it.
+* **`manifests/<host>-<role>`** branches hold the *rendered* YAML — one branch per cluster. The
+  `manifests` module regenerates a cluster's tree and **force-pushes** its branch. These branches
+  are ephemeral desired-state, not history — a force-push is expected and correct.
+* **Every cluster runs Flux** (in a `gitops` vCluster — see <<uniform>>) whose `FluxRoot` tracks
+  *its own* branch `manifests/<host>-<role>` and reconciles it.
+
+So the split is not "which domains the master publishes into its `server-manifests`". It is: **what
+`manifests` renders into `manifests/<host>-<role>`, per cluster** — and Flux, uniformly, applies it.
+
+== The branch model
+
+[cols="1,2,3",options="header"]
+|===
+|Branch |Carries |Reconciled by
+
+|`main`
+|Source: CDK8s Java + input config
+|Nobody applies it — it is the build input
+
+|`manifests/nikopol-mgmt`
+|The management cluster's own definition, in the `seed-master` *sow* shape: single-node RKE2 bootstrap + CAPI operator + the four providers + base + Tailscale client + the `FluxRoot` seed
+|**pulumi / `seed-master`** — sows the management cluster
+
+|`manifests/nikopol-wrkld`
+|The workload's definition as **CAPI CRs**: `Cluster` / `LXCCluster` / `RKE2ControlPlane` / `LXCMachineTemplate` / `MachineDeployment`
+|**CAPI / CAPN** — reconcile the CRs into the nikopol-wrkld nodes
+
+|`manifests/bioskop-wrkld`
+|idem — the workload's CAPI CRs
+|**CAPI / CAPN** — dormant until the bioskop bare-metal is up
+|===
+
+The consumer is per-branch and drives the branch's shape (§ <<render-inputs,output shape>>): a
+`-mgmt` branch carries the `seed-master` sow shape, a `-wrkld` branch carries CAPI CRs. This is the
+*near-term* wiring ("pour l'instant"): the cluster-*creation* content is consumed by `seed-master`
+(management) and CAPI/CAPN (workloads). The in-cluster **app stack** (gitops · storage · cicd …) and
+**Flux everywhere** (including the management cluster running its own Flux — see
+<<function-of-git>>) is the *target* layer, delivered per cluster once the creation flow is proven —
+it is not what consumes these branches today.
+
+The namespace names the *producer* (`manifests`), not the consumer (`gitops`): the branch holds
+rendered manifests, and Flux is only their reader. Per-cluster isolation is a *branch* concern, not
+a directory concern — a render force-pushes ONE branch, so one cluster's regeneration never moves
+the `GitRepository` revision the other clusters' consumers watch.
+
+The deeper win is *correctness*: the branch boundary **mirrors the physical cluster boundary**. Each
+consumer reads only its own branch — there is no shared tree in which a mis-scoped resource could
+land in the wrong cluster. A directory layout (`clusters/<host>-<role>/` on one branch) leaves that
+failure mode open (a wrong path, a stray file, a `prune` that spans siblings); a branch per cluster
+closes it structurally. The physical separation of the clusters is replicated in the git model, so
+"which cluster does this resource belong to?" is answered by *where it can even exist*, not by a
+path convention a render could get wrong.
+
+[[views]]
+== Architecture views
+
+=== System context (C4 L1)
+
+`manifests` (the SSOT) reads `main` and force-pushes one rendered branch per cluster; each branch is
+consumed by the actor that grows that cluster — `seed-master` for `-mgmt`, CAPI/CAPN for `-wrkld`.
+
+[mermaid,manifests-rendered-branches-context,svg]
+----
+flowchart LR
+  OP["Operator"]
+  MAIN[("git · main<br/>source: CDK8s + config")]
+  MOD["manifests<br/>SSOT render"]
+  subgraph REN["git · manifests/* — rendered, force-pushed per cluster"]
+    direction TB
+    BM[("manifests/nikopol-mgmt<br/>seed-master sow")]
+    BW1[("manifests/nikopol-wrkld<br/>CAPI CRs")]
+    BW2[("manifests/bioskop-wrkld<br/>CAPI CRs")]
+  end
+  SM["pulumi / seed-master"]
+  MG["management cluster<br/>CAPI · CAPN · CAPRKE2"]
+  W1["nikopol-wrkld"]
+  W2["bioskop-wrkld"]
+  OP -->|edits| MAIN
+  MAIN -->|reads| MOD
+  MOD -->|"render + force-push"| BM
+  MOD -->|"render + force-push"| BW1
+  MOD -->|"render + force-push"| BW2
+  BM -->|"consumed by"| SM
+  SM -->|"sows (nix-seed)"| MG
+  BW1 -->|"consumed by CAPI/CAPN"| MG
+  BW2 -.->|"consumed by CAPI/CAPN (dormant)"| MG
+  MG ==>|"greenfield-create over mesh"| W1
+  MG -.->|"greenfield-create (bioskop up)"| W2
+  classDef src stroke:#888,stroke-dasharray:4 3;
+  classDef mgmt stroke:#2f6f8f,stroke-width:1.6px;
+  classDef wl stroke:#2e7d5b,stroke-width:1.2px;
+  class MAIN,MOD src; class BM,SM,MG mgmt; class BW1,BW2,W1,W2 wl;
+----
+
+*Legend*: `manifests` is the only writer of `manifests/*`. A `-mgmt` branch (blue) is consumed by
+`seed-master`, which sows the single management node; a `-wrkld` branch (green) is consumed by
+CAPI/CAPN in that management cluster, which greenfield-creates the workload (heavy arrows). Dashed =
+dormant until the bioskop bare-metal is up.
+
+=== Container view (C4 L2)
+
+What each container is, and what crosses between them: the render engine, the branches (with their
+payload), the `seed-master` host, and the clusters.
+
+[mermaid,manifests-rendered-branches-containers,svg]
+----
+flowchart TB
+  MAIN[("main — source")]
+  MOD["manifests<br/>CDK8s render engine"]
+  MAIN --> MOD
+  MOD -->|"sow shape"| BM[("manifests/nikopol-mgmt")]
+  MOD -->|"CAPI CRs"| BW[("manifests/&lt;host&gt;-wrkld")]
+  subgraph HOST["seed-master host · pulumi"]
+    SM["seed-master (Stage A)"]
+  end
+  BM -->|reads| SM
+  subgraph MGMT["management cluster · single node"]
+    RKE2M["RKE2 server"]
+    CTRL["CAPI · CAPN · CAPRKE2"]
+    FRT["FluxRoot (target)"]
+  end
+  SM -->|"local-only: RKE2 config + FluxRoot + providers"| RKE2M
+  RKE2M --> CTRL
+  BW -->|"CRs applied to the mgmt API"| CTRL
+  subgraph WL["workload clusters"]
+    W1["nikopol-wrkld<br/>master+peer1+peer2 (+workers)"]
+    W2["bioskop-wrkld"]
+  end
+  CTRL ==>|"init + scale + provision Incus nodes"| W1
+  CTRL -.-> W2
+  classDef src stroke:#888,stroke-dasharray:4 3;
+  classDef mgmt stroke:#2f6f8f,stroke-width:1.6px;
+  classDef wl stroke:#2e7d5b,stroke-width:1.2px;
+  class MAIN,MOD src; class BM,SM,RKE2M,CTRL,FRT mgmt; class BW,W1,W2 wl;
+----
+
+=== Component view (C4 L3) — inside `manifests`
+
+The render takes the cluster descriptor and two `how` facets (output shape per consumer, delivery
+target), and emits the per-cluster branch (or, at bootstrap, the local seed).
+
+[mermaid,manifests-rendered-branches-components,svg]
+----
+flowchart TB
+  REG["cluster registry<br/>{ host, role, topology }"]
+  SEL["role → consumer"]
+  PROJ["topology projection"]
+  REG --> SEL --> PROJ --> SHAPE{"output shape"}
+  SHAPE -->|"role=mgmt"| SOW["seed-master sow<br/>RKE2 + providers + FluxRoot"]
+  SHAPE -->|"role=wrkld"| CRS["CAPI CRs<br/>Cluster · RKE2ControlPlane · LXCMachineTemplate · MachineDeployment"]
+  SOW --> DELIV{"delivery"}
+  CRS --> DELIV
+  DELIV -->|"branch (steady)"| FP["force-push<br/>manifests/&lt;host&gt;-&lt;role&gt;"]
+  DELIV -->|"local-only (bootstrap)"| SRV["node server-manifests<br/>FluxRoot + Flux seed"]
+----
+
+=== Orchestration (sequence)
+
+[mermaid,manifests-rendered-branches-sequence,svg]
+----
+sequenceDiagram
+  actor OP as Operator
+  participant M as manifests (SSOT)
+  participant G as git · manifests/*
+  participant SM as seed-master (Stage A)
+  participant MG as management cluster
+  participant WL as workload clusters
+  OP->>M: commit source to main
+  M->>G: render + force-push manifests/nikopol-mgmt (sow shape)
+  M->>G: render + force-push manifests/nikopol-wrkld (CAPI CRs)
+  SM->>G: read manifests/nikopol-mgmt
+  SM->>MG: sow single node — local-only (RKE2 + FluxRoot + providers)
+  Note over MG: CAPI · CAPN · CAPRKE2 come up
+  SM->>MG: apply manifests/nikopol-wrkld CRs (pour l'instant)
+  MG->>WL: CAPI/CAPN greenfield-create nodes over the mesh
+  WL-->>MG: control-plane ready → workload kubeconfig
+  Note over MG,WL: target — Flux per cluster reconciles the app stack from its branch
+----
+
+[[uniform]]
+== One architecture for every cluster
+
+Every cluster — management included — runs Flux inside a `gitops` vCluster (the Option-D pattern
+from link:vcluster-gitops-architecture.adoc[the vCluster GitOps Architecture], now applied
+uniformly). There is no "management is special, it has no Flux" exception: the management cluster is
+*just another cluster* whose `gitops` vCluster's Flux tracks `manifests/nikopol-mgmt`.
+
+Running Flux in a vCluster (rather than directly in the core's `flux-system`) buys the same
+Option-D benefits everywhere: isolation (a Flux failure is contained), reentrancy (a `gitops-next`
+vCluster can test a Flux upgrade against a copy), and uniformity (the management plane is managed
+"like just another vCluster"). The vCluster provisions *pods*, never machines, so it never
+re-introduces CAPI into a cluster that should not run it.
+
+[mermaid,manifests-rendered-branches-fluxroot,svg]
+----
+flowchart TB
+  subgraph C["any cluster &lt;host&gt;-&lt;role&gt;"]
+    subgraph GV["gitops vCluster"]
+      FLUX["Flux"]
+      FR["FluxRoot:<br/>GitRepository(ref.branch=manifests/&lt;host&gt;-&lt;role&gt;, path=./)<br/>+ root Kustomization (prune, decryption: sops)"]
+      PK["parent-cluster-kubeconfig<br/>→ this cluster's core"]
+    end
+    CORE["cluster core"]
+  end
+  BR[("manifests/&lt;host&gt;-&lt;role&gt;")]
+  BR -->|tracks| FR
+  FR --> FLUX
+  FLUX -->|"applies via parent-cluster-kubeconfig"| CORE
+  FLUX -.->|holds| PK
+----
+
+`FluxRoot` is the chicken-and-egg solver: it is the single bootstrap object (a `GitRepository`
+pointing at the cluster's rendered branch + a root `Kustomization` with `prune` and SOPS
+decryption) that, once seeded, lets Flux self-manage everything else from the branch.
+
+== The management cluster is function-of-git too
+
+Because the management cluster now runs Flux against `manifests/nikopol-mgmt`, the workload CAPI CRs
+are *GitOps-reconciled by the management cluster's Flux* — not imperatively pushed. This revives, in
+its correct form, the "GitOps source" role the CAPI CRs were always documented to have: a controller
+finally pulls them, and that controller is Flux.
+
+Consequences:
+
+* **The imperative "Stage B `kubectl apply`" dissolves into Flux.** The old
+  `stagea-stageb-handoff-contract` sequence (`seed-mgmt` pushing the workload CRs into the live
+  management cluster) is replaced by: the CRs live in `manifests/nikopol-mgmt`, Flux applies them,
+  CAPI reconciles them.
+* **`seed-mgmt` Stage A shrinks to two acts**: nix-seed the single management node, and bootstrap
+  `FluxRoot` (the `GitRepository` + root `Kustomization` pointing at `manifests/nikopol-mgmt`). From
+  there Flux installs the CAPI operator + providers AND applies the workload CRs — all from the
+  branch. The management cluster is reconstructible from its branch exactly like a workload.
+* **The absent bare-metal's workload is optional.** `bioskop-wrkld`'s `Cluster` CR is either carried
+  with `spec.paused: true` in `manifests/nikopol-mgmt` (defined but not reconciled) or simply
+  omitted until bioskop is up. CAPI's `paused` is the mechanism; the choice is an implementation
+  detail of the render.
+
+== The staging evolves
+
+The DARWIN-local staging (`.local.d`, see link:../osgi/host-cellar-realisation-spec.adoc[host
+Cellar realisation] and `BootstrapPaths`) currently materialises the rendered manifests into a local
+`rke2-manifests.d` (with a rotation slot / drift / `host.live.d` promotion) that a single RKE2 server
+auto-applies. Under this model that whole materialisation *leaves* `.local.d`: the synthesis renders
+the per-cluster tree and **force-pushes it to `manifests/<host>-<role>`** (into a transient git
+worktree of the branch), not into a `server-manifests` drop-in. The rotation / promotion machinery
+is replaced by the render-then-force-push of a branch. `.local.d` is **no longer the delivery
+channel**.
+
+What stays in `.local.d` is then only what legitimately does *not* belong in git — the artefacts of
+a local run, never desired state:
+
+* the **incus image** (`rootfs.squashfs`, `incus.tar.xz`, `.image.checksum.sha256`) — the canonical
+  case: a large binary build output that must never enter git;
+* the **kubeconfig** (a credential);
+* run **logs** and the rendered **runbook**.
+
+So the separation is clean: *desired state* (the rendered manifests) lives in the `manifests/*` git
+branches; *local run artefacts* (image, kubeconfig, logs) stay in the gitignored `.local.d`. The flat
+`.local.d` layout (link:management-workload-topology.adoc[one management node]) is unchanged — it
+simply sheds the manifest-materialisation trees it used to carry.
+
+== Naming
+
+Branches follow the cluster naming convention `<host>-<role>` (see
+link:management-workload-topology.adoc#naming[the topology's naming convention]), namespaced under
+`manifests/`:
+
+* `manifests/bioskop-mgmt` / `manifests/nikopol-mgmt` — the management cluster, on whichever
+  bare-metal currently hosts it.
+* `manifests/bioskop-wrkld` — the workload on bioskop.
+* `manifests/nikopol-wrkld` — the workload on nikopol.
+
+`git branch --list 'manifests/*'` enumerates the rendered clusters — the branch-per-cluster analogue
+of "see the clusters materialised".
+
+== The cluster descriptor is generic — growth ≠ function
+
+A cluster is `{ name=<host>-<role>, host, role, topology }`. The **topology** — single vs multi
+node, the control-plane count (the etcd quorum), the workers and their roles — is a *generic*
+descriptor that applies to every cluster. It is independent of *how* the cluster is grown:
+
+* the *management* cluster's topology is single-node (one control-plane, no workers, never scales —
+  it is nix-seeded and reconstructible from its branch);
+* a *workload* topology is HA (master + peer1 + peer2 = three etcd members, plus workers).
+
+`manifests` renders each cluster from `{ role, topology }`. The **growth mechanism is the consumer**
+of that render, and it is the only thing that differs per cluster: `seed-mgmt` nix-seeds the single
+management node from its rendered RKE2 config; CAPRKE2/CAPN greenfield-create a workload's nodes from
+`RKE2ControlPlane.replicas` + `MachineDeployment`. **Growing a cluster does not change how it
+functions** — the functional topology is the same descriptor whichever mechanism materialises it.
+This is why the render stays uniform across clusters even though only workloads go through CAPI.
+
+== The render's inputs beyond the descriptor
+
+Beyond the descriptor `{ host, role, topology }` (the *what*), the synthesis is parameterised by two
+further facets of *how* it renders.
+
+=== Output shape — which consumer's language
+
+A `manifests/*` branch has *no single canonical shape*: **its shape is a function of who consumes
+it.** `manifests` (the SSOT) projects the same rendered intent into the form each consumer expects,
+and a new consumer is just a new projection off the one source:
+
+* **`seed-master`** → a **sow**: the management node's RKE2 bootstrap (single-node config + the
+  `FluxRoot` seed), applied `local-only` to bring the node up. NOT CAPI CRs — the management cluster
+  is self-seeded, never a CAPI product.
+* **Flux** → **reconcilable manifests**: Kustomizations / HelmReleases / plain YAML it applies to a
+  cluster core (the app stack, the CAPI operator + providers).
+* **CAPI/CAPN** → **CRs**: `Cluster` / `LXCCluster` / `RKE2ControlPlane` / `LXCMachineTemplate` /
+  `MachineDeployment` — carried as plain manifests Flux applies, then reconciled by CAPI into nodes.
+
+Where a shape is a projection of the generic *topology* (the `seed-master` sow and the CAPI CRs), it
+is the *one* topology expressed in that consumer's language: `topology.controlPlanes=3` →
+`RKE2ControlPlane.replicas=3` for CAPI; `=1` → a single-node RKE2 config for `seed-master`. Growth ≠
+function — the same topology, one rendered form per consumer.
+
+=== Delivery target — where it lands
+
+* **`branch`** (steady state) — force-push `manifests/<host>-<role>`; Flux reconciles.
+* **`local-only`** (bootstrap) — the node's local `server-manifests`, applied by RKE2 with no git:
+  the minimal `FluxRoot` + Flux seed that breaks the chicken-and-egg. It is the *only* output applied
+  outside git; everything after is GitOps.
+
+So `manifests` renders `{ descriptor } × { output format } × { delivery }`. In practice the format
+follows the role and `local-only` is only the bootstrap seed, so the free knob is small — but naming
+the three facets keeps the synthesis honest about exactly what it is asked to produce, and it is what
+lets the *flow* be exercised (branch + either format) independently of the CAPI content maturing.
+
+== The output contract of `manifests`
+
+The `manifests` module's delivery contract is one sentence per cluster:
+
+> render the cluster `<host>-<role>` (its role-selected domain set) and force-push
+> `manifests/<host>-<role>`.
+
+The role selects the domain set (management: `cluster-api` + base + Tailscale client + the workload
+CAPI CRs; workload: the app stack, no `cluster-api`). This is the per-cluster generalisation of the
+`manifests.publish.{domain}` toggles, which move from a single global posture to a per-cluster one.
+
+== The flow stands up before CAPI
+
+The delivery seam is *decoupled from CAPI/CAPN*. Because delivery is nothing but "Flux reconciles a
+rendered branch", the WHOLE flow — `manifests` render → force-push `manifests/<host>-<role>` →
+`FluxRoot` in a `gitops` vCluster → reconcile — can be stood up and validated with ANY content,
+before a single CAPI provider exists. A management cluster's Flux reconciling `manifests/nikopol-mgmt`
+and a workload's Flux reconciling its app stack are the *same mechanism* whether or not the CAPI
+operator and workload CRs are present yet.
+
+So the rollout is two independent layers:
+
+. **The flow** — establish rendered-branch + `FluxRoot` + `gitops` vCluster delivery, testable with
+  base / app-stack content alone. This is the foundation and can be proven first.
+. **CAPI as content** — layer the CAPI operator + the four providers + the workload CRs onto
+  `manifests/<host>-<role>` as manifests the flow *carries*. CAPI is not a change to the seam; it is
+  cargo that rides it.
+
+This is why the split is worth doing now, ahead of the CAPI/CAPN work: it gives us a working,
+observable GitOps pipeline (render → branch → Flux → cluster) that the harder CAPI step then plugs
+into, rather than co-developing both at once.
+
+== Reconciliations (drifts this doc supersedes)
+
+* link:management-workload-topology.adoc[Management / Workload Topology] — its `gitops/workloads/…`
+  path becomes the branch namespace `manifests/<host>-<role>`; add "every cluster runs Flux".
+* link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership] — its "the management
+  cluster runs only CAPI/CAPN/CAPRKE2, no Flux" is revised: the management cluster runs Flux (in a
+  `gitops` vCluster) against `manifests/nikopol-mgmt`.
+* link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] — the `flux bootstrap`
+  `--branch=main --path=gitops/workloads/<workload>/…` becomes `--branch=manifests/<host>-<role>
+  --path=./`.
+* link:../bootstrap/stagea-stageb-handoff-contract.adoc[Stage A → Stage B Handoff] — the imperative
+  Stage B `apply workload CRs` step dissolves into Flux; Stage A = nix-seed + `FluxRoot` bootstrap.
+* The dead `gitops-cluster-api-transition-plan` (a memory record, no file) is superseded — its intent
+  (a controller reconciling the CAPI CRs from git) is realised here by Flux-in-mgmt.
+
+== Related Documentation
+
+* link:management-workload-topology.adoc[Management / Workload Topology] — which clusters exist and why
+* link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] — the per-cluster Flux/vCluster (Option D) pattern this generalises
+* link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] — the concrete `FluxRoot` / Kustomization shapes
+* link:../bootstrap/stagea-stageb-handoff-contract.adoc[Stage A → Stage B Handoff] — the bootstrap boundary this reframes
+* link:../osgi/manifests-bdd-spec.adoc[Manifests BDD spec] — the `manifests` synthesis scion and its bot committer

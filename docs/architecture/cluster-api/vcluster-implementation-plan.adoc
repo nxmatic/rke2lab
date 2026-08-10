@@ -70,8 +70,8 @@ Per workload, at its initial bring-up (the workload's RKE2 auto-deploy / `gitops
 vcluster connect gitops -n gitops --print > /tmp/gitops.kubeconfig
 flux bootstrap github \
   --kubeconfig=/tmp/gitops.kubeconfig \
-  --owner=nxmatic --repository=rke2lab --branch=main \
-  --path=gitops/workloads/<workload>/flux-system
+  --owner=nxmatic --repository=rke2lab --branch=manifests/<workload> \
+  --path=./flux-system
 kubectl --kubeconfig=/tmp/gitops.kubeconfig \
   create secret generic parent-cluster-kubeconfig \
   -n flux-system --from-file=kubeconfig=<workload-core-kubeconfig>

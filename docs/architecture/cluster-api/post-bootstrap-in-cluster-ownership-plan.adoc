@@ -16,6 +16,13 @@ single-node, on-demand, and holds *only* CAPI/CAPN/CAPRKE2; the GitOps / workflo
 controllers live *inside each workload cluster*.
 ====
 
+NOTE: The "no Flux in the management cluster" stance is revised by
+link:manifests-rendered-branches.adoc[Manifests Rendered Branches]: the *target* is one architecture
+for every cluster — the management cluster runs its own Flux (in a `gitops` vCluster) against
+`manifests/<host>-mgmt`, like the workloads. CAPI/CAPN/CAPRKE2 staying management-only is unchanged;
+what changes is that Flux is no longer workload-only. Near-term ("pour l'instant") the `-mgmt` branch
+is consumed by `seed-master`; Flux-in-mgmt is the phased target.
+
 == Current intent
 
 The active plan after Stage A is:

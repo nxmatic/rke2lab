@@ -62,6 +62,11 @@ Stage ownership is strict:
   through the Kubernetes controllers running *in the management cluster*. It never scales the
   management cluster itself.
 
+NOTE: In the target model (link:../cluster-api/manifests-rendered-branches.adoc[Manifests Rendered
+Branches]) the imperative "Stage B `kubectl apply` the workload CRs" dissolves into GitOps: the
+workload CRs live in the rendered branch `manifests/<host>-wrkld` and reach CAPI/CAPN through it.
+Near-term `seed-master` applies them; Stage A shrinks to nix-seed + `FluxRoot` bootstrap.
+
 == Required handoff assets
 
 The following assets are the minimum shared contract. Unless noted, they describe the *management*
