@@ -283,6 +283,45 @@ branches; *local run artefacts* (image, kubeconfig, logs) stay in the gitignored
 `.local.d` layout (link:management-workload-topology.adoc[one management node]) is unchanged — it
 simply sheds the manifest-materialisation trees it used to carry.
 
+=== What the host staging becomes
+
+The elaborate host-folder staging — the rotating slots (`host.N.staging.d`), the drift files
+(`host.N.drift.*`), the promotion to `host.live.d`, the retention count — existed for the old
+"materialise into `rke2-manifests.d`, rsync to the remote, keep N slots" delivery. Git subsumes it,
+because the render is a *pure function* of `(main, config, descriptor)` and therefore reproducible:
+
+[cols="1,1",options="header"]
+|===
+|Host staging (today) |Rendered-branch (new)
+
+|`host.N.staging.d` rotating slot |a transient git *worktree* of `manifests/<host>-<role>` to render into
+|`host.N.drift.*` (staged vs live) |`git diff` (render worktree vs branch HEAD) before push
+|promotion rsync → `host.live.d` |`git push --force` (atomic ref update)
+|N-slot retention (rollback) |re-render from `main@<sha>` — nothing kept locally
+|remote reads `host.live.d` over the automount |Flux / `seed-master` read the branch — no manifests rsync
+|===
+
+The render worktree lives at **`.local.d/render/<host>-<role>/`** — a linked git worktree of the
+branch, *inside* gitignored `.local.d`. That nesting is deliberate and clean: the `.local.d` ignore
+makes the main worktree never look inside it (no untracked noise, no "embedded repo" gitlink), while
+`.gitignore` being per-checkout means the parent's ignore never leaks into the rendered branch's own
+tracking. Cleanup is `git worktree remove`.
+
+Two consequences fall out:
+
+* **The automount becomes image-only.** With manifests delivered through git, the remote NixOS host
+  no longer reads a manifests tree over the automount — the bi-machine rsync of manifests dissolves,
+  and `asAutomountView` / `netPrefix` rebase *only the incus image artefacts* (§ the `.local.d`
+  split). That is what keeps the automount machinery earning its place.
+* **Drift doubles and improves.** The single local "staged vs live" diff becomes two: `git diff`
+  (pre-push, to review the change) and Flux reconciliation (post-push, git-vs-cluster — the *actual*
+  drift). Neither is a local rotation file.
+
+So increment 1 *removes* the host-staging machinery (`HostSlotSelector` rotation,
+`BootstrapPaths.asStagingView` / `liveRoot`, the drift files, the retention count) and replaces the
+render target with the git worktree above. The only local materialisation left is the `local-only`
+bootstrap seed.
+
 == Naming
 
 Branches follow the cluster naming convention `<host>-<role>` (see
