@@ -16,13 +16,13 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>{@link Amendment#FACET} — {@link #facets} is the WHOLE {@code rke2lab:manifests:} concern
- *       map of {@code Pulumi.dev.yaml} ({@code {publish, debug}}), one composite component so the
- *       role binds to ONE field. The host contributes the yaml subtree verbatim as the FACET value
- *       (an {@link io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor} it registers into the
- *       world); the assembler gathers it at the amend door and the binder places it on {@code
- *       facets}, naming no manifests vocabulary — {@link Facets} mirroring the yaml is what keeps
- *       the copy blind. When no contributor offers FACET (a bare {@code shape} probe, a survey), it
- *       falls to {@link #defaults()}.
+ *       map of {@code Pulumi.dev.yaml} ({@code {publish, debug, delivery}}), one composite
+ *       component so the role binds to ONE field. The host contributes the yaml subtree verbatim as
+ *       the FACET value (an {@link io.nxmatic.rke2lab.seed.broker.port.AmendmentContributor} it
+ *       registers into the world); the assembler gathers it at the amend door and the binder places
+ *       it on {@code facets}, naming no manifests vocabulary — {@link Facets} mirroring the yaml is
+ *       what keeps the copy blind. When no contributor offers FACET (a bare {@code shape} probe, a
+ *       survey), it falls to {@link #defaults()}.
  *   <li>{@link Amendment#SOIL} — {@link #materializationRoot} is NOT in the yaml: it is the plot
  *       the scion materialises into, which only the host knows (it holds {@code BootstrapPaths}).
  *       The host fills it by role — the SOIL amendment — from its provisioning state (the
@@ -94,12 +94,27 @@ public record ManifestsRunbookInput(
 
   /**
    * The {@code rke2lab:manifests:} concern map, mirroring its yaml sub-map EXACTLY ({@code
-   * {publish, debug}}) — the single {@link Amendment#FACET} component so the role binds to ONE
-   * field (the binder rejects a role borne by several components as ambiguous). The host
+   * {publish, debug, delivery}}) — the single {@link Amendment#FACET} component so the role binds
+   * to ONE field (the binder rejects a role borne by several components as ambiguous). The host
    * contributes this whole subtree verbatim; the scion reads {@code facets().publish()} / {@code
-   * facets().debug()} and flattens each.
+   * facets().debug()} / {@code facets().delivery()} and flattens each. The compact constructor
+   * coalesces any sub-facet the operator omitted to its default, so a partial yaml decodes
+   * complete.
    */
   public record Facets(PublishFacet publish, DebugFacet debug, DeliveryFacet delivery) {
+
+    /**
+     * Coalesce absent sub-facets to their defaults — the host contributes the {@code
+     * rke2lab:manifests:} yaml subtree VERBATIM, and jackson decodes a record component absent from
+     * the yaml (a partial config that omits {@code delivery:}, {@code publish:} or {@code debug:})
+     * to {@code null}. The compact constructor makes every sub-facet non-null, so a consumer reads
+     * a complete facet whatever the operator wrote (a partial yaml never NPEs nor silently pushes).
+     */
+    public Facets {
+      publish = publish != null ? publish : PublishFacet.defaults();
+      debug = debug != null ? debug : DebugFacet.disabled();
+      delivery = delivery != null ? delivery : DeliveryFacet.defaults();
+    }
 
     public static Builder builder() {
       return new Builder();
