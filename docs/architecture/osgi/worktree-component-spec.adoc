@@ -104,11 +104,13 @@ link:../cluster-api/manifests-rendered-branches.adoc[Manifests Rendered Branches
 that replaces the old host-staging rotation/promotion (`host.N.staging.d` → `host.live.d`) with a
 render-then-force-push of a git branch.
 
-* **`RenderedBranch`** (contract) — the factory: `prepare(Path worktreePath, String branch, String
-  base)` shells `git worktree add -B <branch> <worktreePath> <base>` (jgit exposes no worktree
-  porcelain — verified against 7.7.x, which can OPEN a linked worktree but not CREATE one), idempotent
-  across re-runs (a prior worktree at the path is removed + pruned first, then the branch is reset to
-  `base` — a rendered branch is regenerated, never accreted). Domain-neutral like `Worktree`/`GatePolicy`:
+* **`RenderedBranch`** (contract) — the factory: `prepare(Path worktreePath, String branch)` shells
+  `git worktree add --orphan -b <branch> <worktreePath>` (jgit exposes no worktree porcelain —
+  verified against 7.7.x, which can OPEN a linked worktree but not CREATE one), an ORPHAN worktree
+  (empty tree, unborn branch) so the rendered branch carries only the rendered YAML, never the source.
+  Idempotent across re-runs (a prior worktree at the path AND any stale local branch are removed +
+  pruned first, then a fresh orphan is checked out — a rendered branch is regenerated as a single root
+  commit each render, never accreted). Domain-neutral like `Worktree`/`GatePolicy`:
   the caller supplies the branch name (`manifests/<host>-<role>`) and the path
   (`.local.d/render/<host>-<role>/`), so no consumer vocabulary leaks in. Published as an
   `@Component(service = RenderedBranch.class)` that `@Reference`s `Worktree` to learn the repo root

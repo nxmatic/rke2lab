@@ -95,8 +95,11 @@ final class JgitCheckout {
         Git git = new Git(repository)) {
       for (Path path : paths) {
         final Path absolute = (path.isAbsolute() ? path : worktree.resolve(path)).normalize();
-        final String pattern =
+        final String relative =
             worktree.relativize(absolute).toString().replace(File.separatorChar, '/');
+        // The worktree ROOT relativizes to "" — jgit reads that as the whole tree with ".", so
+        // staging root() stages every rendered file (adds and, via the recursive add, the tree).
+        final String pattern = relative.isEmpty() ? "." : relative;
         if (Files.exists(absolute)) {
           git.add().addFilepattern(pattern).call();
         } else {

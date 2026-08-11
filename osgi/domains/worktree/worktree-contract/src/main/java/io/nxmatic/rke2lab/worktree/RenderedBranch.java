@@ -19,14 +19,15 @@ import java.nio.file.Path;
 public interface RenderedBranch {
 
   /**
-   * Prepare a linked worktree checked out at {@code worktreePath} on {@code branch}, (re)created at
-   * {@code base}. Idempotent across re-runs: an existing worktree at {@code worktreePath} is
-   * removed first, then {@code branch} is reset to {@code base} and checked out fresh — a rendered
-   * branch is regenerated, never accreted. {@code base} is any git ref the repository can resolve
-   * (a sha, or a remote-tracking ref such as {@code origin/main}). Returns a handle the caller
-   * materialises into, commits, force-pushes, and {@link LinkedWorktree#close() removes}. {@code
-   * git worktree} is shelled (jgit exposes no worktree porcelain), sealed behind the
-   * implementation.
+   * Prepare an ORPHAN linked worktree checked out at {@code worktreePath} on {@code branch} — an
+   * empty tree on an unborn branch, into which the caller materialises the rendered YAML alone
+   * (never the source: a {@code manifests/<cluster>} branch carries only what was rendered, at its
+   * root). Idempotent across re-runs: an existing worktree at {@code worktreePath} and any stale
+   * local {@code branch} are removed first, then a fresh orphan is checked out — a rendered branch
+   * is regenerated as a single root commit each render, never accreted (it is force-pushed
+   * desired-state, not history). Returns a handle the caller materialises into, commits,
+   * force-pushes, and {@link LinkedWorktree#close() removes}. {@code git worktree} is shelled (jgit
+   * exposes no worktree porcelain), sealed behind the implementation.
    */
-  LinkedWorktree prepare(Path worktreePath, String branch, String base);
+  LinkedWorktree prepare(Path worktreePath, String branch);
 }

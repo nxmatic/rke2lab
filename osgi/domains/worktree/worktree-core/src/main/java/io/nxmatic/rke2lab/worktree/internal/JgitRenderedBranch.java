@@ -30,10 +30,10 @@ public final class JgitRenderedBranch implements RenderedBranch {
   }
 
   @Override
-  public LinkedWorktree prepare(Path worktreePath, String branch, String base) {
+  public LinkedWorktree prepare(Path worktreePath, String branch) {
     final Path path = worktreePath.toAbsolutePath().normalize();
     final GitCli gitCli = new GitCli(worktree.root());
-    gitCli.worktreeAdd(path, branch, base);
+    gitCli.worktreeAdd(path, branch);
     // Canonicalise now that the worktree exists (git records and reports the real, symlink-resolved
     // path — e.g. /private/var over macOS's /var link), so path() agrees with git and with the seed
     // Worktree's own toRealPath()-canonicalised root.

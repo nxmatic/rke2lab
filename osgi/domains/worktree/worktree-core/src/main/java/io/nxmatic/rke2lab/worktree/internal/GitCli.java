@@ -29,16 +29,18 @@ final class GitCli {
   }
 
   /**
-   * Add a linked worktree at {@code worktreePath} on {@code branch}, (re)created at {@code base}.
-   * Idempotent across re-runs: any prior worktree at the path is removed and the administrative
-   * records pruned first, then {@code -B} resets {@code branch} to {@code base} and checks it out
-   * fresh — a rendered branch is regenerated, never accreted. The add is checked (a failure
-   * throws); the pre-clean tolerates absence.
+   * Add an ORPHAN linked worktree at {@code worktreePath} on {@code branch} — an empty tree on an
+   * unborn branch. Idempotent across re-runs: any prior worktree at the path is removed, the
+   * administrative records pruned, and any stale local {@code branch} deleted first, then {@code
+   * --orphan} checks out a fresh empty tree — a rendered branch is regenerated as a single root
+   * commit each render, never accreted. The add is checked (a failure throws); the pre-clean
+   * tolerates absence.
    */
-  void worktreeAdd(Path worktreePath, String branch, String base) {
+  void worktreeAdd(Path worktreePath, String branch) {
     run(false, "worktree", "remove", "--force", worktreePath.toString());
     run(false, "worktree", "prune");
-    run(true, "worktree", "add", "--force", "-B", branch, worktreePath.toString(), base);
+    run(false, "branch", "-D", branch);
+    run(true, "worktree", "add", "--orphan", "-b", branch, worktreePath.toString());
   }
 
   /** Remove the linked worktree at {@code worktreePath} — tolerant of a path already gone. */

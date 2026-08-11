@@ -64,8 +64,8 @@ class JgitRenderedBranchTest {
     final String branch = "manifests/nikopol-mgmt";
     final Path worktreePath = renderRoot.resolve("nikopol-mgmt");
 
-    // 1) prepare — a linked worktree of a fresh branch cut from main.
-    final LinkedWorktree linked = rendered.branch().prepare(worktreePath, branch, "main");
+    // 1) prepare — an orphan linked worktree (empty tree, unborn branch), independent of main.
+    final LinkedWorktree linked = rendered.branch().prepare(worktreePath, branch);
     assertEquals(worktreePath.toRealPath(), linked.path(), "checked out at the asked path");
     assertEquals(branch, linked.branch());
     assertTrue(Files.isDirectory(linked.path()), "the linked worktree is on disk");
@@ -82,7 +82,7 @@ class JgitRenderedBranchTest {
 
     // 3) re-render — a second prepare + commit + force-push regenerates the branch (idempotent
     // prepare, forced ref update). The tree is replaced, not accreted.
-    final LinkedWorktree again = rendered.branch().prepare(worktreePath, branch, "main");
+    final LinkedWorktree again = rendered.branch().prepare(worktreePath, branch);
     Files.writeString(again.path().resolve("cluster.yaml"), "kind: Cluster\nversion: 2\n");
     again.stage(List.of(again.path().resolve("cluster.yaml")));
     final String secondSha = again.commit("re-render nikopol-mgmt", bot, Optional.of(signingKey));
