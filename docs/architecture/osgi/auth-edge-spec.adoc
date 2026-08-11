@@ -35,7 +35,13 @@ crosses no frontier.
   Optional<String>` (empty = the CLI is absent/unauthenticated/non-zero, a present value is trimmed and
   non-blank); and `AuthTokenSource`, the flat contract enum (`GITHUB`, `FLOXHUB`). No host config type
   crosses; the host maps its own env-var precedence and only asks the contact when the environment
-  yielded nothing.
+  yielded nothing. It also carries the sealed-token cellar vocabulary: `GithubToken`
+  (`@SeedContract("github-token")`, the token as a record) and `AuthCoordinate` (the `SeedCoordinate`
+  enum, `GITHUB_TOKEN` slug `github-token`, domain `auth`). The auth-seal files a `GithubToken` at
+  `AuthCoordinate.GITHUB_TOKEN` SEALED (`Sensitivity.SEALED`, `CellarCipher` at rest) from the ONE
+  source of trust — `gh auth token`, never an env var — and the rendered-branch force-push reveals it
+  on fetch. OSGi-only (sealed and revealed in-container), so unlike `ClusterPkiCoordinate` it is not
+  dual-realm.
 * *auth-edge* (`type=edge`, `@Component`): `CliAuthTokenContact` — maps `GITHUB → gh auth token`,
   `FLOXHUB → flox auth token`, and shells nothing else. Pure `ProcessBuilder` over the JDK, no embedded
   jars, mirroring incus-edge's ssh contact.

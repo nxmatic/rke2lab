@@ -99,7 +99,7 @@ public record ManifestsRunbookInput(
    * contributes this whole subtree verbatim; the scion reads {@code facets().publish()} / {@code
    * facets().debug()} and flattens each.
    */
-  public record Facets(PublishFacet publish, DebugFacet debug) {
+  public record Facets(PublishFacet publish, DebugFacet debug, DeliveryFacet delivery) {
 
     public static Builder builder() {
       return new Builder();
@@ -112,6 +112,7 @@ public record ManifestsRunbookInput(
     public static final class Builder {
       private PublishFacet publish = PublishFacet.defaults();
       private DebugFacet debug = DebugFacet.disabled();
+      private DeliveryFacet delivery = DeliveryFacet.defaults();
 
       private Builder() {}
 
@@ -125,9 +126,29 @@ public record ManifestsRunbookInput(
         return this;
       }
 
-      public Facets build() {
-        return new Facets(publish, debug);
+      public Builder delivery(DeliveryFacet delivery) {
+        this.delivery = delivery;
+        return this;
       }
+
+      public Facets build() {
+        return new Facets(publish, debug, delivery);
+      }
+    }
+  }
+
+  /**
+   * The {@code manifests.delivery} concern — whether a rendered tree is force-pushed to its {@code
+   * manifests/<cluster>} branch. {@code push} default OFF: the render crossing ALWAYS materialises
+   * the tree into the render worktree and seals it with a signed commit (a local, reviewable act),
+   * but only force-pushes to GitHub when the operator arms {@code rke2lab:manifests:push}. An
+   * absent key defaults off, so a partial yaml never pushes by surprise.
+   */
+  public record DeliveryFacet(boolean push) {
+
+    /** The safe default — render + commit locally, never push until the operator opts in. */
+    public static DeliveryFacet defaults() {
+      return new DeliveryFacet(false);
     }
   }
 

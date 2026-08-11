@@ -23,5 +23,6 @@
   <modules>
     <module>auth-contract</module>
     <module>auth-edge</module>
+    <module>auth-bdd</module>
   </modules>
 </project>

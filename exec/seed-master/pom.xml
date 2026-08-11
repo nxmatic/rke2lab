@@ -348,6 +348,13 @@
       <artifactId>cluster-pki-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The auth-seal scion: embedded like cluster-pki-bdd, sown early to seal the GitHub token
+         (gh auth token) into the cellar for the rendered-branch force-push to reveal. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>auth-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
          flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
          the launch-secrets updater resolves AuthTokenContact from the registry (singleSpiProvider).

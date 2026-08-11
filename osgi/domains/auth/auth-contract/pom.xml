@@ -23,6 +23,12 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
+    <!-- SeedContract / SeedCoordinate for the sealed GitHub-token cellar case (GithubToken +
+         AuthCoordinate) the auth-seal files and the rendered-branch force-push reveals. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

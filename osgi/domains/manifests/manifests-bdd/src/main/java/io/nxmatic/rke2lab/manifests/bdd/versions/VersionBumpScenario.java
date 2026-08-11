@@ -22,7 +22,6 @@ import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.nxmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.nxmatic.rke2lab.worktree.GitIdentity;
 import io.nxmatic.rke2lab.worktree.Worktree;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -172,15 +171,11 @@ public class VersionBumpScenario
     }
 
     /**
-     * Env {@code GITHUB_TOKEN}/{@code GH_TOKEN} first, else the auth edge ({@code gh auth token}).
+     * The GitHub token, from the ONE source of trust: the auth edge ({@code gh auth token}), never
+     * an ambient environment variable. Empty when the edge is absent or unauthenticated — the
+     * upstream release query then runs anonymously (rate-limited), never against a stray env token.
      */
     private Optional<String> resolveGithubToken() {
-      for (String name : List.of("GITHUB_TOKEN", "GH_TOKEN")) {
-        final String value = System.getenv(name);
-        if (value != null && !value.isBlank()) {
-          return Optional.of(value.trim());
-        }
-      }
       return authToken.flatMap(contact -> contact.tokenFor(AuthTokenSource.GITHUB));
     }
 
