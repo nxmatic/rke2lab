@@ -18,7 +18,6 @@ import io.nxmatic.rke2lab.doctor.contract.DoctorCoordinate;
 import io.nxmatic.rke2lab.doctor.contract.ObservationWire;
 import io.nxmatic.rke2lab.doctor.contract.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.doctor.contract.SymptomKind;
-import io.nxmatic.rke2lab.incus.contract.HostStagingEntry;
 import io.nxmatic.rke2lab.incus.contract.ImageBuildRequest;
 import io.nxmatic.rke2lab.incus.contract.ImageBuilder;
 import io.nxmatic.rke2lab.incus.contract.IncusCoordinate;
@@ -29,8 +28,6 @@ import io.nxmatic.rke2lab.incus.contract.IncusRunbookInput.Image;
 import io.nxmatic.rke2lab.incus.core.GrowIdentityResolver;
 import io.nxmatic.rke2lab.incus.core.GrowNetworkResolver;
 import io.nxmatic.rke2lab.incus.core.GrowPlanAssembler;
-import io.nxmatic.rke2lab.incus.core.HostSlotSelector;
-import io.nxmatic.rke2lab.incus.core.HostTreeChecksummer;
 import io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter;
 import io.nxmatic.rke2lab.incus.ingress.BootstrapPaths;
 import io.nxmatic.rke2lab.incus.ingress.GrowIdentityView;
@@ -78,8 +75,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * the host to grow it through the broker), and verifying reachability is the responsibility of
  * whoever grows it (the host, post-push). Played IN-CONTAINER by the engine so the runbook shows a
  * real node of the OSGi world; it lives in {@code incus-bdd} over the {@code incus-contract} seam
- * plus {@code incus-core} (the host-tree logic — {@code BootstrapPaths} + {@code HostSlotSelector}:
- * the scion owns the tree, so it reconstructs the topology and picks its own slot in-world, §
+ * plus {@code incus-core} (the host-tree logic — {@code BootstrapPaths}: the scion owns the tree,
+ * so it reconstructs the topology and derives the per-cluster render path in-world, §
  * host-cellar-realisation CORRECTION 2026-07-14; the heavy Pulumi-bound instance grow stays
  * host-side). Not a {@code -test} fragment (it is live seeding logic).
  *
@@ -188,9 +185,11 @@ public class IncusProvisionScenario
             : Optional.empty();
     // The scion reconstructs the provisioning topology from the FACET the host amended + the root
     // it
-    // read (§ host-cellar-realisation, computed OSGi-side) and picks its OWN rotation slot ONCE —
-    // stagingRoot, the SOIL forwarded to manifests, the liveRoot, and the worktree for provenance.
-    final Optional<Resolved> resolved = Resolved.from(input.facet(), worktreeRoot, cellar, parcel);
+    // read (§ host-cellar-realisation, computed OSGi-side) and derives the paths the run needs —
+    // the
+    // per-cluster render plot (the SOIL forwarded to manifests), the liveRoot the host renders the
+    // runbook into, and the worktree for provenance.
+    final Optional<Resolved> resolved = Resolved.from(input.facet(), worktreeRoot);
     // The @Test body OWNS the observation sink (the same discipline as the other scions): the When
     // fills it, and the consult below reads THIS reference — independent of jGiven's stage state
     // after a fail-fast step, so a failed build still reaches the consult.
@@ -225,8 +224,6 @@ public class IncusProvisionScenario
         .the_instance_is_prepared()
         .and()
         .the_prep_is_stored(resolved.map(Resolved::soil).orElse(""), cellar, parcel)
-        .and()
-        .the_staging_is_published(resolved, cellar, parcel)
         .and()
         .the_instance_grow_plan_is_published(
             resolved, input.image().orElse(new Image("", "", "")), cellar, parcel);
@@ -306,17 +303,15 @@ public class IncusProvisionScenario
 
   /**
    * The topology the scion resolves ONCE from the worktree scalars — the inversion made concrete:
-   * the scion owns the tree, picks its OWN rotation slot, and derives every path the run needs. The
-   * slot is chosen ONCE here (a second {@code nextStaging()} after manifests materialised the slot
-   * would see it and pick a different N). {@code stagingRoot} is the slot the assets land in;
-   * {@code soil} the manifests plot forwarded to the manifests scion; {@code liveRoot} where the
-   * host renders the runbook; {@code worktreeRoot} the base for the git provenance. {@link
-   * #from(Optional, Optional, Cellar, Parcel)} returns EMPTY for an unamended survey (a bare {@code
-   * shape} probe) — absence is an empty {@link Optional}, never a record carried with blank fields;
-   * a present {@code Resolved} always holds a real topology.
+   * the scion owns the tree and derives every path the run needs. {@code soil} is the per-cluster
+   * RENDER plot forwarded to the manifests scion ({@code .local.d/render/<cluster>}, the orphan
+   * {@code manifests/<cluster>} worktree it prepares and force-pushes from — no rotating staging
+   * slot); {@code liveRoot} is where the host renders the runbook; {@code worktreeRoot} the base
+   * for the git provenance. {@link #from(Optional, Optional)} returns EMPTY for an unamended survey
+   * (a bare {@code shape} probe) — absence is an empty {@link Optional}, never a record carried
+   * with blank fields; a present {@code Resolved} always holds a real topology.
    */
   private record Resolved(
-      String stagingRoot,
       String soil,
       String liveRoot,
       Path worktreeRoot,
@@ -326,23 +321,22 @@ public class IncusProvisionScenario
       boolean automount,
       String netPrefix) {
 
-    static Optional<Resolved> from(
-        Optional<Facet> maybeFacet, Optional<Path> worktreeRoot, Cellar cellar, Parcel parcel) {
+    static Optional<Resolved> from(Optional<Facet> maybeFacet, Optional<Path> worktreeRoot) {
       if (maybeFacet.isEmpty()) {
         return Optional.empty();
       }
       final Facet facet = maybeFacet.orElseThrow();
       final Path root = worktreeRoot.orElseThrow();
       final BootstrapPaths local = BootstrapPaths.fromLocalWorktree(root);
-      final Path slot = new HostSlotSelector(local.stateRoot(), cellar, parcel).nextStaging();
-      final BootstrapPaths staging = local.asStagingView(slot);
       return Optional.of(
           new Resolved(
-              slot.toString(),
-              staging.manifestsRoot().toString(),
+              // The manifests plot is now the per-cluster RENDER worktree the manifests scion
+              // prepares (an orphan `manifests/<cluster>` checkout) and the branch is force-pushed
+              // from — no rotating staging slot, no host.live.d promotion.
+              local.renderRoot().resolve(facet.clusterName()).toString(),
               local.liveRoot().toString(),
               root,
-              staging.secretsFile(),
+              local.secretsFile(),
               facet.clusterName(),
               facet.nodeName(),
               facet.automount(),
@@ -580,43 +574,6 @@ public class IncusProvisionScenario
       final IncusHarvest harvest =
           new IncusHarvest(imageBuilder.orElseThrow().recipeDigest(), soil);
       cellar.store(parcel, IncusCoordinate.INCUS_PREP, harvest);
-      return self();
-    }
-
-    /**
-     * Publish the {@link HostStagingEntry} for the slot this run materialised — the host-tree fact
-     * reconcile folds later to decide the promotion (§ host-cellar-realisation, the reconcile
-     * cycle). It checksums the WHOLE staging tree ({@link HostTreeChecksummer}) — the discriminant
-     * reconcile diffs against the pivot — and captures the worktree's git provenance (taken from
-     * the harvested {@link WorktreeFacts} snapshot in the cellar: sha + dirty), frozen with the
-     * immutable staging (the fold keeps N stagings, so this history survives, unlike the last-wins
-     * live). Skipped for an unamended survey (no slot materialised). The store is unconditional on
-     * the gate: the cellar itself routes conserve vs pre-reserve, so a preview run still records
-     * its staging entry (only the promotion's live entry is gated, at reconcile).
-     */
-    public Then the_staging_is_published(
-        @Hidden Optional<Resolved> maybeResolved, @Hidden Cellar cellar, @Hidden Parcel parcel) {
-      if (maybeResolved.isEmpty()) {
-        return self();
-      }
-      final Resolved resolved = maybeResolved.orElseThrow();
-      final Path stagingRoot = Path.of(resolved.stagingRoot());
-      // The worktree provenance (HEAD sha + dirty) — TAKEN from the harvested WorktreeFacts in the
-      // cellar (the soil's first-crossing snapshot), the source breadcrumb this staging was
-      // cultivated FROM. Pre-materialisation is the RIGHT provenance for the entry: the source git
-      // state, not the staging write's own incidental dirt. Immutable across the run, so taken from
-      // the cellar rather than re-walked (fetch-not-push). No jgit here.
-      final var provenance =
-          cellar
-              .fetch(parcel, WorktreeCoordinate.FACTS, WorktreeFacts.class)
-              .orElseThrow()
-              .provenance();
-      final HostStagingEntry entry =
-          HostStagingEntry.of(
-              resolved.stagingRoot(),
-              new HostTreeChecksummer().checksum(stagingRoot),
-              new HostStagingEntry.Provenance(provenance.sha(), provenance.dirty()));
-      cellar.store(parcel, IncusCoordinate.HOST_STAGING, entry);
       return self();
     }
 

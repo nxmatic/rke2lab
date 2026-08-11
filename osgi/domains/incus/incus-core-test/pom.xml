@@ -90,8 +90,7 @@
     </dependency>
 
     <!-- incus-core's own runtime graph, installed as bundles in-container by the probe so the host
-         resolves: the sibling contracts + the third-party libraries incus-core imports (jsync is
-         embedded in incus-core, so it is NOT listed here). -->
+         resolves: the sibling contracts incus-core imports. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
@@ -100,11 +99,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.github.java-diff-utils</groupId>
-      <artifactId>java-diff-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

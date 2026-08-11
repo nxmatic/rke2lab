@@ -535,12 +535,6 @@
       <artifactId>org.osgi.util.function</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- The OBSERVE brick of the host-tree grow (I6c): line-level unified diffs for the two deltas
-         (HostTreeDelta). Host classpath, no wrap (the grow is Shape C, host-side). -->
-    <dependency>
-      <groupId>io.github.java-diff-utils</groupId>
-      <artifactId>java-diff-utils</artifactId>
-    </dependency>
 
     <!-- test module dependencies -->
     <dependency>

@@ -7,14 +7,11 @@ import io.nxmatic.rke2lab.seed.broker.port.SeedCoordinate;
  * this enum: declaring a coordinate and using it are one act, in one place, so a store never spells
  * a magic string (the {@code "incus"}/{@code "incus-prep"} literals the scion used to pass to
  * {@code new SeedEnvelope(...)} — the single-source-of-truth discipline). Each slug matches the
- * {@code @SeedContract} of the wire-record it addresses ({@link IncusHarvest} → {@code incus-prep},
- * {@link HostStagingEntry} → {@code host-staging}, …), which {@code SeedCodec} verifies at decode.
+ * {@code @SeedContract} of the wire-record it addresses ({@link IncusHarvest} → {@code
+ * incus-prep}), which {@code SeedCodec} verifies at decode.
  */
 public enum IncusCoordinate implements SeedCoordinate {
-  INCUS_PREP("incus-prep"),
-  HOST_STAGING("host-staging"),
-  HOST_LIVE("host-live"),
-  HOST_DRIFT("host-drift");
+  INCUS_PREP("incus-prep");
 
   private static final String DOMAIN = "incus";
 

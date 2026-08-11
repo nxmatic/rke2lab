@@ -8,16 +8,15 @@ import org.jspecify.annotations.Nullable;
  * The provisioning topology of the control node — the roots the bootstrap resolves once from the
  * worktree scalars and carries through the run. The NixOS {@code node-base} substrate bakes the
  * node's config, systemd units and scripts into the image, so the former {@code /srv/host} mount
- * catalog and the host-asset materialisation roots are gone; what remains is the worktree base, the
- * per-node state tree ({@code stateRoot} + {@code liveRoot} for the runbook), the synthesised
- * {@code manifestsRoot} (still produced for the manifests → server-manifests delivery), the {@code
- * assetsRoot} the staging rebase pivots on, and the {@code secretsFile}. Felix is embedded in the
- * host JVM, so the scion computes the whole topology OSGi-side, here. {@link #fromLocalWorktree}
- * builds the DARWIN-local view; {@link #asStagingView} rebases under a rotation slot; {@link
+ * catalog and the host-asset materialisation roots are gone; and the rendered-branch model moved
+ * the manifests delivery to git, so the staging-slot rebase and its {@code manifestsRoot}/{@code
+ * assetsRoot} went with it. What remains is the worktree base, the per-node state tree ({@code
+ * stateRoot}, from which {@link #renderRoot} and {@link #liveRoot} derive), and the {@code
+ * secretsFile}. Felix is embedded in the host JVM, so the scion computes the whole topology
+ * OSGi-side, here. {@link #fromLocalWorktree} builds the DARWIN-local view; {@link
  * #asAutomountView} rebases onto the automount view the remote NixOS host reads through.
  */
-public record BootstrapPaths(
-    Path worktreeRoot, Path stateRoot, Path manifestsRoot, Path assetsRoot, Path secretsFile) {
+public record BootstrapPaths(Path worktreeRoot, Path stateRoot, Path secretsFile) {
 
   private static Builder builder() {
     return new Builder();
@@ -37,38 +36,27 @@ public record BootstrapPaths(
    * {@code var/{run,lib}/incus/...} split to translate.
    */
   public static BootstrapPaths fromLocalWorktree(Path worktreeRoot) {
-    final Path stateRoot = worktreeRoot.resolve(STATE_DIR);
-    final Path hostResourceRoot = stateRoot.resolve("host");
     return builder()
         .worktreeRoot(worktreeRoot)
-        .stateRoot(stateRoot)
-        .manifestsRoot(hostResourceRoot.resolve("rke2-manifests.d"))
-        .assetsRoot(hostResourceRoot)
+        .stateRoot(worktreeRoot.resolve(STATE_DIR))
         .secretsFile(worktreeRoot.resolve(".secrets"))
         .build();
   }
 
   /**
-   * Every materialisation root rebased under {@code stagingRoot} (the rotation slot) — the
-   * manifests synthesis writes there before the promotion rsyncs it onto the live tree. Only {@code
-   * manifestsRoot} moves under the slot (the pivot is {@code assetsRoot}); the worktree/state roots
-   * and the secrets file pass through unchanged.
+   * The root the per-cluster RENDERED trees live under — {@code .local.d/render}. Each cluster gets
+   * an orphan {@code manifests/<cluster>} worktree at {@code renderRoot()/<cluster>} that the
+   * manifests scion prepares, materialises the rendered YAML into, and force-pushes from. It
+   * replaces the old rotating staging slot: a rendered branch is regenerated in place and delivered
+   * through git, so there is no slot rotation and no {@code host.live.d} promotion to size it for.
    */
-  public BootstrapPaths asStagingView(Path stagingRoot) {
-    return builder()
-        .worktreeRoot(worktreeRoot)
-        .stateRoot(stateRoot)
-        .manifestsRoot(stagingRoot.resolve(assetsRoot.relativize(manifestsRoot)))
-        .assetsRoot(stagingRoot)
-        .secretsFile(secretsFile)
-        .build();
+  public Path renderRoot() {
+    return stateRoot.resolve("render");
   }
 
   /**
-   * The deployed tree the instance's host reads — the fixed {@code host.live.d} the promotion
-   * rsyncs a chosen staging slot into. The host writes the run's narration (the runbook) here
-   * directly, post-run. A fixed path off {@code stateRoot}, so the host derives it from the flat
-   * scalars alone — the scion need not return the slot it chose.
+   * The fixed {@code host.live.d} off {@code stateRoot} the host writes the run's narration (the
+   * runbook) into, post-run. A fixed path derived from the flat scalars alone.
    */
   public Path liveRoot() {
     return stateRoot.resolve("host.live.d");
@@ -85,8 +73,6 @@ public record BootstrapPaths(
     return builder()
         .worktreeRoot(automountPath(worktreeRoot, automount, netPrefix))
         .stateRoot(automountPath(stateRoot, automount, netPrefix))
-        .manifestsRoot(automountPath(manifestsRoot, automount, netPrefix))
-        .assetsRoot(automountPath(assetsRoot, automount, netPrefix))
         .secretsFile(automountPath(secretsFile, automount, netPrefix))
         .build();
   }
@@ -112,8 +98,6 @@ public record BootstrapPaths(
   private static final class Builder {
     @Nullable private Path worktreeRoot;
     @Nullable private Path stateRoot;
-    @Nullable private Path manifestsRoot;
-    @Nullable private Path assetsRoot;
     @Nullable private Path secretsFile;
 
     private Builder worktreeRoot(Path value) {
@@ -126,16 +110,6 @@ public record BootstrapPaths(
       return this;
     }
 
-    private Builder manifestsRoot(Path value) {
-      this.manifestsRoot = value;
-      return this;
-    }
-
-    private Builder assetsRoot(Path value) {
-      this.assetsRoot = value;
-      return this;
-    }
-
     private Builder secretsFile(Path value) {
       this.secretsFile = value;
       return this;
@@ -145,8 +119,6 @@ public record BootstrapPaths(
       return new BootstrapPaths(
           Objects.requireNonNull(worktreeRoot),
           Objects.requireNonNull(stateRoot),
-          Objects.requireNonNull(manifestsRoot),
-          Objects.requireNonNull(assetsRoot),
           Objects.requireNonNull(secretsFile));
     }
   }

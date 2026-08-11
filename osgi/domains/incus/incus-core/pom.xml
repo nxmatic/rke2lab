@@ -11,26 +11,18 @@
 
   <artifactId>incus-core</artifactId>
   <name>osgi/domains/incus/incus-core</name>
-  <description>The incus domain's host-tree logic: the tree incus mounts is incus's (rke2-manifests.d
-    is one folder among many), so the slot rotation (HostSlotSelector), the cellar-timeline fold
-    (HostTreeHead), the two deltas (HostTreeDiffer / HostTreeDelta / HostTreeDeltaRenderer) and the
-    per-file checksum (HostTreeChecksummer) live here — pure Java driven by the incus scenarios.
-    type=model — installed as a bundle, wired bundle-to-bundle to the scion. The host-tree
-    vocabulary (Host*Entry) lives in incus-contract; this module holds only the logic.</description>
+  <description>The incus domain's in-container logic: the grow-view projectors (GrowNetworkResolver /
+    GrowIdentityResolver / GrowPlanAssembler the provision scion assembles the InstanceGrowPlan from)
+    and the launch-secrets writer — pure Java driven by the incus scenarios. type=model — installed
+    as a bundle, wired bundle-to-bundle to the scion. The wire-records live in incus-contract; this
+    module holds only the logic. The former host-tree slot-rotation / staging→live promotion moved to
+    git (the rendered-branch model) and was removed.</description>
 
   <dependencies>
     <!-- The host-tree wire-records the fold decodes + the entries the CRUD writes. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
-    </dependency>
-    <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header. incus-core
-         declares its FIRST services here — the HostTreePromoter cultivating/surveying pair — because
-         the jsync ACT is embedded in this bundle, so the live door lives where jsync does. -->
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.service.component.annotations</artifactId>
-      <scope>provided</scope>
     </dependency>
     <!-- The flat grow views the scion projects (GrowNetworkView): GrowNetworkResolver assembles it. -->
     <dependency>
@@ -59,32 +51,9 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
     </dependency>
-    <!-- OBSERVE: the per-file line-level unified diff of a modified text file (HostTreeDiffer). -->
-    <dependency>
-      <groupId>io.github.java-diff-utils</groupId>
-      <artifactId>java-diff-utils</artifactId>
-    </dependency>
-    <!-- ACT: HostTreePromoter jsyncs a staging into host.live.d. jsync ships a nu manifest (no BSN),
-         so it cannot be imported as a bundle — it is EMBEDDED in this bundle's Bundle-ClassPath
-         (bnd -includeresource;lib:=true), one consumer, no *-wrap module. -->
-    <dependency>
-      <groupId>com.fizzed</groupId>
-      <artifactId>jsync-engine</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.fizzed</groupId>
-      <artifactId>jsync-vfs</artifactId>
-    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
-    </dependency>
-    <!-- InMemoryCellar: the test double HostSlotSelectorTest seeds host-staging / host-live cases
-         into (the cellar is the selector's state now, not the filesystem). -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>seed-broker-testkit</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 

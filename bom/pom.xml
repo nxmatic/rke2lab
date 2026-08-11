@@ -77,8 +77,6 @@
          tools.jackson ObjectNode that will not satisfy a com.fasterxml JsonNode. Bump only with a
          whole-project jackson-3 migration. -->
     <victools.version>4.38.0</victools.version>
-    <java-diff-utils.version>4.17</java-diff-utils.version>
-    <jsync.version>1.5.0</jsync.version>
     <jgit.version>7.7.1.202607240634-r</jgit.version>
     <software.constructs.version>10.8.1</software.constructs.version>
     <cdk8s.version>2.70.90</cdk8s.version>
@@ -336,17 +334,6 @@
         <artifactId>org.eclipse.jgit</artifactId>
         <version>${jgit.version}</version>
       </dependency>
-      <!-- ACT of the host-tree reconcile: jsync syncs a staging into host.live.d (setDelete + a
-           .flox exclude). Nu manifest (no BSN) → embedded in incus-core's Bundle-ClassPath. Via the
-           fizzed:jsync aggregator POM — no dedicated -bom, but the aggregator carries a real
-           dependencyManagement for jsync-engine + jsync-vfs, so it imports like a BOM. -->
-      <dependency>
-        <groupId>com.fizzed</groupId>
-        <artifactId>jsync</artifactId>
-        <version>${jsync.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
       <dependency>
         <groupId>software.constructs</groupId>
         <artifactId>constructs</artifactId>
@@ -407,15 +394,6 @@
         <version>${victools.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <!-- java-diff-utils: the OBSERVE brick of the host-tree grow (I6c) — line-level unified diffs
-           for the text files of the two deltas (change / drift). A HOST-classpath dep (the grow is
-           Shape C, host-side), already a first-class OSGi bundle should the OBSERVE ever move
-           in-container (BSN io.github.java-diff-utils). -->
-      <dependency>
-        <groupId>io.github.java-diff-utils</groupId>
-        <artifactId>java-diff-utils</artifactId>
-        <version>${java-diff-utils.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.felix</groupId>

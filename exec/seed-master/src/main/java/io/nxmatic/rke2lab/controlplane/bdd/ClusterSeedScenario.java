@@ -70,10 +70,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * The ClusterSeed root scenario — the host runbook, spoken in the gardening register, composed on
  * the common {@code seed-bdd} stages (link:docs/architecture/osgi/seed-bdd-module-spec.adoc). It is
  * the concrete instance of link:docs/architecture/bdd/bdd.adoc#clusterseed-scenario-map[the
- * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the eight WHENs — the
- * worktree survey (harvest + entry gate) → {@code Cellar.fetch} → five sow-and-graft callers (bbox
- * · incus-provision · incus-reconcile · systemd · cluster) + the host GROW — closed by the {@code
- * Cellar.store} THEN.
+ * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the WHENs — the
+ * worktree survey (harvest + entry gate) → {@code Cellar.fetch} → four sow-and-graft callers (bbox
+ * · incus-provision · systemd · cluster) + the host GROW — closed by the {@code Cellar.store} THEN.
  *
  * <p>The amorce is two-layered (§ the amorce): {@code Main} — inside {@code Pulumi.run} — captures
  * the {@link RunMode} (the one fact only it can know) and seeds it through the launcher session
@@ -181,8 +180,6 @@ public class ClusterSeedScenario
         .the_cluster_ca_is_sealed(hostScenario, hostTree)
         .and()
         .the_instance_is_provisioned(hostScenario, hostTree)
-        .and()
-        .the_live_tree_is_reconciled(hostScenario, hostTree)
         .and()
         .the_instance_grows()
         .and()
@@ -381,9 +378,9 @@ public class ClusterSeedScenario
   }
 
   /**
-   * The eight WHENs — the worktree survey (harvest + entry gate), the {@code Cellar.fetch} bookend,
-   * the five sow-and-graft crossings (bbox · incus-provision · incus-reconcile · systemd ·
-   * cluster), and the host GROW. The closing {@code Cellar.store} is the THEN, not a WHEN.
+   * The WHENs — the worktree survey (harvest + entry gate), the {@code Cellar.fetch} bookend, the
+   * four sow-and-graft crossings (bbox · incus-provision · systemd · cluster), and the host GROW.
+   * The closing {@code Cellar.store} is the THEN, not a WHEN.
    */
   public static class When extends Stage<When> {
 
@@ -492,25 +489,12 @@ public class ClusterSeedScenario
       return self();
     }
 
-    @NestedSteps
-    @As("the live tree is reconciled")
-    public When the_live_tree_is_reconciled(
-        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
-      // Reconcile promotes the fresh staging (incus just published it) into host.live.d BEFORE the
-      // instance mounts it — so it sits after the provision crossing and before systemd/cluster,
-      // which run inside the instance. No amendment: the scion derives its whole state from the
-      // cellar it inherits (source + pivot), the twin transaction the provision crossing wrote to.
-      sowAndGraft
-          .sowing("incus-reconcile", gardening, hostScenario, hostTree)
-          .the_scion_is_sown_and_grafted("the live tree is reconciled");
-      return self();
-    }
-
     @As("the instance grows")
     public When the_instance_grows() {
       // The pure-host GROW (§ host-cellar § the-grow-anatomy): NOT a scion — the com.pulumi graph
-      // cannot enter Felix, so it runs here, host-flat, between the promote (reconcile) and systemd
-      // (which runs inside the instance). It fetches the InstanceGrowPlan the incus scion projected
+      // cannot enter Felix, so it runs here, host-flat, between the incus provision crossing and
+      // systemd (which runs inside the instance). It fetches the InstanceGrowPlan the incus scion
+      // projected
       // (decoded host-side via the dual-realm codec) and actualises it: Project→{Network,Profile,
       // Image}→Instance + the 13 mounts the plan already carries (the scion resolved them OSGi-side
       // — the GROW derives no path). Gated on a live Pulumi deployment on THIS worker thread

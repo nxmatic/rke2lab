@@ -1,14 +1,12 @@
 /**
- * The incus domain's host-tree LOGIC — the tree the instance mounts is incus's (see
- * docs/architecture/osgi/host-cellar-realisation-spec.adoc § CORRECTION 2026-07-14). Pure Java
- * driven by the incus scenarios in-container: the slot rotation ({@link
- * io.nxmatic.rke2lab.incus.core.HostSlotSelector}), the cellar-timeline fold ({@link
- * io.nxmatic.rke2lab.incus.core.HostTreeHead}), the two deltas ({@link
- * io.nxmatic.rke2lab.incus.core.HostTreeDiffer} / {@link
- * io.nxmatic.rke2lab.incus.core.HostTreeDelta} / {@link
- * io.nxmatic.rke2lab.incus.core.HostTreeDeltaRenderer}) and the per-file checksum ({@link
- * io.nxmatic.rke2lab.incus.core.HostTreeChecksummer}). The wire-records these read/write live in
- * {@code incus-contract}; this module holds only the logic.
+ * The incus domain's in-container LOGIC — pure Java driven by the incus scenarios: the grow-view
+ * projectors ({@link io.nxmatic.rke2lab.incus.core.GrowNetworkResolver} / {@link
+ * io.nxmatic.rke2lab.incus.core.GrowIdentityResolver} / {@link
+ * io.nxmatic.rke2lab.incus.core.GrowPlanAssembler} the provision scion assembles the {@code
+ * InstanceGrowPlan} from) and the launch-secrets writer ({@link
+ * io.nxmatic.rke2lab.incus.core.LaunchSecretsWriter}). The wire-records these read/write live in
+ * {@code incus-contract}; this module holds only the logic. The former host-tree slot-rotation /
+ * staging→live promotion moved to git (the rendered-branch model) and was removed.
  */
 @org.osgi.annotation.versioning.Version("1.0.0")
 @org.jspecify.annotations.NullMarked

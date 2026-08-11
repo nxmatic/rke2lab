@@ -21,15 +21,7 @@ public enum GraftTag implements ScenarioTag {
    * (a live mutation), and the layout convention that yields it lives only in the incus scion, so
    * the scion poses it and the host reads it back rather than re-deriving the convention.
    */
-  LIVE_ROOT("live-root"),
-
-  /**
-   * The staging path the reconcile just PROMOTED into {@code host.live.d} — a projection of the
-   * committed {@code HostLiveEntry} (one truth, two renderings § cellar-transactional): the durable
-   * entry is the fact, this tag is its runbook narration, so an operator reads "promoted from
-   * host.N.staging.d" in the tree. Posed only on a real promotion.
-   */
-  PROMOTED("promoted-from");
+  LIVE_ROOT("live-root");
 
   private final String type;
 

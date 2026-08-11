@@ -3,17 +3,8 @@ Import-Package: ${annotation-noimports}, *
 Bundle-SymbolicName: io.nxmatic.rke2lab.incus.core
 
 Export-Package: io.nxmatic.rke2lab.incus.core
-# type=model — the incus domain's host-tree LOGIC: the slot rotation (HostSlotSelector), the
-# cellar-timeline fold (HostTreeHead), the two deltas (HostTreeDiffer / HostTreeDelta /
-# HostTreeDeltaRenderer) and the per-file checksum (HostTreeChecksummer). The tree incus mounts is
-# incus's, so its CRUD/fold/rotation lives here, driven by the incus scenarios in-container —
-# nothing crosses to the host. The Host*Entry wire-records live in incus-contract (type=contract);
-# this module holds only the logic, so the contract-purity guard on incus-contract stays clean.
+# type=model — the incus domain's in-container LOGIC: the grow-view projectors (GrowNetworkResolver /
+# GrowIdentityResolver / GrowPlanAssembler the provision scion assembles the InstanceGrowPlan from)
+# and the launch-secrets writer. Driven by the incus scenarios in-container — nothing crosses to the
+# host. No @Component (the rendered-branch refactor retired the host-tree promotion that held them).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=incus-core
-# ACT of the reconcile: jsync (nu manifest, no BSN) is EMBEDDED as WHOLE nested jars — lib:=true nests
-# each jar AND adds it to this bundle's Bundle-ClassPath, so HostTreePromoter loads com.fizzed.jsync.*
-# from within the bundle, never as an OSGi import (the manifests-cdk8s carrier pattern). jsync's only
-# external package is slf4j, wired by Import-Package.
--includeresource: \
-  jsync-engine-*.jar;lib:=true, \
-  jsync-vfs-*.jar;lib:=true

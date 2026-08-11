@@ -34,9 +34,10 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
     </dependency>
-    <!-- The incus domain's host-tree logic: BootstrapPaths (the scion reconstructs the provisioning
-         topology from the worktree scalars) + HostSlotSelector (it picks its own rotation slot) +
-         GrowNetworkResolver (assembles the flat network view from the netplan blueprint). -->
+    <!-- The incus domain's in-container logic: BootstrapPaths (the scion reconstructs the
+         provisioning topology from the worktree scalars and derives the per-cluster render path) +
+         GrowNetworkResolver / GrowPlanAssembler (assemble the flat grow views from the netplan
+         blueprint). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>incus-core</artifactId>
@@ -48,10 +49,9 @@
       <artifactId>netplan-contract</artifactId>
     </dependency>
     <!-- The worktree domain's jgit-free contract: the scion fetches the harvested WorktreeFacts
-         (WorktreeCoordinate.FACTS) from the cellar to read the staging entry's provenance (sha +
-         dirty), and the facts records (Provenance/WorkingState) the staging Then maps onto
-         HostStagingEntry.Provenance — replacing the worktreeRoot scalar the host used to sow and
-         the deleted GitProvenanceReader. -->
+         (WorktreeCoordinate.FACTS) from the cellar to read the worktree ROOT it anchors every path
+         on — replacing the worktreeRoot scalar the host used to sow and the deleted
+         GitProvenanceReader. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>worktree-contract</artifactId>

@@ -14,8 +14,7 @@ import java.util.Optional;
  * An in-memory {@link Cellar} for tests — it holds decoded values directly (no codec, no backend),
  * so a test seeds the cases a unit under test reads and asserts on what it stored. It is the honest
  * stand-in when the code DOES use the cellar (unlike {@link RefusingCellar}, for code that must
- * not): {@code HostSlotSelector}'s test pre-fills {@code host-staging} / {@code host-live} cases
- * and checks the slot it picks.
+ * not): a test pre-fills the cases a unit reads back and asserts on what it derived from them.
  *
  * <p>Semantics mirror the real cellar's shape without its transaction: {@code store} appends to a
  * per-{@code (parcel, coordinate)} timeline (last wins for the peek); {@code fetch(Class)} returns
