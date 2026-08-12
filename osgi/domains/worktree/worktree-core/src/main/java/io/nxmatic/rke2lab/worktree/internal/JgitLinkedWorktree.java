@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.worktree.internal;
 import io.nxmatic.rke2lab.worktree.GitIdentity;
 import io.nxmatic.rke2lab.worktree.LinkedWorktree;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,8 +52,8 @@ final class JgitLinkedWorktree implements LinkedWorktree {
   }
 
   @Override
-  public void push(String token) {
-    checkout.push(branch, token);
+  public void push(String token, Duration timeout) {
+    checkout.push(branch, token, timeout);
   }
 
   @Override

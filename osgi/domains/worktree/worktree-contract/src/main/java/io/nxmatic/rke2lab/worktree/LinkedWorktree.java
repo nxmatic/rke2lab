@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.worktree;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,8 +59,27 @@ public interface LinkedWorktree extends AutoCloseable {
    * the branch's stable null-commit base, so the remote advances, never rewrites — a divergence
    * fails loudly rather than being clobbered. The credential is held in memory for the single push,
    * never written to a config or a command line.
+   *
+   * <p>{@code timeout} bounds the transport so a wedged connection FAILS rather than blocks the
+   * seed forever; it is the caller's to choose because only the caller knows the push's weight and
+   * the link — a first full push differs from an incremental one. {@link Duration#ZERO} disables
+   * the ceiling (jgit's "no timeout").
    */
-  void push(String token);
+  void push(String token, Duration timeout);
+
+  /**
+   * The ceiling {@link #push(String)} applies — a generous IDLE bound (jgit reads it as a
+   * per-operation socket timeout, not a total deadline, so a slow-but-progressing push is
+   * untouched; only a stalled connection trips it). A named default here, not a literal buried in
+   * the implementation, so a caller with a heavier push overrides it via {@link #push(String,
+   * Duration)}.
+   */
+  Duration DEFAULT_PUSH_TIMEOUT = Duration.ofSeconds(30);
+
+  /** Convenience {@link #push(String, Duration)} with {@link #DEFAULT_PUSH_TIMEOUT}. */
+  default void push(String token) {
+    push(token, DEFAULT_PUSH_TIMEOUT);
+  }
 
   /** Remove this linked worktree ({@code git worktree remove --force}). Never throws on absence. */
   @Override

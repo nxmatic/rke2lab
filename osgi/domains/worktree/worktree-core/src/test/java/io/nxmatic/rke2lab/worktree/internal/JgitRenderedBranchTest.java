@@ -9,182 +9,133 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import io.nxmatic.rke2lab.worktree.GitIdentity;
 import io.nxmatic.rke2lab.worktree.LinkedWorktree;
 import io.nxmatic.rke2lab.worktree.Provenance;
+import io.nxmatic.rke2lab.worktree.RenderedBranch;
 import io.nxmatic.rke2lab.worktree.WorkingState;
 import io.nxmatic.rke2lab.worktree.Worktree;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.transport.Daemon;
+import org.eclipse.jgit.transport.DaemonClient;
+import org.eclipse.jgit.transport.DaemonService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * The RenderedBranch socle proven end-to-end against real git: a {@code file://} bare {@code
- * origin} and a working repository stand in for GitHub and the seed's worktree. It proves the whole
- * rendered-branch gesture — {@code prepare} a linked worktree on a branch seeded with a null-commit
- * base, materialise a tree into it, seal it with an SSH-SIGNED commit (a throwaway {@code
- * ssh-keygen} keypair standing in for the ndh {@code github-signing} key), fast-forward push it to
- * origin, then RE-render (a second prepare that reuses the branch, whose commit accretes on the
- * first — null base + two renders), and {@code close} to leave no linked worktree behind.
+ * The RenderedBranch socle, proven against real git. Each test reads as a step of the one gesture —
+ * {@code prepare} a linked worktree on a branch seeded with a null-commit base, materialise a tree,
+ * seal it with an SSH-SIGNED commit, fast-forward push, RE-render (accretion), and {@code close} —
+ * because the plumbing (a stand-in GitHub, a work repo, a signing key, every {@code git} shell-out)
+ * lives in the {@link GitGround} fixture, not in the tests.
  *
- * <p>Needs {@code git} and {@code ssh-keygen} on PATH (the flox runtime provides both); each is
- * guarded so the proof is skipped, never falsely failed, where a tool is absent.
+ * <p>The stand-in origin is served over a loopback {@code git://} daemon, NOT a {@code file://}
+ * path: jgit's local push deadlocks its in-JVM {@code InternalPushConnection} (two piped streams in
+ * one JVM), so the push must ride a real socket — which is also what production (HTTPS) does.
+ *
+ * <p>Needs {@code git} and {@code ssh-keygen} on PATH (the flox runtime provides both); absence
+ * aborts (skips) rather than fails.
  */
 class JgitRenderedBranchTest {
 
-  @Test
-  void it_prepares_commits_signed_force_pushes_and_removes(@TempDir Path tmp) throws Exception {
+  private static final String CLUSTER = "nikopol-mgmt";
+  private static final String BRANCH = "manifests/" + CLUSTER;
+  private static final String TOKEN = "x-access-token-unused-over-the-git-daemon";
+  private static final GitIdentity BOT =
+      new GitIdentity("rke2lab:manifests-bumper", "rke2lab+manifests-bumper@example.invalid");
+
+  @TempDir Path tmp;
+  private GitGround ground;
+
+  @BeforeEach
+  void setUp() throws Exception {
     assumeTrue(toolPresent("git", "--version"), "git is required");
+    ground = new GitGround(tmp);
+  }
 
-    final Path origin = tmp.resolve("origin.git");
-    final Path work = tmp.resolve("work");
-    final Path renderRoot = tmp.resolve("render");
-    final String signingKey = throwawaySshKey(tmp.resolve("sign.key"));
+  @AfterEach
+  void tearDown() {
+    if (ground != null) {
+      ground.close();
+    }
+  }
 
-    // A bare origin and a working repo with one commit on main, pushed to origin — the ground the
-    // rendered branch is cut from.
-    git(tmp, "init", "--bare", "-b", "main", origin.toString());
-    git(tmp, "init", "-b", "main", work.toString());
-    git(work, "config", "user.name", "test");
-    git(work, "config", "user.email", "test@example.invalid");
-    git(work, "config", "commit.gpgsign", "false");
-    Files.writeString(work.resolve("README"), "source\n");
-    git(work, "add", "README");
-    git(work, "commit", "-m", "init");
-    git(work, "remote", "add", "origin", origin.toUri().toString());
-    git(work, "push", "origin", "main");
+  @Test
+  void prepare_seeds_a_null_commit_base() throws Exception {
+    final Path worktreePath = ground.renderPath(CLUSTER);
 
-    final RenderedBranchFixture rendered =
-        new RenderedBranchFixture(new JgitRenderedBranch(rootedAt(work)));
-    final GitIdentity bot =
-        new GitIdentity("rke2lab:manifests-bumper", "rke2lab+manifests-bumper@example.invalid");
-    final String branch = "manifests/nikopol-mgmt";
-    final Path worktreePath = renderRoot.resolve("nikopol-mgmt");
+    final LinkedWorktree linked = ground.renderedBranch().prepare(worktreePath, BRANCH);
 
-    // 1) prepare — a linked worktree on a fresh branch seeded with a null-commit base.
-    final LinkedWorktree linked = rendered.branch().prepare(worktreePath, branch);
     assertEquals(worktreePath.toRealPath(), linked.path(), "checked out at the asked path");
-    assertEquals(branch, linked.branch());
+    assertEquals(BRANCH, linked.branch());
     assertTrue(Files.isDirectory(linked.path()), "the linked worktree is on disk");
-    assertTrue(worktreeRegistered(work, worktreePath), "git knows the linked worktree");
-    assertEquals(1, commitCount(linked.path()), "the branch starts at its null-commit base");
+    assertTrue(ground.registersWorktree(worktreePath), "git knows the linked worktree");
+    assertEquals(1, ground.commitCount(linked.path()), "the branch starts at its null-commit base");
+  }
 
-    // 2) render 1 — materialise, stage-all, sign, push. Accretes ON the null base.
+  @Test
+  void a_render_accretes_is_ssh_signed_and_pushes() throws Exception {
+    final Path worktreePath = ground.renderPath(CLUSTER);
+    final LinkedWorktree linked = ground.renderedBranch().prepare(worktreePath, BRANCH);
+
     Files.writeString(linked.path().resolve("cluster.yaml"), "kind: Cluster\n");
     linked.stageAll();
-    final String firstSha = linked.commit("render nikopol-mgmt", bot, Optional.of(signingKey));
-    assertFalse(firstSha.isBlank(), "the commit reports its sha");
-    assertTrue(isSshSigned(work, firstSha), "the rendered commit is SSH-signed");
-    assertEquals(2, commitCount(linked.path()), "render 1 accretes on the null base");
-    linked.push("x-access-token-value-unused-over-file");
-    assertEquals(firstSha, originTip(origin, branch), "origin's branch is the pushed commit");
+    final String sha = linked.commit("render " + CLUSTER, BOT, Optional.of(ground.signingKey()));
 
-    // 3) render 2 — re-prepare REUSES the branch (its history survives), the tree is re-rendered
-    // and accretes as a second commit whose parent is render 1 (a fast-forward, not a fresh
-    // orphan).
-    final LinkedWorktree again = rendered.branch().prepare(worktreePath, branch);
-    assertEquals(2, commitCount(again.path()), "re-prepare reuses the branch, keeping its history");
+    assertFalse(sha.isBlank(), "the commit reports its sha");
+    assertTrue(ground.isSshSigned(sha), "the rendered commit is SSH-signed");
+    assertEquals(2, ground.commitCount(linked.path()), "the render accretes on the null base");
+
+    linked.push(TOKEN);
+    assertEquals(sha, ground.originTip(BRANCH), "origin advanced to the pushed render");
+  }
+
+  @Test
+  void re_preparing_reuses_the_branch_so_renders_accrete_as_fast_forwards() throws Exception {
+    final Path worktreePath = ground.renderPath(CLUSTER);
+    final RenderedBranch branch = ground.renderedBranch();
+
+    // render 1 — accretes on the null base, pushed.
+    final LinkedWorktree first = branch.prepare(worktreePath, BRANCH);
+    Files.writeString(first.path().resolve("cluster.yaml"), "kind: Cluster\n");
+    first.stageAll();
+    final String firstSha =
+        first.commit("render " + CLUSTER, BOT, Optional.of(ground.signingKey()));
+    first.push(TOKEN);
+
+    // render 2 — re-prepare REUSES the branch (its history survives), a second commit whose parent
+    // is render 1 (a fast-forward, not a fresh orphan).
+    final LinkedWorktree again = branch.prepare(worktreePath, BRANCH);
+    assertEquals(2, ground.commitCount(again.path()), "re-prepare keeps the branch history");
     Files.writeString(again.path().resolve("cluster.yaml"), "kind: Cluster\nversion: 2\n");
     again.stageAll();
-    final String secondSha = again.commit("re-render nikopol-mgmt", bot, Optional.of(signingKey));
-    assertEquals(3, commitCount(again.path()), "render 2 accretes — null base + two renders");
-    assertEquals(firstSha, parentSha(again.path(), secondSha), "render 2's parent is render 1");
-    again.push("x-access-token-value-unused-over-file");
-    assertEquals(secondSha, originTip(origin, branch), "origin fast-forwarded to render 2");
+    final String secondSha =
+        again.commit("re-render " + CLUSTER, BOT, Optional.of(ground.signingKey()));
 
-    // 4) close — the linked worktree is gone; the branch (with its history) survives.
-    again.close();
+    assertEquals(3, ground.commitCount(again.path()), "null base + two renders");
+    assertEquals(
+        firstSha, ground.parentSha(again.path(), secondSha), "render 2's parent is render 1");
+    again.push(TOKEN);
+    assertEquals(secondSha, ground.originTip(BRANCH), "origin fast-forwarded to render 2");
+  }
+
+  @Test
+  void close_removes_the_linked_worktree_but_keeps_the_branch() throws Exception {
+    final Path worktreePath = ground.renderPath(CLUSTER);
+    final LinkedWorktree linked = ground.renderedBranch().prepare(worktreePath, BRANCH);
+
+    linked.close();
+
     assertFalse(Files.exists(worktreePath), "the linked worktree directory is removed");
-    assertFalse(worktreeRegistered(work, worktreePath), "git no longer lists the linked worktree");
-  }
-
-  /** Number of commits reachable from the worktree's HEAD (the branch's history depth). */
-  private int commitCount(Path worktree) throws Exception {
-    return Integer.parseInt(git(worktree, "rev-list", "--count", "HEAD").trim());
-  }
-
-  /** The parent sha of {@code sha} in the worktree's repo. */
-  private String parentSha(Path worktree, String sha) throws Exception {
-    return git(worktree, "rev-parse", sha + "^").trim();
-  }
-
-  /** A {@link Worktree} that only knows its root — all this socle asks of it. */
-  private Worktree rootedAt(Path root) {
-    return new Worktree() {
-      @Override
-      public Path root() {
-        return root;
-      }
-
-      @Override
-      public Provenance provenance() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public WorkingState workingState() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean flakeLockCoherent() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void stage(List<Path> paths) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public String commit(String message, GitIdentity identity, Optional<String> sshSigningKey) {
-        throw new UnsupportedOperationException();
-      }
-    };
-  }
-
-  /** The sha origin's {@code branch} points at, read from the bare repo. */
-  private String originTip(Path origin, String branch) throws Exception {
-    return git(origin, "rev-parse", "refs/heads/" + branch).trim();
-  }
-
-  /** Whether {@code sha}'s commit object carries an SSH signature header. */
-  private boolean isSshSigned(Path repo, String sha) throws Exception {
-    return git(repo, "cat-file", "-p", sha).contains("BEGIN SSH SIGNATURE");
-  }
-
-  /**
-   * Whether git's worktree registry lists {@code worktreePath} for {@code repo}. Canonicalises via
-   * the PARENT (which outlives the leaf — {@code git worktree remove} drops only the leaf), so the
-   * probe works both before and after {@code close()}, matching the real path git records.
-   */
-  private boolean worktreeRegistered(Path repo, Path worktreePath) throws Exception {
-    final String canonical =
-        worktreePath.getParent().toRealPath().resolve(worktreePath.getFileName()).toString();
-    return git(repo, "worktree", "list", "--porcelain").contains("worktree " + canonical);
-  }
-
-  private String throwawaySshKey(Path keyFile) throws Exception {
-    final Process process =
-        new ProcessBuilder(
-                "ssh-keygen",
-                "-t",
-                "ed25519",
-                "-N",
-                "",
-                "-C",
-                "render-test",
-                "-f",
-                keyFile.toString())
-            .redirectErrorStream(true)
-            .start();
-    if (!process.waitFor(20, TimeUnit.SECONDS) || process.exitValue() != 0) {
-      abort("ssh-keygen could not mint a throwaway key");
-    }
-    return Files.readString(keyFile, StandardCharsets.UTF_8);
+    assertFalse(ground.registersWorktree(worktreePath), "git no longer lists the linked worktree");
   }
 
   private boolean toolPresent(String... probe) {
@@ -206,25 +157,183 @@ class JgitRenderedBranchTest {
             System.getProperty("os.name", "").toLowerCase().contains("win") ? "NUL" : "/dev/null"));
   }
 
-  /** Run {@code git <args>} in {@code dir}, returning stdout; throws on a non-zero exit. */
-  private String git(Path dir, String... args) throws Exception {
-    final java.util.List<String> command = new java.util.ArrayList<>();
-    command.add("git");
-    command.addAll(List.of(args));
-    final Process process =
-        new ProcessBuilder(command).directory(dir.toFile()).redirectErrorStream(true).start();
-    final byte[] output = process.getInputStream().readAllBytes();
-    if (!process.waitFor(30, TimeUnit.SECONDS)) {
-      process.destroyForcibly();
-      throw new IllegalStateException(String.join(" ", command) + " timed out");
+  /**
+   * The inline fixture "app": a bare origin served over a loopback {@code git://} daemon (a
+   * stand-in GitHub on a real socket, so the push does not deadlock jgit's in-JVM {@code file://}
+   * transport), a work repository with one commit on {@code main}, and a throwaway {@code
+   * ssh-keygen} key (the ndh {@code github-signing} stand-in). It owns every {@code git} shell-out
+   * and the daemon lifecycle, so a test reads as prepare / render / push / close, not as plumbing.
+   * {@link AutoCloseable}: {@link #close()} stops the daemon.
+   */
+  static final class GitGround implements AutoCloseable {
+
+    private final Path origin;
+    private final Path work;
+    private final Path renderRoot;
+    private final String signingKey;
+    private final Daemon daemon;
+
+    GitGround(Path tmp) throws Exception {
+      this.origin = tmp.resolve("origin.git");
+      this.work = tmp.resolve("work");
+      this.renderRoot = tmp.resolve("render");
+      this.signingKey = throwawaySshKey(tmp.resolve("sign.key"));
+
+      git(tmp, "init", "--bare", "-b", "main", origin.toString());
+      this.daemon = serveOverGitDaemon(origin);
+      final String originUrl = "git://127.0.0.1:" + daemon.getAddress().getPort() + "/origin.git";
+
+      git(tmp, "init", "-b", "main", work.toString());
+      git(work, "config", "user.name", "test");
+      git(work, "config", "user.email", "test@example.invalid");
+      git(work, "config", "commit.gpgsign", "false");
+      Files.writeString(work.resolve("README"), "source\n");
+      git(work, "add", "README");
+      git(work, "commit", "-m", "init");
+      git(work, "remote", "add", "origin", originUrl);
+      git(work, "push", "origin", "main");
     }
-    final String text = new String(output, StandardCharsets.UTF_8);
-    if (process.exitValue() != 0) {
-      throw new IllegalStateException(String.join(" ", command) + " failed: " + text.trim());
+
+    /** A rendered branch cut from this ground's work repository. */
+    RenderedBranch renderedBranch() {
+      return new JgitRenderedBranch(new SeedWorktree(work));
     }
-    return text;
+
+    /** The render-worktree path for a cluster leaf under the (would-be gitignored) render root. */
+    Path renderPath(String leaf) {
+      return renderRoot.resolve(leaf);
+    }
+
+    /** The throwaway OpenSSH private key renders are signed with. */
+    String signingKey() {
+      return signingKey;
+    }
+
+    /** The sha origin's {@code branch} points at, read straight from the bare repo. */
+    String originTip(String branch) throws Exception {
+      return git(origin, "rev-parse", "refs/heads/" + branch).trim();
+    }
+
+    /** Commits reachable from the worktree's HEAD — the branch's history depth. */
+    int commitCount(Path worktree) throws Exception {
+      return Integer.parseInt(git(worktree, "rev-list", "--count", "HEAD").trim());
+    }
+
+    /** The parent sha of {@code sha} in the worktree's repo. */
+    String parentSha(Path worktree, String sha) throws Exception {
+      return git(worktree, "rev-parse", sha + "^").trim();
+    }
+
+    /** Whether {@code sha}'s commit object carries an SSH signature header. */
+    boolean isSshSigned(String sha) throws Exception {
+      return git(work, "cat-file", "-p", sha).contains("BEGIN SSH SIGNATURE");
+    }
+
+    /**
+     * Whether git's worktree registry lists {@code worktreePath}. Canonicalises via the PARENT
+     * (which outlives the leaf — {@code git worktree remove} drops only the leaf), so it answers
+     * both before and after {@code close()}, matching the real path git records.
+     */
+    boolean registersWorktree(Path worktreePath) throws Exception {
+      final String canonical =
+          worktreePath.getParent().toRealPath().resolve(worktreePath.getFileName()).toString();
+      return git(work, "worktree", "list", "--porcelain").contains("worktree " + canonical);
+    }
+
+    @Override
+    public void close() {
+      daemon.stop();
+    }
+
+    /**
+     * Serve {@code bareRepo} over a loopback {@code git://} daemon (ephemeral port), receive-pack
+     * force-enabled, a single-repo resolver handing back {@code bareRepo} for any requested name.
+     */
+    private Daemon serveOverGitDaemon(Path bareRepo) throws Exception {
+      final Daemon server = new Daemon(new InetSocketAddress("127.0.0.1", 0));
+      final DaemonService receivePack = server.getService("receive-pack");
+      receivePack.setEnabled(true);
+      receivePack.setOverridable(false);
+      server.setRepositoryResolver(
+          (DaemonClient req, String name) -> {
+            try {
+              return new FileRepositoryBuilder().setGitDir(bareRepo.toFile()).build();
+            } catch (IOException ex) {
+              throw new RepositoryNotFoundException(name, ex);
+            }
+          });
+      server.start();
+      return server;
+    }
+
+    private String throwawaySshKey(Path keyFile) throws Exception {
+      final Process process =
+          new ProcessBuilder(
+                  "ssh-keygen",
+                  "-t",
+                  "ed25519",
+                  "-N",
+                  "",
+                  "-C",
+                  "render-test",
+                  "-f",
+                  keyFile.toString())
+              .redirectErrorStream(true)
+              .start();
+      if (!process.waitFor(20, TimeUnit.SECONDS) || process.exitValue() != 0) {
+        abort("ssh-keygen could not mint a throwaway key");
+      }
+      return Files.readString(keyFile, StandardCharsets.UTF_8);
+    }
+
+    /** Run {@code git <args>} in {@code dir}, returning stdout; throws on a non-zero exit. */
+    private String git(Path dir, String... args) throws Exception {
+      final java.util.List<String> command = new java.util.ArrayList<>();
+      command.add("git");
+      command.addAll(List.of(args));
+      final Process process =
+          new ProcessBuilder(command).directory(dir.toFile()).redirectErrorStream(true).start();
+      final byte[] output = process.getInputStream().readAllBytes();
+      if (!process.waitFor(30, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        throw new IllegalStateException(String.join(" ", command) + " timed out");
+      }
+      final String text = new String(output, StandardCharsets.UTF_8);
+      if (process.exitValue() != 0) {
+        throw new IllegalStateException(String.join(" ", command) + " failed: " + text.trim());
+      }
+      return text;
+    }
   }
 
-  /** The socle under test, threaded as an instance rather than reached statically. */
-  private record RenderedBranchFixture(JgitRenderedBranch branch) {}
+  /**
+   * A {@link Worktree} that knows only its root — all {@link RenderedBranch#prepare} asks of it.
+   */
+  private record SeedWorktree(Path root) implements Worktree {
+
+    @Override
+    public Provenance provenance() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public WorkingState workingState() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean flakeLockCoherent() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void stage(List<Path> paths) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String commit(String message, GitIdentity identity, Optional<String> sshSigningKey) {
+      throw new UnsupportedOperationException();
+    }
+  }
 }

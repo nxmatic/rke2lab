@@ -9,6 +9,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,7 +41,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  *
  * <p>Works equally on a main worktree and a LINKED one: a linked worktree's {@code .git} file
  * points at the shared common dir, which {@link FileRepositoryBuilder#findGitDir} resolves, so
- * provenance/stage/commit act on the linked HEAD while {@link #forcePush} pushes through the shared
+ * provenance/stage/commit act on the linked HEAD while {@link #push} pushes through the shared
  * object database to the origin the repository already knows.
  */
 final class JgitCheckout {
@@ -139,14 +140,21 @@ final class JgitCheckout {
    * setForce(false)}): renders accrete on the branch's stable null-commit base, so origin advances
    * — a non-fast-forward (a divergence) is rejected, not clobbered. The credential is held only for
    * this call (jgit's in-memory provider), never written to config or a command line.
+   *
+   * <p>{@code timeout} is the caller-supplied transport ceiling — a stuck connection FAILS rather
+   * than blocking the seed. jgit takes it in whole seconds; {@link Duration#ZERO} means no ceiling.
+   * (jgit's local {@code file://} transport can deadlock its two in-JVM piped streams, which is why
+   * a test pushes over a socket, never a local path — but production is HTTPS, where this bounds a
+   * wedged read.)
    */
-  void push(String branch, String token) {
+  void push(String branch, String token, Duration timeout) {
     try (Repository repository = open();
         Git git = new Git(repository)) {
       git.push()
           .setRemote(Constants.DEFAULT_REMOTE_NAME)
           .setRefSpecs(new RefSpec("refs/heads/" + branch + ":refs/heads/" + branch))
           .setForce(false)
+          .setTimeout((int) timeout.toSeconds())
           .setCredentialsProvider(new UsernamePasswordCredentialsProvider("x-access-token", token))
           .call();
     } catch (GitAPIException ex) {
