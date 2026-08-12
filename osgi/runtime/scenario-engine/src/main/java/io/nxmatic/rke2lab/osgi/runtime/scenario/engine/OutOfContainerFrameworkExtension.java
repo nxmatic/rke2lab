@@ -5,9 +5,8 @@ import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleInstaller;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
+import io.nxmatic.rke2lab.osgi.runtime.framework.FelixStorage;
 import io.nxmatic.rke2lab.osgi.runtime.framework.LaunchConfig;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -75,6 +74,8 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
    * convention), reached only through {@link #framework()}.
    */
   private @MonotonicNonNull Framework framework;
+
+  private @MonotonicNonNull FelixStorage storage;
 
   /**
    * The booted framework, or an {@link IllegalStateException} if reached before {@link #beforeAll}
@@ -311,14 +312,14 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
 
   @Override
   public void beforeAll(ExtensionContext context) throws Exception {
-    Path storage = Files.createTempDirectory("osgi-testkit-felix");
+    storage = FelixStorage.create("osgi-testkit-felix");
     FrameworkFactory factory =
         ServiceLoader.load(FrameworkFactory.class)
             .findFirst()
             .orElseThrow(
                 () -> new IllegalStateException("no OSGi FrameworkFactory on the classpath"));
     Map<String, String> config = new HashMap<>();
-    config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
+    config.put(Constants.FRAMEWORK_STORAGE, storage.path().toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
     // The Felix invariants every boot shares — the SAME source the live FrameworkLauncher uses, so
     // this executor can never drift from it (§ LaunchConfig.applyFrameworkInvariants).
@@ -412,9 +413,15 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
 
   @Override
   public void afterAll(ExtensionContext context) throws Exception {
-    if (framework != null) {
-      framework.stop();
-      framework.waitForStop(5000);
+    try {
+      if (framework != null) {
+        framework.stop();
+        framework.waitForStop(5000);
+      }
+    } finally {
+      if (storage != null) {
+        storage.delete();
+      }
     }
   }
 

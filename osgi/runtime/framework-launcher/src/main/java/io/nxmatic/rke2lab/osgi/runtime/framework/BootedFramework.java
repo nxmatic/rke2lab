@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -31,14 +32,16 @@ public final class BootedFramework implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(BootedFramework.class);
 
   private final Framework framework;
+  private final Optional<FelixStorage> storage;
   private final boolean owns;
 
-  BootedFramework(Framework framework) {
-    this(framework, true);
+  BootedFramework(Framework framework, FelixStorage storage) {
+    this(framework, Optional.of(storage), true);
   }
 
-  private BootedFramework(Framework framework, boolean owns) {
+  private BootedFramework(Framework framework, Optional<FelixStorage> storage, boolean owns) {
     this.framework = framework;
+    this.storage = storage;
     this.owns = owns;
   }
 
@@ -50,7 +53,7 @@ public final class BootedFramework implements AutoCloseable {
    * {@code BootedFramework} but did not perform the boot.
    */
   public static BootedFramework attached(Framework framework) {
-    return new BootedFramework(framework, false);
+    return new BootedFramework(framework, Optional.empty(), false);
   }
 
   /**
@@ -173,6 +176,8 @@ public final class BootedFramework implements AutoCloseable {
         Thread.currentThread().interrupt();
       }
       LOG.warn("OSGi runtime shutdown was not clean", ex);
+    } finally {
+      storage.ifPresent(FelixStorage::delete);
     }
   }
 }

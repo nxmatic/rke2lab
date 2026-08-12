@@ -59,8 +59,10 @@ public final class FrameworkLauncher {
             .orElseThrow(
                 () -> new IllegalStateException("no OSGi FrameworkFactory on the classpath"));
 
-    final Framework framework = factory.newFramework(frameworkConfig(plan));
+    final FelixStorage storage = FelixStorage.create("osgi-runtime-felix");
+    boolean handedOff = false;
     try {
+      final Framework framework = factory.newFramework(frameworkConfig(plan, storage));
       framework.init();
 
       // Install everything pinned to its layer and marked persistently-started; the framework's
@@ -94,24 +96,28 @@ public final class FrameworkLauncher {
       }
       LOG.info(
           "OSGi runtime booted: {} bundle(s) installed and started", plan.installables().size());
-      return new BootedFramework(framework);
+      final BootedFramework booted = new BootedFramework(framework, storage);
+      handedOff = true;
+      return booted;
     } catch (BundleException ex) {
       throw new IOException("failed to boot OSGi runtime", ex);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       throw new IOException("interrupted booting OSGi runtime", ex);
+    } finally {
+      // Any exit before the framework is handed to a BootedFramework — a failed init, an
+      // unresolved graph, a start timeout — owns the storage's cleanup; only a successful handoff
+      // transfers that duty to BootedFramework.close().
+      if (!handedOff) {
+        storage.delete();
+      }
     }
   }
 
-  private Map<String, String> frameworkConfig(BootPlan plan) throws IOException {
-    final Path storage;
-    try {
-      storage = Files.createTempDirectory("osgi-runtime-felix");
-    } catch (IOException ex) {
-      throw new IOException("failed to create Felix storage dir", ex);
-    }
+  private Map<String, String> frameworkConfig(BootPlan plan, FelixStorage storage)
+      throws IOException {
     final Map<String, Object> config = new HashMap<>();
-    config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
+    config.put(Constants.FRAMEWORK_STORAGE, storage.path().toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
     // The Felix invariants every boot shares (felix.bootdelegation.implicit=false) — one source,
     // so the live and test boots can never diverge on them (§
@@ -147,7 +153,8 @@ public final class FrameworkLauncher {
       // pax-logback-config fragment's PaxLogbackConfigurer, in Java — see applyPaxLogbackPolicy.
       // And
       // drain framework/bundle/service events at WARN into the LogService.
-      config.put("org.ops4j.pax.logging.StaticLogbackFile", writePaxLogbackConfig().toString());
+      config.put(
+          "org.ops4j.pax.logging.StaticLogbackFile", writePaxLogbackConfig(storage).toString());
       config.put("org.ops4j.pax.logging.service.frameworkEventsLogLevel", "WARN");
       // pax's fallback logger (used before Config Admin — which we do not install — and while it
       // applies StaticLogbackFile) echoes logback's Joran config status to the console at INFO
@@ -213,8 +220,8 @@ public final class FrameworkLauncher {
    * stays ignorant of the host/Pulumi. This is the ONE logback in the process: it drains the JDK
    * JUL bus (host + Felix) via pax's JdkHandler AND the OSGi LogService.
    */
-  private Path writePaxLogbackConfig() throws IOException {
-    final Path file = Files.createTempFile("rke2lab-osgi-logback-", ".xml");
+  private Path writePaxLogbackConfig(FelixStorage storage) throws IOException {
+    final Path file = storage.path().resolve("logback-bootstrap.xml");
     final String rootLevel =
         config().frameworkLogLevel().map(LaunchConfig::logbackLevelOf).orElse("INFO");
     Files.writeString(
