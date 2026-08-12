@@ -41,13 +41,18 @@ final class JgitLinkedWorktree implements LinkedWorktree {
   }
 
   @Override
+  public void stageAll() {
+    gitCli.addAll(checkout.root());
+  }
+
+  @Override
   public String commit(String message, GitIdentity identity, Optional<String> sshSigningKey) {
     return checkout.commit(message, identity, sshSigningKey);
   }
 
   @Override
-  public void forcePush(String token) {
-    checkout.forcePush(branch, token);
+  public void push(String token) {
+    checkout.push(branch, token);
   }
 
   @Override

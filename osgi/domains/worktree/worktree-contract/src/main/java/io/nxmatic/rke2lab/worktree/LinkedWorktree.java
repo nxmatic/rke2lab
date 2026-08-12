@@ -29,27 +29,37 @@ public interface LinkedWorktree extends AutoCloseable {
   /**
    * Stage the given paths for the next commit — additions/modifications for paths that exist,
    * removals for paths that no longer do. Each path may be absolute or resolved against {@link
-   * #path()}. The rendered tree is staged wholesale before it is sealed.
+   * #path()}. For staging a whole rendered tree (including files a re-render dropped), prefer
+   * {@link #stageAll()}.
    */
   void stage(List<Path> paths);
+
+  /**
+   * Stage the ENTIRE worktree — additions, modifications, AND deletions ({@code git add -A}). The
+   * render verb: a re-render rewrites the tree in place, and a manifest removed since the previous
+   * render must be staged as a deletion so the commit reflects the tree exactly.
+   */
+  void stageAll();
 
   /**
    * Commit the staged tree with {@code message}, authored AND committed as {@code identity} (a bot
    * identity — a rendered branch is machine-made, attributable to the tool, never to the ambient
    * {@code user.name}). {@code sshSigningKey} is the caller's OpenSSH PRIVATE key the commit is
    * SSH-signed with (git SSHSIG, {@code git} namespace); {@link Optional#empty()} commits unsigned.
-   * Returns the new commit sha. Local only — {@link #forcePush} is the separate, credentialed act.
+   * The commit accretes on the branch's tip (a null-commit base + one commit per render). Returns
+   * the new commit sha. Local only — {@link #push} is the separate, credentialed act.
    */
   String commit(String message, GitIdentity identity, Optional<String> sshSigningKey);
 
   /**
-   * Force-push this worktree's {@link #branch()} to the repository's {@code origin} over HTTPS,
+   * Push this worktree's {@link #branch()} to the repository's {@code origin} over HTTPS,
    * authenticating as {@code x-access-token} with {@code token} (a short-lived GitHub token the
-   * caller revealed from the sealed cellar). A rendered branch is desired-state, so the push is a
-   * forced ref update — the remote branch is made to match the freshly-committed HEAD exactly. The
-   * credential is held in memory for the single push, never written to a config or a command line.
+   * caller revealed from the sealed cellar). A FAST-FORWARD push, not a force: renders accrete on
+   * the branch's stable null-commit base, so the remote advances, never rewrites — a divergence
+   * fails loudly rather than being clobbered. The credential is held in memory for the single push,
+   * never written to a config or a command line.
    */
-  void forcePush(String token);
+  void push(String token);
 
   /** Remove this linked worktree ({@code git worktree remove --force}). Never throws on absence. */
   @Override

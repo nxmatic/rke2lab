@@ -24,11 +24,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The RenderedBranch socle proven end-to-end against real git: a {@code file://} bare {@code
  * origin} and a working repository stand in for GitHub and the seed's worktree. It proves the whole
- * rendered -branch gesture — {@code prepare} a linked worktree on a fresh branch, materialise a
- * tree into it, seal it with an SSH-SIGNED commit (a throwaway {@code ssh-keygen} keypair standing
- * in for the ndh {@code github-signing} key), force-push it to origin, re-render idempotently (a
- * second prepare + commit + force-push moves the branch), and {@code close} to leave no linked
- * worktree behind.
+ * rendered-branch gesture — {@code prepare} a linked worktree on a branch seeded with a null-commit
+ * base, materialise a tree into it, seal it with an SSH-SIGNED commit (a throwaway {@code
+ * ssh-keygen} keypair standing in for the ndh {@code github-signing} key), fast-forward push it to
+ * origin, then RE-render (a second prepare that reuses the branch, whose commit accretes on the
+ * first — null base + two renders), and {@code close} to leave no linked worktree behind.
  *
  * <p>Needs {@code git} and {@code ssh-keygen} on PATH (the flox runtime provides both); each is
  * guarded so the proof is skipped, never falsely failed, where a tool is absent.
@@ -64,35 +64,51 @@ class JgitRenderedBranchTest {
     final String branch = "manifests/nikopol-mgmt";
     final Path worktreePath = renderRoot.resolve("nikopol-mgmt");
 
-    // 1) prepare — an orphan linked worktree (empty tree, unborn branch), independent of main.
+    // 1) prepare — a linked worktree on a fresh branch seeded with a null-commit base.
     final LinkedWorktree linked = rendered.branch().prepare(worktreePath, branch);
     assertEquals(worktreePath.toRealPath(), linked.path(), "checked out at the asked path");
     assertEquals(branch, linked.branch());
     assertTrue(Files.isDirectory(linked.path()), "the linked worktree is on disk");
     assertTrue(worktreeRegistered(work, worktreePath), "git knows the linked worktree");
+    assertEquals(1, commitCount(linked.path()), "the branch starts at its null-commit base");
 
-    // 2) materialise + sign + push — the rendered tree sealed and delivered.
+    // 2) render 1 — materialise, stage-all, sign, push. Accretes ON the null base.
     Files.writeString(linked.path().resolve("cluster.yaml"), "kind: Cluster\n");
-    linked.stage(List.of(linked.path().resolve("cluster.yaml")));
+    linked.stageAll();
     final String firstSha = linked.commit("render nikopol-mgmt", bot, Optional.of(signingKey));
     assertFalse(firstSha.isBlank(), "the commit reports its sha");
     assertTrue(isSshSigned(work, firstSha), "the rendered commit is SSH-signed");
-    linked.forcePush("x-access-token-value-unused-over-file");
+    assertEquals(2, commitCount(linked.path()), "render 1 accretes on the null base");
+    linked.push("x-access-token-value-unused-over-file");
     assertEquals(firstSha, originTip(origin, branch), "origin's branch is the pushed commit");
 
-    // 3) re-render — a second prepare + commit + force-push regenerates the branch (idempotent
-    // prepare, forced ref update). The tree is replaced, not accreted.
+    // 3) render 2 — re-prepare REUSES the branch (its history survives), the tree is re-rendered
+    // and accretes as a second commit whose parent is render 1 (a fast-forward, not a fresh
+    // orphan).
     final LinkedWorktree again = rendered.branch().prepare(worktreePath, branch);
+    assertEquals(2, commitCount(again.path()), "re-prepare reuses the branch, keeping its history");
     Files.writeString(again.path().resolve("cluster.yaml"), "kind: Cluster\nversion: 2\n");
-    again.stage(List.of(again.path().resolve("cluster.yaml")));
+    again.stageAll();
     final String secondSha = again.commit("re-render nikopol-mgmt", bot, Optional.of(signingKey));
-    again.forcePush("x-access-token-value-unused-over-file");
-    assertEquals(secondSha, originTip(origin, branch), "origin advanced to the re-render");
+    assertEquals(3, commitCount(again.path()), "render 2 accretes — null base + two renders");
+    assertEquals(firstSha, parentSha(again.path(), secondSha), "render 2's parent is render 1");
+    again.push("x-access-token-value-unused-over-file");
+    assertEquals(secondSha, originTip(origin, branch), "origin fast-forwarded to render 2");
 
-    // 4) close — the linked worktree is gone, the repo left clean of it.
+    // 4) close — the linked worktree is gone; the branch (with its history) survives.
     again.close();
     assertFalse(Files.exists(worktreePath), "the linked worktree directory is removed");
     assertFalse(worktreeRegistered(work, worktreePath), "git no longer lists the linked worktree");
+  }
+
+  /** Number of commits reachable from the worktree's HEAD (the branch's history depth). */
+  private int commitCount(Path worktree) throws Exception {
+    return Integer.parseInt(git(worktree, "rev-list", "--count", "HEAD").trim());
+  }
+
+  /** The parent sha of {@code sha} in the worktree's repo. */
+  private String parentSha(Path worktree, String sha) throws Exception {
+    return git(worktree, "rev-parse", sha + "^").trim();
   }
 
   /** A {@link Worktree} that only knows its root — all this socle asks of it. */

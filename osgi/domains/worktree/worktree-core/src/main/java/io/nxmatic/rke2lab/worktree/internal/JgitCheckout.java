@@ -134,22 +134,23 @@ final class JgitCheckout {
   }
 
   /**
-   * Force-push {@code branch} to {@code origin} over HTTPS, authenticating as {@code
-   * x-access-token} with {@code token}. A forced refspec ({@code +…}) makes the remote branch match
-   * the local HEAD exactly — a rendered branch is desired-state, not history. The credential is
-   * held only for this call (jgit's in-memory provider), never written to config or a command line.
+   * Push {@code branch} to {@code origin} over HTTPS, authenticating as {@code x-access-token} with
+   * {@code token}. A FAST-FORWARD push ({@link org.eclipse.jgit.api.PushCommand#setForce(boolean)
+   * setForce(false)}): renders accrete on the branch's stable null-commit base, so origin advances
+   * — a non-fast-forward (a divergence) is rejected, not clobbered. The credential is held only for
+   * this call (jgit's in-memory provider), never written to config or a command line.
    */
-  void forcePush(String branch, String token) {
+  void push(String branch, String token) {
     try (Repository repository = open();
         Git git = new Git(repository)) {
       git.push()
           .setRemote(Constants.DEFAULT_REMOTE_NAME)
-          .setRefSpecs(new RefSpec("+refs/heads/" + branch + ":refs/heads/" + branch))
-          .setForce(true)
+          .setRefSpecs(new RefSpec("refs/heads/" + branch + ":refs/heads/" + branch))
+          .setForce(false)
           .setCredentialsProvider(new UsernamePasswordCredentialsProvider("x-access-token", token))
           .call();
     } catch (GitAPIException ex) {
-      throw new IllegalStateException("cannot force-push " + branch + " from " + worktree, ex);
+      throw new IllegalStateException("cannot push " + branch + " from " + worktree, ex);
     }
   }
 

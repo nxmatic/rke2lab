@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -178,7 +177,7 @@ public class ManifestSynthesisScenario
         || facet.identity().isEmpty()) {
       return Optional.empty();
     }
-    final String cluster = facet.identity().orElseThrow().clusterName();
+    final String cluster = facet.identity().orElseThrow().clusterId();
     final Path worktreePath =
         Path.of(facet.materializationRoot().orElseThrow()).toAbsolutePath().normalize();
     return Optional.of(renderedBranch.orElseThrow().prepare(worktreePath, BRANCH_PREFIX + cluster));
@@ -199,7 +198,7 @@ public class ManifestSynthesisScenario
     final NdhKeystoreReader ks =
         keystore.orElseThrow(
             () -> new IllegalStateException("no ndh key-store — cannot sign the rendered commit"));
-    final String cluster = facet.identity().orElseThrow().clusterName();
+    final String cluster = facet.identity().orElseThrow().clusterId();
     final GitIdentity bot =
         new GitBotIdentities(ks.authorityDomain(TAILNET_AUTHORITY)).forTool(RENDER_TOOL);
     final boolean push = facet.facets().delivery().push();
@@ -437,10 +436,10 @@ public class ManifestSynthesisScenario
       }
       final LinkedWorktree worktree = rendered.orElseThrow();
       final Delivery plan = delivery.orElseThrow();
-      worktree.stage(List.of(worktree.path()));
+      worktree.stageAll();
       worktree.commit(plan.message(), plan.identity(), Optional.of(plan.signingKey()));
       if (plan.push()) {
-        plan.token().ifPresent(worktree::forcePush);
+        plan.token().ifPresent(worktree::push);
       }
       return self();
     }

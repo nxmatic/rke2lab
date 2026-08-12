@@ -331,9 +331,11 @@ public class IncusProvisionScenario
       return Optional.of(
           new Resolved(
               // The manifests plot is now the per-cluster RENDER worktree the manifests scion
-              // prepares (an orphan `manifests/<cluster>` checkout) and the branch is force-pushed
-              // from — no rotating staging slot, no host.live.d promotion.
-              local.renderRoot().resolve(facet.clusterName()).toString(),
+              // prepares (the `manifests/<cluster>` checkout the branch is pushed from) — no
+              // rotating staging slot, no host.live.d promotion. The cluster identity is
+              // <host>-<role> = clusterName-nodeName (the same identity the mDNS FQDN and the
+              // seed-node name carry).
+              local.renderRoot().resolve(facet.clusterName() + "-" + facet.nodeName()).toString(),
               local.liveRoot().toString(),
               root,
               local.secretsFile(),

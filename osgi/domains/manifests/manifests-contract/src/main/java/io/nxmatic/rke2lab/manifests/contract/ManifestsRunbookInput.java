@@ -177,7 +177,18 @@ public record ManifestsRunbookInput(
    * unamended (a bare survey / the direct CLI call) — the synthesis falls back to an unknown
    * identity.
    */
-  public record Identity(String clusterName, String nodeName) {}
+  public record Identity(String clusterName, String nodeName) {
+
+    /**
+     * The cluster identity {@code <host>-<role>} — {@code clusterName-nodeName}, the SAME identity
+     * the node's mDNS FQDN ({@code <cluster>-<node>.local}) and the seed-node name carry. It is the
+     * rendered branch's name ({@code manifests/<clusterId>}) and its render-worktree leaf, so a
+     * cluster's branch reads {@code manifests/nikopol-mgmt}, not the bare host.
+     */
+    public String clusterId() {
+      return clusterName + "-" + nodeName;
+    }
+  }
 
   /**
    * The {@code manifests.publish} concern: which domain manifest layers the master publishes into

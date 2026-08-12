@@ -29,18 +29,48 @@ final class GitCli {
   }
 
   /**
-   * Add an ORPHAN linked worktree at {@code worktreePath} on {@code branch} — an empty tree on an
-   * unborn branch. Idempotent across re-runs: any prior worktree at the path is removed, the
-   * administrative records pruned, and any stale local {@code branch} deleted first, then {@code
-   * --orphan} checks out a fresh empty tree — a rendered branch is regenerated as a single root
-   * commit each render, never accreted. The add is checked (a failure throws); the pre-clean
-   * tolerates absence.
+   * Add a linked worktree at {@code worktreePath} on {@code branch}, on a STABLE null-commit base.
+   * The first time a {@code branch} is seen it is seeded with an empty root commit — a shared base
+   * Flux can point at and every later render commits ON TOP of (accretion, not orphan-per-render).
+   * On a re-run the existing branch is reused: its tip is checked out (the accretion parent) and
+   * the working tree emptied, so the fresh render starts clean and a manifest removed between
+   * renders is staged as a deletion. Idempotent: any prior worktree at the path is removed and
+   * pruned first.
    */
   void worktreeAdd(Path worktreePath, String branch) {
-    run(false, "worktree", "remove", "--force", worktreePath.toString());
+    final String path = worktreePath.toString();
+    run(false, "worktree", "remove", "--force", path);
     run(false, "worktree", "prune");
-    run(false, "branch", "-D", branch);
-    run(true, "worktree", "add", "--orphan", "-b", branch, worktreePath.toString());
+    if (branchExists(branch)) {
+      run(true, "worktree", "add", path, branch);
+      // Empty the working tree (keep HEAD at the tip) so the render starts from a clean slate.
+      run(false, "-C", path, "rm", "-rf", "--quiet", "--ignore-unmatch", ".");
+    } else {
+      run(true, "worktree", "add", "--orphan", "-b", branch, path);
+      // The null commit — a stable, shared base. Its metadata is immaterial (the render commits on
+      // top carry the real bot identity + SSH signature); a neutral identity keeps it
+      // deterministic.
+      run(
+          true,
+          "-C",
+          path,
+          "-c",
+          "user.name=rke2lab",
+          "-c",
+          "user.email=rke2lab@localhost",
+          "commit",
+          "--allow-empty",
+          "--no-gpg-sign",
+          "-m",
+          "init " + branch);
+    }
+  }
+
+  /**
+   * Stage EVERYTHING in the worktree — additions, modifications, AND deletions ({@code add -A}).
+   */
+  void addAll(Path worktreePath) {
+    run(true, "-C", worktreePath.toString(), "add", "-A");
   }
 
   /** Remove the linked worktree at {@code worktreePath} — tolerant of a path already gone. */
@@ -48,7 +78,11 @@ final class GitCli {
     run(false, "worktree", "remove", "--force", worktreePath.toString());
   }
 
-  private void run(boolean check, String... args) {
+  private boolean branchExists(String branch) {
+    return run(false, "show-ref", "--quiet", "--verify", "refs/heads/" + branch) == 0;
+  }
+
+  private int run(boolean check, String... args) {
     final List<String> command = new ArrayList<>();
     command.add("git");
     command.addAll(List.of(args));
@@ -60,14 +94,16 @@ final class GitCli {
         process.destroyForcibly();
         throw new IllegalStateException(String.join(" ", command) + " timed out after " + TIMEOUT);
       }
-      if (check && process.exitValue() != 0) {
+      final int exit = process.exitValue();
+      if (check && exit != 0) {
         throw new IllegalStateException(
             String.join(" ", command)
                 + " failed ("
-                + process.exitValue()
+                + exit
                 + "): "
                 + new String(output, StandardCharsets.UTF_8).trim());
       }
+      return exit;
     } catch (IOException ex) {
       throw new UncheckedIOException("cannot run " + String.join(" ", command), ex);
     } catch (InterruptedException ex) {

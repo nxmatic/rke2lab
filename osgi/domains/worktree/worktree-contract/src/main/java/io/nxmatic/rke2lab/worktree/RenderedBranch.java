@@ -19,15 +19,18 @@ import java.nio.file.Path;
 public interface RenderedBranch {
 
   /**
-   * Prepare an ORPHAN linked worktree checked out at {@code worktreePath} on {@code branch} — an
-   * empty tree on an unborn branch, into which the caller materialises the rendered YAML alone
-   * (never the source: a {@code manifests/<cluster>} branch carries only what was rendered, at its
-   * root). Idempotent across re-runs: an existing worktree at {@code worktreePath} and any stale
-   * local {@code branch} are removed first, then a fresh orphan is checked out — a rendered branch
-   * is regenerated as a single root commit each render, never accreted (it is force-pushed
-   * desired-state, not history). Returns a handle the caller materialises into, commits,
-   * force-pushes, and {@link LinkedWorktree#close() removes}. {@code git worktree} is shelled (jgit
-   * exposes no worktree porcelain), sealed behind the implementation.
+   * Prepare a linked worktree checked out at {@code worktreePath} on {@code branch}, on a STABLE
+   * null-commit base. The first time {@code branch} is seen it is seeded with an empty root commit
+   * — a shared base a GitOps reader (Flux) can point at even before a full render, and that every
+   * render commits ON TOP of (accretion, one commit per render, fast-forward pushes — not
+   * orphan-per-render force-pushes). On a re-run the branch is reused: its tip is checked out (the
+   * accretion parent) and the working tree emptied, so the caller materialises the rendered YAML
+   * alone (never the source) and a manifest dropped since the previous render is staged as a
+   * deletion. Idempotent: an existing worktree at {@code worktreePath} is removed first. Returns a
+   * handle the caller materialises into, {@link LinkedWorktree#stageAll stages}, {@link
+   * LinkedWorktree#commit commits}, {@link LinkedWorktree#push pushes}, and {@link
+   * LinkedWorktree#close removes}. {@code git worktree} is shelled (jgit exposes no worktree
+   * porcelain), sealed behind the implementation.
    */
   LinkedWorktree prepare(Path worktreePath, String branch);
 }
