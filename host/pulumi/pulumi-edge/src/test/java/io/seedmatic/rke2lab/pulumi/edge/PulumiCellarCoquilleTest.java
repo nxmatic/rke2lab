@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.seedmatic.rke2lab.pulumi.edge.PulumiCellar.Shelved;
-import io.seedmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.seedmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.seedmatic.rke2lab.seed.broker.port.SourceCrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Trail;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +34,8 @@ class PulumiCellarCoquilleTest {
     // A two-crumb fil d'Ariane (root → here) — proves a multi-element trail survives, not just one.
     return new Trail(
         List.of(
-            new Breadcrumb("worktree", "run-provenance", "abc123", true),
-            new Breadcrumb("bbox", COORDINATE, "abc123", true)));
+            new SourceCrumb("worktree", "run-provenance", "abc123", true),
+            new SourceCrumb("bbox", COORDINATE, "abc123", true)));
   }
 
   @Test

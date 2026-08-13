@@ -5,6 +5,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioCaseModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.seedmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
+import io.seedmatic.rke2lab.seed.broker.codec.SeedCodec;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;
@@ -68,6 +69,7 @@ public final class ScenarioPlayer {
   }
 
   private final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
+  private final SeedCodec codec = new SeedCodec();
 
   /**
    * Play {@code scenarioClass} in-container, seeding the launcher session store with {@code
@@ -123,17 +125,31 @@ public final class ScenarioPlayer {
   }
 
   /**
-   * Overwrite the FAILED scenario case's {@code errorMessage} + {@code stackTrace} with the full
-   * captured {@link Throwable} — its whole cause chain and every frame, as {@code printStackTrace}
-   * renders them. jGiven's own capture keeps only the top throwable; this restores the root cause
-   * so it survives serialisation, the cross-realm graft, and a non-grafting CLI reap. Fail-fast
-   * means one failed case per run, so the first match is the one to enrich.
+   * Record the FULL captured {@link Throwable} onto the failed scenario, on TWO channels, at the
+   * one place both the model and the LIVE exception are in hand (jGiven's own capture keeps only
+   * the top throwable, stripped of its cause chain):
+   *
+   * <ul>
+   *   <li>STRUCTURED — a {@link GraftTag#SCENARIO_FAILURE} tag holding a {@link ThrownModel} built
+   *       DIRECTLY from the live exception (its real {@link StackTraceElement}s + cause chain,
+   *       codec-serialised). The graft reads THIS, so the frames rebuild host-side with no
+   *       printStackTrace re-parse — the callee posts its own structured self-report.
+   *   <li>TEXT — the case {@code errorMessage} + {@code stackTrace}, as {@code printStackTrace}
+   *       renders them (produced from the structure, not parsed), so the scion's OWN runbook still
+   *       reads its full reason when rendered standalone.
+   * </ul>
+   *
+   * Fail-fast means one failed case per run, so the first match is the one to record.
    */
   private void enrichFailedCase(ReportModel runbook, Throwable failure) {
     for (ScenarioModel scenario : runbook.getScenarios()) {
       if (scenario.getExecutionStatus() != ExecutionStatus.FAILED
           || scenario.getScenarioCases().isEmpty()) {
         continue;
+      }
+      final ThrownModel reason = ThrownModel.of(failure);
+      if (reason != null) {
+        runbook.addTag(GraftTag.SCENARIO_FAILURE.of(codec.encode(reason)));
       }
       final StringWriter trace = new StringWriter();
       failure.printStackTrace(new PrintWriter(trace));

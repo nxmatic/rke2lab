@@ -1365,12 +1365,23 @@ payload; it rides as a CLEAR sibling on the shell.
 
 *The types (all `seed-broker-port`, seam-owned, flat-composed — no bundle type leaks).*
 
-* `Breadcrumb(String domain, String coordinate, String sha, boolean dirty)` — ONE self-describing
-  source coordinate: the cellar coordinate a value was filed under, and the git source it was cultivated
-  from. The git fields are RAW strings, deliberately NOT a domain `Provenance` (the seam depends on no
-  domain); the worktree soil projects its `Provenance` into a `Breadcrumb` at the seam.
-* `Trail(List<Breadcrumb> breadcrumbs)` — the fil d'Ariane, root-first; immutable (`push` returns a new
-  trail). It is the fourth field of `SeedEnvelope`, CLEAR, outside the sealed payload.
+* `Breadcrumb` — a SEALED interface `{ String domain(); String coordinate(); }`: ONE link of a
+  path-to-origin, naming WHERE the link sits. Two shapes descend from it, one mechanism:
+** `SourceCrumb(String domain, String coordinate, String sha, boolean dirty)` — the CELLAR crumb: a
+   value's source coordinate (the cellar coordinate it was filed under) PLUS the git source it was
+   cultivated from. The git fields are RAW strings, deliberately NOT a domain `Provenance` (the seam
+   depends on no domain); the worktree soil projects its `Provenance` into a `SourceCrumb` at the seam.
+** `Crossing(String domain, String coordinate)` — the SCENARIO crumb: a bare crossing a grafted
+   failure grew through, no git provenance (the `ScenarioGraft` prepends one per graft level). The same
+   `Trail` mechanism, one level up: the cellar traces a VALUE to its git source, the graft traces a
+   FAILURE through its crossings.
+* `Trail(List<Breadcrumb> breadcrumbs)` — the path-to-origin, root-first; immutable (`push` appends
+  leaf-ward as the cellar descends, `prepend` roots-ward as a grafted failure returns up the chain). It
+  is the fourth field of `SeedEnvelope`, CLEAR, outside the sealed payload.
+* The sealed `Breadcrumb` carries NO jackson annotation (the seam has no third-party dependency): the
+  polymorphic type-info is configured ONCE in `SeedCodec` (a `@kind` mixin), and the host's
+  `PulumiCellar` DELEGATES its trail (de)serialization there rather than to a bare mapper — so every
+  realm resolves a crumb back to its concrete shape from the one config.
 
 *The accumulation — the crossing PATH, realised by the EXISTING transactional inheritance.* The
 `RUN_PROVENANCE` foundation coordinate carries a `Trail` — the run's provenance PATH — not a lone
@@ -1378,7 +1389,7 @@ payload; it rides as a CLEAR sibling on the shell.
 `ScenarioCellar.store` reads that path back from its own overlay and stamps every value's trail
 `path.push(here)` — `here` carrying the same git source, so each link is a complete source coordinate.
 The path GROWS per crossing: when a scion is sown, `ScenarioCellar.entriesEncoded(sownChild)` appends the
-child's crossing crumb (`Breadcrumb(childDomain, "runbook", rootSha, rootDirty)`) to the `RUN_PROVENANCE`
+child's crossing crumb (`SourceCrumb(childDomain, "runbook", rootSha, rootDirty)`) to the `RUN_PROVENANCE`
 entry as it descends — so a value stored one sow deep carries the FULL route `root → parent → … → here`,
 not just `[root, here]`. This rides the EXISTING descent (the entries fold up at the graft and descend to
 the next crossing as *inherited* entries) and the SINGLE generic choke-point (`GenericRunbookHandler`,
@@ -1899,10 +1910,37 @@ real harvest a partial run produced — the non-transactional mirror.
   NOT throw, so the crossings AFTER it still run and their failures ACCUMULATE in the one runbook (§ the
   graft, ACCUMULATE not first-wins). For the TERMINAL independent crossings a sower wants to report
   together — systemd AND cluster — so an operator sees both causes, not just the first.
-. *The root's closing gate seals the verdict (fail-at-end).* The THEN calls
-  `ScenarioGraft.assertNoCrossingFailed(hostScenario)`: if any tolerated crossing left an error on the host
-  case, it throws the accumulated reason. So JUnit's verdict AGREES with the runbook without the fail-fast
-  having discarded the sibling diagnostics.
+. *The root's closing gate BUILDS the verdict (fail-at-end), in the ENGINE — not the driver.* The THEN calls
+  `ScenarioGraft.assertNoCrossingFailed(hostScenario, hostTree)`: if any tolerated crossing left an error on
+  the host case, it throws an `AssertionError` carrying the accumulated message AND the per-crossing
+  `GraftThrowable`s as SUPPRESSED exceptions (from the host tree's GRAFT_FAILURE tags). Because it is thrown
+  in the root's THEN, that ONE exception is ROOT-ANCHORED (its stack is `ClusterSeedScenario`), with each
+  scion's full cause chain hanging off it. So JUnit's verdict AGREES with the runbook, and — the point — the
+  verdict is NOT exe-specific: it is the engine's, so a driver only RE-SURFACES the captured throwable to
+  fail its own way (`pulumi up` non-zero), it never reconstructs it. `assertPassed` (the fail-fast default)
+  builds the same shape for a single crossing.
+. *The reason is captured STRUCTURED at the source, and reconstructed on TWO twin channels.* No live
+  `Throwable` crosses the realm — a domain exception (`ClusterNotReadyError` …) is bundle-private, unloadable
+  on the flat host loader. The frames must therefore travel as data through the mapper, NOT as a
+  printStackTrace dump re-parsed on the far side. So the CALLEE captures itself: `ScenarioPlayer` — the one
+  place both the model and the live exception are in hand — builds a `ThrownModel` (type, message, real
+  `StackTraceElement`s, and the recursive `cause` chain) DIRECTLY from the `Throwable` and poses it as a
+  hidden `SCENARIO_FAILURE` tag (`SeedCodec`-encoded). At graft RECEPTION `graftUnder` reads that structured
+  self-report off a failed scion, wraps it in a `GraftFailure` (the WIRE POJO: a crossing `Trail` + the
+  `ThrownModel`), and as it returns up a nested graft chain each level PREPENDS its own `Crossing` — so the
+  tag accrues the full crossing path (the same path-to-origin mechanism the cellar uses for values, see
+  <<fil-d-ariane>>). Both channels rebuild a real `GraftThrowable` from those tags — its frames mapped from
+  the structured `Frame`s, its `Caused by:` chain rebuilt as `ReconstructedThrowable` links, so
+  `printStackTrace` renders a faithful tree with no line parsed from a string:
+** *the runbook* — `ScenarioGraft.foldGraftedReasons`, called by `ScenarioOutcomeExtension` (the universal
+   `@SeedScenario` chokepoint, firing after jGiven has overwritten the case `stackTrace` with the scenario's
+   own closing-gate/fail-fast throw), rewrites the root case `stackTrace` from the tags — each rebuilt
+   `GraftThrowable` rendered per crossing. So EVERY root scenario (the cluster seed, the CLI scenarios)
+   renders the crossings that failed, not the gate boilerplate.
+** *the console* — the engine's closing gate already attached the `GraftThrowable`s as `Suppressed:` on the
+   root-anchored verdict it threw (above); the driver (`Main`) only RE-SURFACES that captured throwable
+   (from the launcher summary) to fail the run, so the operator reads one root-anchored Java exception with
+   one `Suppressed:` (full cause chain) per failed crossing — no verdict logic in the exe.
 
 And on EVERY exit path — pass, fail-fast, fail-at-end — the root DRAINS (§ cellar-transactional, the drain
 is NOT gated on success): the harvest filed before the failure point is real (the world is not

@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
@@ -106,6 +107,14 @@ public final class Main {
                   .facet("bbox", config.bbox().facetJson())
                   .build();
 
+          // The run's VERDICT, built by the engine's closing gate
+          // (ScenarioGraft.assertNoCrossingFailed
+          // / assertPassed): a root-anchored throwable carrying the crossings as suppressed. jGiven
+          // captures it, the SummaryGeneratingListener reports it — this holder carries it out of
+          // the
+          // launcher so the driver RE-SURFACES it (pulumi exits non-zero) without re-constructing
+          // it.
+          final AtomicReference<Throwable> verdict = new AtomicReference<>();
           try {
             final ReportModel runbook =
                 new JUnitLauncherCore<ReportModel>()
@@ -118,17 +127,35 @@ public final class Main {
                           final var listener = new SummaryGeneratingListener();
                           launcher.execute(request, listener);
                           final var summary = listener.getSummary();
+                          summary.getFailures().stream()
+                              .findFirst()
+                              .ifPresent(f -> verdict.set(f.getException()));
+                          // A FAILED scenario still seeds its outcome: ScenarioOutcomeExtension
+                          // runs
+                          // on AfterTestExecutionCallback, which fires even when the body threw
+                          // (the
+                          // closing gate's assertNoCrossingFailed). So read the runbook back and
+                          // RETURN it — the driver renders it (the diagnosis) and only THEN raises
+                          // the honest verdict on the runbook's FAILED status below. This is the
+                          // documented contract of the outcome extension; throwing here instead
+                          // would discard exactly the runbook the failure needs.
+                          final var played = new ScenarioOutcomeSeed().find(sessionStore);
+                          if (played.isPresent()) {
+                            return played.get().runbook();
+                          }
+                          // No outcome AND a failure: a genuine before-body failure (setup /
+                          // container crash) never reached the scenario body — surface it loud,
+                          // with
+                          // the real cause, since there is no runbook to render.
                           if (summary.getTotalFailureCount() > 0) {
-                            // A setup/container failure never seeds a ScenarioOutcome, so reading
-                            // it
-                            // would throw the misleading "no @SeedScenario" and mask the real
-                            // cause.
                             final var first = summary.getFailures().get(0);
                             throw new IllegalStateException(
                                 "scenario failed before it could seed an outcome: "
                                     + first.getTestIdentifier().getDisplayName(),
                                 first.getException());
                           }
+                          // No outcome and no failure: a @SeedScenario always seeds via the
+                          // extension, so this is a wiring bug — read() surfaces it clearly.
                           return new ScenarioOutcomeSeed().read(sessionStore).runbook();
                         },
                         ClusterSeedScenario.SEED
@@ -158,6 +185,12 @@ public final class Main {
             // inside the renderer, so it never fails the provisioning; a run with no live root (a
             // scion that did not pose it) simply renders nothing.
             final var graft = new ScenarioGraft();
+            // The crossing REASONS were already folded onto the runbook's case by
+            // ScenarioOutcomeExtension (the universal @SeedScenario chokepoint), so the render
+            // below
+            // shows the real per-crossing stacks, not the closing-gate boilerplate. Here the driver
+            // only RENDERS the already-corrected runbook, then attaches the same reasons as
+            // suppressed on the console verdict.
             graft
                 .graftedValue(runbook, GraftTag.LIVE_ROOT)
                 .ifPresent(
@@ -168,14 +201,39 @@ public final class Main {
             // ReportModel is the fail-at-end collector (jGiven plays to completion, marking each
             // failed step), so a FAILED or ABORTED scenario means the seed did not complete — fail
             // the Pulumi run so the operator sees a non-zero exit, the runbook already written for
-            // the diagnosis. A clean run raises nothing.
+            // the diagnosis. A clean run raises nothing. The verdict itself is the engine's (a
+            // root-anchored throwable with the crossings suppressed); the driver only RE-SURFACES
+            // it
+            // — Error/RuntimeException rethrown as-is (keeping the root at the top of the stack),
+            // any other Throwable wrapped only because the signature demands unchecked.
             final List<?> broken =
                 runbook.getScenariosWithStatus(ExecutionStatus.FAILED, ExecutionStatus.ABORTED);
             if (!broken.isEmpty()) {
-              throw new IllegalStateException(
-                  "the cluster-seed scenario did not complete — see the rendered runbook ("
-                      + broken.size()
-                      + " failed/aborted)");
+              Throwable reason = verdict.get();
+              // jGiven's fail-at-end rethrows the scenario failure wrapped in a BARE
+              // RuntimeException whose message is the cause's toString — unwrap it so the operator
+              // sees the ROOT verdict once, not doubled (the wrapper's message AND its Caused-by
+              // both printed the folded reason). Only a plain RuntimeException that merely restates
+              // its cause is peeled; a real domain RuntimeException is left intact.
+              while (reason != null
+                  && reason.getClass() == RuntimeException.class
+                  && reason.getCause() != null
+                  && reason.getCause().toString().equals(reason.getMessage())) {
+                reason = reason.getCause();
+              }
+              switch (reason) {
+                case RuntimeException re -> throw re;
+                case Error err -> throw err;
+                case null ->
+                    throw new IllegalStateException(
+                        "the cluster-seed scenario did not complete — see the rendered runbook ("
+                            + broken.size()
+                            + " failed/aborted)");
+                default ->
+                    throw new IllegalStateException(
+                        "the cluster-seed scenario did not complete — see the rendered runbook",
+                        reason);
+              }
             }
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

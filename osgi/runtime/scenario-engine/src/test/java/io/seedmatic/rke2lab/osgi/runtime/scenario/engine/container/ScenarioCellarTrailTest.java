@@ -3,13 +3,13 @@ package io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.seedmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Cellar;
 import io.seedmatic.rke2lab.seed.broker.port.CellarCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.RunbookCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.seedmatic.rke2lab.seed.broker.port.SourceCrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Trail;
 import java.util.List;
 import java.util.Optional;
@@ -88,8 +88,8 @@ class ScenarioCellarTrailTest {
     };
   }
 
-  private static Breadcrumb gitRoot() {
-    return new Breadcrumb("worktree", "worktree-facts", SHA, false);
+  private static SourceCrumb gitRoot() {
+    return new SourceCrumb("worktree", "worktree-facts", SHA, false);
   }
 
   @Test
@@ -101,7 +101,7 @@ class ScenarioCellarTrailTest {
 
     assertEquals(
         Optional.of(
-            new Trail(List.of(gitRoot(), new Breadcrumb("bbox", "bbox-facts", SHA, false)))),
+            new Trail(List.of(gitRoot(), new SourceCrumb("bbox", "bbox-facts", SHA, false)))),
         cellar.trailOf(PARCEL, Value.BBOX_FACTS),
         "the trail is the root path pushed with this coordinate's link");
   }
@@ -125,8 +125,8 @@ class ScenarioCellarTrailTest {
             new Trail(
                 List.of(
                     gitRoot(),
-                    new Breadcrumb("manifests", "runbook", SHA, false),
-                    new Breadcrumb("manifests", "manifests-tree", SHA, false)))),
+                    new SourceCrumb("manifests", "runbook", SHA, false),
+                    new SourceCrumb("manifests", "manifests-tree", SHA, false)))),
         child.trailOf(PARCEL, Value.MANIFESTS_TREE),
         "the child accumulates root → crossing → here (the full route)");
   }

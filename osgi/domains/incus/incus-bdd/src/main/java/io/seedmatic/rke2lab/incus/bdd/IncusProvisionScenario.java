@@ -478,7 +478,11 @@ public class IncusProvisionScenario
           broker.orElseThrow().sow(new RunbookCoordinate("manifests"), cellar, amended);
       final String runbookJson = codec.decode(reaped.payload()).path("runbook").asText();
       graft.graftUnder(
-          hostScenario, hostTree, "the manifests are cultivated", graft.rebuild(runbookJson));
+          hostScenario,
+          hostTree,
+          "manifests",
+          "the manifests are cultivated",
+          graft.rebuild(runbookJson));
       return self();
     }
 

@@ -32,6 +32,7 @@ class ScenarioGraftTest {
 
   private static final String ROOTSTOCK = "the scion world is consulted";
   private static final String ROOTSTOCK2 = "the second scion world is consulted";
+  private static final String SOIL = "scion";
 
   private final ScenarioGraft graft = new ScenarioGraft();
 
@@ -44,7 +45,7 @@ class ScenarioGraftTest {
     final String crossed = new ScenarioJsonWriter(scion).toString();
     assertFalse(crossed.isBlank(), "the scion scenario serializes to cross the seam");
 
-    graft.graftUnder(host.getScenarios().get(0), host, ROOTSTOCK, graft.rebuild(crossed));
+    graft.graftUnder(host.getScenarios().get(0), host, SOIL, ROOTSTOCK, graft.rebuild(crossed));
 
     final StepModel rootstock = stepNamed(host, ROOTSTOCK);
     assertFalse(
@@ -66,6 +67,7 @@ class ScenarioGraftTest {
     graft.graftUnder(
         host.getScenarios().get(0),
         host,
+        SOIL,
         ROOTSTOCK,
         graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
@@ -94,11 +96,13 @@ class ScenarioGraftTest {
     graft.graftUnder(
         host.getScenarios().get(0),
         host,
+        SOIL,
         ROOTSTOCK,
         graft.rebuild(new ScenarioJsonWriter(firstFailure).toString()));
     graft.graftUnder(
         host.getScenarios().get(0),
         host,
+        SOIL,
         ROOTSTOCK2,
         graft.rebuild(new ScenarioJsonWriter(secondFailure).toString()));
 
@@ -128,6 +132,7 @@ class ScenarioGraftTest {
     graft.graftUnder(
         host.getScenarios().get(0),
         host,
+        SOIL,
         ROOTSTOCK,
         graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
@@ -145,6 +150,7 @@ class ScenarioGraftTest {
     graft.graftUnder(
         host.getScenarios().get(0),
         host,
+        SOIL,
         ROOTSTOCK,
         graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
@@ -162,7 +168,7 @@ class ScenarioGraftTest {
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> graft.graftUnder(host.getScenarios().get(0), host, "no such step", rebuilt),
+        () -> graft.graftUnder(host.getScenarios().get(0), host, SOIL, "no such step", rebuilt),
         "grafting under a missing rootstock step fails loudly, not silently");
   }
 
@@ -180,6 +186,7 @@ class ScenarioGraftTest {
     graft.graftUnder(
         hostScenario,
         emptyReportModel,
+        SOIL,
         ROOTSTOCK,
         graft.rebuild(new ScenarioJsonWriter(scion).toString()));
 
@@ -216,20 +223,21 @@ class ScenarioGraftTest {
     // FAILED verdict onto the host case WITHOUT throwing (so its siblings ran), the gate throws the
     // accumulated reason so the run fails overall. A clean host passes the gate.
     final ReportModel cleanHost = playHost();
-    graft.assertNoCrossingFailed(cleanHost.getScenarios().get(0)); // nothing failed → no throw
+    graft.assertNoCrossingFailed(cleanHost.getScenarios().get(0), cleanHost); // nothing failed
 
     final ReportModel host = playHost();
     final ReportModel failing = play(ScionStage.class, r -> r.the_scion_scenario_fails());
     graft.graftUnder(
         host.getScenarios().get(0),
         host,
+        SOIL,
         ROOTSTOCK,
         graft.rebuild(new ScenarioJsonWriter(failing).toString()));
 
     final AssertionError thrown =
         assertThrows(
             AssertionError.class,
-            () -> graft.assertNoCrossingFailed(host.getScenarios().get(0)),
+            () -> graft.assertNoCrossingFailed(host.getScenarios().get(0), host),
             "the gate throws when a tolerated crossing left an error on the host case");
     assertTrue(thrown.getMessage().contains(ROOTSTOCK), "the gate carries the crossing's reason");
   }

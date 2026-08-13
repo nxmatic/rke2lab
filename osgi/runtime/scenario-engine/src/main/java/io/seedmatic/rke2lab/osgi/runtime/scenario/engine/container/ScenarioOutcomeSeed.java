@@ -67,4 +67,16 @@ public final class ScenarioOutcomeSeed {
     final Namespace ns = Namespace.create((Object[]) nsParts);
     return Optional.ofNullable(sessionStore.get(ns, KEY, ScenarioOutcome.class));
   }
+
+  /**
+   * READ the seeded outcome from the SAME launcher-session store through an {@link
+   * ExtensionContext} — the extension-side twin of {@link #find(NamespacedHierarchicalStore)}, for
+   * a callback that runs AFTER the scenario is unbound from the {@code ScenarioHolder} (an {@code
+   * afterEach}) and so cannot reach the model directly. Empty when none was seeded.
+   */
+  public Optional<ScenarioOutcome> find(ExtensionContext context) {
+    final ExtensionContext.Namespace ns = ExtensionContext.Namespace.create((Object[]) nsParts);
+    return Optional.ofNullable(
+        context.getStore(StoreScope.LAUNCHER_SESSION, ns).get(KEY, ScenarioOutcome.class));
+  }
 }

@@ -10,6 +10,7 @@ import com.pulumi.automation.ProjectSettings;
 import com.pulumi.automation.WorkspaceStack;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
+import io.seedmatic.rke2lab.seed.broker.codec.SeedCodec;
 import io.seedmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.RunGate;
@@ -128,6 +129,10 @@ public final class PulumiCellar implements OpaqueCellar {
   private static final String MAC_ALGORITHM = "HmacSHA256";
 
   private final ObjectMapper mapper = new ObjectMapper();
+  // The trail (de)serialization DELEGATES to the SeedCodec, the sole holder of the sealed
+  // Breadcrumb's polymorphic type-info (§ SeedCodec). The bare `mapper` above stays for the shell
+  // map and the MAC canonical (flat strings/booleans, no crumb) — those carry no polymorphism.
+  private final SeedCodec codec = new SeedCodec();
   private final Optional<Path> backendDir;
   private final RunGate gate;
   private final Consumer<String> logger;
@@ -512,7 +517,7 @@ public final class PulumiCellar implements OpaqueCellar {
    */
   Map<String, Object> shell(
       String domain, String coordinate, Trail trail, boolean tombstone, String payload) {
-    final String trailJson = writeString(trail);
+    final String trailJson = codec.encode(trail);
     final Map<String, Object> shell = new LinkedHashMap<>();
     shell.put(KEY_DOMAIN, domain);
     shell.put(KEY_TRAIL, trailJson);
@@ -542,7 +547,7 @@ public final class PulumiCellar implements OpaqueCellar {
               + coordinate
               + " — the clear shell or payload was tampered");
     }
-    final Trail trail = readTrail(trailJson);
+    final Trail trail = codec.decode(trailJson, Trail.class);
     return new Shelved(new SeedEnvelope(domain, coordinate, payload, trail), tombstone);
   }
 
@@ -584,14 +589,6 @@ public final class PulumiCellar implements OpaqueCellar {
       throw new IllegalArgumentException("malformed cellar coquille: output is not a shell map");
     }
     return (Map<String, Object>) value;
-  }
-
-  private Trail readTrail(String trailJson) {
-    try {
-      return mapper.readValue(trailJson, Trail.class);
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("malformed cellar coquille trail", e);
-    }
   }
 
   private String writeString(Object blob) {

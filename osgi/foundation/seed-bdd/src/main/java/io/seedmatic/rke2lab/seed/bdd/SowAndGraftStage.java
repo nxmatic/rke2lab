@@ -121,7 +121,7 @@ public class SowAndGraftStage extends Stage<SowAndGraftStage> {
   private ReportModel sowAndGraft(String rootStepName) {
     final String runbookJson = gardening.sow(soil, amendments, cellar);
     final ReportModel scion = graft.rebuild(runbookJson);
-    graft.graftUnder(hostScenario, hostTree, rootStepName, scion);
+    graft.graftUnder(hostScenario, hostTree, soil, rootStepName, scion);
     return scion;
   }
 }

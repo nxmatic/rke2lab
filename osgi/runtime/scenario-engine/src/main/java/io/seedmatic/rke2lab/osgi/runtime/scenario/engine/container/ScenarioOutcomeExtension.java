@@ -4,6 +4,7 @@ import com.tngtech.jgiven.impl.ScenarioHolder;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.seedmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import java.util.List;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
@@ -27,14 +28,33 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * scenario from the {@link ScenarioHolder}, i.e. the model is still bound when this reads it (the
  * same read {@link ScenarioCellarExtension} does at its own boundary).
  */
-public final class ScenarioOutcomeExtension implements AfterTestExecutionCallback {
+public final class ScenarioOutcomeExtension
+    implements AfterTestExecutionCallback, AfterEachCallback {
 
   private final ScenarioOutcomeSeed outcomeSeed = new ScenarioOutcomeSeed();
+  private final ScenarioGraft graft = new ScenarioGraft();
 
   @Override
   public void afterTestExecution(ExtensionContext context) {
     final ReportModel runbook = ScenarioHolder.get().getScenarioOfCurrentThread().getModel();
     outcomeSeed.put(context, new ScenarioOutcome(runbook, consultationsOf(context)));
+  }
+
+  /**
+   * Restore the crossing REASONS onto the root case — but in {@code afterEach}, NOT {@code
+   * afterTestExecution}: jGiven finalises the case in ITS OWN {@code afterTestExecution} (where the
+   * fail-at-end throw is raised), and this extension's {@code afterTestExecution} runs BEFORE
+   * jGiven's (reverse registration order), so a fold there is OVERWRITTEN. An {@code afterEach}
+   * runs after ALL {@code afterTestExecution} callbacks, so jGiven has finished burying the
+   * crossings under its closing-gate/fail-fast stack, and this re-applies the reconstructed
+   * per-crossing stacks from the GRAFT_FAILURE tags — reading the sealed model back off the
+   * launcher-session store (the {@code ScenarioHolder} is unbound by now). Uniform across EVERY
+   * root scenario that sows-and-grafts (the cluster seed, the CLI scenarios), not just the host
+   * driver; a no-op when nothing grafted.
+   */
+  @Override
+  public void afterEach(ExtensionContext context) {
+    outcomeSeed.find(context).ifPresent(outcome -> graft.foldGraftedReasons(outcome.runbook()));
   }
 
   /**

@@ -1,6 +1,8 @@
 package io.seedmatic.rke2lab.seed.broker.codec;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,8 +11,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.seedmatic.rke2lab.seed.broker.codec.internal.WireEnumModule;
+import io.seedmatic.rke2lab.seed.broker.port.Breadcrumb;
+import io.seedmatic.rke2lab.seed.broker.port.Crossing;
 import io.seedmatic.rke2lab.seed.broker.port.SeedContract;
 import io.seedmatic.rke2lab.seed.broker.port.SeedEnvelope;
+import io.seedmatic.rke2lab.seed.broker.port.SourceCrumb;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Map;
@@ -42,12 +47,40 @@ public final class SeedCodec {
           .registerModule(new WireEnumModule())
           .registerModule(new JavaTimeModule())
           .registerModule(new Jdk8Module())
+          // The sealed Breadcrumb's polymorphism lives HERE, not on the port type: the seam carries
+          // NO jackson dependency, so a Trail's crumbs cannot annotate themselves. This mixin is
+          // the
+          // SOLE type-info config, so every realm's SeedCodec — and the host's PulumiCellar, which
+          // DELEGATES its trail (de)serialization here — resolves a crumb back to its concrete
+          // shape. Add the mixin to a THIRD bare mapper and its trails silently mis-decode.
+          .addMixIn(Breadcrumb.class, BreadcrumbMixin.class)
           .setDefaultPropertyInclusion(JsonInclude.Include.NON_ABSENT)
           .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
           // Additive-schema tolerance: an unknown key is ignored, not a crash — the contract the
           // hand-rolled *Reader classes had (the schema evolves by adding keys, a producer's newer
           // key survives a reader written today). Keeps the "full-typed + lenient" posture.
           .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+  /**
+   * The type-info the sealed {@link Breadcrumb} cannot carry itself (the port is jackson-free) — a
+   * {@code @kind} discriminator so a {@link io.seedmatic.rke2lab.seed.broker.port.Trail}'s crumbs
+   * round-trip to their concrete shape: {@link SourceCrumb} (cellar, git-sourced) or {@link
+   * Crossing} (scenario, a grafted-failure path). {@code defaultImpl = SourceCrumb} keeps the
+   * durable cellar BACKWARD-COMPATIBLE: a coquille persisted before the sealed split carries a flat
+   * {@code {domain, coordinate, sha, dirty}} trail with NO {@code @kind}, and every such legacy
+   * crumb WAS a source crumb — so a missing discriminator decodes as {@link SourceCrumb} rather
+   * than failing the drain on old state.
+   */
+  @JsonTypeInfo(
+      use = JsonTypeInfo.Id.NAME,
+      include = JsonTypeInfo.As.PROPERTY,
+      property = "@kind",
+      defaultImpl = SourceCrumb.class)
+  @JsonSubTypes({
+    @JsonSubTypes.Type(value = SourceCrumb.class, name = "source"),
+    @JsonSubTypes.Type(value = Crossing.class, name = "crossing")
+  })
+  private interface BreadcrumbMixin {}
 
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 

@@ -8,8 +8,13 @@ import com.tngtech.jgiven.report.model.ScenarioModel;
 import com.tngtech.jgiven.report.model.StepModel;
 import com.tngtech.jgiven.report.model.StepStatus;
 import com.tngtech.jgiven.report.model.Tag;
+import io.seedmatic.rke2lab.seed.broker.codec.SeedCodec;
+import io.seedmatic.rke2lab.seed.broker.port.Crossing;
+import io.seedmatic.rke2lab.seed.broker.port.Trail;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -49,6 +54,8 @@ import java.util.Optional;
  * the reason (its case failure → the host case).
  */
 public final class ScenarioGraft {
+
+  private static final SeedCodec CODEC = new SeedCodec();
 
   /**
    * Rebuild a host-realm {@link ReportModel} from the serialized runbook JSON a scion world's
@@ -91,6 +98,7 @@ public final class ScenarioGraft {
   public void graftUnder(
       ScenarioModel hostScenario,
       ReportModel hostTree,
+      String soil,
       String rootstockStepName,
       ReportModel scion) {
     final ScenarioModel scionScenario = firstScenarioOf(scion);
@@ -107,7 +115,11 @@ public final class ScenarioGraft {
     // The scion's tag map rides up with the graft — the ephemeral cellar (§ seed-broker-spec, two
     // cellars). addNestedStep carries only the STEPS, so a within-run fact the scion posed as a tag
     // (e.g. GraftTag.LIVE_ROOT) would be lost; merge it so the host reads it back via graftedValue.
-    scion.getTagMap().values().forEach(hostTree::addTag);
+    // GRAFT_FAILURE tags are the EXCEPTION to the blanket merge: they are re-posed below with THIS
+    // crossing prepended to their path, so merging them raw here too would double them.
+    scion.getTagMap().values().stream()
+        .filter(tag -> !GraftTag.GRAFT_FAILURE.type().equals(tag.getType()))
+        .forEach(hostTree::addTag);
 
     if (scionScenario.getExecutionStatus() == ExecutionStatus.FAILED) {
       rootstock.setStatus(StepStatus.FAILED);
@@ -122,6 +134,12 @@ public final class ScenarioGraft {
       final ScenarioCaseModel scionCase = scionScenario.getScenarioCases().get(0);
       final ScenarioCaseModel hostCase = hostScenario.getScenarioCases().get(0);
       if (scionCase.getErrorMessage() != null) {
+        // The HUMAN errorMessage the closing gate rethrows: one header per crossing + the scion's
+        // own message (ScenarioPlayer already set it to the live exception's toString — clean, no
+        // frames, so no parse). ACCUMULATE, not first-wins: sibling crossings fail INDEPENDENTLY
+        // (systemd AND cluster in one run), so each cause is APPENDED under a header naming it. The
+        // case STACKTRACE is left to ScenarioOutcomeExtension's foldGraftedReasons (from the
+        // structured tags below), so it is not folded here.
         final String header = "═══ " + rootstockStepName + " ═══";
         final boolean firstFailure = hostCase.getErrorMessage() == null;
         hostCase.setErrorMessage(
@@ -129,16 +147,28 @@ public final class ScenarioGraft {
                 + header
                 + "\n"
                 + scionCase.getErrorMessage());
-        final List<String> mergedStack = new ArrayList<>();
-        if (!firstFailure) {
-          mergedStack.addAll(hostCase.getStackTrace());
-          mergedStack.add("");
+        // The STRUCTURED channel: gather the scion's OWN grafted failures (a nested chain it folded
+        // in-container), or its structured self-report (the SCENARIO_FAILURE tag ScenarioPlayer
+        // captured at the source from the live exception) if it grafted none, then PREPEND this
+        // crossing to each path — so as the failure RETURNS up the chain, the tag accrues the full
+        // crossing Trail from the root down to the leaf where it grew (the cellar's path-to-origin,
+        // at the scenario level). Each tag is a hidden JSON carrier the host reloads into a
+        // GraftThrowable — the frames rebuild from the POJO, never a printStackTrace re-parse.
+        final Crossing here = new Crossing(soil, rootstockStepName);
+        final List<GraftFailure> inner = graftedFailurePayloads(scion);
+        final List<GraftFailure> leaves =
+            inner.isEmpty()
+                ? scenarioFailureReason(scion)
+                    .map(reason -> List.of(new GraftFailure(Trail.empty(), reason)))
+                    .orElseGet(List::of)
+                : inner;
+        for (final GraftFailure leaf : leaves) {
+          final Tag failureTag =
+              GraftTag.GRAFT_FAILURE.of(
+                  CODEC.encode(new GraftFailure(leaf.path().prepend(here), leaf.reason())));
+          failureTag.setShowInNavigation(false);
+          hostTree.addTag(failureTag);
         }
-        mergedStack.add(header);
-        if (scionCase.getStackTrace() != null) {
-          mergedStack.addAll(scionCase.getStackTrace());
-        }
-        hostCase.setStackTrace(mergedStack);
       }
       for (int i = rootstockIndex + 1; i < hostSteps.size(); i++) {
         hostSteps.get(i).setStatus(StepStatus.SKIPPED);
@@ -176,32 +206,55 @@ public final class ScenarioGraft {
       return;
     }
     final ScenarioCaseModel failed = scenario.getScenarioCases().get(0);
-    final String stack =
-        failed.getStackTrace() == null || failed.getStackTrace().isEmpty()
-            ? ""
-            : "\n" + String.join("\n", failed.getStackTrace());
-    throw new AssertionError(label + " failed in-container: " + failed.getErrorMessage() + stack);
+    // ScenarioPlayer set the case errorMessage to the live exception's toString (clean, no inlined
+    // frames), so no parse is needed to name the reason. Carry the scion's STRUCTURED failure (its
+    // full cause chain, rebuilt from the SCENARIO_FAILURE tag) as a SUPPRESSED exception, so the
+    // fail-fast verdict is the SAME shape as the closing gate's — one exception with the scion's
+    // reason hanging off it.
+    final AssertionError verdict =
+        new AssertionError(label + " failed in-container: " + failed.getErrorMessage());
+    scenarioFailureReason(model).map(ThrownModel::toThrowable).ifPresent(verdict::addSuppressed);
+    throw verdict;
   }
 
   /**
-   * The sower's CLOSING GATE — fail the host run if any TOLERATED crossing ended FAILED. A crossing
+   * The sower's CLOSING GATE — fail the host run if any TOLERATED crossing ended FAILED, and build
+   * the run's VERDICT here (not in the driver — the verdict is not exe-specific). A crossing
    * grafted with the tolerating sow ({@code the_scion_is_sown_and_grafted_tolerating_failure})
    * folds its FAILED verdict + error text onto the host case WITHOUT throwing, so its siblings run
-   * and aggregate. Called from the root's closing THEN, this throws the accumulated failure off the
-   * host case — so the overall verdict is honest ({@code pulumi up} exits non-zero, JUnit agrees
-   * with the runbook) without the fail-fast having discarded the sibling diagnostics. A no-op when
-   * every crossing passed (the host case carries no error).
+   * and aggregate. Called from the root's closing THEN, this throws an {@link AssertionError} whose
+   * message is a HEADLINE (which crossings failed, by name — NOT their reasons, so nothing repeats)
+   * and which carries the per-crossing {@link GraftThrowable}s as SUPPRESSED exceptions (from the
+   * {@code hostTree}'s GRAFT_FAILURE tags) — so the throw is ONE exception, ROOT-anchored (its
+   * stack is the root scenario's THEN), and each scion's full reason + cause chain hangs off it
+   * ONCE, in its suppressed. The driver only re-surfaces this captured throwable ({@code pulumi up}
+   * exits non-zero); it does not construct the verdict. A no-op when every crossing passed (the
+   * host case carries no error).
    */
-  public void assertNoCrossingFailed(ScenarioModel hostScenario) {
+  public void assertNoCrossingFailed(ScenarioModel hostScenario, ReportModel hostTree) {
     final ScenarioCaseModel hostCase = hostScenario.getScenarioCases().get(0);
     if (hostCase.getErrorMessage() == null) {
       return;
     }
-    final String stack =
-        hostCase.getStackTrace() == null || hostCase.getStackTrace().isEmpty()
-            ? ""
-            : "\n" + String.join("\n", hostCase.getStackTrace());
-    throw new AssertionError(hostCase.getErrorMessage() + stack);
+    final List<GraftThrowable> failures = graftedFailures(hostTree);
+    final AssertionError verdict =
+        failures.isEmpty()
+            ? new AssertionError(hostCase.getErrorMessage())
+            : new AssertionError(
+                failures.size() + " crossing(s) did not complete: " + crossingNames(failures));
+    failures.forEach(verdict::addSuppressed);
+    throw verdict;
+  }
+
+  /** The crossing paths of the failed crossings, by name — the verdict headline (no reasons). */
+  private static String crossingNames(List<GraftThrowable> failures) {
+    final List<String> names = new ArrayList<>();
+    for (final GraftThrowable failure : failures) {
+      final List<String> path = new ArrayList<>();
+      failure.path().breadcrumbs().forEach(crumb -> path.add(crumb.coordinate()));
+      names.add(String.join(" / ", path));
+    }
+    return String.join("; ", names);
   }
 
   /**
@@ -217,6 +270,86 @@ public final class ScenarioGraft {
         .map(Tag::getValues)
         .filter(values -> values != null && !values.isEmpty())
         .map(values -> String.valueOf(values.get(0)))
+        .findFirst();
+  }
+
+  /**
+   * Reload the grafted failures the crossings posed at reception (the {@link
+   * GraftTag#GRAFT_FAILURE} tags, one per failed scion) into host-side {@link GraftThrowable}s —
+   * the "the reason crossed as JSON, rebuild the POJO host-side" step. Each carries the crossing
+   * (context), and — from the structured {@link ThrownModel} — the scion's message, its REAL
+   * frames, and its whole cause chain (no printStackTrace re-parse). The driver ({@code Main})
+   * attaches them as suppressed on the run's verdict, so the operator reads one ordinary {@code
+   * Suppressed:} per failed crossing.
+   */
+  private List<GraftThrowable> graftedFailures(ReportModel hostTree) {
+    return graftedFailurePayloads(hostTree).stream().map(ScenarioGraft::toThrowable).toList();
+  }
+
+  /**
+   * Restore the crossing REASONS onto a runbook's root case for the RENDER — the report-model twin
+   * of {@link #graftedFailures}. {@code graftUnder} folds each scion's frames onto the host case,
+   * but the scenario then THROWS its closing gate ({@code assertNoCrossingFailed}) or fail-fast,
+   * and jGiven OVERWRITES the case {@code stackTrace} with that throw's own stack — so the rendered
+   * runbook would show the gate boilerplate, not the crossings that failed. Called post-run from
+   * {@link ScenarioOutcomeExtension} (the universal {@code @SeedScenario} chokepoint, firing after
+   * jGiven has finished, so nothing overwrites it again), this rewrites the case {@code stackTrace}
+   * from the {@link GraftTag#GRAFT_FAILURE} tags: each rebuilt {@link GraftThrowable} (its path
+   * header + real frames + {@code Caused by:} chain) rendered by {@code printStackTrace} — the same
+   * reasons the operator reads as {@code Suppressed:} on the console verdict, and the SAME
+   * structured source, so the runbook and the console never diverge. Uniform across EVERY root
+   * scenario (the cluster seed, the CLI scenarios), not just the host driver. A no-op when there
+   * are no grafted failures (a non-crossing failure keeps jGiven's real throw site — a leaf scion
+   * that grafted nothing) or the runbook carries no scenario.
+   */
+  public void foldGraftedReasons(ReportModel runbook) {
+    final List<GraftThrowable> failures = graftedFailures(runbook);
+    if (failures.isEmpty() || runbook.getScenarios().isEmpty()) {
+      return;
+    }
+    final ScenarioCaseModel hostCase = runbook.getScenarios().get(0).getScenarioCases().get(0);
+    final List<String> stack = new ArrayList<>();
+    for (final GraftThrowable failure : failures) {
+      if (!stack.isEmpty()) {
+        stack.add("");
+      }
+      final StringWriter rendered = new StringWriter();
+      failure.printStackTrace(new PrintWriter(rendered));
+      stack.addAll(List.of(rendered.toString().split("\\R")));
+    }
+    hostCase.setStackTrace(stack);
+  }
+
+  /** Decode the {@link GraftTag#GRAFT_FAILURE} tags on a model into their {@link GraftFailure}s. */
+  private static List<GraftFailure> graftedFailurePayloads(ReportModel model) {
+    return model.getTagMap().values().stream()
+        .filter(tag -> GraftTag.GRAFT_FAILURE.type().equals(tag.getType()))
+        .map(Tag::getValues)
+        .filter(values -> values != null && !values.isEmpty())
+        .flatMap(List::stream)
+        .map(String::valueOf)
+        .map(json -> CODEC.decode(json, GraftFailure.class))
+        .toList();
+  }
+
+  private static GraftThrowable toThrowable(GraftFailure failure) {
+    return new GraftThrowable(failure.path(), failure.reason());
+  }
+
+  /**
+   * The scion's OWN structured self-report — the {@link ThrownModel} it posed as a {@link
+   * GraftTag#SCENARIO_FAILURE} tag at the source ({@code ScenarioPlayer}, from the live exception).
+   * A failed leaf scion (one that grafted no sub-scenario) has exactly this; {@code graftUnder}
+   * wraps it in a {@link GraftFailure} with the crossing path.
+   */
+  private Optional<ThrownModel> scenarioFailureReason(ReportModel scion) {
+    return scion.getTagMap().values().stream()
+        .filter(tag -> GraftTag.SCENARIO_FAILURE.type().equals(tag.getType()))
+        .map(Tag::getValues)
+        .filter(values -> values != null && !values.isEmpty())
+        .flatMap(List::stream)
+        .map(String::valueOf)
+        .map(json -> CODEC.decode(json, ThrownModel.class))
         .findFirst();
   }
 

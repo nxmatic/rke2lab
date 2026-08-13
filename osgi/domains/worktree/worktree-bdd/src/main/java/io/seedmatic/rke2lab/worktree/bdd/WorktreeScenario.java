@@ -13,10 +13,10 @@ import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
-import io.seedmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Cellar;
 import io.seedmatic.rke2lab.seed.broker.port.CellarCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
+import io.seedmatic.rke2lab.seed.broker.port.SourceCrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Trail;
 import io.seedmatic.rke2lab.worktree.GatePolicy;
 import io.seedmatic.rke2lab.worktree.WorkingState;
@@ -138,7 +138,7 @@ public class WorktreeScenario
   /**
    * Then: plant the run's fil d'Ariane root, then file the harvest at {@link
    * WorktreeCoordinate#FACTS} under the current parcel (THEN seals). As the FIRST crossing, the
-   * worktree soil projects its git HEAD provenance into a foundation {@link Breadcrumb} filed at
+   * worktree soil projects its git HEAD provenance into a foundation {@link SourceCrumb} filed at
    * {@link CellarCoordinate#RUN_PROVENANCE} — the root every later value's {@link
    * io.seedmatic.rke2lab.seed.broker.port.Trail} descends from (it reaches sibling crossings by the
    * ordinary transactional inheritance). The store is unconditional on the gate — the cellar routes
@@ -161,7 +161,7 @@ public class WorktreeScenario
           CellarCoordinate.RUN_PROVENANCE,
           new Trail(
               List.of(
-                  new Breadcrumb(
+                  new SourceCrumb(
                       WorktreeCoordinate.FACTS.domain(),
                       WorktreeCoordinate.FACTS.slug(),
                       facts.provenance().sha(),

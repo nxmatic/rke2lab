@@ -3,7 +3,6 @@ package io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.seedmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
 import io.seedmatic.rke2lab.seed.broker.codec.SeedCodec;
-import io.seedmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Cellar;
 import io.seedmatic.rke2lab.seed.broker.port.CellarCipher;
 import io.seedmatic.rke2lab.seed.broker.port.CellarCoordinate;
@@ -12,6 +11,7 @@ import io.seedmatic.rke2lab.seed.broker.port.Persistence;
 import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.seedmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.seedmatic.rke2lab.seed.broker.port.SourceCrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Trail;
 import io.seedmatic.rke2lab.seed.broker.port.TransactionalCellar;
 import java.util.ArrayList;
@@ -128,7 +128,7 @@ public final class ScenarioCellar implements TransactionalCellar {
 
   /**
    * Extend the provenance-path entry with a crossing crumb for the {@code sownChild} being
-   * launched: a {@link Breadcrumb} under the sown coordinate, carrying the run's git source (the
+   * launched: a {@link SourceCrumb} under the sown coordinate, carrying the run's git source (the
    * path root's {@code sha}/{@code dirty}) so each link stays a complete source coordinate. The
    * child inherits this longer path and stamps its own stores {@code path.push(here)} — the
    * accumulation IS the route. RUN_PROVENANCE is never sealed, so its payload decodes straight to a
@@ -136,9 +136,10 @@ public final class ScenarioCellar implements TransactionalCellar {
    */
   private Entry extendPath(Entry entry, SeedCoordinate sownChild) {
     final Trail path = codec.decode(entry.envelope().payload(), Trail.class);
-    final Breadcrumb root = path.breadcrumbs().isEmpty() ? null : path.breadcrumbs().get(0);
-    final Breadcrumb crossing =
-        new Breadcrumb(
+    final SourceCrumb root =
+        path.breadcrumbs().isEmpty() ? null : (SourceCrumb) path.breadcrumbs().get(0);
+    final SourceCrumb crossing =
+        new SourceCrumb(
             sownChild.domain(),
             sownChild.slug(),
             root == null ? "" : root.sha(),
@@ -297,13 +298,14 @@ public final class ScenarioCellar implements TransactionalCellar {
       return Trail.empty();
     }
     final Trail path = runProvenance(parcel);
-    final Optional<Breadcrumb> root = path.breadcrumbs().stream().findFirst();
-    final Breadcrumb here =
-        new Breadcrumb(
+    final Optional<SourceCrumb> root =
+        path.breadcrumbs().stream().findFirst().map(SourceCrumb.class::cast);
+    final SourceCrumb here =
+        new SourceCrumb(
             coordinate.domain(),
             coordinate.slug(),
-            root.map(Breadcrumb::sha).orElse(""),
-            root.map(Breadcrumb::dirty).orElse(false));
+            root.map(SourceCrumb::sha).orElse(""),
+            root.map(SourceCrumb::dirty).orElse(false));
     return path.push(here);
   }
 

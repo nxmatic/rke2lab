@@ -196,7 +196,7 @@ public class ClusterSeedScenario
         .the_systemd_adapter_is_launched(hostScenario, hostTree)
         .and()
         .the_cluster_becomes_ready(hostScenario, hostTree);
-    then().the_harvest_is_stored().the_run_fails_if_any_crossing_failed(hostScenario);
+    then().the_harvest_is_stored().the_run_fails_if_any_crossing_failed(hostScenario, hostTree);
   }
 
   /**
@@ -703,7 +703,8 @@ public class ClusterSeedScenario
     }
 
     @As("the run fails if any crossing failed")
-    public Then the_run_fails_if_any_crossing_failed(@Hidden ScenarioModel hostScenario) {
+    public Then the_run_fails_if_any_crossing_failed(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
       // The closing gate: the tolerating crossings (systemd, cluster) grafted their FAILED verdict
       // WITHOUT throwing, so their siblings ran and aggregated in the one runbook. Here — after the
       // harvest is filed — fail the whole run if any crossing left an error on the host case, so
@@ -712,7 +713,7 @@ public class ClusterSeedScenario
       // fail-fast having discarded the sibling diagnostics. The drain (afterTestExecution) still
       // runs
       // and persists the real harvest despite this throw — the non-transactional mirror.
-      graft.assertNoCrossingFailed(hostScenario);
+      graft.assertNoCrossingFailed(hostScenario, hostTree);
       return self();
     }
   }

@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.seedmatic.rke2lab.seed.broker.codec.PassphraseCellarCipher;
-import io.seedmatic.rke2lab.seed.broker.port.Breadcrumb;
 import io.seedmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.SeedEnvelope;
 import io.seedmatic.rke2lab.seed.broker.port.Sensitivity;
+import io.seedmatic.rke2lab.seed.broker.port.SourceCrumb;
 import io.seedmatic.rke2lab.seed.broker.port.Trail;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -89,8 +89,8 @@ class CodecCellarSealTest {
     final Trail trail =
         new Trail(
             List.of(
-                new Breadcrumb("worktree", "run-provenance", "abc123", true),
-                new Breadcrumb("test", "test-secret", "abc123", true)));
+                new SourceCrumb("worktree", "run-provenance", "abc123", true),
+                new SourceCrumb("test", "test-secret", "abc123", true)));
     backend.store(
         PARCEL, new SeedEnvelope("test", "test-secret", "cellar:sealed:v1:blob").withTrail(trail));
 
