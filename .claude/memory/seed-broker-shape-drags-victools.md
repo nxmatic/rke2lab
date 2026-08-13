@@ -8,7 +8,7 @@ metadata:
 ---
 
 `seed-broker-shape` packages TWO classes of very different weight in ONE exported package
-(`io.nxmatic.rke2lab.seed.broker.shape`):
+(`io.seedmatic.rke2lab.seed.broker.shape`):
 - `AmendmentBinder` — light: reflection over `@Amendment` record components + jackson `JsonNode`.
 - `RecordSchemaProjector` — heavy: pulls the **victools jsonschema-generator** (`com.github.victools`).
 

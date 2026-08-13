@@ -13,7 +13,7 @@ standalone OSGi-debt chantier left** — each axis is either already resolved, a
 osgi-runtime trunk. The verdicts:
 
 1. **rk2lab typo BUG — DEAD.** The netplan services file is correct
-   (`io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService` → `…netplan.DefaultNetplanSynthesisService`)
+   (`io.seedmatic.rke2lab.netplan.api.NetplanSynthesisService` → `…netplan.DefaultNetplanSynthesisService`)
    and `grep -rn rk2lab osgi/ exec/` returns NOTHING. Purged at step 5. Nothing to do.
 
 2. **Log / logback — heavy half already purged.** Zero logback in the core bundle poms, zero

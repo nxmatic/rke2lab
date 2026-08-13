@@ -22,7 +22,7 @@ FOUNDATION concern any realm/domain may need (the codec is: host + any OSGi doma
 1. **A real OSGi bundle** in `osgi/foundation/`: `bnd.bnd` has a `Bundle-SymbolicName`,
    `Export-Package: <the api pkg>`, `Import-Package` of its realm-isolated dep (jackson) + any seam
    it uses (bnd emits these from bytecode), and the marker `Provide-Capability:
-   io.nxmatic.rke2lab.embed; type=library`. Keep the jackson glue in a NON-exported `.internal`
+   io.seedmatic.rke2lab.embed; type=library`. Keep the jackson glue in a NON-exported `.internal`
    subpackage (only the API type is exported) so SPEC_COVERAGE need not document the glue.
 2. **Staging treats `type=library` as dual** (`StagingClosure.isRealmLibrary` returns
    `b.embed().isLibrary()`): staged under `META-INF/bundles/` AND kept flat in the host uber-jar
@@ -51,8 +51,8 @@ appears, promote it to `type=library` rather than nest-and-export from two bundl
 ## Naming lesson
 
 Name the module/package for what it serves, specific enough to avoid a future split: artifact
-`gateway-document-codec`, package `io.nxmatic.rke2lab.world.gateway.codec` — a SIBLING of the seam's
+`gateway-document-codec`, package `io.seedmatic.rke2lab.world.gateway.codec` — a SIBLING of the seam's
 `…world.gateway.port`, NEVER inside the seam (the seam shares DATA in one copy; this shares
 LOGIC+jackson in two isolated copies — opposite contracts). BSN
-`io.nxmatic.rke2lab.gateway.document.codec`. See [[realm-library-isolation-state]]
+`io.seedmatic.rke2lab.gateway.document.codec`. See [[realm-library-isolation-state]]
 [[codec-foundation-single-exporter-when-needed-backlog]] [[world-gateway-2d-execution-state]].

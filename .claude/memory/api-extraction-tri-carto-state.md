@@ -44,12 +44,12 @@ For each type: **does any HOST module (exec/seed-master, host/*) import it?**
 
 ## Carto findings (host imports, integration @a100b75d)
 
-**unitrepo — PURE intra-OSGi.** The host imports NOTHING from `io.nxmatic.rke2lab.unitrepo.*`. Its api
+**unitrepo — PURE intra-OSGi.** The host imports NOTHING from `io.seedmatic.rke2lab.unitrepo.*`. Its api
 (`unitrepo-handler-api`, the resolver SPI) never crosses to the host. Simplest case: it already is an
 intra-OSGi api bundle; nothing to move to host.
 
 **netplan — the existing api/impl split is MIS-ORIENTED vs who-consumes.** The host imports exactly ONE
-type: `io.nxmatic.rke2lab.netplan.ClusterNetworkBlueprint` — which lives in the IMPL package
+type: `io.seedmatic.rke2lab.netplan.ClusterNetworkBlueprint` — which lives in the IMPL package
 `…netplan` (NOT in `…netplan.api`). And `NetplanSynthesisService` (the SPI sitting in `…netplan.api`) is
 NOT imported by the host at all — it is consumed by `netplan-cli` (exec). So netplan's current
 package-level api/impl split was drawn by "interface vs class", NOT by who-consumes. The bridge type the
@@ -164,8 +164,8 @@ Fraunhofer FIRST, EuroPLoP 2003) and asked, read-only/introspective: did we reas
 - `unitrepo` — untouched (pure intra-OSGi, already `-core` / `-handler-api`).
 
 Open sub-question for the slice (minor): the Java PACKAGE for the bridge-api — keep
-`io.nxmatic.rke2lab.manifests` (the types move module but not package, so no import churn beyond the new
-module dep) or introduce `io.nxmatic.rke2lab.manifests.bridge`? Lean: keep the package, move only the
+`io.seedmatic.rke2lab.manifests` (the types move module but not package, so no import churn beyond the new
+module dep) or introduce `io.seedmatic.rke2lab.manifests.bridge`? Lean: keep the package, move only the
 module — minimal churn, and bnd export is by package so the bundle still exports the same names. Decide
 when coding the slice.
 

@@ -28,7 +28,7 @@ End state: edit `IncusResourceBootstrap.java` → push to GitHub → Tekton (re-
 - **Peer enumeration**: hardcoded canonical netplan topology (peer1/peer2/peer3/worker1/worker2). GitOps controls instantiation via `KThreesControlPlane.spec.replicas` and `MachineDeployment.spec.replicas`.
 - **MachineTemplate granularity**: one `LXCMachineTemplate` per node, each referencing its per-node cloud-init Secret.
 - **Cloud-init Secret encryption**: **SOPS** with cluster-side age key. Flux's SOPS decryption at apply time. All synthesized YAMLs (including cloud-init Secrets) committed.
-- **Image distribution**: Maven `jib-maven-plugin` builds the seed-peers JAR-in-image, pushes to GHCR (`ghcr.io/nxmatic/seed-peers`).
+- **Image distribution**: Maven `jib-maven-plugin` builds the seed-peers JAR-in-image, pushes to GHCR (`ghcr.io/seedmatic/seed-peers`).
 - **Tekton credentials**: GitHub App with branch + PR-creation permissions on the repo (not just push-to-main). PR creation via `gh pr create` from a Task step.
 - **Porch fate**: kept as-is during all three phases. Migration to plain Flux Kustomizations + HelmReleases is a separate later effort.
 
@@ -150,7 +150,7 @@ Replaces the two clusterctl-driven shell-script systemd units with cdk8s manifes
 Author the `seed-peers/` module. Operator runs it locally, commits the synth output, peer1 comes up.
 
 **Deliverables**:
-1. **Module rename**: `seed-master/` → `seed-master/`. Update Maven `<artifactId>`, `<name>`, parent pom's `<modules>`, all refs across CLAUDE.md / pom files / scripts. Group id stays `io.nxmatic.rke2lab`.
+1. **Module rename**: `seed-master/` → `seed-master/`. Update Maven `<artifactId>`, `<name>`, parent pom's `<modules>`, all refs across CLAUDE.md / pom files / scripts. Group id stays `io.seedmatic.rke2lab`.
 2. **Image-state ConfigMap as Stage A output**: master's bootstrap (in HostStage's k8s ConfigMap authoring) emits a `ConfigMap bioskop-image-state` in `capn-system` carrying:
    - `imageAlias: control-node`
    - `imageFingerprint: <sha from imageProvider>`
@@ -184,10 +184,10 @@ Author the `seed-peers/` module. Operator runs it locally, commits the synth out
 GitHub webhook triggers seed-peers in-cluster on relevant pushes; Tekton synthesizes onto a feature branch and opens a PR if apply succeeds. Operator reviews + merges the auto-PR exactly like a normal PR.
 
 **Deliverables**:
-1. **Image build**: add `jib-maven-plugin` to `seed-peers/pom.xml` (and CI workflow `.github/workflows/seed-peers-image.yml`). Push to `ghcr.io/nxmatic/seed-peers:<git-sha>` + `:latest`.
+1. **Image build**: add `jib-maven-plugin` to `seed-peers/pom.xml` (and CI workflow `.github/workflows/seed-peers-image.yml`). Push to `ghcr.io/seedmatic/seed-peers:<git-sha>` + `:latest`.
 2. **Tekton manifests** as a new layer `manifests/.../layers/cicd/SeedPeersTektonLayer.java`:
    - `Task: clone-repo`.
-   - `Task: synth-seed-peers` (image: `ghcr.io/nxmatic/seed-peers`). Workspace shared with clone-repo. Output: `/workspace/gitops/`.
+   - `Task: synth-seed-peers` (image: `ghcr.io/seedmatic/seed-peers`). Workspace shared with clone-repo. Output: `/workspace/gitops/`.
    - `Task: sops-encrypt` — safety net; the Java side does the encryption, this verifies + re-encrypts any plaintext Secret that slipped through.
    - `Task: branch-and-commit` — `git checkout -b tekton/drift-<sha>`; if `git diff --quiet HEAD` against the equivalent on main: exit cleanly without a branch (no drift); else commit + push the branch.
    - `Task: try-apply` — server-side dry-run apply of the new branch's gitops/ tree. If dry-run fails, fail the Task. If dry-run succeeds, real apply.
@@ -217,8 +217,8 @@ GitHub webhook triggers seed-peers in-cluster on relevant pushes; Tekton synthes
 
 **Phase 1**:
 - `manifests/src/main/resources/upstream/clusterapi/{core,infra-incus,cp-rke2}/release-vX.Y.Z.yaml` (new)
-- `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/{ClusterApiCoreLayer,ClusterApiInfraIncusLayer,ClusterApiCpRke2Layer,ClusterApiDomainRegistrar}.java` + ManifestUnits (new, mirrors Tekton pattern)
-- `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/FluxRootLayer.java` (new) — emits `GitRepository` + root `Kustomization` referencing this repo's `gitops/` subtree
+- `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/clusterapi/{ClusterApiCoreLayer,ClusterApiInfraIncusLayer,ClusterApiCpRke2Layer,ClusterApiDomainRegistrar}.java` + ManifestUnits (new, mirrors Tekton pattern)
+- `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/gitops/FluxRootLayer.java` (new) — emits `GitRepository` + root `Kustomization` referencing this repo's `gitops/` subtree
 - `seed-master/.../incus/IncusResourceBootstrap.java` HostStage — add identity-Secret materialization
 - `seed-master/.../policy/ManifestLinkPolicy.java` + `ControlplanePolicy.java` — add `policy.link.clusterApi.enabled`
 - `manifests/src/main/resources/systemd/systemd-{units,scripts}/rke2lab-{cluster-api,capn-provider}-install.{service,sh}` (delete)

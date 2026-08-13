@@ -114,7 +114,7 @@ bundle's EXPORTED surface (RecordPurity verifies doctor-records exports only rec
 NONE checks the CONSUMER direction. The invariant "nothing flat references a bundle-only type" was a
 RUNTIME notion (deriveSystemExports) only — never a build gate. So the build compiled and the crash
 surfaced at runtime. Also confirmed: doctor-port AND cluster-port built manifests carry
-`Import-Package: io.nxmatic.rke2lab.doctor.records` (leak #1, manifest-visible); the host crash
+`Import-Package: io.seedmatic.rke2lab.doctor.records` (leak #1, manifest-visible); the host crash
 (`ControlplanePolicy.from`→`Severity.parse`) is leak #2, NOT manifest-visible (the host is the FLAT
 jar, no Import-Package — needs BYTECODE/ASM to see).
 

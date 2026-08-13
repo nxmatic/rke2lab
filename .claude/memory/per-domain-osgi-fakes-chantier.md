@@ -30,7 +30,7 @@ jGiven's cross-stage interception is genuine) AND serves collaborators from the 
 **Inventory (2026-07-07):** OSGi domains = doctor, cluster, systemd(dbus), manifests, netplan,
 unitrepo, ssh-to-age. Shipped fakes: `doctor-core-fake`, `dbus-systemd-edge-fake`. MISSING (~5):
 cluster, manifests, netplan, unitrepo, ssh-to-age. Each = a fragment module (bnd `Fragment-Host` +
-`Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=<domain>; role=<...>-fake`) + fake
+`Provide-Capability: io.seedmatic.rke2lab.embed; type=fixture; suite=<domain>; role=<...>-fake`) + fake
 `@Component`s. This is the concrete first move of the long-signalled
 [[osgi-frontier-underpopulated-chantier]].
 

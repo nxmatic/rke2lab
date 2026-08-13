@@ -57,7 +57,7 @@ HOST (generic, not seed-specific) so every pipeline reuses them:
   tolerated (doctor-core-test precedent).
 - `osgi/domains/doctor/doctor-core-fake` — `Fragment-Host: …doctor.core`, publishes
   `FakeReadinessAuthority` + `FakeConsultingService` (both `variant=fake`, encode Documents via the
-  fragment's own `DocumentCodec`). Own package `io.nxmatic.rke2lab.doctor.fake` (NOT doctor-core's
+  fragment's own `DocumentCodec`). Own package `io.seedmatic.rke2lab.doctor.fake` (NOT doctor-core's
   sealed package — implements public gateway seams, no white-box needed).
 Capability filters: `(&(type=fixture)(suite=systemd)(role=probe-fake))`,
 `(&(type=fixture)(suite=doctor)(role=gateway-fake))`.

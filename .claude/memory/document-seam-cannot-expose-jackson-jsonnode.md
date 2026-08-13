@@ -26,7 +26,7 @@ turn on the trace.
 The resolver WIRE lines showed:
 - `[doctor.core 25] com.fasterxml.jackson.databind -> [jackson-databind BUNDLE 28]` — jackson is a
   BUNDLE (the user's standing decision: "jackson arrives in OSGi via a bundle, not the JCL"). Correct.
-- `[doctor.core 25] io.nxmatic.rke2lab.gateway.port -> [felix.framework 0]` — the seam is FLAT
+- `[doctor.core 25] io.seedmatic.rke2lab.gateway.port -> [felix.framework 0]` — the seam is FLAT
   (system-exported). Correct.
 - gateway-port's BUILT manifest: `Import-Package: com.fasterxml.jackson.databind, .node` +
   `Provide-Capability: type=seam`.
@@ -61,7 +61,7 @@ that read `payload()` as a JsonNode.
 
 Add `SEAM_PURITY` to `StagingGate` (sibling of RECORD_PURITY / REALM_BOUNDARY in
 `maven-embed-staging-ext/staging-extension`): for each bundle with `Provide-Capability:
-io.nxmatic.rke2lab.embed; type=seam`, its `Import-Package` may name ONLY packages that are
+io.seedmatic.rke2lab.embed; type=seam`, its `Import-Package` may name ONLY packages that are
 system-exported (other seams) / JDK / OSGi-framework — NEVER a package provided by a non-seam bundle
 (type=model/edge/record or a third-party lib bundle like com.fasterxml.jackson.*). A forbidden import
 = ERROR at build time. This would have failed 2A's build the moment Document(JsonNode) made

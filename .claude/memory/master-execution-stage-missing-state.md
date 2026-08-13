@@ -12,7 +12,7 @@ Le scénario `manifests-bdd` synthétise (prouvé vert, commit `b222fe991`) mais
 l'arbre** de master. En cherchant pourquoi, on a remonté un manque structurel bien plus large.
 
 **Ce qui existe sur `main` et a DISPARU chez nous** — `git ls-tree origin/main` sur
-`exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/`:
+`exec/seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/`:
 - packages PRÉSENTS chez nous (4): `controlplane`, `/bdd` (le scénario), `/config`, `/policy`.
 - packages ABSENTS chez nous (6): `/resources` (ResourceManager, ResourceCreationPipeline,
   Seed*Resource), `/incus` (17 classes dont **IncusResourceBootstrap ~3490 l.** + **BootstrapPaths**),

@@ -12,7 +12,7 @@ declaration bug — it "sits around the pipeline migration, which is not finishe
 ## RESOLVED 2026-07-09 — jGiven single-path done, wrap relocated to runtime
 
 The two-path jGiven mess is GONE. The wrap moved out of the `pipeline/` aggregator to
-`osgi/runtime/jgiven-wrap` (artifactId `jgiven-wrap`, BSN unchanged `io.nxmatic.rke2lab.jgiven.wrap`).
+`osgi/runtime/jgiven-wrap` (artifactId `jgiven-wrap`, BSN unchanged `io.seedmatic.rke2lab.jgiven.wrap`).
 It is the ONE jGiven carrier; scenario-engine and every BDD consumer depend on it. The `pipeline/`
 aggregator now holds only pipeline-port (the grammar) + pipeline-testkit/probe/probe-test (the
 in-container jGiven testkit + its guard).

@@ -62,7 +62,7 @@ they lack) — `pluginManagement` + per-bundle opt-in is the only clean cut.
 
 ## State / next
 - Branch `refactor/layout-skeleton`, base `design/target-module-layout` (HEAD 1eaaeff7). Build green.
-- Two stale refs to the old `io.nxmatic.rke2lab:parent` artifactId remain ONLY in
+- Two stale refs to the old `io.seedmatic.rke2lab:parent` artifactId remain ONLY in
   [wip/plans/2026-06-17-osgi-bench-slice2.md] — a finished slice's historical journal, left as-is
   (convention lives in CLAUDE.md, not in old plans).
 - Merge plan: squash/ff into `design/target-module-layout` (solo, no PR — [[rke2lab-solo-no-pr-merge-direct]]);

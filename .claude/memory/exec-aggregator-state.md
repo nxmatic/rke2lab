@@ -25,16 +25,16 @@ already the core's `api/` package, nothing new to model).
 
 ## The netplan core/cli split (verified on design HEAD c3cfb58c)
 
-`osgi/netplan` has 11 classes in pkg `io.nxmatic.rke2lab.netplan` + subpkg `api/`. Split:
+`osgi/netplan` has 11 classes in pkg `io.seedmatic.rke2lab.netplan` + subpkg `api/`. Split:
 - **STAYS in osgi/netplan (becomes pure netplan-CORE, a library bundle):** `Cidr`, `MacAddress`,
   `ClusterNetworkBlueprint`, `DefaultNetplanSynthesisService`, and the `api/` package
   (`NetplanSynthesisService`/`Request`/`Result`, `Net2PlanEndpoint`) = the NORTH port it offers.
   Remove the shade plugin, exec-maven-plugin, mainClass, and the CLI-only deps (logback-classic,
   jackson-dataformat-yaml) from its pom — the core bundle goes back to pure Export-Package, no exec.
 - **MOVES to exec/netplan-cli:** `NetplanCli`, `SynthesisCommand`, `BlueprintExportCommand` + the shade
-  config (classifier `exec`, mainClass `io.nxmatic.rke2lab.netplan.NetplanCli`, logback.xml transformer)
+  config (classifier `exec`, mainClass `io.seedmatic.rke2lab.netplan.NetplanCli`, logback.xml transformer)
   + the CLI-only deps. netplan-cli DEPENDS ON osgi/netplan (the core) and produces the `-exec` jar.
-  NB: the CLI classes are in pkg `io.nxmatic.rke2lab.netplan` today — decide whether they move to a
+  NB: the CLI classes are in pkg `io.seedmatic.rke2lab.netplan` today — decide whether they move to a
   `…netplan.cli` package (cleaner export boundary for the core) or keep the package and just relocate
   the module (bnd Export-Package on the core already only exports what it should — verify no split-pkg).
 
@@ -87,7 +87,7 @@ each FULL `-Posgi` green (29 modules, 15 tests 0-skipped), `git status` clean:
   netplan exec-jar now built via `-pl :netplan-cli -am` (sibling core dep needs the reactor, not `-f`),
   plus the seed-master path; Pulumi.yaml binary + .vscode/launch.json cwd. **Also fixed a PRE-EXISTING
   bug:**
-  the ServiceLoader registration file was misnamed `io.nxmatic.rk2lab.*` (missing the `e`) → `synthesis`
+  the ServiceLoader registration file was misnamed `io.seedmatic.rk2lab.*` (missing the `e`) → `synthesis`
   never resolved a provider; only `yamlExport` (the only path the flake runs) was exercised, so latent.
 - **5b `1905fe3b`** — user grew scope: extract `exec/manifests-cli` too (symmetric). The manifests bundle
   wore THREE hats (library bundle + `manifests-d` asset zip + exec jar) — extract ONLY the exec hat:

@@ -1,6 +1,6 @@
 ---
 name: jgiven-dissolution-is-a-realm-change-backlog
-description: The SAFE half of osgi-aggregator-layout §5.4 ("dissolve jgiven into pipeline") HAS NOW SHIPPED (commit 46c7cdf0, 2026-06-30) — jgiven was regrouped under a pipeline/ aggregator as pipeline-port (grammar seam), pipeline-jgiven (wrap), pipeline-testkit, pipeline-probe, pipeline-probe-test. LAYOUT-ONLY, NO export fusion. The DANGEROUS half — making the pipeline SEAM export com.tngtech.jgiven.* — remains DEFERRED. pipeline-port exports ONLY io.nxmatic.rke2lab.pipeline (type=seam); pipeline-jgiven stays a separate bundle exporting com.tngtech.jgiven.*. Export-fusion would put jGiven in two realms → LinkageError (DUPLICATE_REALM_CLASS forbids). The module-layout complaint ("jgiven as top-level peer") is RESOLVED; the backlog narrows to ONLY the export-fusion realm change. See [[jgiven-domain-into-pipeline-debt]] [[osgi-aggregator-layout-spec-state]] [[document-seam-cannot-expose-jackson-jsonnode]].
+description: The SAFE half of osgi-aggregator-layout §5.4 ("dissolve jgiven into pipeline") HAS NOW SHIPPED (commit 46c7cdf0, 2026-06-30) — jgiven was regrouped under a pipeline/ aggregator as pipeline-port (grammar seam), pipeline-jgiven (wrap), pipeline-testkit, pipeline-probe, pipeline-probe-test. LAYOUT-ONLY, NO export fusion. The DANGEROUS half — making the pipeline SEAM export com.tngtech.jgiven.* — remains DEFERRED. pipeline-port exports ONLY io.seedmatic.rke2lab.pipeline (type=seam); pipeline-jgiven stays a separate bundle exporting com.tngtech.jgiven.*. Export-fusion would put jGiven in two realms → LinkageError (DUPLICATE_REALM_CLASS forbids). The module-layout complaint ("jgiven as top-level peer") is RESOLVED; the backlog narrows to ONLY the export-fusion realm change. See [[jgiven-domain-into-pipeline-debt]] [[osgi-aggregator-layout-spec-state]] [[document-seam-cannot-expose-jackson-jsonnode]].
 metadata:
   type: project
 ---
@@ -10,10 +10,10 @@ metadata:
 The user asked "did we forget to integrate jgiven into pipeline?" — which surfaced that §5.4 of the
 aggregator-layout spec was never executed AND that executing it as written is dangerous.
 
-`osgi/pipeline/bnd.bnd` today exports ONLY `io.nxmatic.rke2lab.pipeline` and carries
-`Provide-Capability: io.nxmatic.rke2lab.embed; type=seam` → it is a SEAM: system-exported, FLAT,
+`osgi/pipeline/bnd.bnd` today exports ONLY `io.seedmatic.rke2lab.pipeline` and carries
+`Provide-Capability: io.seedmatic.rke2lab.embed; type=seam` → it is a SEAM: system-exported, FLAT,
 read by the host out of the framework typed (BootPipeline, manifests-core, seed-master import
-`io.nxmatic.rke2lab.pipeline` flat).
+`io.seedmatic.rke2lab.pipeline` flat).
 
 `jgiven-wrap` has NO embed capability — it is installed as a normal bundle by `JGivenTestkit`
 (`installFromClasspath(...)` for jGiven's whole tail + `installBundles(WRAP_BSN)`), and the `-test`
@@ -31,7 +31,7 @@ detects.
 The layout increment shipped the SAFE half of §5.4 (commit 46c7cdf0). It regrouped `osgi/jgiven/`
 under a `pipeline/` aggregator as pipeline-port (grammar seam, was `pipeline`), pipeline-jgiven (was
 jgiven-wrap), pipeline-testkit, pipeline-probe, pipeline-probe-test — **layout-only, NO export
-fusion**. pipeline-port exports ONLY `io.nxmatic.rke2lab.pipeline` (type=seam); pipeline-jgiven stays
+fusion**. pipeline-port exports ONLY `io.seedmatic.rke2lab.pipeline` (type=seam); pipeline-jgiven stays
 a separate bundle exporting `com.tngtech.jgiven.*`. Packages and BSNs unchanged (jgiven name survives
 in package/BSN; only Maven artifactIds renamed). The module-layout complaint ("jgiven as a top-level
 foundation peer") is **RESOLVED**. §8 ("strictement le layout, aucune fusion") governed this increment

@@ -86,7 +86,7 @@ once bundle-ified here). So land this BEFORE R4 boot-seam coding. Bench-BSN-drif
   -DskipTests=false` from the worktree; COUNT surefire reports ([[build-verification-gotchas]]) — baseline
   is the rename merge's 34 modules / 18 tests / 12 reports / 0 skipped (module count rises with the new
   contract bundles + netplan promotion). Generated manifests: the contract import must now be VERSIONED
-  (`io.nxmatic.rke2lab.manifests.contract;version="1.0"`) — that is the behavioural proof of the
+  (`io.seedmatic.rke2lab.manifests.contract;version="1.0"`) — that is the behavioural proof of the
   re-placement (the lone unversioned import from the carto origin is gone). NO -Plive.
 - CLOSE = commit code AND `.claude/memory/`, build GREEN, then HAND OFF to the design/target-module-layout
   session for the squash-merge — this session does NOT saw its own worktree ([[merge-from-target-worktree]]).

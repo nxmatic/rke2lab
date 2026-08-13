@@ -7,7 +7,7 @@ metadata:
 
 **Backlog (raised 2026-06-26):** the staging-extension gates (RECORD_PURITY / SPEC_COVERAGE /
 INSTANCE_DISCIPLINE) read the `osgi/` bundles' bytecode via ASM — the jars that carry the
-`io.nxmatic.rke2lab.embed` capability, scanned by the build-time Maven extension. They do **not** see
+`io.seedmatic.rke2lab.embed` capability, scanned by the build-time Maven extension. They do **not** see
 `exec/seed-master` (host space) nor anything outside the embedded OSGi topology. So the
 INSTANCE_DISCIPLINE summary ("0 error, N warn") counts ONLY osgi/ statics.
 

@@ -10,7 +10,7 @@ metadata:
 
 Reviewing the bridge→contract rename (in flight, NOT merged), the user noticed the GENERATED manifest of
 `manifests-core` imports the contract package UNVERSIONED:
-`io.nxmatic.rke2lab.manifests.contract` (no `;version=`), while every other OSGi-consumed import IS
+`io.seedmatic.rke2lab.manifests.contract` (no `;version=`), while every other OSGi-consumed import IS
 versioned (`unitrepo.core;version="[0.1,1)"`, `org.osgi.resource;version="[1.0,2)"`, jackson `[2.22,3)`).
 First read (mine): "unversioned because delivered by the host classloader, correct, no fix." The user
 pushed back twice and was right both times:
@@ -53,8 +53,8 @@ single-exporter invariant: ONE copy of the contract Class, shared host↔bundle,
 
 R4 impact (already a pointer in [[osgi-runtime-r4-boot-seam-state]]): the `system.packages.extra` string
 must list the contract packages WITH their version once bundle-ified —
-`io.nxmatic.rke2lab.manifests.contract;version="1.0"`, `.contract.node`, `.contract.profiles`,
-`io.nxmatic.rke2lab.netplan.contract`. The impl bundles' versioned import then constrains against it.
+`io.seedmatic.rke2lab.manifests.contract;version="1.0"`, `.contract.node`, `.contract.profiles`,
+`io.seedmatic.rke2lab.netplan.contract`. The impl bundles' versioned import then constrains against it.
 
 ## What this means for the in-flight rename slice
 

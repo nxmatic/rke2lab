@@ -253,7 +253,7 @@ Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.
 
 LIVE CONFIRMATION that step 5 is the next real work: once the cdk8s carrier moved bundle-side
 (commit 376e7d95 — the staging/boot/gate chain), `pulumi preview` crashes at boot with
-`NoClassDefFoundError: io.nxmatic.rke2lab.doctor.records.Severity`. That is NOT a regression — it
+`NoClassDefFoundError: io.seedmatic.rke2lab.doctor.records.Severity`. That is NOT a regression — it
 is exactly the record-crossing the keystone (above) closes. `type=record` (step 1) made
 doctor-records bundle-only + shade-excluded from the flat uber-jar; the flat jar had been MASKING
 the leak. The host (exec/seed-master) still holds doctor.records.* — `ControlplanePolicy` parses

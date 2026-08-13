@@ -23,7 +23,7 @@ SHIPPED + integrated into design/pre-integration:
 - the port/edge/domain doc (3 roles, one verb each: domain CALLS, port DECLARES, edge PROVIDES; the
   port is owned by the consumer, the edge owns none; world is DERIVED from the consumer's world).
 - *osgi-boot-single-source* — the embedded-bundle hand-list is GONE. Each embeddable bundle declares
-  `Provide-Capability: io.nxmatic.rke2lab.embed; type=model`; `OsgiRuntime.scanEmbeddedModelBundles()`
+  `Provide-Capability: io.seedmatic.rke2lab.embed; type=model`; `OsgiRuntime.scanEmbeddedModelBundles()`
   reads `META-INF/bundles/` manifests and installs whatever declares it (filter on a CAPABILITY, never
   names — names slide on rename). The Java literals are gone: `SeedRuntime.bootingEmbedded()` takes no
   arg, the 3 call-sites pass no jar name. Build green (3 execs + their `EmbeddedBundlesBootTest`). Handoff
@@ -59,7 +59,7 @@ SHIPPED + integrated into design/pre-integration:
    - **(1) Install table — `OsgiRuntime`, prod.** Two columns of one question (*how does it know what to
      install*): **ours → one capability reader** (unify `scanEmbeddedModelBundles()` source=staged
      `META-INF/bundles/` + `embeddableBundlesOnClasspath()` source=reactor classpath — same
-     `io.nxmatic.rke2lab.embed` cap, two duplicated loops → one reader, source as a param); **3rd-party →
+     `io.seedmatic.rke2lab.embed` cap, two duplicated loops → one reader, source as a param); **3rd-party →
      a typed `enum BootStackJar(artifactId, stagedFileName)`** for the 4 loose `…_JAR` constants
      (pax-logging-api/logback, felix.scr/resolver) so `embeddedBootStack()` iterates. HONEST FRONTIER (real
      jars): these are NOT ours — pax-logging-api declares NO `Provide-Capability` — so they STAY named, not

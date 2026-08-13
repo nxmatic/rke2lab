@@ -32,7 +32,7 @@ pre-existing by `git stash` + test-compile at HEAD caea2d7b. The build-cache had
 
 Pulumi preview: ✅ FIXED end-to-end (user confirmed). After ae46278b the synthesis completed and the
 pipeline advanced to a SECOND, latent host-side bug — "Classpath resource root not found:
-META-INF/io.nxmatic/.../incus/manifests/systemd/systemd-scripts" at ClasspathTreeCopier.copy. The
+META-INF/io.seedmatic/.../incus/manifests/systemd/systemd-scripts" at ClasspathTreeCopier.copy. The
 resource IS in the exec-jar; the copier resolved it via the THREAD CONTEXT classloader, which under
 the Pulumi runtime (pipeline worker, after Felix boot + cdk8s synth) does not see the host uber-jar
 (resolves fine standalone — neither Felix nor jsii calls setContextClassLoader, so the exact cause of

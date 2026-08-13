@@ -33,8 +33,8 @@ merged code match — a deliberate, tracked, temporary divergence being reconcil
   (relative dir), the `<module>` entries, and the GAV `<artifactId>` in dependents.
 
 **Dimension 2 — Java package: `.bridge` → `.contract`** (decided: aligned with the artifact):
-- `io.nxmatic.rke2lab.manifests.bridge[.node|.profiles]` → `…manifests.contract[.node|.profiles]`;
-  `io.nxmatic.rke2lab.netplan.bridge` → `…netplan.contract`.
+- `io.seedmatic.rke2lab.manifests.bridge[.node|.profiles]` → `…manifests.contract[.node|.profiles]`;
+  `io.seedmatic.rke2lab.netplan.bridge` → `…netplan.contract`.
 - ~98 `.java` files reference `.bridge` (package decls in the moved types + imports in manifests-core,
   netplan, seed-master, and the many manifests units). Mechanical: move the package dirs + rewrite
   `package`/`import` lines. Verify the bnd `Export-Package` in the impl bundles (manifests-core, netplan)
@@ -44,10 +44,10 @@ merged code match — a deliberate, tracked, temporary divergence being reconcil
 
 These 4 files in `osgi/manifests/manifests-core/src/main/resources/META-INF/services/` are NAMED by the
 SPI's fully-qualified name, which contains `.bridge`:
-- `io.nxmatic.rke2lab.manifests.bridge.ManifestUpdateGate`
-- `io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisService`
-- `io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeService`
-- `io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContributor`
+- `io.seedmatic.rke2lab.manifests.bridge.ManifestUpdateGate`
+- `io.seedmatic.rke2lab.manifests.bridge.ManifestSynthesisService`
+- `io.seedmatic.rke2lab.manifests.bridge.ManifestExplodeService`
+- `io.seedmatic.rke2lab.manifests.bridge.node.NodeEnvContributor`
 `git mv` each to its `.contract` FQN. ServiceLoader looks up the provider by the EXACT FQN path — miss
 one and the dual-path `forServiceLoader()` silently finds no provider (no compile error, no test failure
 unless a test exercises that path). After renaming, GREP for any stray `.bridge` in resources AND verify

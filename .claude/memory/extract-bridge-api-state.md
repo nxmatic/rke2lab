@@ -1,6 +1,6 @@
 ---
 name: extract-bridge-api-state
-description: "REFACTOR slice (worktree refactor/extract-bridge-api, off design/target-module-layout @b503b423): the prerequisite to R4. ★ CODED + GREEN 2026-06-19. Lifted the BRIDGE-API ports out of the OSGi impl bundles into dedicated HOST modules so the host compiles ONLY against the port. Created host/manifests-bridge-api + host/netplan-bridge-api; moved the sorted port types in; re-pointed manifests-core/netplan (impl) + seed-master at the new modules. ★ SPLIT-PACKAGE BIT (as the brief foresaw): keeping the original packages left io.nxmatic.rke2lab.manifests[.node|.profiles] + …netplan straddling two modules (bnd 'Split package' + shade 'overlapping classes' on 4 pkgs) → applied the pre-authorised fallback: moved types renamed into a .bridge namespace (…manifests.bridge[.node|.profiles], …netplan.bridge). Also renamed the 4 META-INF/services SPI registration files to the new FQNs (ServiceLoader dual-path). Full -Posgi clean package GREEN (cache skipped, BUILD SUCCESS, no split/overlap warnings, 12 surefire reports / 18 tests, 0 fail). The R4 work (system.packages.extra re-export + the 3 inversions) is UNCHANGED and still pending. The full per-type sort + naming live in [[api-extraction-tri-carto-state]]. ★ SHIPPED to design/target-module-layout (squash merge 3279fe39, 2026-06-19); worktree torn down. Re-verified from the integration worktree before merge (-Posgi clean package green, 34 modules, 18 tests/12 reports/0 skipped). ★ FOLLOW-UP OWED: rename `-bridge-api` → `-contract` (the Pohl OSGi paper uses 'Bridge' for a runtime hot-swap object, not our port — see [[api-extraction-tri-carto-state]] §'Why NOT bridge'); the merged code is still `-bridge-api`/`.bridge`, the design note says `-contract` — a deliberate temporary divergence the rename slice reconciles."
+description: "REFACTOR slice (worktree refactor/extract-bridge-api, off design/target-module-layout @b503b423): the prerequisite to R4. ★ CODED + GREEN 2026-06-19. Lifted the BRIDGE-API ports out of the OSGi impl bundles into dedicated HOST modules so the host compiles ONLY against the port. Created host/manifests-bridge-api + host/netplan-bridge-api; moved the sorted port types in; re-pointed manifests-core/netplan (impl) + seed-master at the new modules. ★ SPLIT-PACKAGE BIT (as the brief foresaw): keeping the original packages left io.seedmatic.rke2lab.manifests[.node|.profiles] + …netplan straddling two modules (bnd 'Split package' + shade 'overlapping classes' on 4 pkgs) → applied the pre-authorised fallback: moved types renamed into a .bridge namespace (…manifests.bridge[.node|.profiles], …netplan.bridge). Also renamed the 4 META-INF/services SPI registration files to the new FQNs (ServiceLoader dual-path). Full -Posgi clean package GREEN (cache skipped, BUILD SUCCESS, no split/overlap warnings, 12 surefire reports / 18 tests, 0 fail). The R4 work (system.packages.extra re-export + the 3 inversions) is UNCHANGED and still pending. The full per-type sort + naming live in [[api-extraction-tri-carto-state]]. ★ SHIPPED to design/target-module-layout (squash merge 3279fe39, 2026-06-19); worktree torn down. Re-verified from the integration worktree before merge (-Posgi clean package green, 34 modules, 18 tests/12 reports/0 skipped). ★ FOLLOW-UP OWED: rename `-bridge-api` → `-contract` (the Pohl OSGi paper uses 'Bridge' for a runtime hot-swap object, not our port — see [[api-extraction-tri-carto-state]] §'Why NOT bridge'); the merged code is still `-bridge-api`/`.bridge`, the design note says `-contract` — a deliberate temporary divergence the rename slice reconciles."
 metadata:
   node_type: memory
   type: project
@@ -33,7 +33,7 @@ Does NOT (these are R4, [[osgi-runtime-r4-boot-seam-state]]):
 
 ## The bridge-api port set to MOVE (from [[api-extraction-tri-carto-state]], settled)
 
-**manifests-bridge-api** (from `osgi/manifests/manifests-core`, pkg `io.nxmatic.rke2lab.manifests` +
+**manifests-bridge-api** (from `osgi/manifests/manifests-core`, pkg `io.seedmatic.rke2lab.manifests` +
 `.node` + `.profiles`):
 - 3 SPIs: `ManifestSynthesisService`, `ManifestExplodeService`, `ManifestUpdateGate`
 - 4 gateway records: `ManifestSynthesisRequest`, `ManifestSynthesisResult`, `ManifestExplodeRequest`,
@@ -63,15 +63,15 @@ rule: the NAME shows the role (so `-bridge-api`, not bare `-api`, since you don'
 
 - **Java package of the moved types — RESOLVED to `.bridge` (the fallback fired).** Keeping the packages
   was tried first; bnd flagged `Split package, multiple jars provide the same package` on
-  `io/nxmatic/rke2lab/manifests`, `…/manifests/node`, `…/manifests/profiles`, `io/nxmatic/rke2lab/netplan`
+  `io/seedmatic/rke2lab/manifests`, `…/manifests/node`, `…/manifests/profiles`, `io/seedmatic/rke2lab/netplan`
   (and the exec shade warned `overlapping classes`, 22 manifests + 16 netplan). Cause: the impl bundle
   still OWNS public classes in those packages (`Default*Service`, `ManifestYaml`, `Manifests*`,
   `DefaultNodeEnvContext`, the profile impls, `DefaultNetplanSynthesisService`) while the ports moved out
   → the package straddles two modules, and bnd's Export-Package re-absorbs the bridge classes from the
   classpath. A bundle cannot both EXPORT its own classes of a package AND import that package from the
   host at R4 → blocking. So per the brief's pre-authorisation, the moved types were renamed into a
-  `.bridge` namespace: `io.nxmatic.rke2lab.manifests.bridge[.node|.profiles]`,
-  `io.nxmatic.rke2lab.netplan.bridge`. Each package now lives in exactly one module; both warnings gone.
+  `.bridge` namespace: `io.seedmatic.rke2lab.manifests.bridge[.node|.profiles]`,
+  `io.seedmatic.rke2lab.netplan.bridge`. Each package now lives in exactly one module; both warnings gone.
   Consequence: the 4 `META-INF/services/<SPI-FQN>` registration files were renamed to the new FQNs too
   (ServiceLoader keys on the FQN — the dual-path `forServiceLoader()` would silently find no provider
   otherwise). Import churn was real but mechanical (~95 files); the build is the proof.

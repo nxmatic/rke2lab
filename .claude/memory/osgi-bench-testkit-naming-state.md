@@ -1,6 +1,6 @@
 ---
 name: osgi-bench-testkit-naming-state
-description: "REFACTOR slice (worktree refactor/osgi-bench-testkit-naming, off design/target-module-layout @70276800): kill the redundant osgi- prefix under osgi/. Rename the dir osgi/osgi-bench → osgi/bench (8-module domain, follows the step-4 domain-DIR rule) AND osgi/osgi-testkit → osgi/testkit (R3 promoted it but kept the redundant prefix). ★ KEY TRAP found in carto: FelixFrameworkExtension.install(artifact) locates bundles by CLASSPATH SUBSTRING (path.contains(artifact)) — so artifactIds must stay DISCRIMINANT. Keep a bench-* / testkit prefix on artifactIds (bench-config, bench-host, …, osgi-testkit→testkit); do NOT shorten to bare config/host/tests (would collide: 'host'→host-parent, 'tests'→any *-tests). Pure mechanical rename (git mv + artifactIds + <module> + GAV dependents); the Java package io.nxmatic.rke2lab.osgi.testkit is already neutral, no Java change. -Posgi green, NO -Plive. ★ SHIPPED to design/target-module-layout (squash merge e58a44e3, 2026-06-19); worktree torn down. artifactIds = bench-* / testkit (user confirmed: drop the SPACE prefix, keep only the DOMAIN prefix — coherent with manifests-core/unitrepo-core/systemd-contract; 'osgi' is in ZERO artifactIds). install call-sites use bare tokens (config/host/schema/scr-*/manifests-core) that stay valid substrings — no string edit needed."
+description: "REFACTOR slice (worktree refactor/osgi-bench-testkit-naming, off design/target-module-layout @70276800): kill the redundant osgi- prefix under osgi/. Rename the dir osgi/osgi-bench → osgi/bench (8-module domain, follows the step-4 domain-DIR rule) AND osgi/osgi-testkit → osgi/testkit (R3 promoted it but kept the redundant prefix). ★ KEY TRAP found in carto: FelixFrameworkExtension.install(artifact) locates bundles by CLASSPATH SUBSTRING (path.contains(artifact)) — so artifactIds must stay DISCRIMINANT. Keep a bench-* / testkit prefix on artifactIds (bench-config, bench-host, …, osgi-testkit→testkit); do NOT shorten to bare config/host/tests (would collide: 'host'→host-parent, 'tests'→any *-tests). Pure mechanical rename (git mv + artifactIds + <module> + GAV dependents); the Java package io.seedmatic.rke2lab.osgi.testkit is already neutral, no Java change. -Posgi green, NO -Plive. ★ SHIPPED to design/target-module-layout (squash merge e58a44e3, 2026-06-19); worktree torn down. artifactIds = bench-* / testkit (user confirmed: drop the SPACE prefix, keep only the DOMAIN prefix — coherent with manifests-core/unitrepo-core/systemd-contract; 'osgi' is in ZERO artifactIds). install call-sites use bare tokens (config/host/schema/scr-*/manifests-core) that stay valid substrings — no string edit needed."
 metadata:
   node_type: memory
   type: project
@@ -45,8 +45,8 @@ classpath. So:
 - GAV dependents to update: `osgi/bench/bench-tests/pom.xml` (depends on testkit + the 6 bench modules),
   `osgi/bench/bench-scr-consumer` + `bench-scr-provider` (depend on bench-scr-api), and
   `osgi/manifests/manifests-core/pom.xml:95` (test-dep on `osgi-testkit` → `testkit`).
-- Java: package `io.nxmatic.rke2lab.osgi.testkit` is ALREADY neutral (R3 chose it) — NO Java rename.
-  The bench test classes are in `io.nxmatic.rke2lab.osgibench` — leave the package (cosmetic, not part
+- Java: package `io.seedmatic.rke2lab.osgi.testkit` is ALREADY neutral (R3 chose it) — NO Java rename.
+  The bench test classes are in `io.seedmatic.rke2lab.osgibench` — leave the package (cosmetic, not part
   of this slice) UNLESS trivially clean; the ask is the module/artifact naming, not packages.
 
 ## Validation
@@ -91,7 +91,7 @@ A pure mechanical rename like the bench/testkit one above (git mv + artifactId +
 lines + GAV dependents + the capability-filter / classpath-substring call-sites in the edge boot tests
 + the memory `dbus-systemd-edge-spec-state`). NOT done in the specialist-distribution slice (out of
 scope, and renaming pre-existing modules mid-atomic-slice would blur the diff). Own chantier when picked
-up. Note the BSN changes too (`io.nxmatic.rke2lab.dbus.systemd.edge` → `…systemd.dbus.edge`?), so re-check
+up. Note the BSN changes too (`io.seedmatic.rke2lab.dbus.systemd.edge` → `…systemd.dbus.edge`?), so re-check
 every Fragment-Host / Require-Bundle and the embed-capability filters that select these bundles.
 
 See [[osgi-runtime-r3-consume-references-state]] (promoted osgi-testkit; built the substring lookup),

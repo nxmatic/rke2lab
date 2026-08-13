@@ -15,7 +15,7 @@ verra plus clair dans tous ces sub-folders." So this step fills `host/` AND clea
 
 1. **MOVED 3 modules** (NOT 4) under `host/`, re-parented build-parent→host-parent, aggregators updated:
    - `sdks/incus` → `host/pulumi-generated-sdks/incus` (flattened; dir name carries the Pulumi-codegen
-     provenance — versioned-as-source, not authored here). groupId stays `io.nxmatic.rke2lab.sdks`.
+     provenance — versioned-as-source, not authored here). groupId stays `io.seedmatic.rke2lab.sdks`.
    - `pulumi-automation-ext`, `pulumi-automation-ext-testkit` → `host/` (flat).
    - Tagged the 4 pulumi-automation-ext tests `@Tag("host")` (were untagged → an angle-blind spot:
      `-Phost`/`-Posgi` use groups=host|osgi, so untagged ∉ both; default run still ran them). 20 green.
@@ -65,7 +65,7 @@ runtime boundary (pulumi/kubectl/incus/nix + harness settings) is gated.
 - NEXT layout step (own branch, DECIDED 2026-06-18) = **the pure leaves into the OSGi space, GROUPED
   BY TECHNICAL DOMAIN** — `osgi/systemd/{systemd-contract, cdk8s-systemd}` + `osgi/netplan/`. Verified
   facts that settled it:
-  - All three are PURE (0 pulumi/grpc). cdk8s-systemd exports `io.nxmatic.rke2lab.cdk8s.systemd`
+  - All three are PURE (0 pulumi/grpc). cdk8s-systemd exports `io.seedmatic.rke2lab.cdk8s.systemd`
     (Constructs: SystemdChart/Service/Unit/Target/DropIn extends `software.constructs.Construct`);
     `osgi/manifests` IMPORTS + instantiates them → it is a **required library bundle**, NOT a fragment.
     (Fragment would be cdk8s-systemd naming manifests as Fragment-Host with no host-side import — the

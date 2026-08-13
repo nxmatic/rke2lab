@@ -71,7 +71,7 @@ the 3 EmbeddedBundlesBootTest — 0 fail.
      GREEN by construction on prod (manifests-core imports only -port/seam + flat libs, never a
      domain pkg) — the guard makes a future leak impossible, not a fix for a present break.
    - The discriminator is DECLARED, not inferred: the 4 `-port` bnd files carry
-     `Provide-Capability: io.nxmatic.rke2lab.embed; type=seam` (the membrane the flat host shares
+     `Provide-Capability: io.seedmatic.rke2lab.embed; type=seam` (the membrane the flat host shares
      TYPED via system-export — JCL side of the seam). model/edge load on the BundleCL side, never
      system-exported. "which side of the seam frontier does the port load on" + "one package = one
      exporter = one class" are the load-bearing phrases (now in the doc).
@@ -126,7 +126,7 @@ module, 0 failures across the whole tree.
 ## REMAINING (do after the user compacts the conversation)
 
 1. **String-literal duplicates** — DONE for `(type=*)` (now `EmbedCapability.INSTALL_FILTER`). The
-   embed namespace `io.nxmatic.rke2lab.embed` is still a literal across bnd files — irreducible
+   embed namespace `io.seedmatic.rke2lab.embed` is still a literal across bnd files — irreducible
    pom-face (bnd can't reference Java), single Java source already `BundleManifest
    .EMBED_CAPABILITY_NAMESPACE`. Nothing left here — BSN-literal migration fully done above.
 2. **SCR_API_PACKAGES is NOT a BOM-dedup — it is a SYMPTOM of the #4 defect. DO NOT patch it by

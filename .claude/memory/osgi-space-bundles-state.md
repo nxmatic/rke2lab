@@ -32,11 +32,11 @@ If a future session reads "bnd deferred" and is confused — THIS note is the re
 
 - `manifests`, `unitrepo-core`, `unitrepo-handler-api` = ZERO `com.pulumi`/`io.grpc` imports → pure,
   belong in `osgi/` by the purity axis. None has a `bnd.bnd` yet.
-- `unitrepo-core` = 4 files in ONE package `io.nxmatic.rke2lab.unitrepo.core`
+- `unitrepo-core` = 4 files in ONE package `io.seedmatic.rke2lab.unitrepo.core`
   (UnitResolver, UnitResource, CapabilityFilter + test). External imports = ONLY OSGi
   (`org.osgi.resource.*`, `org.osgi.service.resolver.*`, `org.osgi.framework.Filter/FrameworkUtil`,
   `org.apache.felix.resolver.*`). So its bundle role = REQUIRES the OSGi resolver API; it Provides
-  `Export-Package io.nxmatic.rke2lab.unitrepo.core`.
+  `Export-Package io.seedmatic.rke2lab.unitrepo.core`.
 - `unitrepo-handler-api` = 1 file `UnitHandler` (SPI interface: `handledType()`, `handle(String)`).
   Its Javadoc: "the handler SPI a unit binds to via its constitutive `osgi.extender` requirement …
   lives on the shared (parent) class loader so a handler loaded from the store casts safely."
@@ -100,7 +100,7 @@ Four commits on `refactor/osgi-space-bundles` (base `design/target-module-layout
   (it instantiates `ResolverImpl` directly → a package import, not a service require). Dead pom edge
   core→handler-api DELETED.
 - **(b3) manifests** = LIBRARY bundle. `Export-Package` = the exactly-5 packages seed-master imports
-  (manifests, .domain, .node, .profiles, .units.runtime.flox); glue `io.nxmatic.rke2lab.unitrepo`
+  (manifests, .domain, .node, .profiles, .units.runtime.flox); glue `io.seedmatic.rke2lab.unitrepo`
   stays PRIVATE. bare bnd ref coexists with the existing assembly (`manifests-d.zip`) + shade
   (`exec.jar`) — all 3 artifacts still produced; jar picks up bnd's manifest via inherited
   manifestFile. NO `@Capability`: manifests' capability-PROVIDING role (specialist units publishing
@@ -109,7 +109,7 @@ Four commits on `refactor/osgi-space-bundles` (base `design/target-module-layout
 Bundle pattern (all 3) = `parent=bundle-parent` + bare `bnd-maven-plugin` ref + `bnd.bnd`
 identity-only (`Bundle-SymbolicName`/`Export-Package`/`-noimportjava: true`). Packages UNCHANGED:
 the `osgi/` axis is a Maven/purity axis, not a Java-package axis (the bench proves it —
-`io.nxmatic.rke2lab.osgibench.*` under `osgi/osgi-bench/`). The Maven `<name>` carries the space.
+`io.seedmatic.rke2lab.osgibench.*` under `osgi/osgi-bench/`). The Maven `<name>` carries the space.
 
 **(c) PER-MODULE DESCRIPTIONS (polish, scope-widened on user's call).** Review caught a leak: bnd
 folds an inherited `project.description` into `Bundle-Description`, so `bundle-parent`'s description

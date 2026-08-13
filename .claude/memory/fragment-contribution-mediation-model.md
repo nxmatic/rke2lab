@@ -33,7 +33,7 @@ time.)
 
 The role that was missing: a **contribution**. cluster does NOT get a `mediation-host` module, and the
 doctor is NOT bypassed — **the doctor IS the host**. cluster contributes a *fragment of doctor-core*
-(`Fragment-Host: io.nxmatic.rke2lab.doctor.core`), exactly the fragment-test model
+(`Fragment-Host: io.seedmatic.rke2lab.doctor.core`), exactly the fragment-test model
 (`doctor-core-test`/`doctor-port-test`/`jgiven-probe-test` already do this) PROMOTED to production.
 
 Corrected mechanics (I was wrong twice; the user was right both times):

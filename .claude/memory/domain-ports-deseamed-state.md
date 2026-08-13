@@ -7,7 +7,7 @@ metadata:
 
 **What shipped (uncommitted working tree, 2026-07-11, OSGi side green).** Replicated the doctor
 `-contract` template across every domain `-port`: module `X-port`→`X-contract`, package root
-`io.nxmatic.rke2lab.X.port`→`.contract`, bnd `type=seam`→`type=contract` (⇒ installed bundle, boot's
+`io.seedmatic.rke2lab.X.port`→`.contract`, bnd `type=seam`→`type=contract` (⇒ installed bundle, boot's
 `deriveSystemExports` no longer system-exports it — auto-derived, no allow-list), dependents recabled
 (poms + imports).
 
@@ -25,7 +25,7 @@ metadata:
   ssh-to-age-edge, manifests-cli.
 
 **The two seams that REMAIN in osgi/ (verified `grep type=seam osgi/`):**
-- `pipeline` (`io.nxmatic.rke2lab.pipeline`, foundation/pipeline/pipeline-port) — NOT a domain port: it
+- `pipeline` (`io.seedmatic.rke2lab.pipeline`, foundation/pipeline/pipeline-port) — NOT a domain port: it
   is the shared fluent `Topic`/grammar ENGINE, consumed on BOTH sides (host seed pipeline AND two OSGi
   bundles: `framework-launcher`'s `FrameworkLaunchPipeline` — the boot IS a `Topic.Execution` — and
   `manifests-core`'s whole systemd-synthesis stage tree). PROVEN by experiment: removing all 4

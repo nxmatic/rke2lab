@@ -38,7 +38,7 @@ classpath — so a third-party SPI served via system-export would be invisible t
 (this is the very nature of #1565: gRPC transport discovery is a TCCL `ServiceLoader`, which is why gRPC
 stays flat in the HOST world). **VERIFIED INACTIVE for R4** (grep 2026-06-19): the only `ServiceLoader.load`
 calls inside `osgi/` bundles load OUR OWN SPIs (`ManifestSynthesisService`, `NodeEnvContributor` —
-`io.nxmatic.*.port.*`, the paths SCR replaces); every `META-INF/services` file names an `io.nxmatic` type;
+`io.seedmatic.*.port.*`, the paths SCR replaces); every `META-INF/services` file names an `io.seedmatic` type;
 ZERO third-party SPI is consumed. So no third-party jar needs bundle-ifying on this ground — cdk8s/jackson/
 snakeyaml/etc. provide no Java service we consume. The criterion holds with no active exception.
 

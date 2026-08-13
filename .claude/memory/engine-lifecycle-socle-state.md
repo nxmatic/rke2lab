@@ -54,10 +54,10 @@ metadata:
 were too generic; every other leaf is domain-prefixed and every `packaging=pom` aggregator legitimately carries its
 dir name. Both renamed as a balayage (git mv dir + package subtree, artifactId/<name>, all imports, bnd BSN+exports,
 10 dependent poms, both specs):
-- `launcher` → `framework-launcher`, package `io.nxmatic.rke2lab.osgi.runtime` → `…osgi.runtime.framework` (the 4
+- `launcher` → `framework-launcher`, package `io.seedmatic.rke2lab.osgi.runtime` → `…osgi.runtime.framework` (the 4
   boot classes were flat in `runtime`; now symmetric with the sibling).
 - `engine` → `scenario-engine`, package `…osgi.runtime.engine` → `…osgi.runtime.scenario.engine` (+ `.container`/
-  `.diagnostic`). BSN `io.nxmatic.rke2lab.osgi.runtime.scenario.engine`.
+  `.diagnostic`). BSN `io.seedmatic.rke2lab.osgi.runtime.scenario.engine`.
   Bare `launcher`/`engine` no longer exist anywhere. Verified: engine reactor + all in-container consumers
   (doctor/manifests/cluster-edge/dbus-systemd-edge/bench/pipeline-testkit) green; full `-pl :seed-master -am package`
   green, 7 staging gates 0 error (spec-coverage matches type simple-names, so it stayed green throughout).

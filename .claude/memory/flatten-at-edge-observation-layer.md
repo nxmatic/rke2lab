@@ -49,7 +49,7 @@ Names: `PulumiOutput*` (not bare `Output*`) — these are the Pulumi STACK outpu
 
 **WHERE it lives (2026-07-01):** the PURE SPI + registry (`PulumiOutputContributor`,
 `PulumiOutputRegistry` — only `String`+`Map`, zero seed-master type) go in the **`pulumi-edge`**
-module (`host/pulumi/pulumi-edge`, pkg `io.nxmatic.rke2lab.pulumi.edge`), beside `StackHandle`/
+module (`host/pulumi/pulumi-edge`, pkg `io.seedmatic.rke2lab.pulumi.edge`), beside `StackHandle`/
 `SnapshotView` — it IS a Pulumi-edge concept. Verified safe: `seed-master` already depends on
 `pulumi-edge` (pom L45) and `pulumi-edge` does NOT depend on `controlplane` → no cycle. `pulumi-edge`
 is already `@NullMarked` (this session) so the SPI is born null-clean. The stateful IMPLEMENTATIONS

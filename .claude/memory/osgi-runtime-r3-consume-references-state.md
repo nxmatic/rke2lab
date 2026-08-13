@@ -94,7 +94,7 @@ squashed them on merge — granularity is the reviewable layer, not what lands):
   unitrepo-core; manifests-core now declares `osgi.core` at COMPILE (its main code used
   `org.osgi.resource` but only compiled off the leak). **A real latent bug** found standing up the proof.
 - `f0f7aeb3 refactor(osgi-testkit)` — bench testkit PROMOTED to shared `osgi/osgi-testkit` (neutral pkg
-  `io.nxmatic.rke2lab.osgi.testkit`, git-mv history kept); `install()` generalised off the `osgi-bench-`
+  `io.seedmatic.rke2lab.osgi.testkit`, git-mv history kept); `install()` generalised off the `osgi-bench-`
   prefix; NEW builder verb `exportImportsOf(artifact)` reads the bundle's bnd `Import-Package` header and
   mirrors it as system-bundle exports (fail-fast, single source of truth — replaced a 15-line literal
   systemPackages list). 4 bench proofs + aggregators rewired.

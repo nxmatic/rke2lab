@@ -21,7 +21,7 @@ Criterion = module count (present or known-coming), NOT "tidiness for its own sa
      besoin donc toplevel c'est plus simple à l'usage.")
 2. **Regroup the existing flat modules that ARE multi-module domains** (the inconsistency the user caught):
    - `osgi/unitrepo-core` + `osgi/unitrepo-handler-api` → `osgi/unitrepo/{…}` — **domain dir: 2 modules
-     now, `unitrepo-pulumi` (the ACL) coming** → justified. Both share pkg `io.nxmatic.rke2lab.unitrepo.*`.
+     now, `unitrepo-pulumi` (the ACL) coming** → justified. Both share pkg `io.seedmatic.rke2lab.unitrepo.*`.
    - `osgi/manifests` → `osgi/manifests/{…}` **domain dir — NOT because tidiness, but because a
      re-découpe is ALREADY KNOWN to be coming** (model/synthesis split, [[step2-decomposition-state]]).
      That foreknowledge is what justifies the envelope now (vs netplan which has none). (User:
@@ -39,7 +39,7 @@ multi-module domains get a dir; the lone `netplan` stays flat. Mixed by design, 
 ## Why grouped-by-domain, not by-consumer (settled, do not re-litigate)
 
 Verified in code on design HEAD:
-- All 3 are PURE (0 com.pulumi/io.grpc). `cdk8s-systemd` exports `io.nxmatic.rke2lab.cdk8s.systemd`
+- All 3 are PURE (0 com.pulumi/io.grpc). `cdk8s-systemd` exports `io.seedmatic.rke2lab.cdk8s.systemd`
   (Constructs extending `software.constructs.Construct`); `osgi/manifests` IMPORTS + instantiates them
   → `cdk8s-systemd` is a **required library bundle, NOT a fragment** (a fragment would name manifests as
   Fragment-Host with no host-side import — the opposite of the actual edge direction). The prod fragment
@@ -74,7 +74,7 @@ caution for any other module the flake builds by path (e.g. seedMasterJar at lin
 - `netplan` alone under `osgi/netplan/` — a single module in its own domain dir is fine (room to grow),
   but confirm it doesn't need an aggregator (it doesn't — it's one module).
 - bnd `Export-Package`: read each module's public packages. `cdk8s-systemd` exports
-  `io.nxmatic.rke2lab.cdk8s.systemd`; `systemd-contract` and `netplan` — read their src to find the
+  `io.seedmatic.rke2lab.cdk8s.systemd`; `systemd-contract` and `netplan` — read their src to find the
   public package(s). Keep glue private if any.
 - relativePath depth: moving down one or two levels changes `<parent>` relativePath to build-parent /
   bundle-parent — fix per moved pom. Deps resolve by GAV (proven steps 2-3), so only aggregator wiring

@@ -36,7 +36,7 @@ After completing Phase 1.5 (Component merge + ManifestsUnit rename + ManifestsDo
 ### Files to rename:
 
 ```
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
+manifests/src/main/java/io/seedmatic/rk2lab/manifests/layers/
 ├── env/
 │   ├── LayerEnvContext.java → NodeEnvContext.java
 │   ├── LayerEnvContributor.java → NodeEnvContributor.java
@@ -45,7 +45,7 @@ manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
 └── node/
     └── NodeLayerEnvContributor.java → NodeEnvContributor.java (base impl)
 
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/units/
+manifests/src/main/java/io/seedmatic/rk2lab/manifests/units/
 ├── cluster/ClusterLayerEnvContributor.java → ClusterNodeEnvContributor.java
 ├── networking/NetworkingLayerEnvContributor.java → NetworkingNodeEnvContributor.java
 ├── storage/StorageLayerEnvContributor.java → StorageNodeEnvContributor.java
@@ -56,8 +56,8 @@ manifests/src/main/java/io/nxmatic/rk2lab/manifests/units/
 ### Directory rename:
 
 ```
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
-  → manifests/src/main/java/io/nxmatic/rk2lab/manifests/node/
+manifests/src/main/java/io/seedmatic/rk2lab/manifests/layers/
+  → manifests/src/main/java/io/seedmatic/rk2lab/manifests/node/
 
 Keep:
   node/NodeEnvContext.java (interface)
@@ -79,7 +79,7 @@ Keep:
    - `layerId()` → `domainId()` (clearer: it's the domain contributing)
    
 3. Package imports:
-   - `io.nxmatic.rk2lab.manifests.layers.env` → `io.nxmatic.rk2lab.manifests.node`
+   - `io.seedmatic.rk2lab.manifests.layers.env` → `io.seedmatic.rk2lab.manifests.node`
 
 4. Javadoc references to "layer" → "domain" or "node"
 

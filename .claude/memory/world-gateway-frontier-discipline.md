@@ -6,7 +6,7 @@ metadata:
 ---
 
 **The rule (user, 2026-07-08):** any addition of a term usable in `world-gateway`
-(`io.nxmatic.rke2lab.world.gateway.port`) must be JUSTIFIED FIRST — prove that NO existing word carries
+(`io.seedmatic.rke2lab.world.gateway.port`) must be JUSTIFIED FIRST — prove that NO existing word carries
 the need before adding one. Default = do NOT add; reuse.
 
 **Why:** `world-gateway` is the vocabulary of the host↔OSGi FRONTIER — the words that cross the

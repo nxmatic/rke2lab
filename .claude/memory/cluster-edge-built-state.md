@@ -17,7 +17,7 @@ triad, mirroring `dbus-systemd-edge`.
 
 - **cluster-port** (new, `type=seam`): `ClusterReadinessPhase` (moved out of doctor-records —
   the doctor stops carrying cluster vocabulary; 5 seed-master files re-import from
-  `io.nxmatic.rke2lab.cluster.port`), `ClusterSchemaRef` (single-sources the four
+  `io.seedmatic.rke2lab.cluster.port`), `ClusterSchemaRef` (single-sources the four
   `"cluster/*/v1"` literals), `ControllerRef` (neutral kind/name/namespace record), and
   `ClusterReadinessContact` — the Option-B contact seam: `isApiReady(kubeconfig)` +
   `areControllersEffective(kubeconfig, List<ControllerRef>)`, both STATELESS single-shot

@@ -26,7 +26,7 @@ reviewOpenProblems) is the internal edge in doctor-port. The membrane carries th
 contracts + the readers; doctor-core holds 8 package-private actors and depends on the port (acyclic).
 Two public assembly seams return the contract without exposing actors: `Doctor.consultingService(...)`
 (prod, prepends the Network+Cluster roster) and `ExactRosterDoctor.over(...)` (test). Zero actor
-imported outside `io.nxmatic.rke2lab.doctor` (compiler-enforced). Tests went full-OSGi (`-test`
+imported outside `io.seedmatic.rke2lab.doctor` (compiler-enforced). Tests went full-OSGi (`-test`
 fragments `doctor-port-test` + `doctor-core-test`, first client of [[jgiven-osgi-testkit-shipped]]) —
 the `ReferralReplies` Maven cycle dissolved, the 5 HOST-parked value-type tests rehomed to doctor-port,
 the `doctor-testkit` module deleted. Build green across doctor-port/-port-test/-core/-core-test +

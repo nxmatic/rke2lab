@@ -13,7 +13,7 @@ Final terminology (all DONE as of commit 8b235492, 2026-06-03):
 - `Component` + `ManifestUnit` merged into ONE class `*ManifestsUnit` (plural — one unit emits
   multiple K8s manifests). Base class `AbstractManifestsUnit`.
 - `LayerDomain` → `ManifestsDomain` (functional grouping of units by concern).
-- `LayerEnv*` → `NodeEnv*`, relocated to package `io.nxmatic.rke2lab.manifests.node`:
+- `LayerEnv*` → `NodeEnv*`, relocated to package `io.seedmatic.rke2lab.manifests.node`:
   NodeEnvContext, NodeEnvContributor, NodeEnvContributorRegistry, DefaultNodeEnvContext.
   The node-identity contributor is `NodeEnvIdentityContributor` (renamed from NodeLayerEnvContributor
   to avoid colliding with the NodeEnvContributor interface). Domain contributors are `*NodeEnvContributor`.

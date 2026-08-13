@@ -44,7 +44,7 @@ items for context, prune old ones).
   reaches into these impl types) ride with R4, per [[api-extraction-tri-carto-state]].
   Listed here only as a pointer so the backlog is complete.
 - [ ] **Delete the `realgraph` standalone-resolver fixture AT R4.** `exec/seed-master` test package
-  `io.nxmatic.rke2lab.unitrepo.realgraph` (7 files, all now `@Deprecated(forRemoval = true)`) hand-builds
+  `io.seedmatic.rke2lab.unitrepo.realgraph` (7 files, all now `@Deprecated(forRemoval = true)`) hand-builds
   a fake `UnitResource` universe to feed `UnitResolver` — a duplicated source of truth that already
   drifted at the `-core`/`-port` split (`ReactorModuleCatalog` transcribes reactor module ids by hand;
   `systemd-contract`/`manifests`/`netplan` ids left stale, NOT re-synced). Superseded once Felix boots
@@ -58,7 +58,7 @@ items for context, prune old ones).
   [[claude-memory-cascade-state]] and [[jdtls-heap-workspace-generation]].
 - [ ] **Align the stale bench Bundle-SymbolicNames (osgibench → bench/testkit).** The
   `osgi-bench`→`bench` + `osgi-testkit`→`testkit` rename (e58a44e3) moved the artifacts/dirs
-  but left the BSN **and** the Java packages at `io.nxmatic.rke2lab.osgibench.*` — so e.g.
+  but left the BSN **and** the Java packages at `io.seedmatic.rke2lab.osgibench.*` — so e.g.
   module `bench-config` has BSN `…osgibench.config`, `bench-scr-api` has `…osgibench.scr.api`.
   The BSN no longer reflects the module name. Disposable scaffolding → low stakes, but it is
   the naming-drift the user spotted 2026-06-19. A slice of its own (touches the BSN, the
@@ -67,7 +67,7 @@ items for context, prune old ones).
   BSN drifted from its dir (audit all `bnd.bnd` at the time).
 - [~] **Non-deductible Bundle-SymbolicNames hors-bench — IN SCOPE of osgi-cleanup (user widened,
   2026-06-19).** The user's rule: a BSN must be MECHANICALLY DEDUCIBLE from the Maven artifactId
-  (`io.nxmatic.rke2lab.<artifactId, dashes→dots>` verbatim). The netplan promotion FORCES it
+  (`io.seedmatic.rke2lab.<artifactId, dashes→dots>` verbatim). The netplan promotion FORCES it
   (`netplan`→`netplan-core` would turn a today-deducible BSN non-deducible), and uniformity pulls
   the rest of the hors-bench lot in. Fixing in THIS slice (safe: grep confirms NO
   `Require-Bundle`/`Fragment-Host` anywhere → no bundle references another by BSN):

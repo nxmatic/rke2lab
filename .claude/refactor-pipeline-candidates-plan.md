@@ -36,25 +36,25 @@ et `BootstrapPipeline.java`. Relire avant chaque refactor "grammar".
 ## CATÉGORIE A — Trop de paramètres
 
 ### [ ] A1. HostSlotManifest — constructeur 12 params → builder
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/HostSlotManifest.java:34`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/HostSlotManifest.java:34`
 - **Signature** : `(Construct scope, String id, SlotType slotType, Integer slotSequence, Instant timestamp, String buildId, GitInfo git, PolicyInfo policy, List<FloxEnvironment> floxEnvironments, List<StagedManifest> stagedManifests, PromotionInfo promotion, SourceInfo source)`
 - **Pourquoi** : 12 params, plusieurs optionnels (git, policy, promotion, source) → telescoping.
 - **Direction** : builder `HostSlotManifest.builder(scope, id).slotType(...)…build()`, constructeur privé.
 - **Call sites à mettre à jour** : chercher `new HostSlotManifest(` + `writeSlotManifest` (A4).
 
 ### [ ] A2. SeedNodeBootstrapWatcher.renderYamlSummary — 8 params → record
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/SeedNodeBootstrapWatcher.java:143`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/resources/SeedNodeBootstrapWatcher.java:143`
 - **Signature** : `(String probeStatus, String mandatoryTarget, String mandatoryTargetState, int pendingJobCount, int failedUnitCount, String hostContext, Map<String,Object> statusSnapshot, String adapterSummary)`
 - **Direction** : record `YamlSummaryContext` regroupant ces champs.
 
 ### [ ] A3. SeedNodeBootstrapWatcher.waitForBootstrapPreconditions — 5 params (3 Durations) → record
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/SeedNodeBootstrapWatcher.java:29`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/resources/SeedNodeBootstrapWatcher.java:29`
 - **Signature** : `(BootstrapConfig config, Duration timeout, Duration retryInterval, Duration progressLogInterval, Consumer<String> logger)`
 - **Direction** : record `WaitConfig(timeout, retryInterval, progressLogInterval)`.
 - **Note** : cette méthode est AUSSI dans la catégorie B (corps ~80 lignes) — traiter params + corps ensemble.
 
 ### [ ] A4. IncusResourceBootstrap.writeSlotManifest — 5 params
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:2172`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:2172`
 - **Signature** : `(Path slotPath, int slotSeq, BootstrapConfig config, ControlplanePolicy policy, SystemdTarget systemdTarget)`
 - **Direction** : dépend de A1 (construit un HostSlotManifest). Faire APRÈS A1.
 
@@ -63,7 +63,7 @@ et `BootstrapPipeline.java`. Relire avant chaque refactor "grammar".
 ## CATÉGORIE B — Méthodes longues à étapes commentées (fluent grammar)
 
 ### [ ] B1. DefaultManifestSynthesisService.synthesizeInContext  ⭐ PREMIER
-- **Fichier** : `manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java:73`
+- **Fichier** : `manifests/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java:73`
 - **Taille** : ~195 lignes, 8 étapes commentées.
 - **Étapes repérées** (constituent les `.during(...)`) :
   1. build domain registry + apply policy + apply units (l.83-112)
@@ -79,17 +79,17 @@ et `BootstrapPipeline.java`. Relire avant chaque refactor "grammar".
 - **Vérif** : preview identique après refactor (11 domaines, mêmes units).
 
 ### [ ] B2. IncusResourceBootstrap.synthesizeImageStateConfigMapYaml — ~100 lignes
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:850`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:850`
 - **Étapes** : créer app CDK8s in-memory (l.858) / namespace + ConfigMap (l.891) / dépendance (l.918) / relire depuis disque (l.921) / cleanup temp dir (l.932).
 - **Direction** : fluent grammar + try-with-resources pour le cycle temp dir.
 
 ### [ ] B3. IncusResourceBootstrap.ensureNetwork — ~80 lignes
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:1752`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:1752`
 - **Étapes** : check lan-br (l.1754) / safeguard non-canonique (l.1774) / vmnet source de vérité (l.1792) / restriction projet OVN (l.1800) / build args + options + create.
 - **Direction** : extraire stages (check → build args → build options → create), attention aux returns précoces.
 
 ### [ ] B4. IncusResourceBootstrap.HostAssetRootLifecycle.syncStagingToFinal — ~45 lignes
-- **Fichier** : `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:2121`
+- **Fichier** : `seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java:2121`
 - **Étapes** : no-op si identique (l.2128) / promote scratch → slot numéroté (l.2134) / write manifest (l.2142) / backup (l.2146) / synth ou copy (l.2149) / symlink manifest (l.2156).
 - **Direction** : pipeline `.during("compare",…).then().during("allocate",…)…`. Lié à A1/A4 (manifest).
 

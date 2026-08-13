@@ -33,8 +33,8 @@ Java (Jackson). Self-hosted Pulumi service backend = commercial (Business Critic
 fork rejected (disproportionate).
 
 **ARCHITECTURE (3 layers) — REWORKED 2026-06-08, supersedes the interface/Deployment sketch above:**
-(1) NEW top-level module `pulumi-automation-ext` (NOT under sdks/). groupId `io.nxmatic.rke2lab`,
-artifactId `pulumi-automation-ext`, package `io.nxmatic.rke2lab.pulumi.automation`. Anchor =
+(1) NEW top-level module `pulumi-automation-ext` (NOT under sdks/). groupId `io.seedmatic.rke2lab`,
+artifactId `pulumi-automation-ext`, package `io.seedmatic.rke2lab.pulumi.automation`. Anchor =
 `LocalWorkspace.createOrSelectStack`. Classes: **StackHandle**, **StackSnapshot** (delegates to
 `com.pulumi.automation.StackDeployment`, adds `outputsNamed`), **StackHistory + nested Entry**,
 **StackCheckpoint** (the file-backend-coupled class). (2) Neutral doctor data: **`MedicalRecord` is an

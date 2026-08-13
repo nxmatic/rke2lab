@@ -6,7 +6,7 @@ metadata:
 ---
 
 **DONE (2026-06-26).** Built `osgi/manifests/manifests-core-test` mirroring doctor-core-test: a
-`Fragment-Host: io.nxmatic.rke2lab.manifests.core` fragment (`type=fixture; suite=manifests;
+`Fragment-Host: io.seedmatic.rke2lab.manifests.core` fragment (`type=fixture; suite=manifests;
 role=core`), the `ManifestsCoreTests` runner + actor `DefaultManifestExplodeServiceTest` in
 `src/main`, the `ManifestsCoreInContainerTest` Felix probe in `src/test`. The migrated test acquires
 `ManifestExplodeService` + `YamlMapper` from the registry (`getServiceReference`), no more `new
@@ -42,13 +42,13 @@ YamlMapper commit), the in-container model becomes natural: the test gets the se
 
 **How to apply (blueprint exists, mirror doctor exactly — uniformity):**
 - New module `osgi/manifests/manifests-core-test`, parent `bundle-test-parent`, `Fragment-Host:
-  io.nxmatic.rke2lab.manifests.core`, `Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture;
+  io.seedmatic.rke2lab.manifests.core`, `Provide-Capability: io.seedmatic.rke2lab.embed; type=fixture;
   suite=manifests; role=core`. Deps: manifests-core (provided), manifests-port (provided), DS
   annotations (provided), jgiven-testkit/jgiven-wrap/byte-buddy/osgi.core (test).
-- Actor `@Test` classes → `src/main/java/io/nxmatic/rke2lab/manifests/` (compiled into the fragment);
+- Actor `@Test` classes → `src/main/java/io/seedmatic/rke2lab/manifests/` (compiled into the fragment);
   a `ManifestsCoreTests` runner (names `JupiterTestEngine.class`, delegates to `InContainerJUnitRunner`).
 - The bare-JVM probe `ManifestsCoreInContainerTest` in `src/test/java`: `JGivenTestkit.felix()`
-  `.systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")` `.installFromClasspath(junit
+  `.systemPackages("io.seedmatic.rke2lab.systemd.port;version=1.0.0")` `.installFromClasspath(junit
   stack + manifests-port + other domain ports as bundles + junit-testkit)` `.build()`, install fixture
   by filter, resolve host, start, reflectively run the runner.
 - Tests that exercise a `@Component` (e.g. DefaultManifestExplodeService, the YamlMapper) acquire it via

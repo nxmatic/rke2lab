@@ -27,7 +27,7 @@ iff ≥2 modules (singletons reduced — world-gateway, ssh-to-age-edge stay lea
    short). Dir is `osgi/runtime/launcher/`, artifactId `launcher`; 3 exec consumers (seed-master,
    manifests-cli, netplan-cli) depend on `launcher`.
    **RENAMED 2026-07-05 → `framework-launcher`** (dir + artifactId + package
-   `io.nxmatic.rke2lab.osgi.runtime` → `io.nxmatic.rke2lab.osgi.runtime.framework`), when the sibling
+   `io.seedmatic.rke2lab.osgi.runtime` → `io.seedmatic.rke2lab.osgi.runtime.framework`), when the sibling
    `engine` → `scenario-engine` rename made both runtime leaves domain-specific rather than generic.
    Bare `launcher`/`engine` no longer exist. See [[engine-lifecycle-socle-state]].
 
@@ -35,14 +35,14 @@ iff ≥2 modules (singletons reduced — world-gateway, ssh-to-age-edge stay lea
    "dissolve jgiven into pipeline"; §8 said "no fusion" (contradiction). What shipped: jgiven REGROUPED
    under a `pipeline/` aggregator as pipeline-port (grammar seam, was `pipeline`), pipeline-jgiven (was
    jgiven-wrap), pipeline-testkit, pipeline-probe, pipeline-probe-test — layout-only, NO export fusion.
-   pipeline-port exports ONLY `io.nxmatic.rke2lab.pipeline` (type=seam), pipeline-jgiven stays a
+   pipeline-port exports ONLY `io.seedmatic.rke2lab.pipeline` (type=seam), pipeline-jgiven stays a
    separate bundle exporting `com.tngtech.jgiven.*`. Packages and BSNs unchanged (jgiven name survives
    in package/BSN; only Maven artifactIds renamed). The DANGEROUS part — making the seam export
    com.tngtech.jgiven.* (two realms → LinkageError) — is STILL deferred.
 
 **3 renames (the surgical part):** `gateway`→`world-gateway` (the door to the OSGi world; survives the
 embedded→remote RSA evolution; `-port` suffix drops from the MODULE name but the bundle stays
-`type=seam` and its package becomes `io.nxmatic.rke2lab.world.gateway.port`; `GatewayCatalog`→
+`type=seam` and its package becomes `io.seedmatic.rke2lab.world.gateway.port`; `GatewayCatalog`→
 `WorldGatewayCatalog`); `runtime`→`launcher` (actual); `jgiven-*`→`pipeline-*` (layout regroup only).
 
 Spec: `docs/architecture/osgi/osgi-aggregator-layout-spec.adoc` (12+ C4/Mermaid figures, §5 sub-decisions,

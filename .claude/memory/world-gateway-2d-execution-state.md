@@ -9,7 +9,7 @@ metadata:
 
 Executing the 2D plan subagent-driven. Commits on feature/cluster-edge after the jsr310 fix arc:
 - `7e704838`+`33fc1944` Task 1 — networknt pinned in BOM + added to **maven-embed-staging-ext** (build-tooling only; NOT doctor-core — nothing imports it at runtime in 2D, validate is OFF until the capstone).
-- `3183a79e`+`f71205b2`+`e690a72a` Task 2 — `gateway-document-codec`: ONE flat-jar module in osgi/foundation, shaded flat host-side + nested into doctor-core's Bundle-ClassPath (`-includeresource;lib:=true`). New pattern [[nesting-our-own-flat-module-per-realm]]. Package `io.nxmatic.rke2lab.world.gateway.codec`, sibling of the seam (NOT in it — seam shares one String copy; codec carries jackson, two realm copies).
+- `3183a79e`+`f71205b2`+`e690a72a` Task 2 — `gateway-document-codec`: ONE flat-jar module in osgi/foundation, shaded flat host-side + nested into doctor-core's Bundle-ClassPath (`-includeresource;lib:=true`). New pattern [[nesting-our-own-flat-module-per-realm]]. Package `io.seedmatic.rke2lab.world.gateway.codec`, sibling of the seam (NOT in it — seam shares one String copy; codec carries jackson, two realm copies).
 - `7448daae`+`8d483652` Task 3 — `SCHEMA_CONCORD` gate: added to BOTH StagingGate enums (annotation + ASM mirror), `SchemaConcord` (meta-schema validity via networknt + concord) + `CoordinateFieldUsage` (ASM). Slug map DERIVED from `Coordinate.class` `<clinit>` bytecode (not hardcoded). Gate dormant (no schemas) → schema-concord 0/0, reactor green.
 - `308da3ad` memory: the FIELD_* elimination backlog.
 
@@ -104,7 +104,7 @@ bundle** via a NEW staging category `embed; type=library` (jackson's own treatme
 - `EmbedCapability.TYPE_LIBRARY` + `isLibrary()`; `INSTALL_FILTER` includes it (documentary).
 - `StagingClosure.isRealmLibrary` returns `b.embed().isLibrary()` for ours → staged bundle AND kept
   flat (in realmLibraryGas, so NOT shade-excluded). The ONLY embed type in both realms.
-- codec bnd: BSN `io.nxmatic.rke2lab.gateway.document.codec`, Export `world.gateway.codec`, Import
+- codec bnd: BSN `io.seedmatic.rke2lab.gateway.document.codec`, Export `world.gateway.codec`, Import
   jackson+seam, `Provide-Capability embed; type=library`. doctor-core IMPORTS it (no more nesting).
 - Verified DUAL in the uber-jar: `META-INF/bundles/gateway-document-codec.jar` AND flat
   `world/gateway/codec/DocumentCodec.class`. Pattern memory rewritten: type=library is now PREFERRED
@@ -340,4 +340,4 @@ REMAINING (reliability arc, IN THIS BRANCH per user's "je me connais"):
 - 2F sweep residual `new ObjectMapper()` onto codec (T9 removed many; audit what's left).
 - 2G JSpecify @NullMarked package default. 2H centralize dep scope/version in dependencyManagement/BOM.
 - FINAL: string-constant reconciliation (internals↔gateway) — 2E is the biggest slice of this; +
-  FQCN→import pass (e.g. `io.nxmatic...Document` fully-qualified uses, user flagged); whole-branch review.
+  FQCN→import pass (e.g. `io.seedmatic...Document` fully-qualified uses, user flagged); whole-branch review.

@@ -10,7 +10,7 @@ dépendance en direct, c'est la règle. toutes les classes qu'on importe doivent
 d'une dépendance directe."*
 
 **The rule:** if a module's source imports `com.fasterxml.jackson.core.JsonProcessingException`
-or `io.nxmatic.rke2lab.gateway.port.Document`, that module's POM must declare that artifact
+or `io.seedmatic.rke2lab.gateway.port.Document`, that module's POM must declare that artifact
 **directly** — `jackson-core`, `gateway-port` — at the right scope. A class reaching the
 compiler only because some *other* direct dependency happens to drag it in transitively is a
 defect, even though `mvn` is green.

@@ -17,12 +17,12 @@ failing test); the USER also ran the full suite with all tests enabled → SUCCE
 - `31f81da4` runtime/ group + collision-break (leaf → osgi/runtime/runtime/, temp artifactId runtime-host)
 - `1f408fe7` leaf named **launcher** (user rejected the runtime-host collision-patch; FrameworkLauncher
   + BootPipeline.embedded = the ACT of launching, pairs with boot/ the decision) + 3 exec consumers wired
-- `442e3894` **gateway→world-gateway** (module + package io.nxmatic.rke2lab.world.gateway.port +
+- `442e3894` **gateway→world-gateway** (module + package io.seedmatic.rke2lab.world.gateway.port +
   GatewayCatalog→WorldGatewayCatalog; singleton aggregator reduced; bnd type=seam kept; in-container
   tests prove the rename resolved across the realm boundary)
 - `46c7cdf0` + `a0f64f2a` **pipeline regroup** (jgiven under a pipeline/ aggregator: pipeline-port +
   pipeline-jgiven + pipeline-testkit + pipeline-probe + pipeline-probe-test). SAFE half of §5.4 only —
-  NO export fusion (pipeline-port exports only io.nxmatic.rke2lab.pipeline/type=seam; pipeline-jgiven a
+  NO export fusion (pipeline-port exports only io.seedmatic.rke2lab.pipeline/type=seam; pipeline-jgiven a
   separate bundle exporting com.tngtech.jgiven.*); packages+BSNs unchanged. Export-fusion still deferred
   → [[jgiven-dissolution-is-a-realm-change-backlog]]. `aa74c6f9` doc/memory reconciliation.
 

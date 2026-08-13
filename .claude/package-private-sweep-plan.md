@@ -9,7 +9,7 @@ package-private par défaut. Préférence du user : **package-private partout**,
 retirant le mot-clé `private` — SAUF les cas où `private` est légitime/obligatoire.
 
 Référence : forme appliquée à
-[DefaultManifestSynthesisService.java](../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java)
+[DefaultManifestSynthesisService.java](../manifests/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java)
 (tous les `private` retirés, 2026-06-03). C'est l'exemplar de ce à quoi le reste doit ressembler.
 
 ## Ampleur mesurée (2026-06-03)

@@ -15,7 +15,7 @@ metadata:
 Exception in thread "main" java.lang.NoClassDefFoundError: com/google/gson/Gson
     at com.pulumi.deployment.internal.DeploymentImpl$Config.parseConfigSecretKeys
     ...
-    at io.nxmatic.rke2lab.controlplane.Main.main(Main.java:40)
+    at io.seedmatic.rke2lab.controlplane.Main.main(Main.java:40)
 ```
 
 `com.pulumi` needs `com.google.gson.Gson` on the FLAT host classpath at startup. The exec-jar
@@ -32,7 +32,7 @@ The staging extension (`maven-embed-staging-ext/staging-extension`) decides flat
 - gson is NOT a realm library: `StagingClosure.isRealmLibrary` keeps a third-party bundle flat
   ONLY when a DOMAIN/type=library bundle IMPORTS its package. bbox-edge does NOT `Import-Package:
   com.google.gson` (verified: absent from its MANIFEST — the bbox CLIENT uses gson, the edge does
-  not import it; the edge bnd even says "the host is purified off io.nxmatic.bbox.*, one realm").
+  not import it; the edge bnd even says "the host is purified off io.seedmatic.bbox.*, one realm").
 - So no signal keeps gson flat, and it is excluded from flat despite seed-master declaring it a
   DIRECT compile dependency (exec/seed-master/pom.xml:211). **The direct compile dep is overridden
   by the extension's dynamic shade-exclude.**

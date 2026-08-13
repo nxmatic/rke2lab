@@ -32,7 +32,7 @@ the pipeline/jGiven/synthesis foundation work now comes BEFORE cluster. See
 ## jGiven two-path (the first foundation cut, user-chosen 2026-07-09)
 
 jGiven reaches modules by TWO paths — the redundancy to kill:
-- `pipeline-jgiven` (BSN io.nxmatic.rke2lab.jgiven.wrap): wraps jgiven-core+junit5 2.0.3 as an OSGi
+- `pipeline-jgiven` (BSN io.seedmatic.rke2lab.jgiven.wrap): wraps jgiven-core+junit5 2.0.3 as an OSGi
   bundle, `Export-Package: com.tngtech.jgiven.*`. Test-scope wrap.
 - `scenario-engine`: carries jgiven-junit5 at runtime-scope (the dogfooding promotion) — the system
   capability now.

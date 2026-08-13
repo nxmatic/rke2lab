@@ -26,7 +26,7 @@ Final structure:
   `// @codebase` marker first line; google-java-format reflows them on save.
 
 Ground-truth facts captured during the work (verified against code, useful later):
-- Java package is `io.nxmatic.rke2lab.manifests` (the user fixed `rk2lab`→`rke2lab` this session).
+- Java package is `io.seedmatic.rke2lab.manifests` (the user fixed `rk2lab`→`rke2lab` this session).
 - Units live in `units/<domain>/`, domain registrars in `domain/` (e.g. `GitopsDomainRegistrar`),
   NodeEnv SPI in `node/`. No `layers/` or `components/` dirs.
 - Registrars EXIST and use `new ManifestsDomain(ManifestDomainCatalog.GITOPS, deps,

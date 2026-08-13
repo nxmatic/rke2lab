@@ -183,7 +183,7 @@ the bundles are embedded INSIDE it, not staged beside it).
   jar; `Pulumi.yaml` stays unchanged (single `binary:`), so the runtime-adjacent surface is minimal and
   the self-containment principle keeps the environment to config-only.
 
-★ DELETE at R4 — `exec/seed-master` test package `io.nxmatic.rke2lab.unitrepo.realgraph` (7 files:
+★ DELETE at R4 — `exec/seed-master` test package `io.seedmatic.rke2lab.unitrepo.realgraph` (7 files:
 `ReactorModuleCatalog`, `ManifestsUniverse`, `UniverseBuilder`, their 3 `*Test`s, `RealGraphResolutionTest`,
 plus `package-info`). All carry `@Deprecated(forRemoval = true)`. It is the STANDALONE-resolver proof: it
 hand-builds a fake `UnitResource` universe (modules + domains + units transcribed by hand) to feed

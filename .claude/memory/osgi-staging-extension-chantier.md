@@ -191,7 +191,7 @@ The live design view is `.claude/claude-preview.adoc` (throwaway; the canonical 
 - **No code duplication — EXTRACT, don't copy.** `BundleManifest` + `EmbedCapability` (pure parsing of
   what a bundle DECLARES; the only boot-discovery classes the extension needs) move OUT of
   boot-discovery into a NEW module `maven-embed-staging-ext/bundle-discovery` (built in the extension
-  lifecycle, released alongside it). New PACKAGE `io.nxmatic.rke2lab.osgi.bundle.discovery` (NOT the
+  lifecycle, released alongside it). New PACKAGE `io.seedmatic.rke2lab.osgi.bundle.discovery` (NOT the
   old `…boot.discovery`) to avoid a split package — ~5 import lines update in OsgiRuntime,
   FelixFrameworkExtension, HostSeamEmbeddedFelixTest. Extraction verified clean (the 2 classes ref no
   boot sibling). `BundleIndex`/`BundleLocation`/`BootStackJar` STAY in boot-discovery (runtime scan,
@@ -226,7 +226,7 @@ framework via ServiceLoader). Every dependency jar is exactly ONE of FIVE catego
    "does our package cross the frontier", never the BSN. The seam law does not police third-party.
 
 The build-time **fail-fast guard** (mirror of runtime `deriveSystemExports`): for each
-`io.nxmatic.rke2lab.*` package on the flat set (resolved deps minus staged bundles), if it is owned by
+`io.seedmatic.rke2lab.*` package on the flat set (resolved deps minus staged bundles), if it is owned by
 a model/edge bundle (`domainExporterOf` != null) → FAIL at `package`, naming the HOST JAR that pulled
 the forbidden dep (NOT the bundle — its type is declared on purpose; the culprit is the host module).
 
@@ -253,7 +253,7 @@ is deliberate (a future reader sees the alternative weighed, not just the outcom
 
 - **Step 0 — DONE (green), richer than planned.** Extracted into module `maven-embed-staging-ext/bnd-read`
   (NOT "bundle-discovery" — that name collided with boot-discovery and lied: it parses, it does not
-  discover). New package `io.nxmatic.rke2lab.osgi.bnd`, flat jar, RELEASE 1.0.0, version managed in
+  discover). New package `io.seedmatic.rke2lab.osgi.bnd`, flat jar, RELEASE 1.0.0, version managed in
   build-parent `dependencyManagement` (BOM-like, not hardcoded). The extraction became a real
   value-object remodel (user: "again a helper" → kill the static fourre-tout, one class one role):
   - `bnd-read` holds `Clause` (record: name+attributes, `asExportClause`), `OsgiHeader` (record:
@@ -263,7 +263,7 @@ is deliberate (a future reader sees the alternative weighed, not just the outcom
   - boot-discovery's `BundleManifest` is now a RECORD `from(BundleLocation)` — read ONCE, holds the
     parsed headers; `BundleLocation` exposes `readManifest()` (the only byte read); `BundleIndex.Entry`
     collapsed to `(location, BundleManifest)`. boot-discovery depends on bnd-read (release) and exports
-    NONE of `io.nxmatic.rke2lab.osgi.bnd` (Private-Package only — bnd stays internal, verified).
+    NONE of `io.seedmatic.rke2lab.osgi.bnd` (Private-Package only — bnd stays internal, verified).
   - **DETERMINISM HARDENING (user call):** `felix.bootdelegation.implicit=false` in BOTH executors
     (OsgiRuntime + FelixFrameworkExtension). Felix defaults it TRUE — it stack-inspects to guess when a
     non-bundle instigator's class-load should fall through to the parent (app) CL; that is a silent

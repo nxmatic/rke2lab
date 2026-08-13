@@ -1,6 +1,6 @@
 ---
 name: codec-foundation-single-exporter-when-needed-backlog
-description: RESOLVED (world-gateway 2D T5, 2026-07-01) — gateway-document-codec became an autonomous FOUNDATION dual-realm bundle (embed; type=library), single exporter of io.nxmatic.rke2lab.world.gateway.codec, imported by any OSGi domain + shaded flat host-side. doctor-core no longer nests/owns it. NOT an OSGi fragment of jackson (it depends on the seam + must be dual-realm + owns its own export). See [[nesting-our-own-flat-module-per-realm]].
+description: RESOLVED (world-gateway 2D T5, 2026-07-01) — gateway-document-codec became an autonomous FOUNDATION dual-realm bundle (embed; type=library), single exporter of io.seedmatic.rke2lab.world.gateway.codec, imported by any OSGi domain + shaded flat host-side. doctor-core no longer nests/owns it. NOT an OSGi fragment of jackson (it depends on the seam + must be dual-realm + owns its own export). See [[nesting-our-own-flat-module-per-realm]].
 metadata:
   type: project
 ---
@@ -38,7 +38,7 @@ holds: the codec is dual-realm but not on the interface. See [[nesting-our-own-f
 
 ## The mistake to NOT repeat (cost a red build in T5)
 
-EXPORTING `io.nxmatic.rke2lab.world.gateway.codec` from doctor-core turned a nested-private package
+EXPORTING `io.seedmatic.rke2lab.world.gateway.codec` from doctor-core turned a nested-private package
 into a bundle-export → the gate classes it "bundle-only" → the flat host referencing it becomes a
 REALM_BOUNDARY host/seam leak, AND its package-private `WireEnumModule` trips SPEC_COVERAGE. Keep the
 codec nested-private (not exported), exactly like jackson/cdk8s carriers.

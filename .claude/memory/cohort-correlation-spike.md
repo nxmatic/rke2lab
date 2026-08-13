@@ -30,7 +30,7 @@ cheaply, before committing the design.
   record); `LiveMedicalRecordRegistry` overrides it to enumerate sibling stacks via
   `PulumiBackendLayout.stacksDir(backend, project)` → `recordFor` each. Registry read-core UNCHANGED.
 - `Generalist.cohortFinding(symptom)` folds the cohort; `SystemdAdapterStage.consultDoctor` logs it.
-- The repo's FIRST custom annotation `io.nxmatic.rke2lab.controlplane.meta.Spike` (SOURCE retention) —
+- The repo's FIRST custom annotation `io.seedmatic.rke2lab.controlplane.meta.Spike` (SOURCE retention) —
   see [[branch-namespaces]]. KEY STRUCTURAL LEARNING: the per-patient pure clinical methods
   (`historyOf`/`efficacyOf`) fold across patients FOR FREE — the model was shaped right.
 - (An earlier standalone `CohortReader` was absorbed into the registry; a nullable backendDir on

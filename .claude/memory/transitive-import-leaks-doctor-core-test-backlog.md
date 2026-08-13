@@ -1,6 +1,6 @@
 ---
 name: transitive-import-leaks-doctor-core-test-backlog
-description: Backlog (2026-06-28) — doctor-core-test imports io.nxmatic.rke2lab.doctor.records.* and doctor.spi.* but declares NEITHER doctor-records NOR doctor-spi directly (both reach it transitively via doctor-core, provided). Violates [[direct-dependency-for-every-import]]. Pre-dates Option B; fix in a hygiene pass.
+description: Backlog (2026-06-28) — doctor-core-test imports io.seedmatic.rke2lab.doctor.records.* and doctor.spi.* but declares NEITHER doctor-records NOR doctor-spi directly (both reach it transitively via doctor-core, provided). Violates [[direct-dependency-for-every-import]]. Pre-dates Option B; fix in a hygiene pass.
 metadata:
   type: project
 ---
@@ -10,10 +10,10 @@ further transitive leaks in `osgi/doctor/doctor-core-test/pom.xml` were found bu
 dedicated hygiene pass (out of Option B's blast radius — the actor tests used these long before
 Option B):
 
-- `GeneralistConsultDocumentTest` / the actor tests import `io.nxmatic.rke2lab.doctor.records.*`
+- `GeneralistConsultDocumentTest` / the actor tests import `io.seedmatic.rke2lab.doctor.records.*`
   (Symptom, ConsultationReport, Expectation, MedicalRecord, Patient, …) — but the module declares
   no direct `doctor-records` dep; it arrives transitively through `doctor-core` (provided).
-- They also import `io.nxmatic.rke2lab.doctor.spi.*` (Specialist, via FakeSpecialist) — no direct
+- They also import `io.seedmatic.rke2lab.doctor.spi.*` (Specialist, via FakeSpecialist) — no direct
   `doctor-spi` dep either; same transitive path.
 
 Fix: add `doctor-records` and `doctor-spi` as DIRECT `provided` deps of doctor-core-test (the

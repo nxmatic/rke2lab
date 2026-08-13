@@ -23,7 +23,7 @@ isolation — it can; the framework isolates by classloader. See [[reconsider-ch
 ## The design (CONVERGED + user-approved, both AskUserQuestion forks)
 
 - **Derived rule, NO hand-list** (fork 1): a *realm library* = a third-party OSGi bundle (has
-  Bundle-SymbolicName, not io.nxmatic.rke2lab.*, not launcher, not type=seam) whose export a
+  Bundle-SymbolicName, not io.seedmatic.rke2lab.*, not launcher, not type=seam) whose export a
   model/edge/record (`EmbedCapability.isDomain()`) bundle imports. It is STAGED as a bundle (OSGi's
   own copy) AND kept FLAT where the host imports it. Today selects jackson's 5 jars (core, databind,
   annotations, dataformat-yaml, snakeyaml); 2D's networknt+itu self-include with zero code change.
