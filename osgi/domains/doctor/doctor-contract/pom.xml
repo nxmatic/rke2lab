@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -23,12 +23,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
     <!-- The two interfaces name Patient (records, same bundle) + SeedEnvelope (the consult envelope). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The records carry jackson binding annotations (@JsonValue/@JsonCreator on the wire enums). -->

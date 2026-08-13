@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../bundle-parent/pom.xml</relativePath>
@@ -60,11 +60,11 @@
     <!-- The transactional cellar (ScenarioCellar) lives here (dual-realm, jGiven-aware): the neutral
          Cellar/OpaqueCellar/SeedEnvelope seam it decorates, and the codec it encodes tags with. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
 
@@ -83,28 +83,28 @@
     <!-- The connection/lever build on the boot: FrameworkLaunchPipeline.embedded().launch() +
          BootedFramework, and the BootPlan.START_LEVEL_* role->level authority. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
     <!-- The jGiven-free JUnit-Platform runner (JUnitLauncherCore + its strategies): ScenarioPlayer
          plays a scenario THROUGH it. Extracted so a runner-only world installs the runner bundle
          alone (no jGiven); scenario-engine keeps only the jGiven-bearing scenario machinery. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
     </dependency>
     <!-- The shared boot-discovery model the out-of-container envelope reads (ClasspathBundleIndex:
          locate / embeddableBundles / exportsForImportsOf) so test and prod agree on boot discovery
          from one source. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>boot-discovery</artifactId>
     </dependency>
     <!-- The readiness VALUE (ReadinessBudget) the ReadinessBudgetExtension resolves from a scenario's
          @ReadinessDeadlines + the stack override and hands to the ReadinessBudgetReceiver. The driver
          itself lives there too, but only the edges reference it — the engine touches the value only. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>readiness-await</artifactId>
     </dependency>
 
@@ -130,7 +130,7 @@
          felix.scr + the DS-runtime trio to boot a real world at level 4, and the logback backend so
          the resolution diagnostic surfaces. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>

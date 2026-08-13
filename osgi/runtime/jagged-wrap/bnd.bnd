@@ -1,4 +1,4 @@
-Bundle-SymbolicName: io.nxmatic.rke2lab.jagged.wrap
+Bundle-SymbolicName: io.seedmatic.rke2lab.jagged.wrap
 
 # The whole wrap: stamp OSGi headers onto the jagged jars (jagged-x25519 + its jagged-framework /
 # jagged-api / jagged-bech32 closure) — none of which carry a Bundle-SymbolicName. bnd pulls their

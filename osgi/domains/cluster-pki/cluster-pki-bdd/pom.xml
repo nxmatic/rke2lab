@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -21,31 +21,31 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-pki-contract</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-pki-core</artifactId>
     </dependency>
     <!-- SshToAgeConverter — @OsgiService-injected, handed to ClusterSeal (instance-passing). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
     </dependency>
     <!-- NdhKeystoreReader — @OsgiService-injected, handed to ClusterSeal (instance-passing). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-contract</artifactId>
     </dependency>
     <!-- Cellar/Parcel/SeedCoordinate/RunbookCoordinate/SeedHandler/Sensitivity/SeedEnvelope. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- GenericRunbookHandler, ScenarioPlayer, @SeedScenario, CellarReceiver, ScenarioCellar, OsgiService. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
     <dependency>

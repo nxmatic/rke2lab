@@ -1,5 +1,5 @@
 -include: ../../bundle-parent/annotations.bnd
-Bundle-SymbolicName: io.nxmatic.rke2lab.fabric8.wrap
+Bundle-SymbolicName: io.seedmatic.rke2lab.fabric8.wrap
 
 # The wrap owns io.fabric8.* — exported ONCE from this single bundle. The ~21 kubernetes-model-*
 # jars each re-export io.fabric8.kubernetes.api.builder / io.fabric8.kubernetes.model.annotation

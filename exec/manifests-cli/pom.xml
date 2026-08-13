@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
     <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
@@ -24,7 +24,7 @@
          DS-runtime API runtime). The CLI compiles against OsgiRuntime; the felix/pax jars it only
          stages + installs, never compiles against. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
     <dependency>
@@ -35,7 +35,7 @@
          (manifests-core imports but does not export it); OsgiRuntime mirrors it onto the system
          bundle so the embedded manifests-core resolves against this one copy — typed access. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -44,7 +44,7 @@
          A flat consumer references it again, so the demand-fold keeps it flat in this assembly AND
          stages it as a bundle (type=dual-realm), the in-container scion resolving the SAME copy. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-ingress-contract</artifactId>
     </dependency>
     <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
@@ -53,12 +53,12 @@
          against a manifests-core impl type — the compiler now forbids the host→impl leak. The stage
          execution still resolves the reactor artifact at runtime scope. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -68,7 +68,7 @@
          against the edge impl; manifests-core's @Reference SshToAgeConverter binds it from the
          registry. Mandatory reference, so the edge MUST be embedded or the service never publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ssh-to-age-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -79,23 +79,23 @@
     <!-- The launcher engine + OSGi connection contract (JUnitLauncherCore transits via this): the
          host scenario reaches OsgiConnection/SeedRuntime/ScenarioCellar/RunRole/TxIdSeed here. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
     <!-- The neutral launcher core (JUnitLauncherCore) the CLI hands the engine to; a DIRECT import
          (Main names it), never leaned on transitively through scenario-engine. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
     </dependency>
     <!-- The common gardening spine consumed FLAT (SeedReceiver, SessionSeed, Gardening.sow). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-bdd</artifactId>
     </dependency>
     <!-- The broker seam the host speaks (Amendment roles + Cellar); the ONE host<->OSGi membrane. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The broker mechanism (embed type=runtime): DefaultSeedBroker + DefaultAmendmentAssembler,
@@ -103,7 +103,7 @@
          Without it the registry holds only the broker CONTRACT and Gardening.open() finds no
          gardener. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-runtime</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -111,14 +111,14 @@
          the graph so the staging closure stages it under META-INF/bundles; at boot it attaches to
          pax-logging-logback and the launcher invokes its PaxLogbackConfigurer reflectively. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>pax-logback-config</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- The manifests SCION bundle (embed type=model): ManifestsRunbookHandler serves the `manifests`
          coordinate and grows ManifestSynthesisScenario in-container. Staged INTACT like the edges. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -128,17 +128,17 @@
          ndh-core (DefaultNdhKeystoreReader — the tailnet authorityDomain). runtime scope: the host
          never compiles against an impl, only stages it; the contracts arrive transitively. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>worktree-core</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>auth-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-core</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -146,7 +146,7 @@
          scenario is a jGiven ScenarioTest, so jgiven runs FLAT for it and as a BUNDLE for the
          in-container scion. Directly declared = the realm-library signal (StagingClosure). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -216,7 +216,7 @@
     </dependency>
     <!-- The embedded-Felix CLI-scope test boots the same topology as the deployed jar. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>
@@ -257,7 +257,7 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <configuration>
-          <mainClass>io.nxmatic.rke2lab.manifests.cli.Main</mainClass>
+          <mainClass>io.seedmatic.rke2lab.manifests.cli.Main</mainClass>
         </configuration>
       </plugin>
       <!-- Flags + artifact filter inherited from build-parent's managed shade
@@ -280,7 +280,7 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>io.nxmatic.rke2lab.manifests.cli.Main</mainClass>
+                  <mainClass>io.seedmatic.rke2lab.manifests.cli.Main</mainClass>
                 </transformer>
               </transformers>
             </configuration>

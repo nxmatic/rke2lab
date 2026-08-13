@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
     <version>0.0.0</version>
     <relativePath>../../../build-parent/pom.xml</relativePath>

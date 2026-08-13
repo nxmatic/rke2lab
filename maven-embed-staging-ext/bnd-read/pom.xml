@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>maven-embed-staging-ext</artifactId>
     <version>1.0.0</version>
     <relativePath>../pom.xml</relativePath>

@@ -1,5 +1,5 @@
 -include: ../../bundle-parent/annotations.bnd
-Bundle-SymbolicName: io.nxmatic.rke2lab.osgi.foundation.seed.bdd
+Bundle-SymbolicName: io.seedmatic.rke2lab.osgi.foundation.seed.bdd
 
 # Export ONLY the SOW half. seed.bdd.sow (RunbookSower) is REALM-AGNOSTIC by design — it sows a
 # RunbookCoordinate through the broker door and reaps the runbook JSON, holding only the neutral
@@ -7,9 +7,9 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.osgi.foundation.seed.bdd
 # in-container tomorrow (remote — same door, same gesture, § REST embedded-today-remote-tomorrow).
 # So this package is exportable for that in-realm reuse.
 Export-Package: \
-    io.nxmatic.rke2lab.seed.bdd.sow
+    io.seedmatic.rke2lab.seed.bdd.sow
 
-# The base package io.nxmatic.rke2lab.seed.bdd is NOT exported: it holds the GRAFT half
+# The base package io.seedmatic.rke2lab.seed.bdd is NOT exported: it holds the GRAFT half
 # (SowAndGraftStage composing ScenarioGraft), the world opening, the Cellar stages, the preflight
 # gate. The graft is LOCAL to whoever owns the runbook tree (ScenarioGraft is host-side by
 # construction — one jGiven engine, only JSON crosses), so these run on the flat host classpath,
@@ -25,7 +25,7 @@ Export-Package: \
 Import-Package: \
     ${annotation-noimports}, \
     org.osgi.framework;resolution:=optional, \
-    io.nxmatic.rke2lab.osgi.runtime.framework;resolution:=optional, \
+    io.seedmatic.rke2lab.osgi.runtime.framework;resolution:=optional, \
     com.tngtech.jgiven.*;resolution:=optional, \
     *
 

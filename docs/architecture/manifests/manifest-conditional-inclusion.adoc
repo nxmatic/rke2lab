@@ -7,7 +7,7 @@
 
 The manifest synthesis system supports **conditional inclusion of manifest units** and **bootstrap context access** within domains. This enables:
 
-1. **Policy-driven conditional inclusion** - Optional manifest units based on policy flags (e.g., Porch within GitOps)
+1. **Policy-driven conditional inclusion** - Optional manifest units based on policy flags (e.g., an optional unit within GitOps)
 2. **Bootstrap identity access** - Infrastructure configuration (e.g., Incus remote name) passed through BootstrapIdentity
 3. **Graceful ephemeral synthesis** - Units can skip when context is unavailable (smoke tests, unit tests)
 
@@ -26,10 +26,11 @@ method, but:
   link:manifests-architecture.adoc#ordering-and-coherence[Manifests Architecture → visit order and coherence]),
   the *policy-driven conditional* hook that would vary a domain's unit list is not yet exercised.
 
-The **Porch** example used throughout this document is *illustrative only* — there is no
-`PorchResourcesManifestsUnit` or `catalog.porch()` in the codebase. Read this as the intended
-design for conditional inclusion, to be restored alongside the domain registry; substitute a real
-optional unit when you implement it.
+The example used throughout this document is *illustrative only* — it uses a generic *optional
+unit* placeholder. The component that once filled this role was evaluated and removed from the
+project, so a neutral placeholder replaces it. Read this as the intended design for conditional
+inclusion, to be restored alongside the domain registry; substitute a real optional unit when you
+implement the mechanism.
 ====
 
 == Architecture
@@ -142,7 +143,7 @@ graph TB
 
     subgraph "Manifest Units"
         FLUX[FluxInstanceManifestsUnit<br/>SopsAgeSecretManifestsUnit<br/>FluxRootManifestsUnit]
-        PORCH[PorchResourcesManifestsUnit<br/>OPTIONAL]
+        OPT[OptionalManifestsUnit<br/>OPTIONAL]
         CAPI[ClusterApiOperatorManifestsUnit<br/>IncusIdentitySecretManifestsUnit]
     end
 
@@ -154,7 +155,7 @@ graph TB
     LDR -.implements.- OTHER
 
     GDR -->|always includes| FLUX
-    GDR -->|conditionally includes<br/>if porch enabled| PORCH
+    GDR -->|conditionally includes<br/>if optional-unit enabled| OPT
     CDR -->|always includes| CAPI
 
     classDef policyClass fill:#e1f5ff,stroke:#01579b,stroke-width:2px
@@ -169,7 +170,7 @@ graph TB
     class LDR interfaceClass
     class GDR,CDR,OTHER concreteClass
     class FLUX,CAPI mandatoryUnit
-    class PORCH optionalUnit
+    class OPT optionalUnit
 ----
 
 === Sequence Diagram: Policy Flow
@@ -190,11 +191,11 @@ sequenceDiagram
     loop For each domain
         DMS->>LDRB: register(registrar, policy)
         LDRB->>GDR: domain(policy)
-        GDR->>GDR: check policy.isEnabled("porch")
+        GDR->>GDR: check policy.isEnabled("optional-unit")
 
-        alt porch enabled
-            GDR->>LD: new ManifestsDomain("gitops", deps, [Flux, SOPS, FluxRoot, Porch])
-        else porch disabled
+        alt optional-unit enabled
+            GDR->>LD: new ManifestsDomain("gitops", deps, [Flux, SOPS, FluxRoot, OptionalUnit])
+        else optional-unit disabled
             GDR->>LD: new ManifestsDomain("gitops", deps, [Flux, SOPS, FluxRoot])
         end
 
@@ -210,7 +211,7 @@ sequenceDiagram
 
 === ManifestsDomainRegistrar Interface
 
-The link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar] interface provides two methods:
+The link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar] interface provides two methods:
 
 [source,java]
 ----
@@ -227,7 +228,7 @@ public interface ManifestsDomainRegistrar {
 
 **Backwards compatibility**: Existing registrars that don't need conditional logic continue using the no-arg `domain()` method. The default implementation calls it automatically.
 
-**See also**: The interface JavaDoc includes a component diagram showing the policy flow. Navigate to link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] for implementation details.
+**See also**: The interface JavaDoc includes a component diagram showing the policy flow. Navigate to link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] for implementation details.
 
 === Registrar Implementation Pattern
 
@@ -236,11 +237,11 @@ public interface ManifestsDomainRegistrar {
 [source,java]
 ----
 // Creates domain proliferation
-public class PorchDomainRegistrar implements ManifestsDomainRegistrar {
+public class OptionalDomainRegistrar implements ManifestsDomainRegistrar {
   public ManifestsDomain domain() {
-    return new ManifestsDomain("porch",
+    return new ManifestsDomain("optional-unit",
       List.of("gitops"),
-      List.of(new PorchResourcesManifestsUnit()));
+      List.of(new OptionalManifestsUnit()));
   }
 }
 ----
@@ -260,8 +261,8 @@ public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
     units.add(new FluxRootManifestsUnit());
 
     // Optional units based on policy
-    if (policy.isEnabled("porch")) {
-      units.add(new PorchResourcesManifestsUnit());
+    if (policy.isEnabled("optional-unit")) {
+      units.add(new OptionalManifestsUnit());
     }
 
     return new ManifestsDomain("gitops", List.of("replication"), units);
@@ -269,12 +270,12 @@ public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
 }
 ----
 
-**Real implementation**: See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] for the actual gitops registrar (note: it uses the plain `domain()` form today — the policy-aware variant above is the intended design, not current code), and link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain overview.
+**Real implementation**: See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] for the actual gitops registrar (note: it uses the plain `domain()` form today — the policy-aware variant above is the intended design, not current code), and link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain overview.
 
 **Why this is better**:
 
 * **Single source of truth**: One domain owns the feature, not scattered across multiple domains
-* **Logical grouping**: Porch is part of GitOps, not a separate concern
+* **Logical grouping**: the optional unit is part of GitOps, not a separate concern
 * **No dependency complexity**: No need to declare cross-domain dependencies for tightly related features
 * **Policy granularity**: Domain-level enable/disable + unit-level enable/disable
 
@@ -286,8 +287,8 @@ The policy is defined in two layers:
 
 [source,java]
 ----
-public String porch() {
-  return "porch";
+public String optionalUnit() {
+  return "optional-unit";
 }
 ----
 
@@ -306,9 +307,9 @@ ManifestDomainPolicy domains =
         .build();
 ----
 
-Porch is a UNIT *within* the gitops domain, not a domain flag of its own: its conditional
+the optional unit is a UNIT *within* the gitops domain, not a domain flag of its own: its conditional
 inclusion is decided by the gitops registrar's `domain(policy)` hook (see below), not by a
-top-level publish toggle. There is no `publish.porch` key.
+top-level publish toggle. There is no `publish.optional-unit` key.
 
 **3. Pulumi Stack Configuration**:
 
@@ -316,14 +317,14 @@ top-level publish toggle. There is no `publish.porch` key.
 ----
 config:
   rke2lab:manifests.publish.gitops: "true"   # Enable the gitops domain layer
-  # (no publish.porch key — porch inclusion is a unit-level filter within gitops)
+  # (no publish.optional-unit key — the optional unit is a unit-level filter within gitops)
 ----
 
 === Accessing Bootstrap Identity for Infrastructure Configuration
 
 Manifest units that need infrastructure configuration (Incus remote name, cluster name, etc.) access it via `bootstrapIdentity()`:
 
-✅ **Do this** (use link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/profiles/BootstrapIdentity.java[BootstrapIdentity] for infrastructure context):
+✅ **Do this** (use link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/profiles/BootstrapIdentity.java[BootstrapIdentity] for infrastructure context):
 
 [source,java]
 ----
@@ -349,7 +350,7 @@ public class IncusIdentitySecretManifestsUnit extends AbstractManifestsUnit {
 }
 ----
 
-**Real implementation**: See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] for the complete implementation, and link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] for the domain overview.
+**Real implementation**: See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] for the complete implementation, and link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] for the domain overview.
 
 **Why this pattern**:
 
@@ -402,7 +403,7 @@ public class MeshDomainRegistrar implements ManifestsDomainRegistrar {
 
 **Use conditional inclusion when**:
 
-* Feature is logically part of a larger concern (Porch ⊂ GitOps)
+* Feature is logically part of a larger concern (the optional unit ⊂ GitOps)
 * Feature shares dependencies with sibling units
 * Feature is optional/experimental/staged rollout
 * You want fine-grained control without domain-level dependencies
@@ -480,14 +481,14 @@ graph TB
     class SYNTH output
 ----
 
-**Example**: `manifests.publish.gitops=true`, with the (illustrative) porch unit excluded within gitops
+**Example**: `manifests.publish.gitops=true`, with the (illustrative) optional unit excluded within gitops
 
-* **Phase 1**: GitopsDomainRegistrar creates domain with [Flux, SOPS, FluxRoot] (Porch excluded)
+* **Phase 1**: GitopsDomainRegistrar creates domain with [Flux, SOPS, FluxRoot] (the optional unit excluded)
 * **Phase 2**: gitops domain passes domain-level filter, units synthesized
 
-**Example**: `manifests.publish.gitops=false`, with the porch unit included
+**Example**: `manifests.publish.gitops=false`, with the optional unit included
 
-* **Phase 1**: GitopsDomainRegistrar creates domain with [Flux, SOPS, FluxRoot, Porch]
+* **Phase 1**: GitopsDomainRegistrar creates domain with [Flux, SOPS, FluxRoot, OptionalUnit]
 * **Phase 2**: gitops domain filtered out entirely, nothing synthesized
 
 == Code References
@@ -496,28 +497,28 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 **Core Interfaces**:
 
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] - Policy-aware registration interface with component diagram
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistryBuilder.java[ManifestsDomainRegistryBuilder.java] - Builds domain registry with policy
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Policy API with enable/disable flags
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] - Policy-aware registration interface with component diagram
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistryBuilder.java[ManifestsDomainRegistryBuilder.java] - Builds domain registry with policy
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Policy API with enable/disable flags
 
 **Domain Implementations**:
 
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] - GitOps domain (plain `domain()`, fixed unit list via `ManifestsUnit.lazy`)
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/ClusterApiDomainRegistrar.java[ClusterApiDomainRegistrar.java] - Cluster API domain registrar
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] - GitOps domain (plain `domain()`, fixed unit list via `ManifestsUnit.lazy`)
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/ClusterApiDomainRegistrar.java[ClusterApiDomainRegistrar.java] - Cluster API domain registrar
 
 **Bootstrap Identity**:
 
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
-* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
+* link:../seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
 
 **Manifest Units** (showing patterns):
 
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] - Bootstrap identity access + ephemeral guard
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] - Bootstrap identity access + ephemeral guard
 
 **Orchestration**:
 
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
 
 == Related Documentation
 
@@ -541,7 +542,7 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 [source,bash]
 ----
-# Porch has no top-level publish flag — it is filtered within the gitops
+# The optional unit has no top-level publish flag — it is filtered within the gitops
 # registrar's domain(policy) hook. Verify the gitops layer is enabled:
 pulumi config get rke2lab:manifests.publish.gitops
 
@@ -571,11 +572,11 @@ grep -A 10 "domain(ManifestDomainPolicy" \
 pulumi config get rke2lab:manifests.publish.gitops  # Must be true
 
 # Check policy flag matches catalog
-grep 'public String porch()' \
+grep 'public String optionalUnit()' \
   manifests/src/main/java/.../ManifestDomainCatalog.java
 
 # Check for synthesis exceptions
-grep "PorchResourcesManifestsUnit" /tmp/maven.log
+grep "OptionalManifestsUnit" /tmp/maven.log
 ----
 
 === Policy Changes Not Reflected

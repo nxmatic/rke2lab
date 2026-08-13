@@ -82,16 +82,16 @@ graph TB
 **Starting point**: Reading architecture documentation
 
 1. Read link:manifests-architecture.adoc[manifests-architecture.adoc] (the canonical model and synthesis flow)
-2. Jump to the module's package overview → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/package-info.java[manifests/package-info.java]
-3. Click "See interface" → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
-4. Navigate to a concrete registrar → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java] (actual code)
+2. Jump to the module's package overview → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/package-info.java[manifests/package-info.java]
+3. Click "See interface" → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
+4. Navigate to a concrete registrar → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java] (actual code)
 
 === Pattern 2: Bottom-Up (Code → Context)
 
 **Starting point**: Working on a specific class
 
-1. Open link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[units/clusterapi/IncusIdentitySecretManifestsUnit.java] in IDE
-2. Read the package's `package-info` → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] (domain overview + doc links)
+1. Open link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[units/clusterapi/IncusIdentitySecretManifestsUnit.java] in IDE
+2. Read the package's `package-info` → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] (domain overview + doc links)
 3. Click a "Related Documentation" link → link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] for policy context, or
    link:bootstrap-identity-provider.adoc[bootstrap-identity-provider.adoc] for identity access
 
@@ -99,19 +99,19 @@ graph TB
 
 **Starting point**: Understanding one domain, need to implement another
 
-1. Read link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain shape
+1. Read link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain shape
 2. Compare with a sibling domain's overview, e.g.
-   link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java]
+   link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java]
 3. Both registrars (in `domain/`) follow the `new ManifestsDomain(catalog id, deps, List.of(ManifestsUnit.lazy(...)))` shape
 
 === Pattern 4: Interface → Implementation
 
 **Starting point**: Understanding the contract
 
-1. Read link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] (interface with component diagram)
-2. See the package overview → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/package-info.java[domain/package-info.java]
+1. Read link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] (interface with component diagram)
+2. See the package overview → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/package-info.java[domain/package-info.java]
 3. IDE "Show Implementations" → all registrars in the `domain/` package
-4. Pick one → e.g., link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java]
+4. Pick one → e.g., link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java]
 
 == Cross-Reference Syntax Reference
 
@@ -119,18 +119,18 @@ graph TB
 
 **Link to Java file** (GitHub/IDE clickable):
 ----
-link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java]
+link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java]
 ----
 
 **Link to a unit**:
 ----
-link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java[FluxOperatorManifestsUnit.java]
+link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java[FluxOperatorManifestsUnit.java]
 ----
 
 **Inline code reference**:
 ----
 The `ManifestsDomainRegistrar` interface...
-See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[implementation] for details.
+See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[implementation] for details.
 ----
 
 === In JavaDoc → AsciiDoc
@@ -151,7 +151,7 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomain
 
 **Relative path calculation**:
 
-* From `manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java`
+* From `manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java`
 * To `docs/manifest-conditional-inclusion.adoc`
 * Path: `../../../../../../../../../../docs/manifest-conditional-inclusion.adoc` (10 levels up)
 
@@ -163,7 +163,7 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomain
 /**
  * @see ManifestsDomainRegistrar
  * @see ManifestDomainPolicy
- * @see io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity
+ * @see io.seedmatic.rke2lab.manifests.profiles.BootstrapIdentity
  */
 ----
 
@@ -171,7 +171,7 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomain
 [source,java]
 ----
 /**
- * See {@link io.nxmatic.rke2lab.manifests.units.gitops} package
+ * See {@link io.seedmatic.rke2lab.manifests.units.gitops} package
  * for the gitops domain's manifest units.
  */
 ----

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -20,11 +20,11 @@
   <dependencies>
     <!-- The Worktree interface and the facts records (Provenance / WorkingState) JgitWorktree returns. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>worktree-contract</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
     <!-- @Component / @Activate for the impl. -->
@@ -37,6 +37,22 @@
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>
+    </dependency>
+    <!-- jgit's smart-HTTP test server (AppServer + GitServlet): the rendered-branch test pushes over
+         HTTP, the ONLY transport jgit push does not deadlock — file:// and git:// are duplex and
+         hang (push waits for the status while receive-pack waits for the pack), HTTP is half-duplex
+         like production HTTPS. Test-only. -->
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.junit.http</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- jgit's AppServer declares junit (4) as `provided`; supply it so the http test server runs.
+         Third-party need of the test server only — our own tests are Jupiter. -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

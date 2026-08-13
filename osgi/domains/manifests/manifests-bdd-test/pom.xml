@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-test-parent/pom.xml</relativePath>
@@ -27,14 +27,14 @@
     <!-- The host under test: the scenario + the front-door. provided — the fragment is pure test
          bytecode that resolves against the manifests-bdd host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-bdd</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The vocabulary the facet + assertions speak: the runbook-input wire-record, the synthesis
          result, the domain catalog. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -42,19 +42,19 @@
          absent-keystore stub. provided: the interface rides the staged ndh-contract bundle (pulled
          into the bench by manifests-core's import), the stub is the only impl the test publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-contract</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The frontier vocabulary: the RunGate the passenger mocks + registers, the SeedEnvelope the
          trigger rides, the codec that reads the harvested runbook. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -73,7 +73,7 @@
     <!-- The generic in-container runner the fragment's entry delegates to (JUnitLauncherCore /
          InContainerJUnitRunner). Provided — resolved through the manifests-bdd host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -85,7 +85,7 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -101,12 +101,12 @@
     <!-- the src/test @OsgiWorld proxy boots Felix via JGivenTestkit.felix() and installs the JUnit +
          jGiven bundle worlds by classpath substring, so they must be on the TEST classpath. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>test</scope>
     </dependency>
@@ -115,7 +115,7 @@
          exporter is this wrap bundle. The closure walk locates bundles by classpath; without this
          the whole synthesis graph fails to resolve. The jgiven-wrap treatment, for the shape engine. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>victools-wrap</artifactId>
       <scope>test</scope>
     </dependency>
@@ -131,17 +131,17 @@
          same graph manifests-core-test declares — the scion drives the REAL synthesis, so it needs
          all of it in-container. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
       <scope>test</scope>
     </dependency>
@@ -149,7 +149,7 @@
          so its @Component only activates when the provider bundle is present. The scion drives
          synthesis, so unlike manifests-core-test (which does not) this proof needs it. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ssh-to-age-edge</artifactId>
       <scope>test</scope>
     </dependency>

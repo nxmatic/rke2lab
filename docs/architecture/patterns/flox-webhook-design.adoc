@@ -412,7 +412,7 @@ spec:
       serviceAccountName: flox-webhook
       containers:
       - name: webhook
-        image: ghcr.io/nxmatic/flox-webhook:latest
+        image: ghcr.io/seedmatic/flox-webhook:latest
         ports:
         - containerPort: 9443
           name: webhook

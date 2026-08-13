@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -21,13 +21,13 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>systemd-contract</artifactId>
     </dependency>
     <!-- The connect-retry + two-tier-deadline driver awaitReady runs on. A real OSGi bundle staged
          in-container (Import-Package, NOT embedded like the dbus libs below). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>readiness-await</artifactId>
     </dependency>
     <dependency>
@@ -61,14 +61,14 @@
          edge by its embed capability, and exercises the published probe. Out-of-container, no
          fragment (the seam type is exported; no white-box access needed). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- The out-of-container framework envelope moved to the runtime engine module (JUnit/jGiven are
          runtime-scope now); the @Osgi tag stays in junit-testkit above. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>test</scope>
     </dependency>

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../bundle-parent/pom.xml</relativePath>
@@ -28,13 +28,13 @@
          the @Tests in-framework), ScrDiagnostics (src/main). provided keeps the in-container half out
          of the fragment jar — it resolves as its own bundle at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The JUnit-in-OSGi testkit: now only the test-only tags (@Osgi/@Pipeline) a fragment wears. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>provided</scope>
     </dependency>

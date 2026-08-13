@@ -3,7 +3,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.nxmatic.rke2lab</groupId>
+  <groupId>io.seedmatic.rke2lab</groupId>
   <artifactId>build-parent</artifactId>
   <!-- 0.0.0: a deliberate "release that does not exist" sentinel — a fixed RELEASE coordinate (not
   a
@@ -27,8 +27,8 @@
   <distributionManagement>
     <repository>
       <id>github</id>
-      <name>GitHub Packages — nxmatic/rke2lab</name>
-      <url>https://maven.pkg.github.com/nxmatic/rke2lab</url>
+      <name>GitHub Packages — seedmatic/rke2lab</name>
+      <url>https://maven.pkg.github.com/seedmatic/rke2lab</url>
     </repository>
   </distributionManagement>
 
@@ -97,7 +97,7 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bom</artifactId>
         <version>1.0.0</version>
         <type>pom</type>
@@ -108,506 +108,531 @@
            so its version is fixed here, NOT ${rke2lab.version}. boot-discovery depends on it; the
            single source for that version is this line. -->
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bnd-read</artifactId>
         <version>1.0.0</version>
       </dependency>
       <!-- rke2lab inter-module versions (project lifecycle) -->
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-master</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-master</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-cli</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-cli</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>netplan-cli</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>netplan-cli</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>auth-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>auth-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>auth-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
+        <artifactId>operator-notifier-port</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.seedmatic.rke2lab</groupId>
+        <artifactId>operator-notifier-edge</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.seedmatic.rke2lab</groupId>
+        <artifactId>ghapp-contract</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.seedmatic.rke2lab</groupId>
+        <artifactId>ghapp-edge</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.seedmatic.rke2lab</groupId>
+        <artifactId>ghapp-bdd</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bbox-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bbox-bdd-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bbox-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bbox-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bbox-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-pki-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-pki-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-pki-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <!-- The sops external edge is TOP-LEVEL (a generic tool, like ssh-to-age-edge), not a
            cluster-pki module — its SopsEncryptor seam is consumer-owned in cluster-pki-contract. -->
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>sops-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <!-- The ndh domain: the single reader of the operator key inventory (.ndh-ssh.d/keys.yaml),
            consumed by manifests-core + cluster-pki-core. -->
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>ndh-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>ndh-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-cellar-api</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-cellar-recipient</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-cellar-recipient-late</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-cellar-clean</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-cellar-clean-static</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-cellar-smudge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-config</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-fragment-contribution</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-fragment-host</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-host</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-scr-api</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-scr-consumer</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-startlevel-api</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-startlevel-grower</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-startlevel-contributor</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>bench-tests</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>boot-discovery</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>boot-logging</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cellar-cipher-age</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-bdd-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>cluster-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>dbus-systemd-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>doctor-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>doctor-contract-test</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>doctor-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>doctor-spi</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>domain-annotations</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>framework-launcher</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>pax-logback-config</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>junit-launcher</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-bdd-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-ingress-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-ingress</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>incus-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>jagged-wrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>jgiven-wrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>junit-testkit</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-bdd-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-cdk8s</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-ingress-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>manifests-core-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>netplan-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>netplan-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>netplan-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>scenario-probe</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>scenario-probe-test</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>scenario-testkit</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>pulumi-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>pulumi-edge-testkit</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>scenario-engine</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>readiness-await</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-broker-codec</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-broker-port</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-broker-runtime</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-broker-shape</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>seed-broker-testkit</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>ssh-to-age-edge</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>systemd-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>systemd-bdd-test</artifactId>
         <version>${rke2lab.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>systemd-cdk8s-manifests</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>systemd-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>unitrepo-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>victools-wrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>fabric8-wrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>worktree-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>worktree-core</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
+        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>worktree-bdd</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic.rke2lab.sdks</groupId>
+        <groupId>io.seedmatic.rke2lab.sdks</groupId>
         <artifactId>incus</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
@@ -668,14 +693,14 @@
 
   <!--
     Repository resolution order: Maven Central first (always), then the
-    internal GH Packages repos as a fallback for io.nxmatic artifacts.
+    internal GH Packages repos as a fallback for io.seedmatic artifacts.
 
     Why explicit Central before GH Packages:
     Maven asks every <repository> for every artifact in declaration order.
     GH Packages returns HTTP 500 (rather than 404) for unknown artifacts,
     and the response is slow.  Putting Central first means the vast majority
     of dependency lookups (transitive third-party trees) succeed at Central
-    and never touch GH Packages — only io.nxmatic artifacts (which Central
+    and never touch GH Packages — only io.seedmatic artifacts (which Central
     misses) fall through.
   -->
   <repositories>
@@ -696,8 +721,8 @@
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-      <id>github-nxmatic-rke2lab</id>
-      <url>https://maven.pkg.github.com/nxmatic/rke2lab</url>
+      <id>github-seedmatic-rke2lab</id>
+      <url>https://maven.pkg.github.com/seedmatic/rke2lab</url>
     </repository>
     <repository>
       <releases>
@@ -706,8 +731,8 @@
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-      <id>github-nxmatic-java-systemd</id>
-      <url>https://maven.pkg.github.com/nxmatic/java-systemd</url>
+      <id>github-seedmatic-java-systemd</id>
+      <url>https://maven.pkg.github.com/seedmatic/java-systemd</url>
     </repository>
     <repository>
       <releases>
@@ -716,8 +741,8 @@
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-      <id>github-nxmatic-java-bbox-api-client</id>
-      <url>https://maven.pkg.github.com/nxmatic/java-bbox-api-client</url>
+      <id>github-seedmatic-java-bbox-api-client</id>
+      <url>https://maven.pkg.github.com/seedmatic/java-bbox-api-client</url>
     </repository>
   </repositories>
 
@@ -848,7 +873,7 @@
               <dep>org.jspecify:jspecify</dep>
               <dep>org.checkerframework:checker-qual</dep>
               <dep>org.osgi:org.osgi.annotation.versioning</dep>
-              <dep>io.nxmatic.rke2lab:domain-annotations</dep>
+              <dep>io.seedmatic.rke2lab:domain-annotations</dep>
             </ignoredUnusedDeclaredDependencies>
           </configuration>
         </plugin>
@@ -930,7 +955,7 @@
               <exclusion>**/pulumi-generated-sdks/**</exclusion>
               <exclusion>**/package-info.java</exclusion>
               <!-- These two hold a DELIBERATE FQN: `implements Topic.Checkpoint` shadows the simple
-                   name Checkpoint, so the domain enum io.nxmatic.rke2lab.seed.broker.port.Checkpoint
+                   name Checkpoint, so the domain enum io.seedmatic.rke2lab.seed.broker.port.Checkpoint
                    is named fully-qualified. The recipe misses this inner-type shadow and would
                    re-shorten it into an ambiguous reference (compile error). Their only other FQNs are
                    already proper imports, so excluding them loses no coverage. -->

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
     <version>0.0.0</version>
     <relativePath>../../../../build-parent/pom.xml</relativePath>
@@ -17,34 +17,34 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- The out-of-container framework envelope moved to the runtime engine module (JUnit/jGiven are
          runtime-scope now); the @Osgi tag stays in junit-testkit above. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-config</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-host</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-scr-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-scr-consumer</artifactId>
       <scope>test</scope>
     </dependency>
@@ -52,12 +52,12 @@
          the @Component that provides it. Both located on the test classpath by their embed
          capability (installFixtureWithHost), not named in the test. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-fragment-host</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-fragment-contribution</artifactId>
       <scope>test</scope>
     </dependency>
@@ -65,17 +65,17 @@
          The api is a test dep so its package is system-exported (shared class for a typed
          awaitService); the grower/contributor bundles are located by their embed capability. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-startlevel-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-startlevel-grower</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-startlevel-contributor</artifactId>
       <scope>test</scope>
     </dependency>
@@ -83,32 +83,32 @@
          (typed awaitService + shared SealedBlob); the recipient/clean/smudge bundles are located by
          their embed capability (suite=cellar) and installed by the test. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-cellar-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-cellar-recipient</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-cellar-recipient-late</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-cellar-clean</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-cellar-clean-static</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bench-cellar-smudge</artifactId>
       <scope>test</scope>
     </dependency>

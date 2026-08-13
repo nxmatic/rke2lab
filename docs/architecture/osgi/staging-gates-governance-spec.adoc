@@ -90,12 +90,12 @@ The other three gates judge a bundle's *exported* surface and read *signatures o
 (`ClassReader.SKIP_CODE`). `REALM_BOUNDARY` judges the *consumer* direction and must read *method
 bodies* — the drift it catches is `Severity.parse()`, an `invokestatic` inside a body, not a
 signature. It reads every referenced type (the constant pool's `CONSTANT_Class` entries + descriptors,
-the jdeps technique) and keeps only those under our root (`io.nxmatic.rke2lab.*` — same jurisdiction
+the jdeps technique) and keeps only those under our root (`io.seedmatic.rke2lab.*` — same jurisdiction
 filter as its twins; a reference to a JDK or jackson type is not ours to police).
 
 * *The forbidden set of the flat realm* — the union of `ourExportedPackages()` of every `isDomain()`
   bundle (model/edge/record) in the resolved set. For our drift this includes
-  `io.nxmatic.rke2lab.doctor.records`. A flat-realm class that references a type in that set leaks: the
+  `io.seedmatic.rke2lab.doctor.records`. A flat-realm class that references a type in that set leaks: the
   flat host classloader cannot load a bundle-only package at runtime (`NoClassDefFoundError`).
 * *The visible set of a bundle realm* — the bundle's own packages + its `Import-Package` (already read
   by `ResolvedBundle`) + the system packages. A bundle-realm class referencing one of OUR types
@@ -117,7 +117,7 @@ directory.
 ==== Dual-realm flat face — materialised on demand (was `DUAL_REALM_JUSTIFIED`)
 
 `DUPLICATE_REALM_CLASS` forbids a package from *accidentally* living in two realms; the dual-realm
-flat face is the *deliberate* case. A `Provide-Capability: io.nxmatic.rke2lab.embed; type=dual-realm`
+flat face is the *deliberate* case. A `Provide-Capability: io.seedmatic.rke2lab.embed; type=dual-realm`
 carrier is staged as a bundle AND *can* be kept flat host-side — its export legitimately lives in
 both realms (so `DUPLICATE_REALM_CLASS` exempts it). But "kept flat" is a property of the (carrier,
 exec-assembly) *pair*, not of the carrier alone: `manifests-ingress-contract` is consumed flat by
@@ -202,7 +202,7 @@ is the standing guarantee; a package opts a single gate down to `WARN`/`IGNORE` 
 ----
 @GovernedBy(StagingGate.SPEC_COVERAGE, EnforcementLevel.WARN)         // listed, build green
 @GovernedBy(StagingGate.INSTANCE_DISCIPLINE, EnforcementLevel.ERROR)  // breaks the build
-package io.nxmatic.rke2lab.netplan.contract;
+package io.seedmatic.rke2lab.netplan.contract;
 ----
 
 The annotations live in `osgi/domain-annotations` — a dependency-free bundle common to ALL domains,

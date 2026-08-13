@@ -1,8 +1,8 @@
 -include: ../../bundle-parent/annotations.bnd
 Import-Package: ${annotation-noimports}, *
-Bundle-SymbolicName: io.nxmatic.rke2lab.seed.broker.testkit
+Bundle-SymbolicName: io.seedmatic.rke2lab.seed.broker.testkit
 Export-Package: \
-    io.nxmatic.rke2lab.seed.broker.testkit
+    io.seedmatic.rke2lab.seed.broker.testkit
 # Our OWN dual-realm test-double library — the Cellar stand-ins (RefusingCellar, InMemoryCellar) used
 # BOTH flat (core modules' src/test unit tests) AND in-container (a -test fragment passenger like
 # doctor-core-test's InterventionIntakeTest, whose bnd emits an Import-Package for this package). A
@@ -11,4 +11,4 @@ Export-Package: \
 # a bundle (installed in-framework, exporting seed.broker.testkit) AND kept flat in the host. Its
 # types are NOT a seam surface (none crosses the String-only seed-broker seam), so DUPLICATE_REALM_CLASS
 # exempts it like every dual-realm library.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=dual-realm
+Provide-Capability: io.seedmatic.rke2lab.embed; type=dual-realm

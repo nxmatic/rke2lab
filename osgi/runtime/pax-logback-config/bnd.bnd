@@ -1,5 +1,5 @@
 -include: ../../bundle-parent/annotations.bnd
-Bundle-SymbolicName: io.nxmatic.rke2lab.osgi.runtime.logback
+Bundle-SymbolicName: io.seedmatic.rke2lab.osgi.runtime.logback
 
 # THE fragment header: attach to pax-logging-logback by its BSN, sharing its classloader. pax embeds
 # logback and its own internals but EXPORTS NO PACKAGE (its manifest carries no Export-Package), so a
@@ -19,4 +19,4 @@ Import-Package: !ch.qos.logback.*, ${annotation-noimports}, *
 # uber-jar. type=model (isDomain): a fragment loads on the BUNDLE side of the seam; it exports nothing,
 # so the leak-guard is moot — the classification only routes staging + install. Same shape as the
 # systemd-cdk8s-manifests fragment.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=pax-logback-config
+Provide-Capability: io.seedmatic.rke2lab.embed; type=model; model=pax-logback-config

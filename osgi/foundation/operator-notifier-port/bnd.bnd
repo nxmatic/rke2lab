@@ -1,0 +1,10 @@
+-include: ../../bundle-parent/annotations.bnd
+Import-Package: ${annotation-noimports}, *
+Bundle-SymbolicName: io.seedmatic.rke2lab.operator.notifier.port
+Export-Package: io.seedmatic.rke2lab.operator
+# type=contract — a cross-cutting FOUNDATION vocabulary (the OperatorNotifier verb), not a domain's.
+# Installed bundle-side and wired bundle-to-bundle so a scenario can @OsgiService-inject the port; NOT
+# a seam (the operator contact is made in-container, never host-side). Belongs to no domain, so it
+# lives in foundation alongside the seed-broker port. The contract-purity guard fails the build if
+# this bundle exports a concrete class — it exports only the interface.
+Provide-Capability: io.seedmatic.rke2lab.embed; type=contract

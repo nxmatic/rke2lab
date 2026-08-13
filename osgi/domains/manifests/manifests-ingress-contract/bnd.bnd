@@ -1,7 +1,7 @@
 -include: ../../../bundle-parent/annotations.bnd
 Import-Package: ${annotation-noimports}, *
-Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.ingress
-Export-Package: io.nxmatic.rke2lab.manifests.ingress
+Bundle-SymbolicName: io.seedmatic.rke2lab.manifests.ingress
+Export-Package: io.seedmatic.rke2lab.manifests.ingress
 # type=dual-realm — the manifests domain's dual-realm host face: the version pins BOTH realms
 # genuinely consume. ComponentVersions is the single source of truth for the bootstrap-layer
 # component versions: OSGi-side the manifest units read it through the synthesis context; host-side
@@ -19,4 +19,4 @@ Export-Package: io.nxmatic.rke2lab.manifests.ingress
 # is machine-enforced. ComponentVersions qualifies: a pure String value record with a builder, zero
 # imports, manifests-owned, consumed on both sides. It carries no @Component, so it does NOT Require
 # the SCR extender.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=dual-realm
+Provide-Capability: io.seedmatic.rke2lab.embed; type=dual-realm

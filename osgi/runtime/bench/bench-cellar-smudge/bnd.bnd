@@ -1,2 +1,2 @@
-Bundle-SymbolicName: io.nxmatic.rke2lab.benchcellar.smudge
-Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=cellar; role=smudge
+Bundle-SymbolicName: io.seedmatic.rke2lab.benchcellar.smudge
+Provide-Capability: io.seedmatic.rke2lab.embed; type=fixture; suite=cellar; role=smudge

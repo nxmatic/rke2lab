@@ -1,2 +1,2 @@
-Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.scr.api
-Export-Package: io.nxmatic.rke2lab.osgibench.scr
+Bundle-SymbolicName: io.seedmatic.rke2lab.osgibench.scr.api
+Export-Package: io.seedmatic.rke2lab.osgibench.scr

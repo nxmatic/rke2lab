@@ -21,11 +21,11 @@ confirmed.
    `launcher`; renamed to `framework-launcher` (2026-07-05) when the sibling `engine` →
    `scenario-engine` rename made both leaf names domain-specific rather than generic — the
    directory is `osgi/runtime/framework-launcher/`, artifactId `framework-launcher`, package
-   `io.nxmatic.rke2lab.osgi.runtime.framework`, and the 3 exec consumers (seed-master,
+   `io.seedmatic.rke2lab.osgi.runtime.framework`, and the 3 exec consumers (seed-master,
    manifests-cli, netplan-cli) depend on `framework-launcher`.
 
 2. **jGiven lives in its OWN bundle `osgi/runtime/jgiven-wrap` — never folded into scenario-engine**.
-   The wrap (BSN `io.nxmatic.rke2lab.jgiven.wrap`) exports `com.tngtech.jgiven.*`; scenario-engine
+   The wrap (BSN `io.seedmatic.rke2lab.jgiven.wrap`) exports `com.tngtech.jgiven.*`; scenario-engine
    depends on it, does NOT re-export it. Two rules this encodes:
    * *Do not merge jGiven's export into scenario-engine.* scenario-engine is dual-realm (base package
      host-flat, `.container` in-container). Re-exporting jGiven there forces jGiven's whole tail (guava,
@@ -33,7 +33,7 @@ confirmed.
      runner-only world that never plays a scenario. A single-responsibility wrap, installed only where
      jGiven is actually used, keeps those worlds clean.
    * *The synthesis grammar never carries jGiven.* The fluent-synthesis grammar is internal to
-     `manifests-core` (`io.nxmatic.rke2lab.manifests.internal.synthesis`, un-exported) and jGiven-free
+     `manifests-core` (`io.seedmatic.rke2lab.manifests.internal.synthesis`, un-exported) and jGiven-free
      by construction; putting `com.tngtech.jgiven.*` on any exported package would place jGiven in two
      realms → LinkageError. Keeping jGiven a separate bundle is what makes that impossible by
      construction.
@@ -440,7 +440,7 @@ dans le transport, pas dans le port.
 ====
 
 Empreinte du renommage (mesurée — c'est une spec, non exécutée) : au-delà du
-dossier, le package `io.nxmatic.rke2lab.gateway.port` → `…world.gateway.port`
+dossier, le package `io.seedmatic.rke2lab.gateway.port` → `…world.gateway.port`
 (8 types : `Document`, `Coordinate`, `Domain`, `Action`, `SymptomKind`,
 `ReadinessAuthority`, `GatewayCatalog`→`SeedBrokerCatalog`, `package-info`) et
 ~11 fichiers consommateurs (doctor-core/-port/-test, exec/seed-master) suivent le

@@ -64,7 +64,7 @@ world-of-residence differs.
   low-level contact types.
 |===
 
-What lives in `host/pulumi-edge` (package `io.nxmatic.rke2lab.pulumi.edge`):
+What lives in `host/pulumi-edge` (package `io.seedmatic.rke2lab.pulumi.edge`):
 
 * *Low-level contact* — `StackHandle`, `StackHistory`, `StackSnapshot`, `StackCheckpoint`,
   `PulumiBackendLayout`, and the `Stack*Exception` family. The single place that knows the on-disk

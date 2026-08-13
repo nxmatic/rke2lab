@@ -39,7 +39,7 @@ host consumes it as a *flat jar*. Location and realm are independent axes — th
 `scenario-engine` (`osgi/runtime/`): *a bundle is a superset of a plain jar*, and the split is by PACKAGE,
 not by module.
 
-* *One artifact, one BSN* (`io.nxmatic.rke2lab.osgi.foundation.seed.bdd`), both a bundle and a plain jar.
+* *One artifact, one BSN* (`io.seedmatic.rke2lab.osgi.foundation.seed.bdd`), both a bundle and a plain jar.
 * *The SOW half IS exported* (`seed.bdd.sow` — `Gardening`). The open gardening is an INSTANCE holding
   the live connection + the gardener (the `SeedBroker`), and it knows how to sow: `gardening.sow(soil)`
   grows that soil's scenario through the gardener and reaps the runbook. Sowing is REALM-AGNOSTIC: the

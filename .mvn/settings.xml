@@ -36,17 +36,17 @@
       <password>${env.GH_TOKEN}</password>
     </server>
     <server>
-      <id>github-nxmatic-rke2lab</id>
+      <id>github-seedmatic-rke2lab</id>
       <username>nxmatic</username>
       <password>${env.GH_TOKEN}</password>
     </server>
     <server>
-      <id>github-nxmatic-java-systemd</id>
+      <id>github-seedmatic-java-systemd</id>
       <username>nxmatic</username>
       <password>${env.GH_TOKEN}</password>
     </server>
     <server>
-      <id>github-nxmatic-java-bbox-api-client</id>
+      <id>github-seedmatic-java-bbox-api-client</id>
       <username>nxmatic</username>
       <password>${env.GH_TOKEN}</password>
     </server>

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../bundle-parent/pom.xml</relativePath>
@@ -26,27 +26,27 @@
          a RunbookCoordinate(soil); the Cellar stages carry a Parcel/SeedEnvelope. The arrow runs
          FROM seed-bdd TO the seam — depending on it, never entering it. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The host's own codec: the sow-and-graft caller reads the reaped RunbookEnvelope
          GENERICALLY (JsonNode → the "runbook" field), never a domain wire-record. Shaded flat into
          the host classpath, binding to the host's flat jackson. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <!-- The flirt-level mechanics the stages compose: ScenarioGraft (rebuild + graftUnder) and the
          OsgiConnection socle the world-opening stage attaches to. seed-bdd SPEAKS gardening in its
          step titles and calls the engine's neutral mechanics underneath. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
     <!-- The launcher boot the world-opening stage drives (OsgiConnection.embedded() →
          FrameworkLaunch.embedded()). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
 

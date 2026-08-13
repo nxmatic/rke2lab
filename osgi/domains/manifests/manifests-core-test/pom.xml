@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-test-parent/pom.xml</relativePath>
@@ -28,14 +28,14 @@
     <!-- compile the actor tests white-box against the host (provided: the fragment is pure test
          bytecode that resolves against the manifests-core host at runtime). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
       <scope>provided</scope>
     </dependency>
 
     <!-- the value vocabulary the tests speak (ManifestExplodeRequest/Result, ManifestAnnotations) -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -45,19 +45,19 @@
          installImportClosureOf can stage them — the closure walk locates bundles by classpath, and
          without a provider of seed.broker.port the whole manifests-core graph fails to resolve. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- the fragment's src/main entry names the in-container runner (JUnitLauncherCore/
          InContainerJUnitRunner) directly; provided — resolved through the manifests-core host. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -66,7 +66,7 @@
          exporter is this wrap bundle. Without it the whole synthesis graph fails to resolve. The
          jgiven-wrap treatment, for the shape engine (mirrors manifests-bdd-test). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>victools-wrap</artifactId>
       <scope>test</scope>
     </dependency>
@@ -85,12 +85,12 @@
     <!-- the src/test harness boots Felix via JGivenTestkit.felix() and installs the JUnit + jGiven
          bundle worlds by classpath substring, so they must be on the TEST classpath. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>test</scope>
     </dependency>
@@ -106,17 +106,17 @@
          third-party OSGi bundles (jackson stack, snakeyaml, commons-*). All test-scope: the probe
          installFromClasspath()s them by BSN. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
       <scope>test</scope>
     </dependency>

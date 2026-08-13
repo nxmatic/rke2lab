@@ -82,7 +82,7 @@ never a hand-list"). The rule:
 
 ____
 A *realm library* is a third-party OSGi bundle (carries a `Bundle-SymbolicName`, is not under
-`io.nxmatic.rke2lab.*`, is not the framework launcher, and is not a `type=seam` carrier) whose
+`io.seedmatic.rke2lab.*`, is not the framework launcher, and is not a `type=seam` carrier) whose
 package is imported by a `model`/`edge`/`record` bundle. A realm library is *staged as a bundle*
 (the OSGi world loads its own copy) AND *kept flat* where the host imports it (the host loads its own
 copy on the JCL).

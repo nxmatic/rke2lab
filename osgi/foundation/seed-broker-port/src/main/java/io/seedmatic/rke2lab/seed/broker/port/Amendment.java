@@ -1,0 +1,62 @@
+package io.seedmatic.rke2lab.seed.broker.port;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Marks an INPUT wire-record component as an AMENDMENT — a growth-need the soil (a domain)
+ * declares, that the gardener (host) fills from its provisioning state before it sows. The AMONT
+ * twin of {@link Scion}: a scion is a reaped part a domain marks by its neutral {@link Role} so the
+ * host affixes it without learning the field name; an amendment is a needed input a domain marks by
+ * its neutral role so the host FILLS it without learning the field name. They meet on the role —
+ * never on the other's field or state name.
+ *
+ * <p>Its {@link #value} is the amendment's ROLE, drawn from the neutral vocabulary held here as
+ * String constants ({@link #SOIL}, {@link #FACET}) — the amont twin of {@link Role} (fruit /
+ * sowing), a single source so no call site spells a role as a magic string. String constants (not
+ * an enum) so a role is usable as an annotation element ({@code @Amendment(Amendment.SOIL)} — an
+ * annotation value must be a constant expression). A domain maps its input components onto these:
+ * {@code @Amendment(Amendment.SOIL)} on the materialisation-root component,
+ * {@code @Amendment(Amendment.FACET)} on the activation facet; the host maps its state onto the
+ * same role ("fill {@code SOIL} with the plot I materialise into"), never the domain's field name.
+ *
+ * <p>The SHAPE of the payload is projected separately by the {@link ShapeCoordinate} reflector (the
+ * JSON Schema of the {@code @SeedContract} wire-record); the schema says the FORM, this annotation
+ * says WHICH of the host's states fills each field — the mapping the schema alone cannot carry (a
+ * schema knows nothing of the host's provisioning topology). See
+ * docs/architecture/osgi/seed-broker-spec.adoc (§ @Amendment) and the gardening lexicon (amendement
+ * / amender).
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.RECORD_COMPONENT)
+public @interface Amendment {
+
+  /** The plot the soil materialises into — the host fills it from its provisioning paths. */
+  String SOIL = "soil";
+
+  /** The activation facet the sow carries — the host fills it from the run's policy. */
+  String FACET = "facet";
+
+  /**
+   * The identity provisioning coordinates — the flat scalars (identity root, cluster, node,
+   * automount) the host holds and a domain needs to RECONSTRUCT the provisioning topology in-world.
+   * The host fills it from its {@code BootstrapConfig}; the scion computes its own paths from it (§
+   * host-cellar-realisation, the whole topology is computed OSGi-side).
+   */
+  String IDENTITY = "identity";
+
+  /**
+   * The seed-image build coordinates — the flat scalars (image alias, builder binary/host, shared
+   * artifact folder) the host holds and the incus scion needs to drive the image build and PROJECT
+   * the image view the host GROW actualises. The host fills it from its {@code BootstrapConfig};
+   * the scion folds the edge's {@code recipeDigest} with these into the {@code buildChecksum} and
+   * resolves the artifact paths (§ host-cellar-realisation, the scion-projects/host-actualises
+   * rule).
+   */
+  String IMAGE = "image";
+
+  /** The neutral gardening role of this amendment (e.g. {@link #SOIL}, {@link #FACET}). */
+  String value();
+}

@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>host-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../host-parent/pom.xml</relativePath>
@@ -26,14 +26,14 @@
          deserializes. Declared explicitly since pulumi-edge names these types itself, not just
          transitively through doctor-contract. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The document codec: the journals build/read seam Documents through the typed wire-contract
          (VisitWire, …) rather than hand-rolled jackson trees. Shaded flat into the host classpath,
          binding to the host's flat jackson (the same source is nested OSGi-side). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <dependency>

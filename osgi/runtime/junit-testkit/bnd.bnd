@@ -1,5 +1,5 @@
 -include: ../../bundle-parent/annotations.bnd
-Bundle-SymbolicName: io.nxmatic.rke2lab.junit.testkit
+Bundle-SymbolicName: io.seedmatic.rke2lab.junit.testkit
 
 # The runtime-playable machinery moved out: the jGiven-free JUnit-Platform runner (JUnitLauncherCore
 # + strategies + InContainerJUnitRunner) now lives in osgi/runtime/junit-launcher, the framework

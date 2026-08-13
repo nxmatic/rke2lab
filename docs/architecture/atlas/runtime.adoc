@@ -85,7 +85,7 @@ services from the SCR registry. The pieces:
   `pipeline-port` seam, then DISSOLVED: with the boot de-grammatised and the seed's own chains the last
   host holdout, manifests-core became its only OSGi consumer, so the engine relocated INTO manifests-core
   as un-exported internal synthesis (`Phase`/`PhaseRunner`/`PhaseFailure`,
-  `io.nxmatic.rke2lab.manifests.internal.synthesis`) — no shared seam. The three copied
+  `io.seedmatic.rke2lab.manifests.internal.synthesis`) — no shared seam. The three copied
   `bootEmbeddedOsgiRuntime()` were NOT collapsed into a `SeedRuntime` seam (an earlier design) but
   DISSOLVED by the boot decomposition (link:../osgi/osgi-boot-decomposition-spec.adoc[boot
   decomposition]): the pure decision `BootPlanner` → `BootPlan` told apart from the effectful

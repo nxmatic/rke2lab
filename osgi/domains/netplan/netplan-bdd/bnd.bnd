@@ -1,11 +1,11 @@
 -include: ../../../bundle-parent/annotations.bnd
-Bundle-SymbolicName: io.nxmatic.rke2lab.netplan.bdd
+Bundle-SymbolicName: io.seedmatic.rke2lab.netplan.bdd
 
 # A type=model embeddable bundle (scanned + installed under META-INF/bundles by the
-# io.nxmatic.rke2lab.embed capability, like manifests-bdd). It is isDomain, so StagingClosure stages
+# io.seedmatic.rke2lab.embed capability, like manifests-bdd). It is isDomain, so StagingClosure stages
 # its import closure — this is how jgiven-wrap (com.tngtech.jgiven.*) and its tail enter the LIVE
 # world: pulled by THIS bundle's imports, not by a hand-listed staging entry.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=netplan-bdd
+Provide-Capability: io.seedmatic.rke2lab.embed; type=model; model=netplan-bdd
 
 # No Export-Package: the scenario class is not shared. The launcher plays it by class-selection; the
 # host grafts its serialized ScenarioModel. The class never crosses a realm boundary.

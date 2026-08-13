@@ -11,8 +11,8 @@ focused companions; see <<related-documentation>>.
 
 [NOTE]
 ====
-**Java package**: all code referenced here lives under `io.nxmatic.rke2lab.manifests`
-(directory `manifests/src/main/java/io/nxmatic/rke2lab/manifests/`). Units live in
+**Java package**: all code referenced here lives under `io.seedmatic.rke2lab.manifests`
+(directory `manifests/src/main/java/io/seedmatic/rke2lab/manifests/`). Units live in
 `units/<domain>/`, the node-environment SPI in `node/`.
 ====
 
@@ -362,14 +362,14 @@ graph LR
 
 | `ManifestExplodeRequest`
 | Request record (`consolidatedManifestFile`, `explodedTargetDir`). The domain/package come from the
-  `io.nxmatic.rke2lab/domain` + `/package` annotations stamped on each resource; the order prefix is
+  `io.seedmatic.rke2lab/domain` + `/package` annotations stamped on each resource; the order prefix is
   kind-derived (`00-` CRDs, `01-` other cluster-scoped, `02-` namespace-scoped).
 
 | `ManifestExplodeResult`
 | Result record for `explode(...)`: the `explodedTargetDir` and the `List<Path>` of files written.
 
 | `ManifestAnnotations`
-| The metadata annotation constants (`io.nxmatic.rke2lab/domain`, `/package`, …) that enable
+| The metadata annotation constants (`io.seedmatic.rke2lab/domain`, `/package`, …) that enable
   exploding — the stamp every emitted resource carries so the explode step can bucket it.
 
 | `ManifestDocumentService`
@@ -755,11 +755,11 @@ domains. The error names both units and both domains.
 Each manifests package carries a `package-info.java` with a short architecture overview and links
 back to this doc — read them next to the code in your IDE. Start points:
 
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/package-info.java[manifests/] — the SPI core (this module's entry point)
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/package-info.java[domain/] — the per-concern `ManifestsDomainRegistrar`s
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/node/package-info.java[node/] — the node environment context
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/profiles/package-info.java[profiles/] — the immutable context records
-* `units/<domain>/` — one overview per domain: link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/networking/package-info.java[networking], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/package-info.java[gitops], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[clusterapi], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/mesh/package-info.java[mesh], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/storage/package-info.java[storage], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/platform/package-info.java[platform], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/cicd/package-info.java[cicd], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/ha/package-info.java[ha], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/cluster/package-info.java[cluster], link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/runtime/package-info.java[runtime]
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/package-info.java[manifests/] — the SPI core (this module's entry point)
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/package-info.java[domain/] — the per-concern `ManifestsDomainRegistrar`s
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/node/package-info.java[node/] — the node environment context
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/profiles/package-info.java[profiles/] — the immutable context records
+* `units/<domain>/` — one overview per domain: link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/networking/package-info.java[networking], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[gitops], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[clusterapi], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/mesh/package-info.java[mesh], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/storage/package-info.java[storage], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/platform/package-info.java[platform], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/cicd/package-info.java[cicd], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/ha/package-info.java[ha], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/cluster/package-info.java[cluster], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/runtime/package-info.java[runtime]
 
 [[related-documentation]]
 == Related Documentation
@@ -779,7 +779,7 @@ back to this doc — read them next to the code in your IDE. Start points:
   infrastructure identity from context
 * link:../bdd/bdd.adoc[BDD-as-engine] — the seeding expressed as jGiven scenarios on the JUnit
   launcher
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java]
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java]
   — the synthesis orchestrator
-* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
+* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
   — the unit interface

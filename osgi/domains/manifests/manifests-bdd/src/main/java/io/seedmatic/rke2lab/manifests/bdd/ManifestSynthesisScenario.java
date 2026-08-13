@@ -1,0 +1,447 @@
+package io.seedmatic.rke2lab.manifests.bdd;
+
+import com.tngtech.jgiven.Stage;
+import com.tngtech.jgiven.annotation.ExpectedScenarioState;
+import com.tngtech.jgiven.annotation.Hidden;
+import com.tngtech.jgiven.annotation.ProvidedScenarioState;
+import com.tngtech.jgiven.base.ScenarioTestBase;
+import com.tngtech.jgiven.impl.Scenario;
+import io.seedmatic.rke2lab.auth.contract.AuthCoordinate;
+import io.seedmatic.rke2lab.auth.contract.GithubToken;
+import io.seedmatic.rke2lab.manifests.bdd.versions.GitBotIdentities;
+import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
+import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
+import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
+import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisService;
+import io.seedmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
+import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
+import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.seedmatic.rke2lab.seed.broker.port.Parcel;
+import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.seedmatic.rke2lab.worktree.GitIdentity;
+import io.seedmatic.rke2lab.worktree.LinkedWorktree;
+import io.seedmatic.rke2lab.worktree.RenderedBranch;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+/**
+ * The manifests synthesis scenario, a production jGiven scenario told in the MANIFESTS DOMAIN's own
+ * vocabulary — the operator's activation facet ({@link ManifestsRunbookInput}: which layers
+ * publish, which debug) translated into the synthesis input and materialised, no host/Pulumi type.
+ * Played IN-CONTAINER by the engine so the runbook shows a real node of the OSGi world; it is the
+ * fifth scion, on the trio pattern the four contact scions share, with the differences its nature
+ * forces (see docs/architecture/osgi/manifests-bdd-spec.adoc § what makes it different): it
+ * synthesises + materialises rather than probing a live system, it READS its trigger (the others
+ * ignore theirs), and it consults no doctor (a synthesis failure is a build defect, not a symptom).
+ *
+ * <p>The WHEN stage is the transposition of {@code HostSlotManifest.Builder.policy()} — the
+ * projection the incus-bootstrap demolition orphaned — now OSGi-side: from the facet it derives the
+ * {@link ManifestDomainPolicy} (synth-time filter), owning the {@link ManifestDomainCatalog}. So
+ * the control-plane policy is reactivated INSIDE synthesis: the {@link ManifestSynthesisRequest}
+ * carries it, and — threaded into the env-config unit — the {@code PublishNodeEnvContributor}
+ * synthesises the {@code RKE2LAB_MANIFESTS_PUBLISH_*} env section the master's install/ready
+ * scripts read (a normal ConfigMap, no out-of-band overlay) — invisible at the master frontier.
+ *
+ * <p>Its collaborator is INJECTED from its OWN bundle's registry by the {@link OsgiService} bridge:
+ * the {@link ManifestSynthesisService} (the SCR-published synthesis; the env-config synthesis and
+ * its {@code PublishNodeEnvContributor} run inside it). MODE-BLIND — it injects no run gate:
+ * manifests is a pure FS materialiser with no live touch (no {@code Cultivating}/{@code Surveying}
+ * pair), so it runs identically in both modes; the materialisation target is carried by the SOIL
+ * amendment alone (the real tree when the host amended a plot, a temp dir for a bare survey), and
+ * rendering the run PENDING under a surveying gate is the frontier's business (the engine's survey
+ * executor), not the scenario's. The activation facet is seeded by the front-door via the inbound
+ * {@link #INPUT} channel and received here ({@link InputReceiver}) before the play; the outbound
+ * {@code ScenarioOutcome} channel harvests the played runbook.
+ */
+@SeedScenario
+public class ManifestSynthesisScenario
+    extends ScenarioTestBase<
+        ManifestSynthesisScenario.Given,
+        ManifestSynthesisScenario.When,
+        ManifestSynthesisScenario.Then>
+    implements InputReceiver<ManifestsRunbookInput>,
+        CellarReceiver<ScenarioCellar>,
+        ScenarioPlayer.Playable {
+
+  private static final ManifestDomainCatalog CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+
+  /**
+   * The inbound channel the runbook handler ({@code ManifestsRunbookHandler.seedFrom}) seeds the
+   * {@link ManifestsRunbookInput} facet through and this scenario receives it from (via {@link
+   * InputReceiver}). Single-sourced here — the receiver owns the key + type — and referenced by the
+   * handler for the seeding end ({@code INPUT.into(facet)}). Registered as a {@link
+   * RegisterExtension} so its {@code TestInstancePostProcessor} fires before the body reads {@link
+   * #input}.
+   */
+  @RegisterExtension
+  public static final ScenarioInputSeed<ManifestsRunbookInput> INPUT =
+      new ScenarioInputSeed<>(ManifestsRunbookInput.class, "manifests-runbook-input");
+
+  private final Scenario<Given, When, Then> scenario = createScenario();
+
+  // The activation facet the front-door seeds before the body (InputReceiver) — the operator's
+  // choice (which layers publish, which debug) the WHEN translates. @MonotonicNonNull: null until
+  // receiveInput sets it (before the body), then read.
+  @MonotonicNonNull private ManifestsRunbookInput input;
+
+  // The shared in-container cellar (injected by ScenarioCellarExtension before the body) + the
+  // current plot — the seam through which the sealed admin-credentials case the seal scion filed is
+  // revealed (decoded into OperatorPkiMaterial via a neutral wire coordinate), in-container, never
+  // crossing the host membrane.
+  @MonotonicNonNull private ScenarioCellar cellar;
+
+  // await=false: the parcel is genuinely OPTIONAL — a bare survey or a run before the seal filed
+  // has
+  // none, and revealOperatorPki() guards on parcel.isEmpty() for exactly that. A required (await)
+  // injection would contradict that guard, throwing before the body on any parcel-less play.
+  @OsgiService(await = false)
+  private Optional<Parcel> parcel = Optional.empty();
+
+  // The rendered-branch delivery seam and the ndh key-store, both OPTIONAL (await=false): a bare
+  // survey / the standalone manifests-cli renders into a temp dir with no branch and no signature,
+  // so
+  // absence is honest — the render still materialises, only the git delivery is skipped. Present in
+  // a
+  // provisioning run (worktree-core + ndh-core embedded), where the render lands in the linked
+  // worktree the GROW mounts and is sealed with a signed commit.
+  @OsgiService(await = false)
+  private Optional<RenderedBranch> renderedBranch = Optional.empty();
+
+  @OsgiService(await = false)
+  private Optional<NdhKeystoreReader> keystore = Optional.empty();
+
+  @Override
+  public Scenario<Given, When, Then> getScenario() {
+    return scenario;
+  }
+
+  @Override
+  public void receiveInput(ManifestsRunbookInput input) {
+    this.input = input;
+  }
+
+  @Override
+  public void receiveCellar(ScenarioCellar cellar) {
+    this.cellar = cellar;
+  }
+
+  // Reveal the operator's admin PKI straight into the manifests-side OperatorPkiMaterial: its three
+  // PEM fields mirror the cluster-pki AdminCredentials record exactly, so the codec's structural
+  // decode reads the sealed case 1:1. Addressed by the NEUTRAL wire coordinate (see
+  // ClusterPkiCase),
+  // so no cluster-pki type is ever touched and manifests-bdd carries no cluster-pki-contract
+  // dependency — the standalone manifests-cli assembly never drags that domain's dual-realm flat
+  // copy. Empty when no cellar/plot (a bare survey) or the seal has not filed yet.
+  private Optional<OperatorPkiMaterial> revealOperatorPki() {
+    if (cellar == null || parcel.isEmpty()) {
+      return Optional.empty();
+    }
+    return cellar.fetch(
+        parcel.orElseThrow(), ClusterPkiCase.ADMIN_CREDENTIALS, OperatorPkiMaterial.class);
+  }
+
+  private static final String TAILNET_AUTHORITY = "mammoth-skate";
+  private static final String SIGNING_KEY = "github-signing";
+  private static final String RENDER_TOOL = "manifests-render";
+  private static final String BRANCH_PREFIX = "manifests/";
+
+  /**
+   * Prepare the rendered-branch worktree for THIS run's cluster — an orphan linked worktree at the
+   * SOIL path on branch {@code manifests/<cluster>}, into which the synthesis materialises the
+   * rendered tree (the GROW then mounts this worktree). Present only when the delivery seam is
+   * reachable (a provisioning run) AND the host amended a SOIL plot AND the cluster identity is
+   * known; a bare survey / the standalone CLI leaves it empty and the synthesis falls back to a
+   * temp dir, with no branch and no commit.
+   */
+  private Optional<LinkedWorktree> prepareRenderWorktree(ManifestsRunbookInput facet) {
+    if (renderedBranch.isEmpty()
+        || facet.materializationRoot().isEmpty()
+        || facet.identity().isEmpty()) {
+      return Optional.empty();
+    }
+    final String cluster = facet.identity().orElseThrow().clusterId();
+    final Path worktreePath =
+        Path.of(facet.materializationRoot().orElseThrow()).toAbsolutePath().normalize();
+    return Optional.of(renderedBranch.orElseThrow().prepare(worktreePath, BRANCH_PREFIX + cluster));
+  }
+
+  /**
+   * The delivery plan for a prepared worktree — the bot identity + signing key the rendered commit
+   * carries, whether the operator armed the push, and (only then) the revealed GitHub token. Empty
+   * when there is no worktree (a survey / CLI render). The commit is ALWAYS signed as the rke2lab
+   * bot; the force-push is opt-in ({@code rke2lab:manifests:push}, default off) and needs the
+   * sealed token.
+   */
+  private Optional<Delivery> deliveryPlan(
+      ManifestsRunbookInput facet, Optional<LinkedWorktree> rendered) {
+    if (rendered.isEmpty()) {
+      return Optional.empty();
+    }
+    final NdhKeystoreReader ks =
+        keystore.orElseThrow(
+            () -> new IllegalStateException("no ndh key-store — cannot sign the rendered commit"));
+    final String cluster = facet.identity().orElseThrow().clusterId();
+    final GitIdentity bot =
+        new GitBotIdentities(ks.authorityDomain(TAILNET_AUTHORITY)).forTool(RENDER_TOOL);
+    final boolean push = facet.facets().delivery().push();
+    final Optional<String> token = push ? revealGithubToken() : Optional.empty();
+    return Optional.of(
+        new Delivery(
+            "render " + cluster + " manifests", bot, ks.sshPrivate(SIGNING_KEY), push, token));
+  }
+
+  /**
+   * The GitHub token the auth-seal filed SEALED, revealed from the cellar for a force-push. Empty
+   * when no cellar/plot (a survey) or the seal did not run (no gh session) — the push is then
+   * simply skipped. Reads {@link AuthCoordinate#GITHUB_TOKEN} directly (manifests-bdd already
+   * depends on auth-contract for the version bumper).
+   */
+  private Optional<String> revealGithubToken() {
+    if (cellar == null || parcel.isEmpty()) {
+      return Optional.empty();
+    }
+    return cellar
+        .fetch(parcel.orElseThrow(), AuthCoordinate.GITHUB_TOKEN, GithubToken.class)
+        .map(GithubToken::token);
+  }
+
+  /** The rendered-branch delivery plan carried from the scenario into the THEN. */
+  private record Delivery(
+      String message,
+      GitIdentity identity,
+      String signingKey,
+      boolean push,
+      Optional<String> token) {}
+
+  /**
+   * The cluster-pki seal's {@code admin-credentials} cellar case, addressed by its NEUTRAL wire
+   * coordinate so the manifests realm reveals it without a compile link to {@code
+   * cluster-pki-contract}. Naming that domain's {@code ClusterPkiCoordinate} enum would drag its
+   * {@code type=dual-realm} flat copy into the standalone {@code manifests-cli} assembly — a dead
+   * flat copy the staging gate rightly flags. The membrane speaks slugs; the {@code slug}/{@code
+   * domain} here MUST match {@code ClusterPkiCoordinate.ADMIN_CREDENTIALS}. This is the one place
+   * the manifests realm knows that cross-realm wire name (the cellar matches a read case by slug).
+   */
+  private enum ClusterPkiCase implements SeedCoordinate {
+    ADMIN_CREDENTIALS;
+
+    @Override
+    public String slug() {
+      return "admin-credentials";
+    }
+
+    @Override
+    public String domain() {
+      return "cluster-pki";
+    }
+  }
+
+  @Test
+  void the_manifests_are_synthesized_from_the_activation_facet() {
+    final ManifestsRunbookInput facet =
+        Objects.requireNonNull(input, "the activation facet was not seeded before the body");
+    // Prepare the rendered-branch worktree (a provisioning run) — the synthesis materialises INTO
+    // it, and the THEN seals + delivers it. Empty for a bare survey / the standalone CLI: the
+    // synthesis then falls back to a temp dir with no branch, and the delivery THEN is a no-op.
+    final Optional<LinkedWorktree> rendered = prepareRenderWorktree(facet);
+    given().the_activation_facet(facet);
+    when()
+        .the_policy_is_derived_from_the_facet()
+        .and()
+        .the_manifests_are_synthesized(revealOperatorPki(), rendered);
+    then()
+        .every_enabled_domain_produced_its_units()
+        .and()
+        .the_manifests_file_is_written()
+        .and()
+        .the_rendered_branch_is_delivered(rendered, deliveryPlan(facet, rendered));
+  }
+
+  /** Given: the activation facet and the synthesis collaborators. */
+  public static class Given extends Stage<Given> {
+
+    @ProvidedScenarioState ManifestsRunbookInput facet;
+
+    @Hidden
+    public Given the_activation_facet(ManifestsRunbookInput facet) {
+      this.facet = facet;
+      return self();
+    }
+  }
+
+  /**
+   * When: the transposition of {@code HostSlotManifest.Builder.policy()}. Derives the {@link
+   * ManifestDomainPolicy} + {@link FloxDebugPolicy} from the facet and synthesises. The policy
+   * drives the synth-time domain filter (which layers synthesise). Mode-blind: the materialisation
+   * target follows the SOIL amendment alone (a temp dir here), never a run gate.
+   */
+  public static class When extends Stage<When> {
+
+    @ExpectedScenarioState ManifestsRunbookInput facet;
+
+    // Injected straight from the bundle registry by the @OsgiService bridge (the stage creator) —
+    // not threaded from the scenario through the Given as a step param.
+    @OsgiService private Optional<ManifestSynthesisService> synthesis = Optional.empty();
+
+    @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
+    @ProvidedScenarioState ManifestSynthesisResult result;
+
+    public When the_policy_is_derived_from_the_facet() {
+      final ManifestsRunbookInput.PublishFacet publish = facet.facets().publish();
+      // The one policy the run carries: base infra (cluster/runtime/platform) always on; the rest
+      // follow the facet. It drives the synth-time domain filter (which layers synthesise).
+      this.domainPolicy =
+          ManifestDomainPolicy.builder()
+              .domainCatalog(CATALOG)
+              .stageADefaults()
+              .cluster(true)
+              .runtime(true)
+              .platform(true)
+              .gitops(publish.gitops())
+              .networking(publish.networking())
+              .storage(publish.storage())
+              .mesh(publish.mesh())
+              .highAvailability(publish.highAvailability())
+              .cicd(publish.cicd())
+              .clusterApi(publish.clusterApi())
+              .build();
+      return self();
+    }
+
+    public When the_manifests_are_synthesized(
+        @Hidden Optional<OperatorPkiMaterial> operatorPki,
+        @Hidden Optional<LinkedWorktree> rendered) {
+      final ManifestsRunbookInput.DebugFacet debug = facet.facets().debug();
+      final FloxDebugPolicy floxDebug =
+          new FloxDebugPolicy(
+              debug.mesh().enabled(),
+              debug.networking().enabled(),
+              debug.nriPlugins().flox().enabled());
+      // Materialise INTO the rendered-branch worktree when one was prepared (a provisioning run —
+      // the GROW mounts it and the THEN seals + delivers it), else a temp dir (a survey / the
+      // standalone CLI). Mode-blind: whether the run is a survey is the frontier's business.
+      final Path root = rendered.map(LinkedWorktree::path).orElseGet(this::freshTempDir);
+      // manifests.yaml is the INTERMEDIATE aggregate, not part of the mounted/checksummed tree — it
+      // sits a level ABOVE the synthesis root (sibling of rke2-manifests.d), so the staging replica
+      // the scion checksums holds only the manifest units, never the merged file. Falls back into
+      // the root when the SOIL is a bare temp dir with no usable parent.
+      final Path parent = root.getParent();
+      final Path manifestFile = (parent == null ? root : parent).resolve("manifests.yaml");
+      final ManifestSynthesisRequest.Builder builder =
+          ManifestSynthesisRequest.builder(root, manifestFile)
+              .manifestDomainPolicy(java.util.Optional.of(domainPolicy))
+              .floxDebugPolicy(floxDebug);
+      // The cross-frontier identity view: reaped ONCE at this scion via the WORKTREE amendment,
+      // then
+      // handed to synthesis on the request — the synthesis root threads one NodeEnvContext derived
+      // from it to every unit. Absent (a bare survey / no worktree amended) → the request keeps its
+      // unknown identity and the synthesis renders a clearly-blank cluster.
+      facet
+          .identity()
+          .ifPresent(
+              w ->
+                  builder.bootstrapIdentity(
+                      BootstrapIdentity.builder()
+                          .clusterName(w.clusterName())
+                          .nodeName(w.nodeName())
+                          .build()));
+      // The operator PKI revealed from the cellar (empty on a bare survey / before the seal filed):
+      // the kubeconfig unit renders the operator + CAPI kubeconfigs from it, or nothing.
+      builder.operatorPki(operatorPki);
+      final ManifestSynthesisRequest request = builder.build();
+      try {
+        this.result = synthesis.orElseThrow().synthesize(request);
+      } catch (IOException ex) {
+        throw new UncheckedIOException("manifests synthesis failed", ex);
+      }
+      return self();
+    }
+
+    private Path freshTempDir() {
+      try {
+        return Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
+      } catch (IOException ex) {
+        throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+      }
+    }
+  }
+
+  /**
+   * Then: the two ends landed. Every enabled domain produced units (the synth-time filter); the
+   * materialised tree is complete (manifest file exists, hit count &gt; 0); and the synthesised
+   * manifests carry the publish env section ({@code RKE2LAB_MANIFESTS_PUBLISH_*}) — what the
+   * master's scripts read.
+   */
+  public static class Then extends Stage<Then> {
+
+    @ExpectedScenarioState ManifestDomainPolicy domainPolicy;
+    @ExpectedScenarioState ManifestSynthesisResult result;
+
+    public Then every_enabled_domain_produced_its_units() {
+      final int enabled = domainPolicy.enabledDomainIds().size();
+      if (result.domainCount() < enabled) {
+        throw new ManifestSynthesisError(
+            "expected at least " + enabled + " synthesised domains, got " + result.domainCount(),
+            ManifestSynthesisError.Gap.DOMAIN_COUNT_SHORT,
+            result);
+      }
+      return self();
+    }
+
+    public Then the_manifests_file_is_written() {
+      if (!Files.exists(result.manifestFile())) {
+        throw new ManifestSynthesisError(
+            "manifest file was not written: " + result.manifestFile(),
+            ManifestSynthesisError.Gap.MANIFEST_FILE_MISSING,
+            result);
+      }
+      if (result.manifestUnitHitCount() <= 0) {
+        throw new ManifestSynthesisError(
+            "no manifest units were processed",
+            ManifestSynthesisError.Gap.NO_UNITS_PROCESSED,
+            result);
+      }
+      return self();
+    }
+
+    /**
+     * Seal + deliver the rendered branch: stage the whole rendered tree, commit it SIGNED as the
+     * rke2lab bot, and — only when the operator armed {@code rke2lab:manifests:push} and the sealed
+     * token was revealed — force-push {@code manifests/<cluster>} to origin. The worktree is NOT
+     * closed: it persists at the SOIL path for the GROW to mount. A no-op for a survey / CLI render
+     * (no worktree prepared) — the tree was materialised, nothing is delivered.
+     */
+    public Then the_rendered_branch_is_delivered(
+        @Hidden Optional<LinkedWorktree> rendered, @Hidden Optional<Delivery> delivery) {
+      if (rendered.isEmpty() || delivery.isEmpty()) {
+        return self();
+      }
+      final LinkedWorktree worktree = rendered.orElseThrow();
+      final Delivery plan = delivery.orElseThrow();
+      worktree.stageAll();
+      worktree.commit(plan.message(), plan.identity(), Optional.of(plan.signingKey()));
+      if (plan.push()) {
+        plan.token().ifPresent(worktree::push);
+      }
+      return self();
+    }
+  }
+}

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-test-parent/pom.xml</relativePath>
@@ -22,19 +22,19 @@
     <!-- The host under test: the materializer + BootstrapPaths logic. provided — the fragment is
          pure test bytecode that resolves against the incus-core host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-core</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The vocabulary the actor test speaks: BootstrapPaths (the slot roots it asserts on). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The manifests contract face of the co-resident world the in-container harness installs. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -42,12 +42,12 @@
     <!-- The seed-broker seam incus-core + manifests-core import (SeedHandler reflectors, codec). On
          the classpath so installImportClosureOf can stage the providers of seed.broker.port. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -55,7 +55,7 @@
          InContainerJUnitRunner) on the booted Felix; provided — both resolved through the incus-core
          host at runtime (same fragment pattern as incus-bdd-test). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -68,12 +68,12 @@
     <!-- The src/test harness boots Felix via ScenarioTestkit.felix() and installs the JUnit + jGiven
          bundle worlds by classpath substring, so they must be on the TEST classpath. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>test</scope>
     </dependency>
@@ -92,12 +92,12 @@
     <!-- incus-core's own runtime graph, installed as bundles in-container by the probe so the host
          resolves: the sibling contracts incus-core imports. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
       <scope>test</scope>
     </dependency>
@@ -112,27 +112,27 @@
          manifests-core-test stages (the cdk8s carrier + its systemd fragment, the sibling ports, the
          pipeline engine, unitrepo-core, the third-party OSGi bundles). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>victools-wrap</artifactId>
       <scope>test</scope>
     </dependency>

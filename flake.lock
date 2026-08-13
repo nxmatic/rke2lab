@@ -65346,13 +65346,13 @@
       "locked": {
         "lastModified": 1786257288,
         "narHash": "sha256-s7KXT3+D2kzfBvLLDRHz02BHr3FAyEHd8woc+nFG2+M=",
-        "owner": "nxmatic",
+        "owner": "seedmatic",
         "repo": "nix-flake-commons",
         "rev": "674c6d3497bebf050e815a7f5d7aaa52b6964b1e",
         "type": "github"
       },
       "original": {
-        "owner": "nxmatic",
+        "owner": "seedmatic",
         "ref": "develop",
         "repo": "nix-flake-commons",
         "type": "github"

@@ -249,5 +249,5 @@ parsed MAC strings, not a darwin derivation.
 
 * link:flake-build-entry-point.adoc[Flake as Build Entry Point] — the broader
   move to store-built, flake-sourced artifacts this complements.
-* link:../../../osgi/domains/netplan/netplan-contract/src/main/java/io/nxmatic/rke2lab/netplan/contract/ClusterNetworkBlueprint.java[ClusterNetworkBlueprint.java] — the Java source of truth (a `type=contract` bundle record).
+* link:../../../osgi/domains/netplan/netplan-contract/src/main/java/io/seedmatic/rke2lab/netplan/contract/ClusterNetworkBlueprint.java[ClusterNetworkBlueprint.java] — the Java source of truth (a `type=contract` bundle record).
 * link:../osgi/netplan-bdd-spec.adoc[netplan-bdd-spec] — the in-container `NetplanBlueprintScenario` that derives the blueprint and the JSON→YAML crossing `netplan-cli`'s `yamlExport` performs.

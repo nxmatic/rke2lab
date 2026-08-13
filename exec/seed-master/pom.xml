@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
     <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
@@ -47,29 +47,29 @@
          delegates the grow), the IngressConfig the run fills, and BootstrapPaths (dual-realm, flat
          host-side). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
     </dependency>
     <!-- The cluster-pki dual-realm contract: the host GROW beat fetches ClusterCaBundle +
          ClusterAgeKey (via ClusterPkiCoordinate) and poses them on the instance's devlxd config —
          compile scope, the flat host copy the seal scion's OSGi copy is the twin of. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-pki-contract</artifactId>
     </dependency>
     <!-- The Pulumi actualiser of the ingress flow: the run delegates the instance grow to
          InstanceGrow here, filling an IngressConfig from its BootstrapConfig — no com.pulumi.incus in
          seed-master itself any more. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-ingress</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>pulumi-edge</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>pulumi-edge-testkit</artifactId>
       <scope>test</scope>
     </dependency>
@@ -77,7 +77,7 @@
          run time (and on the test classpath the host-seam test locates it as a bundle). WI-C will
          embed it intact as an OSGi bundle. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -98,11 +98,11 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
     <!-- Runtime-engine infra the host reaches directly in src/main: it boots Felix flat
@@ -114,7 +114,7 @@
       <artifactId>org.apache.felix.framework</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
     </dependency>
     <dependency>
@@ -131,7 +131,7 @@
       <artifactId>jackson-annotations</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>
@@ -140,7 +140,7 @@
          OsgiConnection to attach the phases to the world. The dogfooding promotion (parallel to
          jgiven-junit5): the launcher is the runtime engine, not a test tool. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
     <!-- jGiven-in-OSGi, dual-realm. jGiven runs in BOTH realms: FLAT (shaded into the uber-jar) for
@@ -154,7 +154,7 @@
          /jgiven-junit5 jars (pulled compile for the flat root) stay flat, the wrap carries the OSGi
          headers the bundle realm needs. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -164,19 +164,19 @@
          manifests-core impl type (the realgraph fixture that once forced compile scope is gone). The
          stage-embedded-bundles execution still resolves the reactor artifact at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- The cdk8s carrier bundle: embedded INTACT under META-INF/bundles, the Fragment-Host the
-         systemd-cdk8s-manifests fragment attaches to (it exports io.nxmatic.rke2lab.systemd.cdk8s,
+         systemd-cdk8s-manifests fragment attaches to (it exports io.seedmatic.rke2lab.systemd.cdk8s,
          which manifests-core imports). manifests-core depends on it as provided (non-transitive), so
          the staging closure never reaches it transitively — it must be declared here, exactly as the
          manifests-cli exec module declares it. Without it the fragment stages host-less and
          manifests-core fails to resolve. runtime scope: seed-master compiles against flat cdk8s for
          its own host rendering, never against this OSGi carrier. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -185,7 +185,7 @@
          manifests-core's @Reference SshToAgeConverter binds it from the registry. Mandatory
          reference, so the edge MUST be embedded or ManifestSynthesisService never publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ssh-to-age-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -194,7 +194,7 @@
          SopsEncryptor from the registry (mandatory @OsgiService). MUST be embedded or the seal never
          seals. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>sops-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -203,7 +203,7 @@
          impl; the readiness pipeline resolves SystemdRuntimeProbe from the registry (awaitService).
          The edge MUST be embedded or the runtime-status probe never publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>dbus-systemd-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -212,7 +212,7 @@
          the readiness probe resolves ClusterReadinessContact from the registry (awaitService). The
          edge MUST be embedded or the kubectl contact never publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -223,7 +223,7 @@
          carries the remote image-build recipe as a bundle resource. MUST be embedded or the contacts
          never publish. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -232,7 +232,7 @@
          from the registry. The edge imports the (bundled) bbox client + gson, staged as carriers by
          the closure. The edge MUST be embedded or the reconcile contact never publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bbox-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -244,7 +244,7 @@
          it; it is embedded INTACT under META-INF/bundles like the edges, its SCR component publishing
          the service. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-core</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -256,7 +256,7 @@
          runtime scope; embedded INTACT under META-INF/bundles, its SCR component publishing the
          service. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>worktree-core</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -267,7 +267,7 @@
          runtime scope; embedded INTACT under META-INF/bundles, its SCR component publishing the
          service. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-core</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -300,7 +300,7 @@
          jackson + BouncyCastle it imports are already staged. Without the wrap the framework boots
          but cluster-edge is unresolved and the readiness contact never publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>fabric8-wrap</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -314,45 +314,65 @@
          only the neutral RunbookCoordinate through the broker membrane. embed;type=model, so each is
          staged INTACT under META-INF/bundles like the edges. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>worktree-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bbox-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>systemd-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-pki-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- The auth-seal scion: embedded like cluster-pki-bdd, sown early to seal the GitHub token
          (gh auth token) into the cellar for the rendered-branch force-push to reveal. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>auth-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- The ghapp scion + its two edges + the operator-notifier foundation edge: embedded like the
+         auth / cluster-pki scions so the broker has a "ghapp" handler and the registrar / minter /
+         desktop-notifier @Components publish. ghapp-contract + operator-notifier-port ride in
+         transitively via the scion's import closure. runtime scope — seed-master never compiles
+         against them; it sows the neutral RunbookCoordinate("ghapp") through the broker. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-edge</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>operator-notifier-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
@@ -367,13 +387,13 @@
          staging gate lists the flat-realm doctor.contract references during the Plan 2 migration
          (build-time only, not runtime behaviour). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
     <!-- The seed-broker seam: Document + SeedBroker. The stage sows a checkpoint Document through
          the broker and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The common gardening spine: the host runbook stages ClusterSeedScenario composes
@@ -381,7 +401,7 @@
          Cellar fetch/store, sow-and-graft) + the open Gardening the GIVEN bootstraps + the SessionSeed
          bootstrap channel. Consumed FLAT (seed-bdd's host-side base package is not exported). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-bdd</artifactId>
     </dependency>
     <!-- The document codec: JSON (de)serialization + validation for Document payloads. Shaded flat
@@ -389,7 +409,7 @@
          doctor-core's Bundle-ClassPath OSGi-side, binding to the bundle's jackson — one source, two
          realm-specific copies, no codec type crosses the seam. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <!-- The seed-broker mechanism (embed type=runtime): the DefaultSeedBroker @Component that
@@ -398,7 +418,7 @@
          the SeedBroker seam via awaitService); the bundle is staged under META-INF/bundles and
          installed by OsgiRuntime so SCR publishes the door in-container. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-runtime</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -406,7 +426,7 @@
          the graph so the staging closure stages it under META-INF/bundles; at boot it attaches to
          pax-logging-logback and the launcher invokes its PaxLogbackConfigurer reflectively. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>pax-logback-config</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -538,27 +558,27 @@
 
     <!-- test module dependencies -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bbox-bdd-test</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-core-test</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-bdd-test</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-bdd-test</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-bdd-test</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>systemd-bdd-test</artifactId>
     </dependency>
   </dependencies>
@@ -601,12 +621,12 @@
             <phase>generate-resources</phase>
             <configuration>
               <target>
-                <mkdir dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rke2lab/controlplane/incus/assets"/>
-                <copy overwrite="true" todir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rke2lab/controlplane/incus/assets">
+                <mkdir dir="${project.build.directory}/generated-resources/META-INF/io.seedmatic/rke2lab/controlplane/incus/assets"/>
+                <copy overwrite="true" todir="${project.build.directory}/generated-resources/META-INF/io.seedmatic/rke2lab/controlplane/incus/assets">
                   <fileset dir="${maven.multiModuleProjectDirectory}/assets/incus" erroronmissingdir="false"/>
                 </copy>
-                <mkdir dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rke2lab/controlplane/incus"/>
-                <copy overwrite="true" todir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rke2lab/controlplane/incus">
+                <mkdir dir="${project.build.directory}/generated-resources/META-INF/io.seedmatic/rke2lab/controlplane/incus"/>
+                <copy overwrite="true" todir="${project.build.directory}/generated-resources/META-INF/io.seedmatic/rke2lab/controlplane/incus">
                   <fileset dir="${project.basedir}/src/main/resources/incus"/>
                 </copy>
               </target>
@@ -637,7 +657,7 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>io.nxmatic.rke2lab.controlplane.Main</mainClass>
+                  <mainClass>io.seedmatic.rke2lab.controlplane.Main</mainClass>
                   <manifestEntries>
                     <!-- JGiven generates stage subclasses via byte-buddy, whose reflective class
                          injector needs java.lang opened under JDK module encapsulation. Honored
@@ -647,7 +667,7 @@
                          handing it Instrumentation — no -javaagent flag, no self-attach. It
                          throttles pulumi-java's DefaultRunner busy-poll. See
                          PulumiRunnerThrottleAgent. -->
-                    <Launcher-Agent-Class>io.nxmatic.rke2lab.controlplane.PulumiRunnerThrottleAgent</Launcher-Agent-Class>
+                    <Launcher-Agent-Class>io.seedmatic.rke2lab.controlplane.PulumiRunnerThrottleAgent</Launcher-Agent-Class>
                   </manifestEntries>
                 </transformer>
               </transformers>
@@ -659,7 +679,7 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <configuration>
-          <mainClass>io.nxmatic.rke2lab.controlplane.Main</mainClass>
+          <mainClass>io.seedmatic.rke2lab.controlplane.Main</mainClass>
         </configuration>
       </plugin>
       <plugin>
@@ -726,7 +746,7 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>io.nxmatic.rke2lab</groupId>
+          <groupId>io.seedmatic.rke2lab</groupId>
           <artifactId>bench-tests</artifactId>
           <scope>test</scope>
         </dependency>

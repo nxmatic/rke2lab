@@ -18,9 +18,9 @@ work is the first real client of).
 ====
 *Frozen point-in-time handoff.* The module names below are those of this branch's session. The doctor
 boundary was later *de-seamed*: `doctor-port` is now the installed, bundle-to-bundle-wired
-`doctor-contract` bundle (`type=contract`), its package root `io.nxmatic.rke2lab.doctor.port` →
-`io.nxmatic.rke2lab.doctor.contract`. The `-test` fragment `doctor-port-test` described here is now
-`doctor-contract-test` (`Fragment-Host: io.nxmatic.rke2lab.doctor.contract`). Read the historical
+`doctor-contract` bundle (`type=contract`), its package root `io.seedmatic.rke2lab.doctor.port` →
+`io.seedmatic.rke2lab.doctor.contract`. The `-test` fragment `doctor-port-test` described here is now
+`doctor-contract-test` (`Fragment-Host: io.seedmatic.rke2lab.doctor.contract`). Read the historical
 names below through that map.
 ====
 
@@ -58,16 +58,16 @@ so it sees the host white-box with no reverse module edge — no cycle, no parki
   bundle, drives a JUnit Platform Launcher inside the framework).
 
 | `osgi/doctor/doctor-port-test`
-| The `-test` fragment of `doctor-port` (`Fragment-Host: io.nxmatic.rke2lab.doctor.port`). Carries,
+| The `-test` fragment of `doctor-port` (`Fragment-Host: io.seedmatic.rke2lab.doctor.port`). Carries,
   in `src/main` so they land in the fragment: the 5 value-type tests + the shared fixtures
-  (`ReferralReplies`, `FakeSpecialist`) in package `io.nxmatic.rke2lab.doctor.testkit`, *exported* so
+  (`ReferralReplies`, `FakeSpecialist`) in package `io.seedmatic.rke2lab.doctor.testkit`, *exported* so
   the core fragment imports them through the host. `src/test` holds the JVM harness.
 
 | `osgi/doctor/doctor-core-test`
-| The `-test` fragment of `doctor-core` (`Fragment-Host: io.nxmatic.rke2lab.doctor.core`). Carries
+| The `-test` fragment of `doctor-core` (`Fragment-Host: io.seedmatic.rke2lab.doctor.core`). Carries
   the 10 actor tests (8 plain `@Test` reaching the sealed package-private actors white-box + 2 jGiven
   scenarios). `-include`s `jgiven-fragment.bnd`, so jGiven runs in-container too. Imports
-  `io.nxmatic.rke2lab.doctor.testkit` through the doctor-core host (wired from the doctor-port-test
+  `io.seedmatic.rke2lab.doctor.testkit` through the doctor-core host (wired from the doctor-port-test
   fragment's export).
 
 | `osgi/doctor/doctor-testkit`

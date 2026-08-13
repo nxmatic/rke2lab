@@ -277,7 +277,7 @@ Routing:  Network: Native   Host: Legacy
 
 == References
 
-* Implementation: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/CiliumAdvancedLayer.java`
+* Implementation: `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/networking/CiliumAdvancedLayer.java`
 * Kernel modules: `nix-darwin-home/modules/nixos/cilium-kernel-modules.nix`
-* Cilium Helm config: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/CiliumConfigLayer.java`
+* Cilium Helm config: `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/networking/CiliumConfigLayer.java`
 * Cilium BGP Control Plane docs: https://docs.cilium.io/en/stable/network/bgp-control-plane/

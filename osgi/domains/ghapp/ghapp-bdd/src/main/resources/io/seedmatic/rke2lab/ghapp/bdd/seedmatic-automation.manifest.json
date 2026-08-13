@@ -1,0 +1,15 @@
+{
+  "name": "seedmatic-automation",
+  "url": "https://github.com/seedmatic/rke2lab",
+  "public": false,
+  "hook_attributes": { "active": false },
+  "redirect_url": "http://localhost:8099/callback",
+  "default_permissions": {
+    "contents": "write",
+    "statuses": "write",
+    "pull_requests": "write",
+    "checks": "write",
+    "metadata": "read"
+  },
+  "default_events": []
+}

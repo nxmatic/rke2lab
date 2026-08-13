@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -20,27 +20,27 @@
   <dependencies>
     <!-- The enumerator produces bbox-contract's BboxReservationRequest vocabulary. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bbox-contract</artifactId>
     </dependency>
     <!-- BlueprintRowEnumerator derives each reservation from the netplan blueprint. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
     <!-- The amend door: BboxAmendReflector serves BboxCoordinate.AMEND and binds the host's router
          FACET onto BboxRunbookInput. seed-broker-port carries the SeedHandler/AmendmentAssembler
          ports; seed-broker-codec the SeedCodec + AmendmentBinder it reconciles with. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <!-- the enumerator reads its blueprint input as a jackson JsonNode. -->
@@ -58,7 +58,7 @@
     <!-- BboxAmendReflectorTest drives the reflector with a stub AmendmentAssembler + RefusingCellar
          (pure-JSON, no container). junit-jupiter is inherited from the parent. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-testkit</artifactId>
       <scope>test</scope>
     </dependency>

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -27,7 +27,7 @@
          foundation like the BOM — resolved from the local repo, no masking, the no-snapshot-install
          guard untouched. "bnd" stays an implementation detail: boot-discovery exports none of it. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bnd-read</artifactId>
     </dependency>
     <!-- DiscoveryPolicy / BundleIndex / BundleLocation compile against org.osgi.framework (Filter,

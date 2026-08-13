@@ -917,6 +917,11 @@ lookup, not by the broker:
   another in the world they share.
 | the ambient run-condition | look up `RunGate` — a fact of the WHOLE run, published once (its own §
   below).
+| the operator-secrets door (read/write `.secrets`) | look up `SecretsGateway` — a host-owned seam the
+  GIVEN `registerService`s beside `RunGate`/`Parcel`. The flat host owns `.secrets` (the `ConfigLoader`
+  family reads it; `DotSecretsGateway` writes it) and publishes it into the framework it grew, so a
+  scion rehydrates an anchor and persists a freshly-established one through a JSON-only door (the ghapp
+  registration is its first consumer) without any `.secrets` logic crossing a realm.
 | its OWN domain's edge (`BboxReconciler`, `ClusterReadinessContact`, …) | look up the contact from
   the registry — same domain, same world.
 |===
@@ -1001,7 +1006,7 @@ rebuilding doctor types — re-creates a doctor vocabulary on the host, the very
 
 The seam module `osgi/foundation/world-gateway` (`type=seam`, system-exported, one shared copy —
 renamed `seed-broker` in the conceived form; § <<the-rename>>) holds the entire crossing vocabulary in
-package `io.nxmatic.rke2lab.seed.broker.port`:
+package `io.seedmatic.rke2lab.seed.broker.port`:
 
 * *The envelope* — `Document(String domain, String coordinate, String payload)`. The payload is a
   serialized `String`, NOT a `JsonNode` — so jackson never crosses the seam; each realm parses the
@@ -1080,7 +1085,7 @@ codec also exposes `toMap(record)` / `fromMap(map, type)` (record ↔ opaque `Ma
 seed WITHOUT the class — the opacity path § <<contribution-and-opacity>> generalizes.
 
 The codec (`osgi/foundation/gateway-document-codec`, package
-`io.nxmatic.rke2lab.seed.broker.codec`) registers its jackson modules EXPLICITLY (never
+`io.seedmatic.rke2lab.seed.broker.codec`) registers its jackson modules EXPLICITLY (never
 `findAndRegisterModules`, so it stays clear of the `ServiceLoader<Module>` surface): a custom
 `WireEnumModule` (maps every `WireEnum` ↔ slug generically, so seam enums carry no jackson
 annotation), a `JavaTimeModule` (ISO-8601 `Instant`), and `Jdk8Module` (`Optional<T>` → an absent key,

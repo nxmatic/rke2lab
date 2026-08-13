@@ -102,7 +102,7 @@ designed: adding it was *one staging `artifactItem` + one `Provide-Capability` l
 boot path.
 
 * `ssh-to-age-edge/bnd.bnd` self-declares
-  `Provide-Capability: io.nxmatic.rke2lab.embed; type=edge; edge=ssh-to-age`. The boot scan keys on the
+  `Provide-Capability: io.seedmatic.rke2lab.embed; type=edge; edge=ssh-to-age`. The boot scan keys on the
   NAMESPACE, so the edge is discovered like any model bundle; the `type`/`<type>=<id>` attributes
   qualify its NATURE (read by humans, not the scan) — and ssh-to-age is the first carrier whose nature
   is `edge`, not `model`, which is why the two cores were retrofitted to `type=model; model=<id>`.
@@ -134,7 +134,7 @@ session. Recorded here as explicit, actionable requests so they are not lost:
 
 . *Unify the two capability readers into one, parameterised by source.* `scanEmbeddedModelBundles()`
   (source = the staged `META-INF/bundles/` root) and `embeddableBundlesOnClasspath()` (source = the
-  reactor classpath) now read the *same* `io.nxmatic.rke2lab.embed` capability through *two* duplicated
+  reactor classpath) now read the *same* `io.seedmatic.rke2lab.embed` capability through *two* duplicated
   manifest-reading loops. The single-source move is one reader keyed on the capability, taking the
   source as a parameter — the embedded vs classpath topologies differ only in where they enumerate
   jars, not in what they look for. Today the discovery logic is forked; it should be one.

@@ -27,8 +27,8 @@ The implementation plan lives at the end (§ <<plan>>); it is the NEXT work sess
 == Why this is the first step (how we got here)
 
 Attacking the host top-down (`Main` → `ApplicationPipeline` → …) the build stops BELOW seed-master, in
-`pulumi-edge`, on `package io.nxmatic.rke2lab.doctor.port does not exist` /
-`io.nxmatic.rke2lab.doctor.records does not exist`. Those packages were de-seamed into
+`pulumi-edge`, on `package io.seedmatic.rke2lab.doctor.port does not exist` /
+`io.seedmatic.rke2lab.doctor.records does not exist`. Those packages were de-seamed into
 `doctor.contract` (records fused, the `-port` seam dissolved). Three `pulumi-edge` classes still import
 them:
 

@@ -179,7 +179,7 @@ To stay *deterministic*, every unit emits a *group marker* during synthesize: a 
 that guarantees the output directory exists even when empty.
 
 * The marker is a `ConfigMap` carrying `config.kubernetes.io/local-config: "true"` plus the
-  unit's `io.nxmatic.rke2lab/domain` + `io.nxmatic.rke2lab/package` annotations.
+  unit's `io.seedmatic.rke2lab/domain` + `io.seedmatic.rke2lab/package` annotations.
 * The exploder writes it (so the directory is created), but the installer script skips
   `local-config` documents — so the marker is never linked into RKE2's manifests dir, only its
   directory survives.

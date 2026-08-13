@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>host-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../host-parent/pom.xml</relativePath>
@@ -24,13 +24,13 @@
     <!-- The ingress contract: the InstanceGrowPlan this actualises + the IngressConfig the run fills
          (dual-realm; consumed here through its flat copy). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
     </dependency>
     <!-- The generated Incus SDK: com.pulumi.incus.* — the Project/Network/Profile/Image/Instance
          resources InstanceGrow declares. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab.sdks</groupId>
+      <groupId>io.seedmatic.rke2lab.sdks</groupId>
       <artifactId>incus</artifactId>
     </dependency>
     <dependency>

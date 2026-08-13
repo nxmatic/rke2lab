@@ -1,0 +1,89 @@
+package io.seedmatic.rke2lab.incus.core;
+
+import io.seedmatic.rke2lab.incus.ingress.GrowNetworkView;
+import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
+import io.seedmatic.rke2lab.netplan.contract.NetplanSynthesisRequest;
+import io.seedmatic.rke2lab.netplan.contract.NetplanSynthesisService;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Assembles the flat {@link GrowNetworkView} the host GROW poses on the Pulumi graph — the two NIC
+ * hardware addresses and the dnsmasq config the per-cluster {@code vmnet} bridge carries. It reads
+ * the {@link NetplanSynthesisService} (the scion resolves it from its registry, like {@code
+ * ImageBuilder}) and reduces the blueprint's raw pieces to the three flat values, OSGi-side — the
+ * scion-projects/host-actualises rule (the host receives the result and only poses it).
+ *
+ * <p>The dnsmasq map is the incus metier, not netplan's: it is the config an Incus {@code Network}
+ * resource takes ({@code ipv4.*} + a {@code raw.dnsmasq} block of one {@code dhcp-host} line per
+ * cluster node). Its {@code dhcp-host} lines need the WAN MAC + node IP of EVERY node, so the
+ * resolver synthesizes the whole cluster ({@link ClusterNetworkBlueprint#CANONICAL_NODE_NAMES}),
+ * not just the node being grown — the netplan domain owns that node list, so this reads its single
+ * source. The lease hostname is {@code <cluster>-<node>}, matching the instance name the host
+ * grows.
+ */
+public final class GrowNetworkResolver {
+
+  private final NetplanSynthesisService netplan;
+
+  public GrowNetworkResolver(NetplanSynthesisService netplan) {
+    this.netplan = netplan;
+  }
+
+  /**
+   * Assemble the view for the {@code node} of {@code cluster} (the node the instance grows for).
+   */
+  public GrowNetworkView resolve(String cluster, String node) {
+    final ClusterNetworkBlueprint blueprint = synthesize(cluster, node);
+    return new GrowNetworkView(
+        blueprint.lan().hostMacaddr().value(),
+        blueprint.wan().hostMacaddr().value(),
+        vmnetBridgeConfig(cluster, blueprint));
+  }
+
+  private ClusterNetworkBlueprint synthesize(String cluster, String node) {
+    return netplan.synthesize(new NetplanSynthesisRequest(cluster, node)).blueprint();
+  }
+
+  /**
+   * The Incus {@code vmnet} network's config map — the seven keys the bridge takes. The addresses,
+   * DHCP range and per-node leases derive from the blueprint; {@code ipv4.nat}/{@code ipv4.dhcp}/
+   * {@code dns.mode}/{@code bridge.driver} are the fixed policy of a per-cluster provisioning
+   * bridge.
+   */
+  private Map<String, String> vmnetBridgeConfig(String cluster, ClusterNetworkBlueprint local) {
+    final Map<String, String> config = new LinkedHashMap<>();
+    config.put(
+        "ipv4.address",
+        local.host().clusterGatewayInetaddr().getHostAddress()
+            + "/"
+            + local.host().clusterCidr().prefixLength());
+    config.put("ipv4.nat", "false");
+    config.put("ipv4.dhcp", "true");
+    config.put("ipv4.dhcp.ranges", local.wan().dhcpRange());
+    config.put("dns.mode", "none");
+    config.put("bridge.driver", "native");
+    config.put("raw.dnsmasq", rawDnsmasq(cluster));
+    return config;
+  }
+
+  /**
+   * One {@code dhcp-host=<wanMac>,<nodeIp>,<cluster>-<node>} line per cluster node, newline-joined.
+   */
+  private String rawDnsmasq(String cluster) {
+    return ClusterNetworkBlueprint.CANONICAL_NODE_NAMES.stream()
+        .map(node -> synthesize(cluster, node))
+        .map(
+            blueprint ->
+                "dhcp-host="
+                    + blueprint.wan().hostMacaddr().value()
+                    + ","
+                    + blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress()
+                    + ","
+                    + cluster
+                    + "-"
+                    + blueprint.node().name())
+        .reduce((left, right) -> left + "\n" + right)
+        .orElse("");
+  }
+}

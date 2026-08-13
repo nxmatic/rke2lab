@@ -1,17 +1,17 @@
 -include: ../../../bundle-parent/annotations.bnd
 Import-Package: ${annotation-noimports}, *
-Bundle-SymbolicName: io.nxmatic.rke2lab.incus.core.test
+Bundle-SymbolicName: io.seedmatic.rke2lab.incus.core.test
 
 # THE fragment header: attach to the incus-core bundle by its BSN, sharing its classloader and
-# package (io.nxmatic.rke2lab.incus.core). The actor tests, authored in that same package, run
+# package (io.seedmatic.rke2lab.incus.core). The actor tests, authored in that same package, run
 # in-container and reach incus-core's DS @Components through the host's BundleContext, with
 # manifests-core installed as a second host by the probe (the two domains coexist in one Felix).
-Fragment-Host: io.nxmatic.rke2lab.incus.core
+Fragment-Host: io.seedmatic.rke2lab.incus.core
 
 # Test fixture, selected by OutOfContainerFrameworkExtension via an LDAP filter over these
 # attributes, never by a Bundle-SymbolicName literal. Its host (incus-core) is found through the
 # Fragment-Host above. type=fixture, suite=incus, role=core.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=incus; role=core
+Provide-Capability: io.seedmatic.rke2lab.embed; type=fixture; suite=incus; role=core
 
 # The shared include carries the forced com.tngtech.jgiven.impl.intercept import + the
 # com.tngtech.jgiven.* tail + the trailing * wildcard; everything else this fragment needs is

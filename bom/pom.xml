@@ -11,7 +11,7 @@
     ${project.version}. Having no <parent> is deliberate: it breaks the cycle that
     would otherwise arise from the parent importing this BOM.
   -->
-  <groupId>io.nxmatic.rke2lab</groupId>
+  <groupId>io.seedmatic.rke2lab</groupId>
   <artifactId>bom</artifactId>
   <version>1.0.0</version>
   <packaging>pom</packaging>
@@ -325,7 +325,7 @@
       <!-- The Bbox router client the bbox-edge embeds (translated home↔library, no type crosses the
            seam). An external artifact, so its version belongs here in the third-party catalogue. -->
       <dependency>
-        <groupId>io.nxmatic</groupId>
+        <groupId>io.seedmatic</groupId>
         <artifactId>java-bbox-api-client</artifactId>
         <version>${java-bbox-api-client.version}</version>
       </dependency>
@@ -333,6 +333,20 @@
         <groupId>org.eclipse.jgit</groupId>
         <artifactId>org.eclipse.jgit</artifactId>
         <version>${jgit.version}</version>
+      </dependency>
+      <!-- jgit's smart-HTTP test server (AppServer + GitServlet, pulls http.server + Jetty): the
+           only transport jgit push does not deadlock (file:// and git:// are duplex and hang). -->
+      <dependency>
+        <groupId>org.eclipse.jgit</groupId>
+        <artifactId>org.eclipse.jgit.junit.http</artifactId>
+        <version>${jgit.version}</version>
+      </dependency>
+      <!-- JUnit 4: jgit's AppServer/HttpTestCase compile against org.junit.Assert and declare junit
+           as `provided` (non-transitive), so a consumer running the http test server supplies it. -->
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.13.2</version>
       </dependency>
       <dependency>
         <groupId>software.constructs</groupId>

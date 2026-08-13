@@ -158,7 +158,7 @@ per `model-substrate-alignment` — do not describe a substrate that does not ex
 *The boot trap (resolved — `refactor/osgi-boot-single-source`).* The `META-INF/bundles` embed topology
 WAS hand-listed at ~8 sites with no single source — `OsgiRuntime` admitted it ("poms cannot call Java,
 this is the authoritative registry during review"). It is now single-sourced by a *capability scan*: each
-model bundle self-declares `Provide-Capability: io.nxmatic.rke2lab.embed; type=model` in its `bnd.bnd`,
+model bundle self-declares `Provide-Capability: io.seedmatic.rke2lab.embed; type=model` in its `bnd.bnd`,
 and `OsgiRuntime.boot()` scans `META-INF/bundles`, reads each jar's manifest, and installs exactly the
 carriers of that capability. The boot-stack jars (pax/scr/resolver) do not carry the marker, so they are
 excluded *objectively* — not by a name filter, which would be a hand-list in disguise that slips at the
@@ -243,7 +243,7 @@ the seam does it load on", and that is *declared*, not inferred. A `-contract` a
 installed as a bundle — the correct disposition, since it never crosses to the host.
 ====
 
-So the embed namespace `io.nxmatic.rke2lab.embed` carries the seam `type` alongside the ownership roles'
+So the embed namespace `io.seedmatic.rke2lab.embed` carries the seam `type` alongside the ownership roles'
 boot faces:
 
 [cols="1,2,2",options="header"]

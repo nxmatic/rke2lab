@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -24,19 +24,19 @@
     <!-- The domain contract: the seal's output records (ClusterCaBundle, ClusterAgeKey) + the
          SopsEncryptor seam it drives. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-pki-contract</artifactId>
     </dependency>
     <!-- The ssh-to-age seam: ClusterSeal derives the cluster age IDENTITY from the rke2-cluster SSH
          key (the same conversion SopsAgeMaterialResolver uses), realised by ssh-to-age-edge. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
     </dependency>
     <!-- The ndh keystore reader seam: ClusterSeal reads the mammoth-skate-tls root + rke2-cluster
          key through it (the single reader, realised by ndh-core). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-contract</artifactId>
     </dependency>
     <!-- Read keys.yaml + .sops.yaml (structured YAML, no regex) and render the 11-key bundle YAML. -->

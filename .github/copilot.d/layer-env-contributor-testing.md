@@ -4,7 +4,7 @@
 
 ### ✅ Completed Components
 
-**1. Core Interfaces** (manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/env/)
+**1. Core Interfaces** (manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/env/)
 - ✅ `LayerEnvContributor.java` - Interface for layers to contribute env vars
 - ✅ `LayerEnvContext.java` - Bootstrap context with paths, node identity, cluster topology
 - ✅ `LayerEnvContributorRegistry.java` - Service to load and aggregate contributors
@@ -16,7 +16,7 @@
 - ✅ `runtime/RuntimeLayerEnvContributor.java` - 17 vars (rke2, config, containerd, cri, helm, kubectl, user)
 
 **3. ServiceLoader Registration**
-- ✅ META-INF/services/io.nxmatic.rke2lab.manifests.layers.env.LayerEnvContributor (4 implementations registered)
+- ✅ META-INF/services/io.seedmatic.rke2lab.manifests.layers.env.LayerEnvContributor (4 implementations registered)
 
 **4. IncusResourceBootstrap Integration** (controlplane/src/main/java/io/.../IncusResourceBootstrap.java)
 - ✅ Added imports for LayerEnvContributor, LayerEnvContext, LayerEnvContributorRegistry
@@ -315,7 +315,7 @@ echo "RKE2LAB_DEBUG=$RKE2LAB_DEBUG"                            # false (from 99-
 
 ```
 manifests/
-├── src/main/java/io/nxmatic/rke2lab/manifests/
+├── src/main/java/io/seedmatic/rke2lab/manifests/
 │   └── layers/
 │       ├── env/                          (✅ NEW)
 │       │   ├── LayerEnvContributor.java  (✅ NEW)
@@ -331,10 +331,10 @@ manifests/
 │           └── RuntimeLayerEnvContributor.java (✅ NEW + MODIFIED)
 └── src/main/resources/
     └── META-INF/services/                (✅ NEW)
-        └── io.nxmatic.rke2lab.manifests.layers.env.LayerEnvContributor (4 registrations)
+        └── io.seedmatic.rke2lab.manifests.layers.env.LayerEnvContributor (4 registrations)
 
 controlplane/
-└── src/main/java/io/nxmatic/rke2lab/controlplane/
+└── src/main/java/io/seedmatic/rke2lab/controlplane/
     └── incus/
         └── IncusResourceBootstrap.java
             ├── Added: LayerEnvContributor imports (✅)

@@ -122,8 +122,8 @@ reactor-relative path to the shared file:
 
 [source]
 ----
-Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core.test
-Fragment-Host: io.nxmatic.rke2lab.doctor.core
+Bundle-SymbolicName: io.seedmatic.rke2lab.doctor.core.test
+Fragment-Host: io.seedmatic.rke2lab.doctor.core
 -include: ${.}/../../jgiven/jgiven-testkit/src/main/resources/jgiven-fragment.bnd
 ----
 

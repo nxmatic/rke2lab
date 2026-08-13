@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-test-parent/pom.xml</relativePath>
@@ -24,29 +24,29 @@
     <!-- The host under test: the scenario + the front-door. provided — the fragment is pure test
          bytecode that resolves against the cluster-bdd host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-bdd</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The vocabulary the mocks + assertions speak: the readiness contact + its refs, the doctor's
          ConsultingService, the SeedEnvelope the consult rides. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-contract</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -65,7 +65,7 @@
     <!-- The generic in-container runner the fragment's entry delegates to (JUnitLauncherCore /
          InContainerJUnitRunner). Provided — resolved through the cluster-bdd host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -77,12 +77,12 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>doctor-contract</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -98,12 +98,12 @@
     <!-- the src/test @OsgiWorld proxy boots Felix via JGivenTestkit.felix() and installs the JUnit +
          jGiven bundle worlds by classpath substring, so they must be on the TEST classpath. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>test</scope>
     </dependency>

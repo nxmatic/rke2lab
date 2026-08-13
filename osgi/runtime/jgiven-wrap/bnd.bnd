@@ -1,4 +1,4 @@
-Bundle-SymbolicName: io.nxmatic.rke2lab.jgiven.wrap
+Bundle-SymbolicName: io.seedmatic.rke2lab.jgiven.wrap
 
 # The whole wrap: stamp OSGi headers onto jgiven-core + jgiven-junit5 — the ONLY two jars in
 # jgiven's graph that lack a Bundle-SymbolicName. bnd pulls their packages off the classpath and

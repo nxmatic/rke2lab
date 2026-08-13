@@ -61,10 +61,10 @@ Each model bundle declares, in its `bnd.bnd`:
 
 [source]
 ----
-Provide-Capability: io.nxmatic.rke2lab.embed; type=model
+Provide-Capability: io.seedmatic.rke2lab.embed; type=model
 ----
 
-* The namespace `io.nxmatic.rke2lab.embed` is *ours* — reverse-DNS, the vendor convention for custom
+* The namespace `io.seedmatic.rke2lab.embed` is *ours* — reverse-DNS, the vendor convention for custom
   capability namespaces. It deliberately does NOT start with `osgi.`, the prefix the OSGi Alliance
   reserves for the standard namespaces (`osgi.wiring.package`, `osgi.identity`, `osgi.extender`,
   `osgi.service`, …). No collision, present or future.

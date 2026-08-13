@@ -10,8 +10,8 @@ this file is the *where we are now + what to decide next*.
 ====
 *Frozen point-in-time record.* The module names below are those of this branch's session. The doctor
 boundary was later *de-seamed*: `doctor-port` is now the installed, bundle-to-bundle-wired
-`doctor-contract` bundle (`type=contract`), its package root `io.nxmatic.rke2lab.doctor.port` →
-`io.nxmatic.rke2lab.doctor.contract`. The `-test` fragment `doctor-port-test` is now
+`doctor-contract` bundle (`type=contract`), its package root `io.seedmatic.rke2lab.doctor.port` →
+`io.seedmatic.rke2lab.doctor.contract`. The `-test` fragment `doctor-port-test` is now
 `doctor-contract-test`, and the `doctor-testkit` module discussed here was subsequently deleted (its
 fixtures fused into the `-test` fragment). Read the historical names below through that map.
 ====
@@ -37,7 +37,7 @@ fixtures fused into the `-test` fragment). Read the historical names below throu
 BUILD SUCCESS (19 modules), *254 tests / 0 failures / 0 errors / 1 skipped* (18 doctor-port + 9
 doctor-core + 27 seed-master surefire reports — no test lost across the whole increment). Proven:
 all 8 actors are `final class`/`record` with no `public`; zero actor is imported anywhere outside
-`io.nxmatic.rke2lab.doctor` (compiler-enforced membrane). doctor is now symmetric with
+`io.seedmatic.rke2lab.doctor` (compiler-enforced membrane). doctor is now symmetric with
 manifests/netplan — consumers cross a pure port, the impl evolves freely behind a sealed internal edge.
 
 Two public assembly seams in doctor-core return the contract without exposing the actors:
@@ -166,7 +166,7 @@ asymmetry in the otherwise-clean relocation.
 
 == Commit 3 (after 2) — the hiding mechanism, restated
 
-Drop `public` from the *8* actors (all in the single package `io.nxmatic.rke2lab.doctor`). The Java
+Drop `public` from the *8* actors (all in the single package `io.seedmatic.rke2lab.doctor`). The Java
 compiler then forbids importing them from any other module (compile + OSGi), while the co-located
 doctor-core tests (relocated in commit 2) still see them white-box. `Doctor` stays the only public
 assembly type; the `Generalist` it returns is package-private ("public interface, package-private
@@ -181,8 +181,8 @@ doctor-port), then *commit 3* (drop `public` from the 8 actors).
 == Appendix — measured classification of the 52 bdd files (commit 2)
 
 Final: 25 PORT + 10 CORE + 13 HOST + 1 TESTKIT + 3 FIXTURE-stay = 52.
-PORT tests → doctor-port/src/test (package io.nxmatic.rke2lab.doctor.port).
-CORE tests → doctor-core/src/test (package io.nxmatic.rke2lab.doctor — MUST, for commit-3 white-box).
+PORT tests → doctor-port/src/test (package io.seedmatic.rke2lab.doctor.port).
+CORE tests → doctor-core/src/test (package io.seedmatic.rke2lab.doctor — MUST, for commit-3 white-box).
 HOST tests stay in seed-master. The 4 readers → doctor-port/src/main (read-edges).
 ReferralReplies + a new prescribing FakeSpecialist (schema-self-describing) → doctor-testkit/src/main.
 New DbusTcpSpecialistTest (host) covers DbusTcp's real ADAPTER_UNIT/RESTART_UNIT behaviour,

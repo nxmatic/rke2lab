@@ -26,7 +26,7 @@ The seeding runtime does three distinct `java.util.ServiceLoader` lookups
 jackson `Module` discovery under `manifests-cdk8s`). Only the third one is
 painful, and it is the reason for this spike.
 
-`jsii-runtime`, nested in the `io.nxmatic.rke2lab.manifests.cdk8s` carrier, builds
+`jsii-runtime`, nested in the `io.seedmatic.rke2lab.manifests.cdk8s` carrier, builds
 an `ObjectMapper` and calls `findAndRegisterModules()`, which runs
 `ServiceLoader<com.fasterxml.jackson.databind.Module>`. `ServiceLoader` reads
 `META-INF/services` off the *thread-context classloader*, not through OSGi package
@@ -106,7 +106,7 @@ carrier's loader, which is exactly what nesting guarantees.
 [mermaid]
 ....
 flowchart TB
-  subgraph carrier["Bundle: io.nxmatic.rke2lab.manifests.cdk8s"]
+  subgraph carrier["Bundle: io.seedmatic.rke2lab.manifests.cdk8s"]
     apps["Cdk8sApps.create<br/>pins TCCL to this carrier"]
     jsii["jsii-runtime (nested, lib:=true)<br/>JsiiObjectMapper.findAndRegisterModules"]
     jsr["jackson-datatype-jsr310 (nested, lib:=true)<br/>JavaTimeModule + META-INF/services"]
@@ -136,7 +136,7 @@ longer nests jsr310, and `Cdk8sApps` is a plain `new App(props)` — no TCCL.
 ....
 flowchart TB
   spifly["Bundle: org.apache.aries.spifly.dynamic.bundle<br/>registrar + mediator (WeavingHook)"]
-  subgraph carrier["Bundle: io.nxmatic.rke2lab.manifests.cdk8s"]
+  subgraph carrier["Bundle: io.seedmatic.rke2lab.manifests.cdk8s"]
     jsii["jsii-runtime (nested)<br/>JsiiObjectMapper (WOVEN)"]
     req["Require-Capability:<br/>osgi.extender=serviceloader.processor"]
   end
@@ -200,7 +200,7 @@ sequenceDiagram
 
 | Install SPI-Fly
 | Add `org.apache.aries.spifly.dynamic.bundle` (+ its asm) to the framework launch
-  closure, started *before* the `io.nxmatic.rke2lab.embed` model carriers.
+  closure, started *before* the `io.seedmatic.rke2lab.embed` model carriers.
 
 | Wrap `jsr310` as a provider bundle
 | A bnd-wrapped `jackson-datatype-jsr310` carrying
@@ -248,7 +248,7 @@ Any failure is a *result*, not a defeat: record which hypothesis broke and why
 == Risks / new failure modes
 
 * *Boot order (principal risk).* The mediator's `WeavingHook` must be registered
-  before `JsiiObjectMapper` is first loaded. If the `io.nxmatic.rke2lab.embed` scan
+  before `JsiiObjectMapper` is first loaded. If the `io.seedmatic.rke2lab.embed` scan
   installs and activates carriers before SPI-Fly, the `load()` call is never woven
   and falls back to the JRE scan — a *silent* failure, not an exception. The spike
   must assert weaving happened (e.g. SPI-Fly debug log, or a deliberate negative

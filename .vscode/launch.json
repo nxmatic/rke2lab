@@ -8,7 +8,7 @@
             "type": "java",
             "name": "Main",
             "request": "launch",
-            "mainClass": "io.nxmatic.rke2lab.manifests.cli.Main",
+            "mainClass": "io.seedmatic.rke2lab.manifests.cli.Main",
             "projectName": "manifests-cli"
         },
         {
@@ -50,7 +50,7 @@
             "name": "Debug DbusTcpSpike",
             "request": "launch",
             "projectName": "rke2lab-seed-master",
-            "mainClass": "io.nxmatic.rke2lab.controlplane.DbusTcpSpike",
+            "mainClass": "io.seedmatic.rke2lab.controlplane.DbusTcpSpike",
             "args": "${input:dbusTcpSpikeArgs}",
             "cwd": "${workspaceFolder:rke2lab}/exec/seed-master",
             "console": "internalConsole",
@@ -62,7 +62,7 @@
             "name": "Launch DbusTcpSpike (JDWP suspend, attach later)",
             "request": "launch",
             "projectName": "rke2lab-seed-master",
-            "mainClass": "io.nxmatic.rke2lab.controlplane.DbusTcpSpike",
+            "mainClass": "io.seedmatic.rke2lab.controlplane.DbusTcpSpike",
             "args": "${input:dbusTcpSpikeArgs}",
             "cwd": "${workspaceFolder:rke2lab}/exec/seed-master",
             "console": "internalConsole",
@@ -80,7 +80,7 @@
             "type": "java",
             "name": "Launch manifests Main",
             "request": "launch",
-            "mainClass": "io.nxmatic.rke2lab.manifests.Main",
+            "mainClass": "io.seedmatic.rke2lab.manifests.Main",
             "args": "${input:manifestsCommandArgs}",
             "cwd": "${workspaceFolder:rke2lab}/manifests",
             "console": "internalConsole",
@@ -91,7 +91,7 @@
         {
             "id": "manifestsCommandArgs",
             "type": "pickString",
-            "description": "Select arguments for io.nxmatic.rke2lab.manifests.Main",
+            "description": "Select arguments for io.seedmatic.rke2lab.manifests.Main",
             "default": "shim-build",
             "options": [
                 "synthesize",

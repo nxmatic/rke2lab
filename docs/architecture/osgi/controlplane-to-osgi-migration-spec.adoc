@@ -159,7 +159,7 @@ named as a whole word in some `docs/` `.adoc`, OR to carry `@Transitional`. It i
 not a violation counter: a type leaves the specs only when the CODE stops exporting it. The
 fluent-synthesis grammar shows the far end of the ratchet: it was once the `pipeline-port` seam
 under SPEC_COVERAGE, but its engine (`Phase`, `PhaseRunner`, `PhaseFailure`) is now UN-EXPORTED,
-internal to `manifests-core` (`io.nxmatic.rke2lab.manifests.internal.synthesis`), so it left the
+internal to `manifests-core` (`io.seedmatic.rke2lab.manifests.internal.synthesis`), so it left the
 specs the moment the code stopped exporting it — no doc names it any longer. Each shipped edge's
 exported contract types are covered by that edge's own spec (table above). This index names them
 once more so the sweep reads whole in one place.

@@ -10,8 +10,8 @@ must be made *before* Move B is implemented, because Move A revealed a debt it d
 ====
 *Frozen point-in-time report.* The module names below are those of this session. The doctor boundary
 was later *de-seamed*: `doctor-port` is now the installed, bundle-to-bundle-wired `doctor-contract`
-bundle (`type=contract`), its package root `io.nxmatic.rke2lab.doctor.port` →
-`io.nxmatic.rke2lab.doctor.contract`, and the `doctor-testkit` module weighed here was subsequently
+bundle (`type=contract`), its package root `io.seedmatic.rke2lab.doctor.port` →
+`io.seedmatic.rke2lab.doctor.contract`, and the `doctor-testkit` module weighed here was subsequently
 deleted. Read the historical names below through that map.
 ====
 
@@ -194,7 +194,7 @@ Strict dependency chain: 3 ⟶ 2 ⟶ B-prod. We go all the way to (3).
 Decision: *Option 1 — façade `Doctor` in doctor-core, standard roster internal to the core.* Not a
 re-litigation; the implementation fork the plan left open is now closed.
 
-* *`Doctor` façade* (public, exported, in `io.nxmatic.rke2lab.doctor`):
+* *`Doctor` façade* (public, exported, in `io.seedmatic.rke2lab.doctor`):
   `Doctor.consultingService(Patient, MedicalRecordRegistry, InterventionLedgerWriter,
   List<Specialist> hostSpecialists, Consumer<String>) → ConsultingService`. Port-only
   signature. It news up GrantPolicy/ClinicalAccess/DriftSpecialist/Network+ClusterSpecialist/
@@ -208,7 +208,7 @@ re-litigation; the implementation fork the plan left open is now closed.
   makes commit 3 mechanical.
 * *commit-3 mechanism = package-private, NOT bnd `Export-Package` narrowing.* The caveat below is
   right: bnd governs OSGi resolution, not the Maven compile classpath. So commit 3 drops `public`
-  from the 12 actors (all in the one package `io.nxmatic.rke2lab.doctor`); the Java compiler then
+  from the 12 actors (all in the one package `io.seedmatic.rke2lab.doctor`); the Java compiler then
   forbids importing them from seed-master (another module) at BOTH compile and OSGi level, while the
   co-located doctor-core tests (relocated in commit 2) still see them white-box. No ArchUnit, no
   api/impl split. `Doctor` stays the only public assembly type; the concrete `Generalist` it returns
@@ -303,7 +303,7 @@ methods already public); + `Doctor` assembly façade (if the façade option is c
 
 *commit 1 verification*: `flox activate -- ./mvnw -pl :doctor-core,:doctor-port,:seed-master -am clean
 package -Dmaven.build.cache.skipCache=true -DskipTests=false` + count surefire reports; grep proves zero
-`import io.nxmatic.rke2lab.doctor.{HealthSystem,Generalist,DriftSpecialist,ClusterSpecialist,
+`import io.seedmatic.rke2lab.doctor.{HealthSystem,Generalist,DriftSpecialist,ClusterSpecialist,
 NetworkSpecialist,ClinicalAccess,GrantPolicy,Grant}` in `seed-master/src/main`.
 
 == Related

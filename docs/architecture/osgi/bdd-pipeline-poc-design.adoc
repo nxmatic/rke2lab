@@ -99,7 +99,7 @@ On ne le décide pas sur le papier. On construit une maquette compilable, on la 
 
 Un *nouveau module bench* `osgi/runtime/bench/bench-bdd-pipeline` (mouler sur
 `bench-fragment-contribution`, le précédent POC qui a prouvé une hypothèse ; package
-`io.nxmatic.rke2lab.osgibench.bddpipeline`). Deux faces si l'arête cross-monde l'exige (un bench
+`io.seedmatic.rke2lab.osgibench.bddpipeline`). Deux faces si l'arête cross-monde l'exige (un bench
 host + un bench OSGi), tout sous `bench/`, tout jetable.
 
 *Livrable A — la FORME.* La transposition du pipeline *ClusterSeed entier* (6 phases : environment

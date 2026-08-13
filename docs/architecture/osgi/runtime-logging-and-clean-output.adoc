@@ -82,7 +82,7 @@ the pax bundle's own classloader and invokes it reflectively:
 
 [source,java]
 ----
-bundle.loadClass("io.nxmatic.rke2lab.osgi.runtime.logback.PaxLogbackConfigurer")
+bundle.loadClass("io.seedmatic.rke2lab.osgi.runtime.logback.PaxLogbackConfigurer")
       .getMethod("configure", Bundle.class, String.class)
       .invoke(null, bundle, rootLevel);   // rootLevel from LaunchConfig — values flow from the host
 ----

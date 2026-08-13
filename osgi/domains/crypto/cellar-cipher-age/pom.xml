@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -25,14 +25,14 @@
   <dependencies>
     <!-- The CellarCipher seam this bundle fills, and the currency it registers under. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
 
     <!-- The ndh key inventory: the rke2-cluster OpenSSH key the cellar seals to / reveals with. The
          mandatory @Reference — the age service is present only where the inventory is. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-contract</artifactId>
     </dependency>
 
@@ -40,7 +40,7 @@
          the compile classpath here, wired at runtime through this bundle's Import-Package to
          jagged-wrap's export. The only age carrier — no embedded tail (JDK JCA does the crypto). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jagged-wrap</artifactId>
     </dependency>
 

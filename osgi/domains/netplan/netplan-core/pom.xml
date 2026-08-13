@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -19,11 +19,11 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
     <dependency>
@@ -34,11 +34,11 @@
          implements the Specialist SPI over the doctor's record vocabulary, published as a @Component
          the health system's tier-scoped @Reference collects. The domain owns its specialist. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>doctor-spi</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>doctor-contract</artifactId>
     </dependency>
     <!-- bnd-consumed construction annotations: @Component declares the DS descriptor bnd generates
@@ -51,7 +51,7 @@
     <!-- The shared doctor test fixtures (TestReferrals) for the NetworkSpecialist unit test — the
          Referral comes from the one testkit factory, not re-spelled boilerplate. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>doctor-contract-test</artifactId>
       <scope>test</scope>
     </dependency>

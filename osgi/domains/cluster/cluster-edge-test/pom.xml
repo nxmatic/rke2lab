@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-test-parent/pom.xml</relativePath>
@@ -22,21 +22,21 @@
     <!-- The host under test: the edge @Component. provided — the fragment is pure test bytecode that
          resolves against the cluster-edge host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-edge</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The contact the passenger resolves + calls typed (ClusterReadinessContact + ControllerRef).
          DE-SEAMED (installed bundle): pulled through the host closure at runtime, provided here. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>cluster-contract</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- The generic in-container runner the fragment's entry delegates to (InContainerJUnitRunner).
          provided — resolved through the cluster-edge host at runtime. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -48,7 +48,7 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -60,7 +60,7 @@
          snakeyaml-engine rides in transitively via the wrap; jackson + BC are declared explicitly
          (the wrap embeds the fabric8 jars provided, so they are not transitive from it). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>fabric8-wrap</artifactId>
       <scope>test</scope>
     </dependency>
@@ -110,7 +110,7 @@
     <!-- the src/test @OsgiWorld proxy boots Felix + installs the JUnit bundle world (via withScr +
          the runner), and SCR must run so the edge @Component publishes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>

@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
     <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
@@ -26,7 +26,7 @@
          DS-runtime API runtime). The CLI compiles against OsgiRuntime; the felix/pax jars it only
          stages + installs, never compiles against. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>framework-launcher</artifactId>
     </dependency>
     <dependency>
@@ -44,29 +44,29 @@
     <!-- The launcher engine + OSGi connection contract: the host scenario reaches
          OsgiConnection/SeedRuntime/ScenarioCellar/RunRole/TxIdSeed/LogFileSeed/ScenarioOutcomeSeed. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
     <!-- The neutral launcher core (JUnitLauncherCore) NetplanCli names directly. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
     </dependency>
     <!-- The common gardening spine consumed FLAT (SeedReceiver, SessionSeed, Gardening.sow,
          EphemeralCellar). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-bdd</artifactId>
     </dependency>
     <!-- The broker seam the host speaks (Amendment roles + Cellar); the ONE host<->OSGi membrane. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The broker mechanism (embed type=runtime): DefaultSeedBroker + DefaultAmendmentAssembler,
          staged under META-INF/bundles + published by SCR so the sow resolves the netplan door. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-runtime</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -74,7 +74,7 @@
          the graph so the staging closure stages it under META-INF/bundles; at boot it attaches to
          pax-logging-logback and the launcher invokes its PaxLogbackConfigurer reflectively. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>pax-logback-config</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -82,14 +82,14 @@
          serve the `netplan` coordinates and grow NetplanBlueprintScenario in-container. Staged INTACT;
          it pulls netplan-contract into the staged world via its import closure (no flat host copy). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- jGiven-in-OSGi wrap, dual-realm (staged as a bundle AND kept host-flat): the host root
          scenario is a jGiven ScenarioTest, so jgiven runs FLAT for it and as a BUNDLE for the scion. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>jgiven-wrap</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -160,7 +160,7 @@
     </dependency>
     <!-- The embedded-Felix CLI-scope test boots the same topology as the deployed jar. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>
@@ -201,7 +201,7 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <configuration>
-          <mainClass>io.nxmatic.rke2lab.netplan.cli.NetplanCli</mainClass>
+          <mainClass>io.seedmatic.rke2lab.netplan.cli.NetplanCli</mainClass>
         </configuration>
       </plugin>
       <!-- Flags + artifact filter inherited from build-parent's managed shade
@@ -224,7 +224,7 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>io.nxmatic.rke2lab.netplan.cli.NetplanCli</mainClass>
+                  <mainClass>io.seedmatic.rke2lab.netplan.cli.NetplanCli</mainClass>
                 </transformer>
               </transformers>
             </configuration>

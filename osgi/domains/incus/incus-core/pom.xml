@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -21,38 +21,38 @@
   <dependencies>
     <!-- The host-tree wire-records the fold decodes + the entries the CRUD writes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-contract</artifactId>
     </dependency>
     <!-- The flat grow views the scion projects (GrowNetworkView): GrowNetworkResolver assembles it. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>incus-ingress-contract</artifactId>
     </dependency>
     <!-- The netplan blueprint + synthesis service GrowNetworkResolver reads to project the NIC hwaddrs
          and the dnsmasq config the per-cluster bridge carries. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
     <!-- The codec the fold uses to decode the cellar-timeline envelopes. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <!-- SeedEnvelope is imported directly (not only via seed-broker-codec) — declare the port. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The auth port LaunchSecretsWriter asks for the gh/flox token (§ provisioning-slice #10):
          the value crosses via AuthTokenContact, realised by auth-edge (gh/flox CLI). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
   </dependencies>

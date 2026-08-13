@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -15,20 +15,20 @@
   <description>The live bbox edge: an @Component satisfying BboxReconciler by opening one session to
     the Bouygues Bbox router and applying each desired reservation. Imports java-bbox-api-client and
     gson (both real OSGi bundles, staged as carriers) rather than embedding them; no library type
-    reaches the host (it is purified off io.nxmatic.bbox.*). Translates the home vocabulary
+    reaches the host (it is purified off io.seedmatic.bbox.*). Translates the home vocabulary
     (BboxReservationRequest/BboxRowOutcome/BboxAction) to and from the library's.</description>
 
   <dependencies>
     <!-- The edge implements BboxReconciler and speaks the reservation vocabulary — all in the
          contract; it needs nothing of bbox-core's enumerator logic. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>bbox-contract</artifactId>
     </dependency>
     <!-- The bbox client + gson are real OSGi bundles: this edge compiles against them and IMPORTS
          them at runtime (staged as carriers, resolved from the registry) — no embedding. -->
     <dependency>
-      <groupId>io.nxmatic</groupId>
+      <groupId>io.seedmatic</groupId>
       <artifactId>java-bbox-api-client</artifactId>
     </dependency>
     <dependency>
@@ -49,12 +49,12 @@
 
     <!-- The boot test -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-testkit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
       <scope>test</scope>
     </dependency>

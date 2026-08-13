@@ -23,7 +23,7 @@
     # Keep the dependency one-directional at the flake level: nix-darwin-home -> rke2lab.
 
     # Use flake-commons as aggregator to stay synchronized with nix-darwin-home
-    flake-commons.url = "github:nxmatic/nix-flake-commons/develop";
+    flake-commons.url = "github:seedmatic/nix-flake-commons/develop";
 
     # Follow flake-commons versions
     nixpkgs.follows = "flake-commons/nixpkgs";
@@ -113,7 +113,7 @@
       hostM2Repo = "${builtins.getEnv "M2_REPO"}";
       hostGHToken = "${builtins.getEnv "GH_TOKEN"}";
 
-      # The io.nxmatic closure the `.mvn/extensions.xml` core extension needs at
+      # The io.seedmatic closure the `.mvn/extensions.xml` core extension needs at
       # bootstrap: staging-extension + its bnd-read dep + the parent-POM chain
       # (aggregator maven-embed-staging-ext → build-parent → root rke2lab). Model
       # building resolves every link BEFORE any POM, by the BootstrapCoreExtensionManager
@@ -121,11 +121,11 @@
       # build's resolver only). So the whole closure must be seeded into the PRIMARY,
       # from the host ~/.m2 where it is `mvn install`ed.
       stagingExtensionClosure = [
-        "io/nxmatic/rke2lab/staging-extension"
-        "io/nxmatic/rke2lab/bnd-read"
-        "io/nxmatic/rke2lab/maven-embed-staging-ext"
-        "io/nxmatic/rke2lab/build-parent"
-        "io/nxmatic/rke2lab/rke2lab"
+        "io/seedmatic/rke2lab/staging-extension"
+        "io/seedmatic/rke2lab/bnd-read"
+        "io/seedmatic/rke2lab/maven-embed-staging-ext"
+        "io/seedmatic/rke2lab/build-parent"
+        "io/seedmatic/rke2lab/rke2lab"
       ];
 
       # Shared Maven-in-nix plumbing for both reactor derivations: a buildPhase prelude
@@ -162,7 +162,7 @@
           fi
         done
 
-        if [ ! -d "$M2_REPO/io/nxmatic/rke2lab/staging-extension" ]; then
+        if [ ! -d "$M2_REPO/io/seedmatic/rke2lab/staging-extension" ]; then
           cat <<EoE
           FATAL: staging-extension not seeded from '${hostM2Repo}'." >&2
           That path has no ~/.m2 artifacts. Either:
@@ -350,7 +350,7 @@
 
         # Maven-build toolchain re-exported as individual packages, so the flox
         # env pins each tool to this flake's version
-        # (e.g. `shfmt.flake = "github:nxmatic/rke2lab#shfmt"`) instead of the
+        # (e.g. `shfmt.flake = "github:seedmatic/rke2lab#shfmt"`) instead of the
         # overlapping fleet includes. This flake is the source of truth; flox
         # follows it, keeping the dev loop aligned with the Maven build's
         # spotless gate.

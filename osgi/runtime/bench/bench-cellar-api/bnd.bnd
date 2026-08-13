@@ -1,2 +1,2 @@
-Bundle-SymbolicName: io.nxmatic.rke2lab.benchcellar.api
-Export-Package: io.nxmatic.rke2lab.benchcellar
+Bundle-SymbolicName: io.seedmatic.rke2lab.benchcellar.api
+Export-Package: io.seedmatic.rke2lab.benchcellar

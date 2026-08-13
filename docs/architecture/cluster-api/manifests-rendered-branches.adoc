@@ -23,8 +23,9 @@ The shape is a *rendered-branch* GitOps model:
 * **`main`** holds the *source* — the CDK8s Java + the input config. Humans edit `main`; nothing
   applies from it.
 * **`manifests/<host>-<role>`** branches hold the *rendered* YAML — one branch per cluster. The
-  `manifests` module regenerates a cluster's tree and **force-pushes** its branch. These branches
-  are ephemeral desired-state, not history — a force-push is expected and correct.
+  `manifests` module regenerates a cluster's tree and **pushes** its branch as ordinary,
+  history-preserving commits. These branches keep the *full change history* — an auditable GitOps
+  trail, never a force-push that discards it.
 * **Every cluster runs Flux** (in a `gitops` vCluster — see <<uniform>>) whose `FluxRoot` tracks
   *its own* branch `manifests/<host>-<role>` and reconciles it.
 
@@ -64,7 +65,7 @@ it is not what consumes these branches today.
 
 The namespace names the *producer* (`manifests`), not the consumer (`gitops`): the branch holds
 rendered manifests, and Flux is only their reader. Per-cluster isolation is a *branch* concern, not
-a directory concern — a render force-pushes ONE branch, so one cluster's regeneration never moves
+a directory concern — a render pushes ONE branch, so one cluster's regeneration never moves
 the `GitRepository` revision the other clusters' consumers watch.
 
 The deeper win is *correctness*: the branch boundary **mirrors the physical cluster boundary**. Each
@@ -80,7 +81,7 @@ path convention a render could get wrong.
 
 === System context (C4 L1)
 
-`manifests` (the SSOT) reads `main` and force-pushes one rendered branch per cluster; each branch is
+`manifests` (the SSOT) reads `main` and pushes one rendered branch per cluster (history-preserving); each branch is
 consumed by the actor that grows that cluster — `seed-master` for `-mgmt`, CAPI/CAPN for `-wrkld`.
 
 [mermaid,manifests-rendered-branches-context,svg]
@@ -89,7 +90,7 @@ flowchart LR
   OP["Operator"]
   MAIN[("git · main<br/>source: CDK8s + config")]
   MOD["manifests<br/>SSOT render"]
-  subgraph REN["git · manifests/* — rendered, force-pushed per cluster"]
+  subgraph REN["git · manifests/* — rendered, pushed per cluster (history kept)"]
     direction TB
     BM[("manifests/nikopol-mgmt<br/>seed-master sow")]
     BW1[("manifests/nikopol-wrkld<br/>CAPI CRs")]
@@ -101,9 +102,9 @@ flowchart LR
   W2["bioskop-wrkld"]
   OP -->|edits| MAIN
   MAIN -->|reads| MOD
-  MOD -->|"render + force-push"| BM
-  MOD -->|"render + force-push"| BW1
-  MOD -->|"render + force-push"| BW2
+  MOD -->|"render + push"| BM
+  MOD -->|"render + push"| BW1
+  MOD -->|"render + push"| BW2
   BM -->|"consumed by"| SM
   SM -->|"sows (nix-seed)"| MG
   BW1 -->|"consumed by CAPI/CAPN"| MG
@@ -174,7 +175,7 @@ flowchart TB
   SHAPE -->|"role=wrkld"| CRS["CAPI CRs<br/>Cluster · RKE2ControlPlane · LXCMachineTemplate · MachineDeployment"]
   SOW --> DELIV{"delivery"}
   CRS --> DELIV
-  DELIV -->|"branch (steady)"| FP["force-push<br/>manifests/&lt;host&gt;-&lt;role&gt;"]
+  DELIV -->|"branch (steady)"| FP["push · history kept<br/>manifests/&lt;host&gt;-&lt;role&gt;"]
   DELIV -->|"local-only (bootstrap)"| SRV["node server-manifests<br/>FluxRoot + Flux seed"]
 ----
 
@@ -190,8 +191,8 @@ sequenceDiagram
   participant MG as management cluster
   participant WL as workload clusters
   OP->>M: commit source to main
-  M->>G: render + force-push manifests/nikopol-mgmt (sow shape)
-  M->>G: render + force-push manifests/nikopol-wrkld (CAPI CRs)
+  M->>G: render + push manifests/nikopol-mgmt (sow shape)
+  M->>G: render + push manifests/nikopol-wrkld (CAPI CRs)
   SM->>G: read manifests/nikopol-mgmt
   SM->>MG: sow single node — local-only (RKE2 + FluxRoot + providers)
   Note over MG: CAPI · CAPN · CAPRKE2 come up
@@ -265,9 +266,10 @@ The DARWIN-local staging (`.local.d`, see link:../osgi/host-cellar-realisation-s
 Cellar realisation] and `BootstrapPaths`) currently materialises the rendered manifests into a local
 `rke2-manifests.d` (with a rotation slot / drift / `host.live.d` promotion) that a single RKE2 server
 auto-applies. Under this model that whole materialisation *leaves* `.local.d`: the synthesis renders
-the per-cluster tree and **force-pushes it to `manifests/<host>-<role>`** (into a transient git
-worktree of the branch), not into a `server-manifests` drop-in. The rotation / promotion machinery
-is replaced by the render-then-force-push of a branch. `.local.d` is **no longer the delivery
+the per-cluster tree and **pushes it to `manifests/<host>-<role>`** (into a transient git
+worktree of the branch) as history-preserving commits, not into a `server-manifests` drop-in. The
+rotation / promotion machinery is replaced by the render-then-push of a branch. `.local.d` is **no
+longer the delivery
 channel**.
 
 What stays in `.local.d` is then only what legitimately does *not* belong in git — the artefacts of
@@ -296,8 +298,8 @@ because the render is a *pure function* of `(main, config, descriptor)` and ther
 
 |`host.N.staging.d` rotating slot |a transient git *worktree* of `manifests/<host>-<role>` to render into
 |`host.N.drift.*` (staged vs live) |`git diff` (render worktree vs branch HEAD) before push
-|promotion rsync → `host.live.d` |`git push --force` (atomic ref update)
-|N-slot retention (rollback) |re-render from `main@<sha>` — nothing kept locally
+|promotion rsync → `host.live.d` |`git push` (history-preserving, atomic ref update)
+|N-slot retention (rollback) |the branch history — `git revert` to a prior rendered commit (or re-render from `main@<sha>`)
 |remote reads `host.live.d` over the automount |Flux / `seed-master` read the branch — no manifests rsync
 |===
 
@@ -379,7 +381,7 @@ function — the same topology, one rendered form per consumer.
 
 === Delivery target — where it lands
 
-* **`branch`** (steady state) — force-push `manifests/<host>-<role>`; Flux reconciles.
+* **`branch`** (steady state) — push `manifests/<host>-<role>` (history-preserving); Flux reconciles.
 * **`local-only`** (bootstrap) — the node's local `server-manifests`, applied by RKE2 with no git:
   the minimal `FluxRoot` + Flux seed that breaks the chicken-and-egg. It is the *only* output applied
   outside git; everything after is GitOps.
@@ -393,8 +395,8 @@ lets the *flow* be exercised (branch + either format) independently of the CAPI 
 
 The `manifests` module's delivery contract is one sentence per cluster:
 
-> render the cluster `<host>-<role>` (its role-selected domain set) and force-push
-> `manifests/<host>-<role>`.
+> render the cluster `<host>-<role>` (its role-selected domain set) and push
+> `manifests/<host>-<role>` (keeping history).
 
 The role selects the domain set (management: `cluster-api` + base + Tailscale client + the workload
 CAPI CRs; workload: the app stack, no `cluster-api`). This is the per-cluster generalisation of the
@@ -403,7 +405,7 @@ CAPI CRs; workload: the app stack, no `cluster-api`). This is the per-cluster ge
 == The flow stands up before CAPI
 
 The delivery seam is *decoupled from CAPI/CAPN*. Because delivery is nothing but "Flux reconciles a
-rendered branch", the WHOLE flow — `manifests` render → force-push `manifests/<host>-<role>` →
+rendered branch", the WHOLE flow — `manifests` render → push `manifests/<host>-<role>` →
 `FluxRoot` in a `gitops` vCluster → reconcile — can be stood up and validated with ANY content,
 before a single CAPI provider exists. A management cluster's Flux reconciling `manifests/nikopol-mgmt`
 and a workload's Flux reconciling its app stack are the *same mechanism* whether or not the CAPI
@@ -443,3 +445,4 @@ into, rather than co-developing both at once.
 * link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] — the concrete `FluxRoot` / Kustomization shapes
 * link:../bootstrap/stagea-stageb-handoff-contract.adoc[Stage A → Stage B Handoff] — the bootstrap boundary this reframes
 * link:../osgi/manifests-bdd-spec.adoc[Manifests BDD spec] — the `manifests` synthesis scion and its bot committer
+* link:github-credential-model.adoc[GitHub Credential Model] — the auth companion: every push/pull of these branches mints a scoped token from ONE `seedmatic`-org-owned GitHub App (no personal PAT); the `FluxRoot` `secretRef` carries the App-auth Secret (appID + installationID + the cluster's App key)

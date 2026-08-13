@@ -220,7 +220,7 @@ reads ONE authoritative vocabulary and names no seed-master type. The GROW betwe
 pure-host (`com.pulumi` + provider invokes only — it fetches the plan and actualises, computes nothing of
 the domain), NOT a scion; the import-lookup it keeps is a provider invoke, not ssh. Its actualiser
 (`InstanceGrow` + `IncusProviderContext` + `IncusImportLookup`) lives in the host module `incus-ingress`
-(`host/pulumi/`, package `io.nxmatic.rke2lab.controlplane.incus`): the run fetches the plan and DELEGATES
+(`host/pulumi/`, package `io.seedmatic.rke2lab.controlplane.incus`): the run fetches the plan and DELEGATES
 the grow to it, filling an `IngressConfig` from its `BootstrapConfig` — no `com.pulumi.incus` in
 seed-master itself. The probe pulls out to a VERIFY beat (post-grow). See link:host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar §
 the-grow-anatomy] (the scion-projects/host-actualises rule + the plan) and

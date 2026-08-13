@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>host-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../host-parent/pom.xml</relativePath>
@@ -31,7 +31,7 @@
   -->
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>pulumi-edge</artifactId>
     </dependency>
     <!-- compile scope, not test: GrpcChannelNoiseCapture is a JUnit extension shared as a main-scope
@@ -44,7 +44,7 @@
     <!-- the main-scope fixtures name the seed-broker seam (SeedEnvelope/Document) directly; compile,
          same main-scope-fixture rationale as the extension above. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
   </dependencies>

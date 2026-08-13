@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.seedmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>ghapp-bdd</artifactId>
+  <name>osgi/domains/ghapp/ghapp-bdd</name>
+  <description>The ghapp registration scion: the in-container @SeedScenario the grow sows to ensure the
+    one org-owned GitHub App exists and its credentials are sealed. It branches on "are the credentials
+    sealed" (idempotent-keep), and when absent drives two cultivating edges — GithubAppRegistrar (the
+    manifest flow over the loopback endpoint) and OperatorNotifier (pop the operator's browser) —
+    sealing the resolved GithubAppCredentials at GhAppCoordinate.GITHUB_APP. The App manifest is a
+    bundle resource. GithubAppRunbookHandler is the broker's host-to-scion door (no input).</description>
+
+  <dependencies>
+    <!-- GithubAppCredentials / GhAppCoordinate / GithubAppRegistrar (the sealed case + the register verb). -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-contract</artifactId>
+    </dependency>
+    <!-- OperatorNotifier: the desktop edge the scenario drives to signal the operator. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>operator-notifier-port</artifactId>
+    </dependency>
+    <!-- Map the .secrets JSON subtree (via SecretsGateway) to/from GithubAppCredentials in-container. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!-- Cellar / Parcel / SeedCoordinate / RunbookCoordinate / SeedHandler / Sensitivity / SeedEnvelope. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <!-- GenericRunbookHandler, ScenarioPlayer, @SeedScenario, CellarReceiver, ScenarioCellar, OsgiService. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>scenario-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

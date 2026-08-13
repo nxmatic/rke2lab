@@ -29,14 +29,14 @@ The domain has four modules:
 |===
 | Module | Role
 
-| `worktree-contract` (`type=contract`, pkg `io.nxmatic.rke2lab.worktree`)
+| `worktree-contract` (`type=contract`, pkg `io.seedmatic.rke2lab.worktree`)
 | The jgit-free `Worktree` service interface (OSGi consumers `@Reference` it — the incus scion), the
 `RenderedBranch` factory + its `LinkedWorktree` handle (the rendered-branch delivery seam), the
 entry-gate wire types `GatePolicy` and `WorktreeRunbookInput` (`@SeedContract("runbook")`), AND the
 cellar-harvested wire types folded in from the former `worktree-contract-host` (see <<refinement>>):
 `WorktreeFacts`, `WorktreeCoordinate`, `Provenance`, `WorkingState`. OSGi-only.
 
-| `worktree-core` (pkg `io.nxmatic.rke2lab.worktree.internal`)
+| `worktree-core` (pkg `io.seedmatic.rke2lab.worktree.internal`)
 | `JgitWorktree` and `JgitRenderedBranch` `@Component`s, composing the jgit-holder `JgitCheckout` (all
 git facts + write verbs for one worktree path), the `GitCli` (the sole `git worktree` shell), the
 `JgitLinkedWorktree` handle, and the `SshCommitSigner`. jgit lives only here.

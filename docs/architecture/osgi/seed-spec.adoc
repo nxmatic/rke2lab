@@ -214,7 +214,7 @@ class moved host→OSGi drops one `-port`'s host-import count toward 0.
   `Topic.Execution` alone — pure value-threading, jGiven-free. With the seed's fluent `during/then`
   gone, the grammar's only surviving OSGi consumer was manifests-core, so the shared seam had no
   reason to stand: the engine relocated INTO manifests-core as
-  `io.nxmatic.rke2lab.manifests.internal.synthesis` (`Phase`/`PhaseRunner`/`PhaseFailure`, un-exported),
+  `io.seedmatic.rke2lab.manifests.internal.synthesis` (`Phase`/`PhaseRunner`/`PhaseFailure`, un-exported),
   the unit `Topic`→`Phase` (neither the pipeline word nor jGiven's `Stage`). The boot ceased to be a
   `Topic` too: `FrameworkLaunch.embedded().launch()` is invoked as a scenario's first jGiven step, not
   a pipeline verb. `PipelineContext` died with the host. The gate `PIPELINE_PATTERN` became

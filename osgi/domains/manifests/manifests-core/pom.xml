@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -28,7 +28,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>domain-annotations</artifactId>
     </dependency>
     <!-- The cdk8s vocabulary (org.cdk8s + software.constructs) comes from the manifests-cdk8s carrier
@@ -36,7 +36,7 @@
          build-time compile need only (so bnd computes the Import-Package); at runtime manifests-core
          resolves the packages bundle-to-bundle against the carrier, never host-flat. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-cdk8s</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -72,42 +72,42 @@
       <artifactId>commons-compress</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-contract</artifactId>
     </dependency>
     <!-- The dual-realm host face carrying ComponentVersions: ManifestSynthesisContext + every unit's
          componentVersions() name it. Declared directly (not leaned on transitively via -contract). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>manifests-ingress-contract</artifactId>
     </dependency>
     <!-- The seed-broker seam + the shape engine: manifests contributes its shape reflector (a
          @Component SeedHandler serving ShapeCoordinate("manifests")), decoding via the codec and
          projecting the runbook-input schema via seed-broker-shape's RecordSchemaProjector. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-shape</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
     <!-- The ndh keystore reader seam: SopsAgeMaterialResolver reads the rke2-cluster SSH key through
          it (the single reader, realised by ndh-core), no longer navigating keys.yaml itself. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ndh-contract</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
     </dependency>
     <!-- org.osgi.resource (capability graph types used by ManifestsDomainRegistry / VisitOrder).
@@ -134,7 +134,7 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-testkit</artifactId>
       <scope>test</scope>
     </dependency>

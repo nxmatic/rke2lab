@@ -1,9 +1,9 @@
 -include: ../../../bundle-parent/annotations.bnd
 Import-Package: ${annotation-noimports}, *
-Bundle-SymbolicName: io.nxmatic.rke2lab.dbus.systemd.edge
+Bundle-SymbolicName: io.seedmatic.rke2lab.dbus.systemd.edge
 # Self-declares this jar as an embeddable EDGE bundle (scanned + installed under META-INF/bundles by
-# the same io.nxmatic.rke2lab.embed capability as the other carriers). See ssh-to-age-edge.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=edge; edge=dbus-systemd
+# the same io.seedmatic.rke2lab.embed capability as the other carriers). See ssh-to-age-edge.
+Provide-Capability: io.seedmatic.rke2lab.embed; type=edge; edge=dbus-systemd
 
 # Wildcard (overriding bnd's auto per-component value) so a test fragment attached to this edge can
 # contribute its own OSGI-INF/*.xml: findEntries spans attached fragments, so this catches BOTH this

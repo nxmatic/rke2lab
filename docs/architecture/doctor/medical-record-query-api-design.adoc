@@ -4,7 +4,7 @@
 
 *Status:* ✅ Implemented on `feature/medical-record-accumulator`. This is the settled design and its
 rationale; the as-built code is the `pulumi-automation-ext` module (root package
-`io.nxmatic.rke2lab.pulumi.automation`) plus the doctor records under
+`io.seedmatic.rke2lab.pulumi.automation`) plus the doctor records under
 `seed-master/.../controlplane/bdd/`. Where a design-time name and a shipped name differ, the
 mapping is called out inline (see _As-built mapping_ below). The model was grounded on a working
 proof before implementation (the throwaway `wip/sandbox` program; not retained on `main`).
@@ -113,7 +113,7 @@ seed-master, so every seed-* reuses it.
 *generated provider SDK* — `sdks/incus` is package `com.pulumi.incus` with resource classes
 (`StorageBucket`, `NetworkLb`, …) a program instantiates to *create* resources. Our module creates
 nothing; it *observes* a stack from outside the resource graph via the Automation API. So it is a
-*top-level module* (sibling of `netplan`, `manifests`, …), groupId `io.nxmatic.rke2lab`, named
+*top-level module* (sibling of `netplan`, `manifests`, …), groupId `io.seedmatic.rke2lab`, named
 *`pulumi-automation-ext`*: `pulumi-automation` = the tech it builds on (the Automation API client,
 anchored on a `LocalWorkspace` handle — see the next section); `-ext` = it *extends Pulumi's
 client-side capability* by re-providing the versioned export the file backend lacks. It is *not* a
@@ -124,8 +124,8 @@ So there are *three* layers, each in its place:
 * *`pulumi-automation-ext` (new, generic module)* — Pulumi self-introspection: read own state
   (`exportStack`) and history in-process, and materialize the snapshot of *any* past deployment
   (addressed by its deployment instant) over the checkpoint JSON. Knows Pulumi, knows nothing about
-  the doctor. Reusable by any future seed-* module. Coordinates: groupId `io.nxmatic.rke2lab`,
-  artifactId `pulumi-automation-ext`, root package `io.nxmatic.rke2lab.pulumi.automation` (the `-ext`
+  the doctor. Reusable by any future seed-* module. Coordinates: groupId `io.seedmatic.rke2lab`,
+  artifactId `pulumi-automation-ext`, root package `io.seedmatic.rke2lab.pulumi.automation` (the `-ext`
   qualifies the module name, not the package — as `sdks/incus` is artifactId `incus` / package
   `com.pulumi.incus`). As-built types: `StackHandle` (the workspace anchor), `StackHistory` +
   `StackHistory.Entry` (the deployment timeline, ordered by instant), `StackSnapshot` /

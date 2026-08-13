@@ -23,7 +23,7 @@ Currently, all 17 env variable sections are hardcoded in `manifests/src/main/res
 ### 1. `LayerEnvContributor` Interface
 
 ```java
-package io.nxmatic.rke2lab.manifests.layers;
+package io.seedmatic.rke2lab.manifests.layers;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -122,7 +122,7 @@ public interface LayerEnvContributor {
 ### 2. `LayerEnvContext` Interface
 
 ```java
-package io.nxmatic.rke2lab.manifests.layers;
+package io.seedmatic.rke2lab.manifests.layers;
 
 import java.nio.file.Path;
 
@@ -165,7 +165,7 @@ public interface LayerEnvContext {
 ### 3. `LayerEnvContributorRegistry` Service
 
 ```java
-package io.nxmatic.rke2lab.manifests.layers;
+package io.seedmatic.rke2lab.manifests.layers;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -297,7 +297,7 @@ When `rke2lab-env-load.sh` runs post-boot:
 ## Implementation Roadmap
 
 ### Phase 2A: `NetworkingLayerEnvContributor`
-**Location:** `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/NetworkingLayerEnvContributor.java`
+**Location:** `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/networking/NetworkingLayerEnvContributor.java`
 
 ```java
 public class NetworkingLayerEnvContributor implements LayerEnvContributor {
@@ -331,23 +331,23 @@ public class NetworkingLayerEnvContributor implements LayerEnvContributor {
 }
 ```
 
-Register via `META-INF/services/io.nxmatic.rke2lab.manifests.layers.LayerEnvContributor`:
+Register via `META-INF/services/io.seedmatic.rke2lab.manifests.layers.LayerEnvContributor`:
 ```
-io.nxmatic.rke2lab.manifests.layers.networking.NetworkingLayerEnvContributor
+io.seedmatic.rke2lab.manifests.layers.networking.NetworkingLayerEnvContributor
 ```
 
 ### Phase 2B: `HaLayerEnvContributor`
-**Location:** `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/ha/HaLayerEnvContributor.java`
+**Location:** `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/ha/HaLayerEnvContributor.java`
 
 Contributes: `network-vip.env`
 
 ### Phase 2C: `StorageLayerEnvContributor`
-**Location:** `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/storage/StorageLayerEnvContributor.java`
+**Location:** `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/storage/StorageLayerEnvContributor.java`
 
 Contributes: `etcdctl.env`
 
 ### Phase 2D: `RuntimeLayerEnvContributor`
-**Location:** `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/runtime/RuntimeLayerEnvContributor.java`
+**Location:** `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/runtime/RuntimeLayerEnvContributor.java`
 
 Contributes: `rke2.env`, `config.env`, `containerd.env`, `cri.env`, `helm.env`, `kubectl.env`, `user.env`
 

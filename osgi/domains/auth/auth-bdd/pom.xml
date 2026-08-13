@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
+    <groupId>io.seedmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
@@ -11,28 +11,35 @@
 
   <artifactId>auth-bdd</artifactId>
   <name>osgi/domains/auth/auth-bdd</name>
-  <description>The auth-seal scion: the in-container @SeedScenario the host sows early (before any
-    crossing that must authenticate to GitHub). It resolves a short-lived GitHub token from the ONE
-    source of trust — the AuthTokenContact edge (`gh auth token`), never an env var — and files a
-    GithubToken at AuthCoordinate.GITHUB_TOKEN SEALED for the rendered-branch force-push to reveal.
-    AuthRunbookHandler is the broker's host-to-scion door; the scion takes NO input (it reads the
-    token via the edge in-container), so the handler's seedFrom is a no-op.</description>
+  <description>The auth-seal scion: the in-container @SeedScenario the host sows (after the ghapp
+    registration) to file the short-lived GitHub push token SEALED — the ONE place auth DELEGATES its
+    GitHub sourcing to ghapp. It reveals the sealed GithubAppCredentials at GhAppCoordinate.GITHUB_APP,
+    mints a WRITER installation token via GithubAppMinter, and files it as a GithubToken at
+    AuthCoordinate.GITHUB_TOKEN for the rendered-branch push to reveal. The `gh auth token` edge is
+    retired for GitHub. AuthRunbookHandler is the broker's host-to-scion door; the scion takes NO
+    input, so the handler's seedFrom is a no-op.</description>
 
   <dependencies>
-    <!-- AuthTokenContact / AuthTokenSource (the edge verb) + GithubToken / AuthCoordinate (the
-         sealed cellar case this scion files). -->
+    <!-- GithubToken / AuthCoordinate (the sealed cellar case this scion files). -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
+    </dependency>
+    <!-- The delegation target: GithubAppMinter + GithubAppCredentials + GhAppCoordinate + TokenScope +
+         MintedToken. auth-seal reveals the sealed App credentials and mints a WRITER token from them,
+         replacing the retired `gh auth token` edge — the ONE place auth sources GitHub from ghapp. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-contract</artifactId>
     </dependency>
     <!-- Cellar / Parcel / SeedCoordinate / RunbookCoordinate / SeedHandler / Sensitivity / SeedEnvelope. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- GenericRunbookHandler, ScenarioPlayer, @SeedScenario, CellarReceiver, ScenarioCellar, OsgiService. -->
     <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
+      <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
     <dependency>
