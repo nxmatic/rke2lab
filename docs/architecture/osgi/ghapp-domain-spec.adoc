@@ -4,235 +4,154 @@
 
 [NOTE]
 ====
-*Status:* 🟡 Domain built, not yet wired into the grow (2026-08-13). `ghapp-contract`
-(`GithubAppCredentials`, `GhAppCoordinate`, `GithubAppMinter`, `GithubAppRegistrar`, `TokenScope`,
-`MintedToken`), `ghapp-edge` (`GithubAppTokenMinter` + `LoopbackGithubAppRegistrar`) and `ghapp-bdd`
-(`GithubAppScenario` + `GithubAppRunbookHandler`) all build green, as does the `OperatorNotifier`
-foundation edge. Still pending: sowing the `ghapp` crossing in the grow, the writer token seal, and
-the Flux reader render. This is the domain realisation of the cross-cutting vision in
+*Status:* 🟡 Domain built; declaration moved out of the grow into the `ghapp` CLI (2026-08-13).
+`ghapp-contract` (`GithubAppCredentials`, `GhAppCoordinate`, `GithubAppMinter`, `TokenScope`,
+`MintedToken`), `ghapp-edge` (`GithubAppTokenMinter`) and `ghapp-bdd` (`GithubAppScenario` — a pure
+rehydrate — + `GithubAppRunbookHandler`) build green, as does the host-side `GithubAppCli` operator
+command. Still pending: the writer token seal and the Flux reader render. This is the domain
+realisation of the cross-cutting vision in
 link:../cluster-api/github-credential-model.adoc[GitHub Credential Model].
 ====
 
 == Overview
 
 The `ghapp` domain owns *one thing*: the identity of the single org-owned GitHub App
-`seedmatic-automation`. It does two jobs:
+`seedmatic-rke2lab`. It does two jobs:
 
-. *Declare* the App on GitHub — a one-time registration (the App-manifest flow), whose *only*
-  irreducible manual step is a single human approval in the browser.
 . *Mint* short-lived, scoped installation tokens from the App's private key — the writer's
   `contents:write` push token host-side, and (via Kubernetes operators) the readers' tokens
   in-cluster.
+. *Rehydrate* the sealed credentials into each run so the mint has a key to work from.
+
+*Declaration* — creating the App on GitHub, generating its key, installing it, and seeding
+`.secrets` — is NOT a domain job in the grow: it is an out-of-band operator ceremony driven by the
+standalone `ghapp` CLI (see <<The ghapp CLI>>). It is kept out of the grow deliberately: `seed-master`
+runs under `pulumi up`, whose gRPC engine captures the console and makes a mid-run browser/prompt
+unusable, so the human ceremony runs on a real console instead.
 
 Everything the system does with GitHub — `seed-master` pushing a rendered branch, each cluster's Flux
 pulling it — is authenticated by a token minted from this one App. No personal PAT, no `gh auth token`,
 no deploy key. The *why* (escaping the corporate governance of personal tokens) lives in the
-link:../cluster-api/github-credential-model.adoc[credential-model vision]; this doc is the *how* — the
-domain's contract, edge, and scenario, and the three concrete flows.
+link:../cluster-api/github-credential-model.adoc[credential-model vision]; this doc is the *how*.
 
 The domain follows the standard `contract` / `edge` / `bdd` layout (like `auth`, `bbox`, `incus`):
 
 * *ghapp-contract* (`type=contract`) — the vocabulary: `GithubAppCredentials` (the sealed cellar case),
-  `GhAppCoordinate`, the `GithubAppMinter` verb (mint a scoped token), the `GithubAppRegistrar` verb
-  (run the manifest flow), `TokenScope`, `MintedToken`.
-* *ghapp-edge* (`type=edge`, two `@Component`) — the GitHub-API contacts: `GithubAppTokenMinter` signs
-  the App JWT and mints scoped installation tokens; `LoopbackGithubAppRegistrar` drives the
-  manifest-flow conversion and owns the *local HTTP endpoint*.
-* *ghapp-bdd* (`@SeedScenario`) — the scenario the grow sows: register-if-absent (a PENDING step
-  carrying the approval URL) / mint-if-present. Carries the App manifest as a resource. It drives
-  *two* edges — the GitHub-API contact above and the desktop contact below.
-* *OperatorNotifier* — a *foundation* edge (`@Component` over `java.desktop`), the second, cross-cutting
-  contact: it opens the operator's browser and shows a desktop notification. NOT ghapp-specific — any
-  domain may signal the operator; ghapp is its first consumer. See <<Two edges, not host-side>>.
+  `GhAppCoordinate`, the `GithubAppMinter` verb (mint a scoped token), `TokenScope`, `MintedToken`.
+* *ghapp-edge* (`type=edge`, one `@Component`) — the GitHub-API contact: `GithubAppTokenMinter` signs
+  the App JWT and mints scoped installation tokens.
+* *ghapp-bdd* (`@SeedScenario`) — `GithubAppScenario`, a *pure rehydrate*: seal the credentials into
+  the run from the cellar or from the `.secrets` `githubApp` block (via the read-only
+  `SecretsGateway`). No browser, no registration.
+* *GithubAppCli* — the host-side `ghapp` operator command (a `seed-master` subcommand), driving the
+  declaration ceremony (`create` / `install` / `seed`) out-of-band. See <<The ghapp CLI>>.
 
-== The two artefacts the registration needs
+== Why declaration cannot be a loopback POST — GitHub's SameSite hardening
 
-=== The App manifest — the declared shape
+GitHub's original App-*manifest* flow POSTs a JSON manifest from a page you host to
+`github.com/…/settings/apps/new`; GitHub stores it in your web session, you confirm, and it redirects
+with a short-lived `code` you exchange for the PEM. A tempting automation is to host that
+auto-submitting form on a loopback endpoint (`127.0.0.1`) the operator opens. *It cannot work.*
 
-The App's permissions and events are a *declared* artefact — a committed JSON *resource of
-ghapp-bdd* (`.../ghapp/bdd/seedmatic-automation.manifest.json`), no secret in it. It is what the
-manifest flow POSTs to GitHub:
+GitHub protects App creation behind two session cookies — `user_session` (`SameSite=Lax`) and
+`__Host-user_session_same_site` (`SameSite=Strict`). A form served from `127.0.0.1` POSTing to
+`github.com` is a *cross-site POST*, and the browser strips *both* (Lax is withheld on cross-site
+POST; Strict is withheld on any cross-site request). GitHub receives an *anonymous* request, cannot
+tie the manifest to a session, and answers `"url" wasn't supplied` — even though the manifest is
+perfect and the operator is logged in. Proven from a HAR of the real POST: zero session cookies on
+the request. There is no self-install or key-generation API either, so *nothing* lets code create the
+App from a loopback.
 
-[source,json]
-----
-{
-  "name": "seedmatic-automation",
-  "url": "https://github.com/seedmatic/rke2lab",
-  "public": false,
-  "hook_attributes": { "active": false },
-  "redirect_url": "http://localhost:8099/callback",
-  "default_permissions": {
-    "contents": "write",
-    "statuses": "write",
-    "pull_requests": "write",
-    "checks": "write",
-    "metadata": "read"
-  },
-  "default_events": []
-}
-----
+The escape is a *top-level GET navigation*, which DOES carry the Lax session: GitHub's *pre-filled*
+"New GitHub App" form (`settings/apps/new?<params>`). The operator lands *authenticated* on GitHub's
+own page with the App's shape pre-selected, and the final "Create" click is *same-site* on github.com
+(carrying the Strict cookie). That is what the `ghapp create` subcommand opens.
 
-The `default_permissions` are the *union* of what every usage needs; each minted token is *scoped down*
-to a `TokenScope` subset (writer → `contents:write`, reader → `contents:read`, CI →
-`statuses`/`pull_requests`/`checks`). One App, many least-privilege tokens.
+== The ghapp CLI — declaration, out of the grow
 
-=== The HTTP/S endpoint — the callback catcher
-
-The manifest flow is a *browser* round-trip, not a token API: the manifest POST must carry the
-operator's GitHub web session, and GitHub returns the short-lived `code` by *redirecting the browser*
-to the manifest's `redirect_url`. So the registration needs a *local HTTP endpoint*, stood up by
-`ghapp-edge` for the duration of the ceremony, on `http://localhost:8099`:
+`GithubAppCli` runs as the `ghapp` subcommand of `seed-master`'s `Main`, *before* the Pulumi envelope
+(so it needs no engine and prints to the real console). It drives the three-click ceremony and
+finishes it:
 
 [cols="1,3",options="header"]
 |===
-|Route |Purpose
+|Subcommand |What it does
 
-|`GET /` |serves an auto-submitting HTML form that POSTs the manifest to
-`https://github.com/organizations/seedmatic/settings/apps/new?state=<random>` — the operator opens
-this in the browser where they are signed in as a `seedmatic` owner
-|`GET /callback?code=…` |catches GitHub's post-approval redirect; the edge exchanges the `code` via
-`POST https://api.github.com/app-manifests/{code}/conversions`
+|`ghapp create`
+|Opens GitHub's PRE-FILLED New-App form (the top-level GET below) via `java.awt.Desktop`. The
+operator clicks *Create GitHub App* and *Generate a private key* (PEM → `~/Downloads`).
+
+|`ghapp install`
+|Opens the App's install page; the operator installs it on the `seedmatic` org (selecting
+`seedmatic/rke2lab` or all repos).
+
+|`ghapp seed <appId> [pemPath]`
+|Forges the App JWT from the PEM (JDK-only: PKCS#1→PKCS#8 wrap + `SHA256withRSA`), resolves the
+installation id via `GET /app/installations`, and writes the `githubApp` block into `.secrets`
+(`appId` / `installationId` in the clear, `privateKeyPem` marked `# sops:encrypted`). `pemPath`
+defaults to the newest `*.pem` in `~/Downloads`.
 |===
 
-The endpoint is *ephemeral and loopback-only* — it exists only while the scenario waits for the
-approval, binds `127.0.0.1`, and is torn down once the `code` is caught. It is not a service the
-running system exposes.
+The pre-filled form URL (permissions use the permission slug as the parameter name; see
+link:https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-using-url-parameters[GitHub's
+URL-parameters doc]):
 
-== Flow 1 — declaring the App in GitHub
-
-The grow sows the `ghapp` scenario. If the App is already known (its `GithubAppCredentials` are sealed
-— see <<the-pem-is-the-proof>>), this flow is skipped entirely. If not, the scenario runs the
-manifest flow: it stands up the local endpoint, surfaces the URL in the run model, and waits for the
-one human approval.
-
-[mermaid,ghapp-declare,svg]
 ----
-sequenceDiagram
-  actor OP as Operator (terminal + browser)
-  participant PU as pulumi up (gRPC engine)
-  participant SM as seed-master (pulumi-edge) · sows the ghapp scenario
-  participant EP as ghapp-edge · loopback endpoint (127.0.0.1:8099)
-  participant GH as GitHub (seedmatic)
-  OP->>PU: pulumi up
-  PU->>SM: run program (stdout captured by gRPC — unusable for a live signal)
-  SM->>SM: GithubAppCredentials sealed? — no
-  SM->>EP: start endpoint, load manifest resource
-  SM->>OP: Desktop.browse(http://localhost:8099) — OUT-OF-BAND, bypasses console/gRPC
-  OP->>EP: browser GET / (logged-in session)
-  EP-->>OP: auto-submit form → POST manifest to GitHub
-  OP->>GH: "Create GitHub App" (the ONE human click)
-  GH-->>EP: redirect GET /callback?code=…
-  EP->>GH: POST /app-manifests/{code}/conversions
-  GH-->>EP: appId + installationId + PRIVATE KEY (PEM)
-  EP-->>SM: GithubAppCredentials → sealed
-  Note over PU,SM: the scenario BLOCKS on the callback → pulumi sees a slow step, no interactive prompt
+https://github.com/organizations/seedmatic/settings/apps/new
+  ?name=seedmatic-rke2lab
+  &url=https://github.com/seedmatic/rke2lab
+  &webhook_active=false
+  &contents=write&statuses=write&pull_requests=write&checks=write&metadata=read
 ----
 
-*Read it*: the only manual atom is the operator's click on GitHub's "Create GitHub App" page. In
-*preview* mode the `cultivating`-tagged registrar + notifier edges are filtered out of the frontier, so
-the scenario resolves them empty and *seals nothing* — honest inertness (the plan shows the credentials
-are simply not yet present). The registration happens on a *live* `up`, where both edges are present:
-the endpoint stands up, the operator's browser pops, and the scenario blocks on the callback.
-
-== Notifying the operator — java.desktop, not the console
-
-The live approval needs the operator to act *mid-run*, and two obvious channels are both unusable:
-
-* *the console* — `seed-master` runs under `pulumi up`, whose gRPC engine host captures the program's
-  stdout/stderr. A `System.out` line (or a logback *console* appender) is buffered/reframed, not a
-  reliable real-time "act now" signal.
-* *the runbook* — the jGiven report is rendered at the *end* of the root scenario; by the time it
-  exists, the approval moment has passed.
-
-So the live signal is *not a text channel* — it is a *desktop action*, via the JDK's `java.desktop`
-module (no shell-out, no macOS-specific command):
-
-[source,java]
-----
-final URI url = URI.create("http://localhost:8099");
-if (!GraphicsEnvironment.isHeadless()
-    && Desktop.isDesktopSupported()
-    && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-  Desktop.getDesktop().browse(url);              // the operator's browser POPS — that IS the signal
-} else {
-  LOG.warn("Approve the GitHub App at {}", url); // headless fallback: the durable channel
-}
-----
-
-* *Signal* — `Desktop.browse(URI)` opens the operator's default browser to the loopback endpoint; the
-  browser *appearing* is the action-required signal — hands-free, independent of console/gRPC. An
-  optional `java.awt.SystemTray` `TrayIcon.displayMessage(…)` adds a notification banner.
-* *Record / fallback* — the URL is *always* logged at WARN through *logback* (the durable in-code
-  channel — a file appender survives gRPC). On a headless JVM this is the only output: the operator
-  reads the URL from the log and opens it by hand.
-* *Wait* — the scenario then BLOCKS on the callback (the engine's temporal await). Under `pulumi up`
-  this reads as a step that simply takes time — no interactive prompt (which Pulumi does not support).
-
-=== Two edges, not host-side
-
-Opening the browser / notifying is a contact toward an EXTERNAL system — the operator's *desktop* —
-distinct from the GitHub API. So it is its OWN edge: a port `OperatorNotifier` (`browse(URI)` /
-`notify(…)`) satisfied by an `@Component` over `java.desktop`. Because *any* domain may need to signal
-the operator, this is a *foundation* edge (ghapp is merely its first consumer), not ghapp-specific. The
-`ghapp` domain thus drives *two* contacts — the GitHub API (`GithubAppMinter`, JDK `HttpClient`) and the
-desktop (`OperatorNotifier`, `java.desktop`) — and the scenario orchestrates both.
-
-Kept in-container as a proper edge (rather than host-side), it earns the model's properties:
-
-* the in-container scenario invokes it *directly* (bundle-wired) — no broker signal needed to reach
-  host code (the *realm gap* a host-side notifier would open: an in-container scenario cannot open the
-  host's browser without extra machinery);
-* it is *survey-filterable* — tagged `rke2lab.gardening=cultivating` and `@OsgiService(await = false)`
-  like `CliAuthTokenContact`, so under a survey/preview frontier it is absent → the registration PENDS
-  naturally, no browser opened.
-
-And it costs the framework *nothing*: the edge touches only `java.awt.*` / `java.net.*` — `java.*`
-packages, which OSGi boot-delegates to every bundle, so *no* `org.osgi.framework.system.packages.extra`
-entry is needed (bnd omits them from `Import-Package`). The only real constraint is a non-headless GUI
-session for `Desktop` / `SystemTray`; a headless JVM falls back to the logback WARN.
-
-== Flow 2 — retrieving the PEM into the secrets
-
-[[the-pem-is-the-proof]]
-The manifest-flow conversion (`POST /app-manifests/{code}/conversions`) returns the App id and the
-*private key (PEM)* — *once*, at creation. The PEM IS the App's identity proof: knowing the App merely
-EXISTS on GitHub is not enough; *holding its private key* is what lets us later "be the App" (a JWT
-signed with it). So the conversion output is captured immediately.
+The permissions are the *union* of what every usage needs; each minted token is *scoped down* to a
+`TokenScope` subset (writer → `contents:write`, reader → `contents:read`, CI →
+`statuses`/`pull_requests`/`checks`). One App, many least-privilege tokens.
 
 [NOTE]
 ====
-*The installation id is a second step.* Creating the App does not *install* it, so the conversion does
-NOT return an `installationId`. The edge resolves it with a JWT-authed `GET /app/installations` — which
-is empty until the operator installs the App on the org (one more in-browser click in the same
-ceremony). If it is still empty, `LoopbackGithubAppRegistrar` fails fast ("the App was created but is
-not installed on the org yet — install it, then re-run the grow"). Once resolved, the full
-`GithubAppCredentials` triple (`appId` + `installationId` + PEM) is sealed.
+*The three clicks are irreducible.* Creating the App, generating the key, and installing it are
+GitHub-UI-only — there is no API for an App to install itself or mint its own first key. `ghapp seed`
+automates *only* what has an API: installation-id resolution and the `.secrets` write. It turns the
+manual URL-reading + YAML edit into one command; it does not remove the clicks.
 ====
 
-[mermaid,ghapp-seal,svg]
+[mermaid,ghapp-cli,svg]
 ----
-flowchart LR
-  CONV["conversion output<br/>appId + installationId + PEM"]
-  REC["GithubAppCredentials<br/>(record, @SeedContract github-app)"]
-  CEL[("cellar / .secrets — SEALED<br/>GhAppCoordinate.GITHUB_APP")]
-  CONV --> REC --> CEL
-  classDef s fill:#dfd,stroke:#2a2,stroke-width:2px;
-  class REC,CEL s;
+sequenceDiagram
+  actor OP as Operator (real console + browser)
+  participant CLI as ghapp CLI (host, before Pulumi)
+  participant GH as GitHub (seedmatic)
+  OP->>CLI: ghapp create
+  CLI->>GH: Desktop.browse(pre-filled form) — top-level GET (Lax session rides)
+  OP->>GH: Create App · Generate key (PEM → ~/Downloads)
+  OP->>CLI: ghapp install
+  CLI->>GH: Desktop.browse(install page)
+  OP->>GH: Install on seedmatic (select repos)
+  OP->>CLI: ghapp seed <appId>
+  CLI->>GH: JWT → GET /app, GET /app/installations
+  CLI->>CLI: write githubApp block → .secrets (privateKeyPem # sops:encrypted)
 ----
 
-The PEM lands in *two* homes for two lifetimes:
+== The grow rehydrates — GithubAppScenario
 
-* the *cellar* case `GithubAppCredentials` at `GhAppCoordinate.GITHUB_APP`, `Sensitivity.SEALED` — the
-  in-run source the writer mint and the reader-Secret render fetch;
-* `.secrets` (sops-governed, committed encrypted) under `githubApp.{appId,installationId,privateKeyPem}`
-  — the durable, operator-owned source of truth, so a later grow (fresh cellar) re-seals from it
-  without a new human approval.
+The grow sows `GithubAppScenario`. It is a *pure rehydrate* — it never declares the App, never opens a
+browser, never hard-fails:
 
-`appId` / `installationId` are identifiers, not secrets; the PEM is the crown material — so the whole
-record is sealed. It is never re-derivable: if lost, a *new* key must be generated in the GitHub UI
-(also human-gated).
+. *cellar hit* — the `GithubAppCredentials` were already sealed this run → no-op (idempotent-keep).
+. *`.secrets` hit* — the `githubApp` block is present (via the read-only `SecretsGateway`) →
+  rehydrate: seal to the cellar. This is the steady state once the operator has run `ghapp seed`.
+. *miss* — neither present → seals nothing. That is the honest local skip: a required-credential
+  absence is a HARD fail at the CONSUMPTION site (the writer mint / the Flux-Secret render), never
+  here. If the operator has not run the `ghapp` CLI, the downstream mint/render fails loudly.
 
-== Flow 3 — using it in the cluster via Flux
+The credentials thus live in *two* homes for two lifetimes: `.secrets` (sops-governed, committed
+encrypted, operator-owned — the durable source of truth, written by `ghapp seed`) and the *cellar*
+case `GithubAppCredentials` at `GhAppCoordinate.GITHUB_APP`, `Sensitivity.SEALED` (the in-run working
+copy the writer mint and the reader-Secret render fetch). The PEM is never re-derivable: if lost, a
+*new* key must be generated in the GitHub UI (also human-gated).
+
+== Flow — using it in the cluster via Flux
 
 The management cluster's Flux pulls the rendered branch as the App. `seed-master` renders a *githubapp
 Secret* — the Flux Operator's native GitHub App auth shape — into the *local-only bootstrap seed* (the
@@ -316,7 +235,7 @@ This *replaces* the current `gh auth token` → sealed `GithubToken` → `JgitCh
 the push must never be left without a credential. `GithubAppMinter` is fail-fast: it returns a token or
 throws, never a silent fallback.
 
-== The domain — contract / edge / bdd (UML)
+== The domain — contract / edge / bdd / host CLI (UML)
 
 [mermaid,ghapp-uml,svg]
 ----
@@ -346,74 +265,51 @@ classDiagram
     <<port>>
     +mint(GithubAppCredentials, TokenScope) MintedToken
   }
-  class GithubAppRegistrar {
-    <<port>>
-    +register(manifest, onReady) GithubAppCredentials
-  }
   class GithubAppTokenMinter {
     <<edge>>
     +mint(GithubAppCredentials, TokenScope) MintedToken
   }
-  class LoopbackGithubAppRegistrar {
-    <<edge>>
-    +register(manifest, onReady) GithubAppCredentials
-  }
   class GithubAppScenario {
     <<scenario>>
-    +register_if_absent()
+    +the_github_app_credentials_are_rehydrated()
   }
-  class WriterMintScenario {
-    <<scenario>>
-    +mint_and_seal_writer_token()
-  }
-  class OperatorNotifier {
-    <<port>>
-    +browse(URI)
-    +notify(text)
-  }
-  class DesktopNotifierEdge {
-    <<edge>>
-    +browse(URI)
-    +notify(text)
+  class GithubAppCli {
+    <<host CLI>>
+    +create()
+    +install()
+    +seed(appId, pemPath)
   }
   GithubAppCredentials ..> GhAppCoordinate : sealed at
   GithubAppMinter ..> GithubAppCredentials : consumes
   GithubAppMinter ..> TokenScope : scopes
   GithubAppMinter ..> MintedToken : produces
-  GithubAppRegistrar ..> GithubAppCredentials : produces
   GithubAppTokenMinter ..|> GithubAppMinter : implements
-  LoopbackGithubAppRegistrar ..|> GithubAppRegistrar : implements
-  DesktopNotifierEdge ..|> OperatorNotifier : implements
-  GithubAppScenario ..> GithubAppRegistrar : drives (GitHub API)
-  GithubAppScenario ..> OperatorNotifier : drives (desktop)
-  GithubAppScenario ..> GithubAppCredentials : seals
-  WriterMintScenario ..> GithubAppMinter : drives
-  WriterMintScenario ..> GithubAppCredentials : reveals
+  GithubAppScenario ..> GithubAppCredentials : rehydrates + seals
+  GithubAppCli ..> GithubAppCredentials : writes .secrets block
 ----
 
-*Read it*: the *contract* is pure vocabulary (records + enums + two verbs, `GithubAppMinter` and
-`GithubAppRegistrar`). Three *edges* do the external contacts — `GithubAppTokenMinter` implements the
-minter (JWT + API), `LoopbackGithubAppRegistrar` implements the registrar (the manifest flow + the
-local endpoint), and `DesktopNotifierEdge` (a *foundation* edge over `java.desktop`) implements
-`OperatorNotifier` (browse + notify). Two *scenarios* consume them: the grow-sown `GithubAppScenario`
-drives the registrar + notifier and seals the credentials on first registration; the
-`WriterMintScenario` reveals those credentials and mints + seals the WRITER token the host reveals to
-push (see <<The writer — the spine>>). Both minting and registration are host-side-invisible — the host
-speaks only to the broker.
+*Read it*: the *contract* is pure vocabulary (records + enums + the `GithubAppMinter` verb). One
+*edge* does the GitHub-API contact — `GithubAppTokenMinter` (JWT + API). The grow-sown
+`GithubAppScenario` only rehydrates the sealed credentials (cellar or `.secrets`). The host-side
+`GithubAppCli` owns declaration (create / install / seed). No in-container browser edge exists — the
+human ceremony is host-side, out of the pulumi-driven grow.
 
 == Predictability & caveats
 
-* *One human atom, once.* App creation and key generation are GitHub-UI/manifest-flow gated — no token
-  API. The registration surfaces this as a PENDING step with the approval URL; every run after the PEM
-  is sealed is fully automatic.
+* *Three human clicks, once.* Create the App, generate the key, install it — GitHub-UI-only, no API.
+  Every run after `.secrets` is seeded is fully automatic (rehydrate).
 * *Existence ≠ authority.* Only *holding the PEM* authenticates as the App. The scenario branches on
-  "is the PEM sealed", not "does the App exist".
-* *One key, scoped short tokens.* No per-cluster keys (generating App keys is UI-only). Isolation is by
-  *token scope* (a reader never mints write) and short lifetime (≈1 h); revocation is suspend-the-App
-  or rotate-the-key.
-* *Fail-fast mint.* `GithubAppMinter` throws on failure — never a silent fallback to another source.
-* *Loopback endpoint only.* The registration HTTP endpoint binds `127.0.0.1`, exists only during the
-  ceremony, and is torn down after the callback.
+  "is the PEM sealed / anchored", not "does the App exist".
+* *No loopback, by GitHub's design.* App creation is gated behind `SameSite` session cookies a
+  cross-site loopback POST cannot carry; the pre-filled top-level-GET form is the only working path.
+* *Declaration out of the grow.* Because `seed-master` runs under `pulumi up` (console captured by the
+  gRPC engine), the browser ceremony lives in the standalone `ghapp` CLI on the real console — the
+  grow only rehydrates.
+* *One key, scoped short tokens.* No per-cluster keys (generating App keys is UI-only). Isolation is
+  by *token scope* (a reader never mints write) and short lifetime (≈1 h); revocation is
+  suspend-the-App or rotate-the-key.
+* *Read-only secrets seam.* The in-container `SecretsGateway` only READS `.secrets`; the one write
+  (the `githubApp` block) is the host-side `ghapp seed` command, not a scion.
 
 == Related documentation
 
@@ -423,5 +319,7 @@ speaks only to the broker.
   delivery seam whose auth this domain provides.
 * link:auth-edge-spec.adoc[auth-edge] — the sibling credential domain whose `gh auth token` writer path
   this supersedes.
+* https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-using-url-parameters[Registering
+  a GitHub App using URL parameters] — the pre-filled-form mechanism `ghapp create` uses.
 * https://fluxcd.io/blog/2025/04/flux-operator-github-app-bootstrap/[Flux Operator GitHub App bootstrap]
   — the native reader minting this domain feeds.

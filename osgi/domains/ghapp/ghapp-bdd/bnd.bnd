@@ -4,7 +4,7 @@ Bundle-SymbolicName: io.seedmatic.rke2lab.ghapp.bdd
 # A type=model embeddable bundle (scanned + installed under META-INF/bundles by the
 # io.seedmatic.rke2lab.embed capability, like the other domain carriers). isDomain, so StagingClosure
 # stages its import closure — this is how jgiven-wrap and its tail, plus the ghapp-contract /
-# operator-notifier-port / seed-broker-port / scenario-engine bundles it imports, enter the LIVE world.
+# seed-broker-port / scenario-engine bundles it imports, enter the LIVE world.
 Provide-Capability: io.seedmatic.rke2lab.embed; type=model; model=ghapp-bdd
 
 # No Export-Package: the scenario class is bundle-private, played by class-selection; the handler is

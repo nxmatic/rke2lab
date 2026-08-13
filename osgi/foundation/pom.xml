@@ -23,7 +23,5 @@
     <module>seed-broker-testkit</module>
     <module>seed-broker-shape</module>
     <module>seed-bdd</module>
-    <module>operator-notifier-port</module>
-    <module>operator-notifier-edge</module>
   </modules>
 </project>

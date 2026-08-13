@@ -355,9 +355,8 @@
       <artifactId>auth-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- The ghapp scion + its two edges + the operator-notifier foundation edge: embedded like the
-         auth / cluster-pki scions so the broker has a "ghapp" handler and the registrar / minter /
-         desktop-notifier @Components publish. ghapp-contract + operator-notifier-port ride in
+    <!-- The ghapp scion + its token-minter edge: embedded like the auth / cluster-pki scions so the
+         broker has a "ghapp" handler and the minter @Component publishes. ghapp-contract rides in
          transitively via the scion's import closure. runtime scope — seed-master never compiles
          against them; it sows the neutral RunbookCoordinate("ghapp") through the broker. -->
     <dependency>
@@ -368,11 +367,6 @@
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ghapp-edge</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.seedmatic.rke2lab</groupId>
-      <artifactId>operator-notifier-edge</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT

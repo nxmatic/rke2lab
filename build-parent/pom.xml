@@ -163,16 +163,6 @@
       </dependency>
       <dependency>
         <groupId>io.seedmatic.rke2lab</groupId>
-        <artifactId>operator-notifier-port</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.seedmatic.rke2lab</groupId>
-        <artifactId>operator-notifier-edge</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>ghapp-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>

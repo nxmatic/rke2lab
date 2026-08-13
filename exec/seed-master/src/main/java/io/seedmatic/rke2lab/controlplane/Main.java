@@ -9,6 +9,7 @@ import io.seedmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.seedmatic.rke2lab.controlplane.bdd.SeedRun;
 import io.seedmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.seedmatic.rke2lab.controlplane.config.ConfigLoader;
+import io.seedmatic.rke2lab.controlplane.config.GithubAppCli;
 import io.seedmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.seedmatic.rke2lab.incus.ingress.BootstrapPaths;
 import io.seedmatic.rke2lab.osgi.runtime.junit.launcher.JUnitLauncherCore;
@@ -53,6 +54,13 @@ public final class Main {
   private Main() {}
 
   public static void main(String[] args) {
+    // Operator subcommand: drive the out-of-band GitHub App declaration ceremony (create / install
+    // / seed .secrets). Kept OUT of the grow because seed-master runs under pulumi up, whose gRPC
+    // engine captures the console — so this runs before the Pulumi envelope, on the real console.
+    if (args.length > 0 && "ghapp".equals(args[0])) {
+      GithubAppCli.run(args);
+      return;
+    }
     // Route the process's raw console to the boot file, NEVER the real console: under a remote
     // debugger the console is not drained, so a native write to System.out/err blocks the
     // FelixStartLevel thread and the boot deadlocks (proven by jstack). This catches stray direct

@@ -11,23 +11,18 @@
 
   <artifactId>ghapp-bdd</artifactId>
   <name>osgi/domains/ghapp/ghapp-bdd</name>
-  <description>The ghapp registration scion: the in-container @SeedScenario the grow sows to ensure the
-    one org-owned GitHub App exists and its credentials are sealed. It branches on "are the credentials
-    sealed" (idempotent-keep), and when absent drives two cultivating edges — GithubAppRegistrar (the
-    manifest flow over the loopback endpoint) and OperatorNotifier (pop the operator's browser) —
-    sealing the resolved GithubAppCredentials at GhAppCoordinate.GITHUB_APP. The App manifest is a
-    bundle resource. GithubAppRunbookHandler is the broker's host-to-scion door (no input).</description>
+  <description>The ghapp scion: the in-container @SeedScenario the grow sows to make the one org-owned
+    GitHub App's credentials available to the run. A pure rehydrate — cellar hit (idempotent-keep) or
+    rehydrate from the .secrets githubApp block (via the read-only SecretsGateway), sealing the
+    resolved GithubAppCredentials at GhAppCoordinate.GITHUB_APP. It does NOT declare the App: that
+    out-of-band ceremony (create / install / seed .secrets) is the standalone `ghapp` CLI, kept out of
+    the pulumi-driven grow. GithubAppRunbookHandler is the broker's host-to-scion door (no input).</description>
 
   <dependencies>
-    <!-- GithubAppCredentials / GhAppCoordinate / GithubAppRegistrar (the sealed case + the register verb). -->
+    <!-- GithubAppCredentials / GhAppCoordinate (the sealed case + coordinate). -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ghapp-contract</artifactId>
-    </dependency>
-    <!-- OperatorNotifier: the desktop edge the scenario drives to signal the operator. -->
-    <dependency>
-      <groupId>io.seedmatic.rke2lab</groupId>
-      <artifactId>operator-notifier-port</artifactId>
     </dependency>
     <!-- Map the .secrets JSON subtree (via SecretsGateway) to/from GithubAppCredentials in-container. -->
     <dependency>

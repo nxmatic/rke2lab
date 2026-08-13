@@ -11,11 +11,10 @@
 
   <artifactId>ghapp-edge</artifactId>
   <name>osgi/domains/ghapp/ghapp-edge</name>
-  <description>The live ghapp edge: two @Components over the JDK — GithubAppTokenMinter satisfies
-    GithubAppMinter (sign the App JWT, POST a scoped installation token) and LoopbackGithubAppRegistrar
-    satisfies GithubAppRegistrar (run the App-manifest flow over an ephemeral loopback ServerSocket,
-    exchange the code, resolve the installation id). BouncyCastle reads the PEM; the JDK HttpClient calls
-    GitHub. Tagged rke2lab.gardening=cultivating so survey/preview filters both out.</description>
+  <description>The live ghapp edge: one @Component over the JDK — GithubAppTokenMinter satisfies
+    GithubAppMinter (sign the App JWT, POST a scoped installation token). BouncyCastle reads the PEM;
+    the JDK HttpClient calls GitHub. Tagged rke2lab.gardening=cultivating so survey/preview filters it
+    out. (Declaration of the App is host-side, in the standalone ghapp CLI — not an edge.)</description>
 
   <dependencies>
     <dependency>

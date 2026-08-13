@@ -1,8 +1,0 @@
--include: ../../bundle-parent/annotations.bnd
-Import-Package: ${annotation-noimports}, *
-Bundle-SymbolicName: io.seedmatic.rke2lab.operator.notifier.edge
-# An embeddable EDGE bundle (scanned + installed under META-INF/bundles by the io.seedmatic.rke2lab.embed
-# capability). Belongs to no domain — a cross-cutting foundation edge (edge=operator-notifier). The
-# desktop contact touches only java.* packages (java.awt / java.net), boot-delegated to every bundle,
-# so it needs no system.packages.extra entry.
-Provide-Capability: io.seedmatic.rke2lab.embed; type=edge; edge=operator-notifier
