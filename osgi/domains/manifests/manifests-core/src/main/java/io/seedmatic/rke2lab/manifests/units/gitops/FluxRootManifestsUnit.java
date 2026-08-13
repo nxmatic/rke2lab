@@ -14,28 +14,33 @@ import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
 /**
- * Manifest unit that creates the Flux GitRepository and root Kustomization for GitOps bootstrap.
+ * The chicken-and-egg solver for the rendered-branch GitOps model: the single bootstrap object — a
+ * {@code GitRepository} on THIS cluster's rendered branch plus a root {@code Kustomization} — that,
+ * once seeded from the node's local-only server-manifests, lets Flux self-manage everything else
+ * from the branch (see {@code docs/architecture/cluster-api/manifests-rendered-branches.adoc} and
+ * {@code github-credential-model.adoc}).
  *
- * <p>This is the chicken-and-egg solver for GitOps bootstrap:
+ * <p><b>GitRepository:</b> {@code https://github.com/seedmatic/rke2lab.git} (HTTPS — App auth, not
+ * SSH), tracking {@code ref.branch: manifests/<host>-<role>} (this cluster's rendered branch, the
+ * EXACT branch the manifests scion pushes — {@link
+ * io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity#clusterSlug()}). It
+ * authenticates as the one org-owned GitHub App via {@code spec.secretRef} → the {@code githubapp}
+ * Secret ({@code githubAppID}, {@code githubAppInstallationID}, {@code githubAppPrivateKey}); Flux
+ * self-mints and self-refreshes a {@code contents:read} pull token.
  *
- * <ol>
- *   <li>The manifest layer emits GitRepository + Kustomization CRs during master bootstrap
- *   <li>Applied by {@code rke2lab-cluster-manifests.service} at first boot
- *   <li>From then on, Flux self-manages reconciliation of the {@code gitops/} subtree
- *   <li>The same CRs are also committed under {@code gitops/flux-system/} for self-reference
- * </ol>
- *
- * <p><b>GitRepository CR:</b> Points to this repository, branch {@code main}
- *
- * <p><b>Root Kustomization CR:</b> Watches {@code gitops/clusters/<cluster>/} in the GitRepository.
- * Configured with SOPS decryption using the cluster age key.
- *
- * <p><b>Note:</b> Currently uses placeholder values for repository URL and age key secret
- * reference. These will be configured from environment/config in a future iteration.
+ * <p><b>Root Kustomization:</b> watches the branch root ({@code path: ./}) with {@code prune: true}
+ * and SOPS decryption via the {@code sops-age} Secret — the two Secrets (App-auth + age) ride the
+ * same local-only bootstrap lane so Flux comes up able to both pull and decrypt.
  */
 public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/flux-root";
+
+  private static final String REPO_URL = "https://github.com/seedmatic/rke2lab.git";
+  private static final String BRANCH_PREFIX = "manifests/";
+  private static final String GIT_REPOSITORY_NAME = "rke2lab";
+  private static final String APP_AUTH_SECRET = "githubapp";
+  private static final String SOPS_AGE_SECRET = "sops-age";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "flux-root");
@@ -46,13 +51,13 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final String clusterName = ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
-    createGitRepository(scope, clusterName);
-    createRootKustomization(scope, clusterName);
+    final String clusterSlug = ManifestSynthesisContext.current().bootstrapIdentity().clusterSlug();
+    createGitRepository(scope, clusterSlug);
+    createRootKustomization(scope, clusterSlug);
   }
 
-  private void createGitRepository(Construct scope, String clusterName) {
-    ApiObject gitRepo =
+  private void createGitRepository(Construct scope, String clusterSlug) {
+    final ApiObject gitRepo =
         new ApiObject(
             scope,
             "gitrepository-rke2lab",
@@ -61,45 +66,48 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
                 .kind("GitRepository")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("rke2lab")
+                        .name(GIT_REPOSITORY_NAME)
                         .namespace("flux-system")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "source.toolkit.fluxcd.io|GitRepository|flux-system|rke2lab"))
+                                "source.toolkit.fluxcd.io|GitRepository|flux-system|"
+                                    + GIT_REPOSITORY_NAME))
                         .build())
                 .build());
 
-    // TODO: Repository URL should be configurable (from environment or config)
     gitRepo.addJsonPatch(
         JsonPatch.add(
             "/spec",
             Map.of(
-                "interval", "1m",
-                "ref", Map.of("branch", "main"),
-                "url", "https://github.com/nxmatic/rke2lab.git")));
+                "interval",
+                "1m",
+                "url",
+                REPO_URL,
+                "ref",
+                Map.of("branch", BRANCH_PREFIX + clusterSlug),
+                "secretRef",
+                Map.of("name", APP_AUTH_SECRET))));
   }
 
-  private void createRootKustomization(Construct scope, String clusterName) {
-    ApiObject kustomization =
+  private void createRootKustomization(Construct scope, String clusterSlug) {
+    final ApiObject kustomization =
         new ApiObject(
             scope,
-            "kustomization-cluster",
+            "kustomization-root",
             ApiObjectProps.builder()
                 .apiVersion("kustomize.toolkit.fluxcd.io/v1")
                 .kind("Kustomization")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name(clusterName + "-cluster")
+                        .name(clusterSlug)
                         .namespace("flux-system")
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "kustomize.toolkit.fluxcd.io|Kustomization|flux-system|"
-                                    + clusterName
-                                    + "-cluster"))
+                                    + clusterSlug))
                         .build())
                 .build());
 
-    // TODO: SOPS age key secret reference should be dynamic once age key bootstrap is implemented
     kustomization.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -107,12 +115,12 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
                 "interval",
                 "5m",
                 "path",
-                "./gitops/clusters/" + clusterName,
+                "./",
                 "prune",
                 true,
                 "sourceRef",
-                Map.of("kind", "GitRepository", "name", "rke2lab"),
+                Map.of("kind", "GitRepository", "name", GIT_REPOSITORY_NAME),
                 "decryption",
-                Map.of("provider", "sops", "secretRef", Map.of("name", "sops-age")))));
+                Map.of("provider", "sops", "secretRef", Map.of("name", SOPS_AGE_SECRET)))));
   }
 }

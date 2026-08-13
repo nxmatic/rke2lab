@@ -483,14 +483,15 @@ public class IncusProvisionScenario
     }
 
     /**
-     * Upsert the gh/flox launch tokens into the worktree's {@code .secrets} (§ provisioning-slice
-     * delta #10) — a WHEN because it FABRICATES material (a file materialisation), BEFORE the
-     * {@code worktree.dir} mount binds it into the instance. {@link LaunchSecretsWriter} resolves
-     * each token from the environment first, else the {@link AuthTokenContact} edge. Mode-blind:
-     * the inertness lives at the frontier — the {@code AuthTokenContact} CLI probe is tagged {@code
-     * cultivating}, so a surveying run resolves it empty (no {@code gh}/{@code flox} shelled) and
-     * the writer falls back to the environment; the step renders PENDING via E9. Skipped only for
-     * an unamended survey (no worktree {@code .secrets} to upsert).
+     * Upsert the flox launch token into the worktree's {@code .secrets} (§ provisioning-slice delta
+     * #10) — a WHEN because it FABRICATES material (a file materialisation), BEFORE the {@code
+     * worktree.dir} mount binds it into the instance. {@link LaunchSecretsWriter} resolves the
+     * token from the environment first, else the {@link AuthTokenContact} edge. Mode-blind: the
+     * inertness lives at the frontier — the {@code AuthTokenContact} CLI probe is tagged {@code
+     * cultivating}, so a surveying run resolves it empty (no {@code flox} shelled) and the writer
+     * falls back to the environment; the step renders PENDING via E9. Skipped only for an unamended
+     * survey (no worktree {@code .secrets} to upsert). (GitHub is no longer written here — its
+     * credential flows from the App via {@code ghapp}, sealed in the cellar.)
      */
     public When the_secrets_are_written(@Hidden Optional<Resolved> maybeResolved) {
       if (maybeResolved.isEmpty()) {

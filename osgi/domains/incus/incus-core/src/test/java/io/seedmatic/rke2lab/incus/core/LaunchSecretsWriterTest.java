@@ -17,11 +17,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Proves the comment-preserving {@code .secrets} upsert (§ provisioning-slice #10): the token
- * contact's values are written under the {@code github}/{@code flox} blocks, existing values are
- * replaced in place, comments and unrelated keys survive, an environment variable wins over the
- * contact, and a missing contact + empty environment leaves the file untouched. The environment is
- * injected (empty by default here) so the tests are hermetic regardless of the ambient shell.
+ * Proves the comment-preserving {@code .secrets} upsert for the flox launch token (§
+ * provisioning-slice #10): the token contact's value is written under the {@code flox} block, an
+ * existing value is replaced in place, comments and unrelated keys survive, an environment variable
+ * wins over the contact, and a missing contact + empty environment leaves the file untouched. The
+ * environment is injected (empty by default here) so the tests are hermetic regardless of the
+ * ambient shell. (GitHub is no longer written here — its credential flows from the App via {@code
+ * ghapp}, sealed in the cellar.)
  */
 class LaunchSecretsWriterTest {
 
@@ -39,25 +41,19 @@ class LaunchSecretsWriterTest {
   }
 
   @Test
-  void it_appends_both_blocks_to_a_bare_file(@TempDir Path tmp) throws IOException {
+  void it_appends_the_flox_block_to_a_bare_file(@TempDir Path tmp) throws IOException {
     final Path secrets = tmp.resolve(".secrets");
     Files.writeString(secrets, "# launch secrets\nregistry:\n  url: 'example.com'\n");
 
-    writer(
-            Optional.of(
-                contactWith(
-                    Map.of(AuthTokenSource.GITHUB, "ghtok", AuthTokenSource.FLOXHUB, "flxtok"))),
-            NO_ENV)
+    writer(Optional.of(contactWith(Map.of(AuthTokenSource.FLOXHUB, "flxtok"))), NO_ENV)
         .ensureTokensPresent(secrets);
 
     final String result = Files.readString(secrets, StandardCharsets.UTF_8);
     assertTrue(result.contains("# launch secrets"), "the leading comment survives");
     assertTrue(result.contains("url: 'example.com'"), "the unrelated key survives");
-    assertTrue(result.contains("github:"), "the github block is appended");
-    assertTrue(result.contains("username: 'x-access-token'"), "the github username is written");
-    assertTrue(result.contains("token: 'ghtok'"), "the github token is written");
     assertTrue(result.contains("flox:"), "the flox block is appended");
     assertTrue(result.contains("token: 'flxtok'"), "the flox token is written");
+    assertFalse(result.contains("github:"), "no github block is written");
   }
 
   @Test
@@ -66,13 +62,12 @@ class LaunchSecretsWriterTest {
     Files.writeString(
         secrets,
         """
-        github:
-          username: 'x-access-token'
+        flox:
           token: 'stale'  # rotated nightly
         """,
         StandardCharsets.UTF_8);
 
-    writer(Optional.of(contactWith(Map.of(AuthTokenSource.GITHUB, "fresh"))), NO_ENV)
+    writer(Optional.of(contactWith(Map.of(AuthTokenSource.FLOXHUB, "fresh"))), NO_ENV)
         .ensureTokensPresent(secrets);
 
     final String result = Files.readString(secrets, StandardCharsets.UTF_8);
@@ -87,8 +82,8 @@ class LaunchSecretsWriterTest {
     Files.writeString(secrets, "", StandardCharsets.UTF_8);
 
     writer(
-            Optional.of(contactWith(Map.of(AuthTokenSource.GITHUB, "from-contact"))),
-            name -> "GH_TOKEN".equals(name) ? "from-env" : null)
+            Optional.of(contactWith(Map.of(AuthTokenSource.FLOXHUB, "from-contact"))),
+            name -> "FLOX_TOKEN".equals(name) ? "from-env" : null)
         .ensureTokensPresent(secrets);
 
     final String result = Files.readString(secrets, StandardCharsets.UTF_8);

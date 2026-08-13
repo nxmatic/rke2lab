@@ -60,6 +60,19 @@ public record BootstrapIdentity(
     return DEFAULT;
   }
 
+  /**
+   * The cluster identity slug {@code <host>-<role>} — {@code clusterName-nodeName}, the SINGLE
+   * SOURCE OF TRUTH for the rendered-branch name ({@code manifests/<clusterSlug>}) and its
+   * render-worktree leaf. Mirrors {@code ManifestsRunbookInput.Identity#clusterId()} (the door side
+   * of the same identity, where the field name is free) so a unit rendering the branch reference
+   * (e.g. {@code FluxRootManifestsUnit}) names the EXACT branch the manifests scion pushes — no
+   * {@code <host>-<role>} literal duplicated per call site. (Distinct from the numeric {@link
+   * #clusterId()} record component.)
+   */
+  public String clusterSlug() {
+    return clusterName + "-" + nodeName;
+  }
+
   public static Builder builder() {
     return new Builder();
   }

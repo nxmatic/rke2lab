@@ -4,10 +4,11 @@ import java.util.Optional;
 
 /**
  * The auth domain's external-contact seam: resolve a short-lived credential for one {@link
- * AuthTokenSource} by asking its CLI. The {@code auth-edge} provides it by shelling {@code gh auth
- * token} / {@code flox auth token}; the host launch-secrets updater composes it after its own
- * environment-variable precedence has come up empty, then upserts the token into the launch-secrets
- * YAML.
+ * AuthTokenSource} by asking its CLI. The {@code auth-edge} provides it by shelling {@code flox
+ * auth token}; the host launch-secrets updater composes it after its own environment-variable
+ * precedence has come up empty, then upserts the token into the launch-secrets YAML. (GitHub is no
+ * longer a source — its token flows from the App via {@code ghapp}, filed as a {@link
+ * GithubToken}.)
  *
  * <p>The grain is fine and stateless — one call asks ONE provider for a token as it is NOW. The
  * contact owns no precedence and no persistence.

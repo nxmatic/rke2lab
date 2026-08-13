@@ -14,13 +14,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The realised auth edge: resolves a short-lived credential by asking the provider's CLI — {@code
- * gh auth token} for GitHub, {@code flox auth token} for FloxHub. The single door toward this one
- * external contact — the {@code ProcessBuilder} mechanism formerly inlined in the host {@code
+ * flox auth token} for FloxHub. The single door toward this one external contact — the {@code
+ * ProcessBuilder} mechanism formerly inlined in the host {@code
  * IncusResourceBootstrap.LaunchSecretsUpdater}. {@code ProcessBuilder} is playable, so this edge
  * lives in the OSGi world; SCR publishes it and the host updater composes it from the registry
- * after its own environment-variable precedence comes up empty.
+ * after its own environment-variable precedence comes up empty. (GitHub was retired from this edge:
+ * its token now flows from the App via {@code ghapp}, never {@code gh auth token}.)
  *
- * <p><b>Runtime dependency:</b> {@code gh} / {@code flox} on {@code PATH}, authenticated.
+ * <p><b>Runtime dependency:</b> {@code flox} on {@code PATH}, authenticated.
  *
  * <p>Tagged {@code rke2lab.gardening=cultivating} — a token contact is a PURE PROBE (its output IS
  * the live credential, so a surveying impl could only fabricate one), and it is an OPTIONAL
@@ -43,7 +44,6 @@ public final class CliAuthTokenContact implements AuthTokenContact {
 
   private static List<String> commandFor(AuthTokenSource source) {
     return switch (source) {
-      case GITHUB -> List.of("gh", "auth", "token");
       case FLOXHUB -> List.of("flox", "auth", "token");
     };
   }

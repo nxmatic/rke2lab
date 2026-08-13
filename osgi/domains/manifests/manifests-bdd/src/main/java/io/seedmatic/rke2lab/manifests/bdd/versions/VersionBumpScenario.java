@@ -3,23 +3,28 @@ package io.seedmatic.rke2lab.manifests.bdd.versions;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.As;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
+import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.NestedSteps;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import io.seedmatic.rke2lab.auth.contract.AuthTokenContact;
-import io.seedmatic.rke2lab.auth.contract.AuthTokenSource;
+import io.seedmatic.rke2lab.auth.contract.AuthCoordinate;
+import io.seedmatic.rke2lab.auth.contract.GithubToken;
 import io.seedmatic.rke2lab.manifests.contract.ManifestVersionsBumpInput;
 import io.seedmatic.rke2lab.manifests.ingress.BumpLevel;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.OsgiService;
+import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCellar;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.seedmatic.rke2lab.seed.broker.port.Cellar;
+import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.worktree.GitIdentity;
 import io.seedmatic.rke2lab.worktree.Worktree;
 import java.util.Objects;
@@ -43,15 +48,20 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p>Its collaborators are INJECTED from the framework registry by the {@link OsgiService} bridge,
  * all bundle-side (unreachable to the flat host, which is exactly why the bump is a scion): the
- * {@link Worktree} (jgit stage/commit), the optional {@link AuthTokenContact} (the GitHub token,
- * {@code await = false} — the env var is the higher-precedence fallback), and the {@link
- * NdhKeystoreReader} (the tailnet {@code authorityDomain} the bot email is minted from).
+ * {@link Worktree} (jgit stage/commit) and the {@link NdhKeystoreReader} (the tailnet {@code
+ * authorityDomain} the bot email is minted from). The GitHub token for the release query is NOT
+ * shelled here: it is revealed uniformly from the cellar at {@link AuthCoordinate#GITHUB_TOKEN}
+ * (the one the {@code auth-seal} scion mints from the App via {@code ghapp}), empty for a
+ * standalone CLI run whose ephemeral cellar never sealed one — the query then runs anonymously
+ * (rate-limited), never against a personal {@code gh auth token}.
  */
 @SeedScenario
 public class VersionBumpScenario
     extends ScenarioTestBase<
         VersionBumpScenario.Given, VersionBumpScenario.When, VersionBumpScenario.Then>
-    implements InputReceiver<ManifestVersionsBumpInput>, ScenarioPlayer.Playable {
+    implements InputReceiver<ManifestVersionsBumpInput>,
+        CellarReceiver<ScenarioCellar>,
+        ScenarioPlayer.Playable {
 
   /** The inbound channel the {@code VersionsRunbookHandler} seeds the bump facet through. */
   @RegisterExtension
@@ -61,6 +71,9 @@ public class VersionBumpScenario
   private final Scenario<Given, When, Then> scenario = createScenario();
 
   @MonotonicNonNull private ManifestVersionsBumpInput input;
+
+  /** The in-container cellar (injected before the body) — where the sealed GitHub token is read. */
+  @MonotonicNonNull private ScenarioCellar cellar;
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
@@ -72,12 +85,19 @@ public class VersionBumpScenario
     this.input = input;
   }
 
+  @Override
+  public void receiveCellar(ScenarioCellar cellar) {
+    this.cellar = cellar;
+  }
+
   @Test
   void the_component_versions_are_bumped() {
     final ManifestVersionsBumpInput.BumpFacet facet =
         Objects.requireNonNull(input, "the bump facet was not seeded before the body").facet();
+    final Cellar tx =
+        Objects.requireNonNull(cellar, "the ScenarioCellar was not injected before the body");
     given().the_bump_policy(facet.level(), facet.apply(), facet.component());
-    when().the_component_versions_are_processed();
+    when().the_component_versions_are_processed(tx);
     then().the_pins_are_current_within_the_gate();
   }
 
@@ -116,8 +136,11 @@ public class VersionBumpScenario
 
     @OsgiService private Optional<Worktree> worktree = Optional.empty();
 
+    /**
+     * The current plot — the key the sealed GitHub token is revealed under; absent for a survey.
+     */
     @OsgiService(await = false)
-    private Optional<AuthTokenContact> authToken = Optional.empty();
+    private Optional<Parcel> parcel = Optional.empty();
 
     @OsgiService private Optional<NdhKeystoreReader> ndh = Optional.empty();
 
@@ -125,8 +148,8 @@ public class VersionBumpScenario
 
     @NestedSteps
     @As("the component versions are processed")
-    public When the_component_versions_are_processed() {
-      final VersionBumper bumper = new VersionBumper(level, resolveGithubToken());
+    public When the_component_versions_are_processed(@Hidden Cellar cellar) {
+      final VersionBumper bumper = new VersionBumper(level, resolveGithubToken(cellar));
       if (apply) {
         applyBump(bumper);
       } else {
@@ -171,12 +194,17 @@ public class VersionBumpScenario
     }
 
     /**
-     * The GitHub token, from the ONE source of trust: the auth edge ({@code gh auth token}), never
-     * an ambient environment variable. Empty when the edge is absent or unauthenticated — the
-     * upstream release query then runs anonymously (rate-limited), never against a stray env token.
+     * The GitHub token, from the ONE source of trust: the {@link GithubToken} the {@code auth-seal}
+     * scion minted from the App (via {@code ghapp}) and filed SEALED at {@link
+     * AuthCoordinate#GITHUB_TOKEN}, revealed here uniformly. Empty when there is no plot or the
+     * seal did not run (a standalone CLI bump, whose ephemeral cellar sealed none) — the upstream
+     * release query then runs anonymously (rate-limited), never against a personal {@code gh auth
+     * token}.
      */
-    private Optional<String> resolveGithubToken() {
-      return authToken.flatMap(contact -> contact.tokenFor(AuthTokenSource.GITHUB));
+    private Optional<String> resolveGithubToken(Cellar cellar) {
+      return parcel
+          .flatMap(plot -> cellar.fetch(plot, AuthCoordinate.GITHUB_TOKEN, GithubToken.class))
+          .map(GithubToken::token);
     }
 
     private String commitMessage(VersionBumper.BumpApplication application) {

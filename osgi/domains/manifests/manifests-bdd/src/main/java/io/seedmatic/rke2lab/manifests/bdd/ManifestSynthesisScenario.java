@@ -17,6 +17,7 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.seedmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
@@ -158,6 +159,22 @@ public class ManifestSynthesisScenario
         parcel.orElseThrow(), ClusterPkiCase.ADMIN_CREDENTIALS, OperatorPkiMaterial.class);
   }
 
+  /**
+   * The one org-owned App's credentials the ghapp registration sealed, revealed from the cellar so
+   * the {@code githubapp} Secret unit renders them for Flux's native App auth. Empty on a bare
+   * survey / before the registration filed — the unit then renders nothing. Addressed by the
+   * NEUTRAL {@code github-app} wire coordinate ({@link GhAppCase}) into the manifests-side {@link
+   * GithubAppMaterial} mirror, so no {@code ghapp-contract} flat copy is dragged into the
+   * standalone {@code manifests-cli} assembly — the exact treatment {@link #revealOperatorPki()}
+   * gives cluster-pki.
+   */
+  private Optional<GithubAppMaterial> revealGithubApp() {
+    if (cellar == null || parcel.isEmpty()) {
+      return Optional.empty();
+    }
+    return cellar.fetch(parcel.orElseThrow(), GhAppCase.GITHUB_APP, GithubAppMaterial.class);
+  }
+
   private static final String TAILNET_AUTHORITY = "mammoth-skate";
   private static final String SIGNING_KEY = "github-signing";
   private static final String RENDER_TOOL = "manifests-render";
@@ -254,6 +271,27 @@ public class ManifestSynthesisScenario
     }
   }
 
+  /**
+   * The ghapp registration's {@code github-app} cellar case, addressed by its NEUTRAL wire
+   * coordinate so the manifests realm reveals the sealed App credentials without a compile link to
+   * {@code ghapp-contract} (naming {@code GhAppCoordinate} would drag its flat copy into the
+   * standalone {@code manifests-cli} assembly). The {@code slug}/{@code domain} here MUST match
+   * {@code GhAppCoordinate.GITHUB_APP}; the cellar matches a read case by slug.
+   */
+  private enum GhAppCase implements SeedCoordinate {
+    GITHUB_APP;
+
+    @Override
+    public String slug() {
+      return "github-app";
+    }
+
+    @Override
+    public String domain() {
+      return "ghapp";
+    }
+  }
+
   @Test
   void the_manifests_are_synthesized_from_the_activation_facet() {
     final ManifestsRunbookInput facet =
@@ -266,7 +304,7 @@ public class ManifestSynthesisScenario
     when()
         .the_policy_is_derived_from_the_facet()
         .and()
-        .the_manifests_are_synthesized(revealOperatorPki(), rendered);
+        .the_manifests_are_synthesized(revealOperatorPki(), revealGithubApp(), rendered);
     then()
         .every_enabled_domain_produced_its_units()
         .and()
@@ -328,6 +366,7 @@ public class ManifestSynthesisScenario
 
     public When the_manifests_are_synthesized(
         @Hidden Optional<OperatorPkiMaterial> operatorPki,
+        @Hidden Optional<GithubAppMaterial> githubApp,
         @Hidden Optional<LinkedWorktree> rendered) {
       final ManifestsRunbookInput.DebugFacet debug = facet.facets().debug();
       final FloxDebugPolicy floxDebug =
@@ -366,6 +405,10 @@ public class ManifestSynthesisScenario
       // The operator PKI revealed from the cellar (empty on a bare survey / before the seal filed):
       // the kubeconfig unit renders the operator + CAPI kubeconfigs from it, or nothing.
       builder.operatorPki(operatorPki);
+      // The one App credentials revealed from the cellar (empty on a bare survey / before the ghapp
+      // registration filed): the githubapp Secret unit renders Flux's App-auth Secret from them, or
+      // nothing.
+      builder.githubApp(githubApp);
       final ManifestSynthesisRequest request = builder.build();
       try {
         this.result = synthesis.orElseThrow().synthesize(request);

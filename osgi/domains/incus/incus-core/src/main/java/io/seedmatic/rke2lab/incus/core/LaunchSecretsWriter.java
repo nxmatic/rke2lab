@@ -16,23 +16,21 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Upserts the github/flox launch tokens into the worktree's {@code .secrets}, preserving the file's
+ * Upserts the flox launch token into the worktree's {@code .secrets}, preserving the file's
  * comments and layout. A beat of the incus PREPARE (§ provisioning-slice delta #10): a FILE
  * materialisation (regex YAML upsert, no Pulumi engine) over the SAME FS the scion computes its
  * {@code BootstrapPaths} on, run BEFORE the {@code worktree.dir} mount binds {@code .secrets} into
  * the instance. It was host-only in {@code main} only because it was nested in {@code
  * IncusResourceBootstrap} — an accident of place; in I6 every materialisation is a scion gesture.
  *
- * <p>Precedence per source: an environment variable wins, else the {@link AuthTokenContact} is
- * asked ({@code gh auth token} / {@code flox auth token}). A blank result leaves the file
- * untouched; the file is written only when the upsert changed it.
+ * <p>Precedence: an environment variable wins, else the {@link AuthTokenContact} is asked ({@code
+ * flox auth token}). A blank result leaves the file untouched; the file is written only when the
+ * upsert changed it. (GitHub is no longer written here — its credential flows from the App via
+ * {@code ghapp}, sealed in the cellar, not into {@code .secrets}.)
  */
 public final class LaunchSecretsWriter {
 
-  private static final Pattern GITHUB_HEADER = Pattern.compile("^([\\t ]*)github:\\s*(#.*)?$");
   private static final Pattern FLOX_HEADER = Pattern.compile("^([\\t ]*)flox:\\s*(#.*)?$");
-  private static final Pattern USERNAME =
-      Pattern.compile("^([\\t ]*username\\s*:\\s*)([^#]*)(\\s*(#.*)?)$");
   private static final Pattern TOKEN =
       Pattern.compile("^([\\t ]*token\\s*:\\s*)([^#]*)(\\s*(#.*)?)$");
 
@@ -54,19 +52,9 @@ public final class LaunchSecretsWriter {
     this.env = env;
   }
 
-  /** Upsert both tokens into {@code secretsFile} — github first, then flox. */
+  /** Upsert the flox token into {@code secretsFile}. */
   public void ensureTokensPresent(Path secretsFile) {
-    ensureGithubToken(secretsFile);
     ensureFloxToken(secretsFile);
-  }
-
-  private void ensureGithubToken(Path secretsFile) {
-    final String token =
-        resolve(AuthTokenSource.GITHUB, env.apply("GITHUB_TOKEN"), env.apply("GH_TOKEN"));
-    if (token.isBlank()) {
-      return;
-    }
-    rewrite(secretsFile, original -> upsertGithub(original, token));
   }
 
   private void ensureFloxToken(Path secretsFile) {
@@ -101,53 +89,6 @@ public final class LaunchSecretsWriter {
     } catch (IOException ex) {
       throw new UncheckedIOException("failed to update launch secrets: " + secretsFile, ex);
     }
-  }
-
-  private String upsertGithub(String content, String githubToken) {
-    final String lineSeparator = content.contains("\r\n") ? "\r\n" : "\n";
-    final List<String> lines = new ArrayList<>(List.of(content.split("\\r?\\n", -1)));
-    final String usernameValue = yamlSingleQuoted("x-access-token");
-    final String tokenValue = yamlSingleQuoted(githubToken);
-
-    final int headerIndex = findHeader(lines, GITHUB_HEADER);
-    if (headerIndex < 0) {
-      appendBlock(lines, "github:", "  username: " + usernameValue, "  token: " + tokenValue);
-      return String.join(lineSeparator, lines);
-    }
-
-    final String headerIndent = leadingWhitespace(lines.get(headerIndex));
-    final String childIndent = headerIndent + "  ";
-    final int blockStart = headerIndex + 1;
-    final int blockEnd = blockEnd(lines, blockStart, indentationWidth(headerIndent));
-
-    int usernameIndex = -1;
-    int tokenIndex = -1;
-    for (int i = blockStart; i < blockEnd; i++) {
-      final Matcher usernameMatcher = USERNAME.matcher(lines.get(i));
-      if (usernameMatcher.matches()) {
-        lines.set(i, usernameMatcher.group(1) + usernameValue + nullToEmpty(usernameMatcher, 3));
-        usernameIndex = i;
-        continue;
-      }
-      final Matcher tokenMatcher = TOKEN.matcher(lines.get(i));
-      if (tokenMatcher.matches()) {
-        lines.set(i, tokenMatcher.group(1) + tokenValue + nullToEmpty(tokenMatcher, 3));
-        tokenIndex = i;
-      }
-    }
-
-    int insertIndex = blockEnd;
-    if (usernameIndex < 0) {
-      lines.add(insertIndex, childIndent + "username: " + usernameValue);
-      insertIndex++;
-      if (tokenIndex >= insertIndex) {
-        tokenIndex++;
-      }
-    }
-    if (tokenIndex < 0) {
-      lines.add(insertIndex, childIndent + "token: " + tokenValue);
-    }
-    return String.join(lineSeparator, lines);
   }
 
   private String upsertFlox(String content, String floxToken) {

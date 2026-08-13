@@ -4,6 +4,7 @@ package io.seedmatic.rke2lab.manifests;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.seedmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
@@ -119,6 +120,10 @@ public final class ManifestSynthesisContext {
 
   public Optional<OperatorPkiMaterial> operatorPki() {
     return request.operatorPki();
+  }
+
+  public Optional<GithubAppMaterial> githubApp() {
+    return request.githubApp();
   }
 
   public Optional<SopsAgeMaterial> sopsAgeMaterial() {

@@ -2,6 +2,7 @@ package io.seedmatic.rke2lab.manifests.contract;
 
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.seedmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
@@ -27,7 +28,8 @@ public record ManifestSynthesisRequest(
     ComponentVersions componentVersions,
     Optional<ImageState> imageState,
     Optional<IncusIdentityMaterial> incusIdentity,
-    Optional<OperatorPkiMaterial> operatorPki)
+    Optional<OperatorPkiMaterial> operatorPki,
+    Optional<GithubAppMaterial> githubApp)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rke2lab.manifests.policy.enabledDomains";
@@ -56,6 +58,7 @@ public record ManifestSynthesisRequest(
     imageState = imageState == null ? Optional.empty() : imageState;
     incusIdentity = incusIdentity == null ? Optional.empty() : incusIdentity;
     operatorPki = operatorPki == null ? Optional.empty() : operatorPki;
+    githubApp = githubApp == null ? Optional.empty() : githubApp;
   }
 
   public static Builder builder(Path synthOutdir, Path synthManifestFile) {
@@ -72,7 +75,8 @@ public record ManifestSynthesisRequest(
         .componentVersions(componentVersions)
         .imageState(imageState)
         .incusIdentity(incusIdentity)
-        .operatorPki(operatorPki);
+        .operatorPki(operatorPki)
+        .githubApp(githubApp);
   }
 
   // Immutable transformations: each returns a new request with one slice replaced. They delegate to
@@ -108,6 +112,10 @@ public record ManifestSynthesisRequest(
 
   public ManifestSynthesisRequest withOperatorPki(OperatorPkiMaterial material) {
     return toBuilder().operatorPki(Optional.of(material)).build();
+  }
+
+  public ManifestSynthesisRequest withGithubApp(GithubAppMaterial material) {
+    return toBuilder().githubApp(Optional.of(material)).build();
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -173,6 +181,7 @@ public record ManifestSynthesisRequest(
     private Optional<ImageState> imageState = Optional.empty();
     private Optional<IncusIdentityMaterial> incusIdentity = Optional.empty();
     private Optional<OperatorPkiMaterial> operatorPki = Optional.empty();
+    private Optional<GithubAppMaterial> githubApp = Optional.empty();
 
     private Builder(Path synthOutdir, Path synthManifestFile) {
       this.synthOutdir = synthOutdir;
@@ -219,6 +228,11 @@ public record ManifestSynthesisRequest(
       return this;
     }
 
+    public Builder githubApp(final Optional<GithubAppMaterial> v) {
+      this.githubApp = v;
+      return this;
+    }
+
     public ManifestSynthesisRequest build() {
       return new ManifestSynthesisRequest(
           synthOutdir,
@@ -230,7 +244,8 @@ public record ManifestSynthesisRequest(
           componentVersions,
           imageState,
           incusIdentity,
-          operatorPki);
+          operatorPki,
+          githubApp);
     }
   }
 
