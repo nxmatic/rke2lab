@@ -55,6 +55,15 @@ the memory bridge. Memory bridge also restored: `hub/projects/<slug>/memory` →
 root via `git rev-parse --show-toplevel` (correct at any depth). Shipped to main in BOTH
 repos + resynced via subtree split/push/pull. See [[claude-auto-memory-mechanics]].
 
+**★ SUPERSEDED 2026-08-14 — the memory bridge + `link-memory.sh` are REMOVED.** Everything
+about the *memory* symlink above is history: `autoMemoryDirectory` (absolute path in the
+per-worktree `.claude/settings.local.json`) now pins auto-memory read+write to the tracked
+`<wt>/.claude/memory` directly — slug- and reader-independent (VERIFIED on darwin). `link-memory.sh`
+is DELETED. Only the SESSIONS transcript bridge survives, now as `link-sessions.sh`. Likewise the
+`claudeProcessWrapper`/`claude-config-home-wrapper.sh` and `CONFIG_DIR=<wt>/.claude/hub` described
+above were replaced by the clean-split `.code-workspace` env var (`CLAUDE_CONFIG_DIR=<wt>/.claude`,
+NOT `.claude/hub`). Current reference: [[claude-memory-cascade-state]].
+
 Wiring: `CLAUDE_CONFIG_DIR=<worktree>/.claude/hub` → hub=USER scope, worktree=PROJECT
 scope; Claude **deep-merges natively** (no build step — there is NO `include` in
 settings.json, but the scope cascade does it). Instructions use the project

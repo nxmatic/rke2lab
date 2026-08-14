@@ -9,14 +9,21 @@ POSTPONED (2026-06-06): how to handle Claude's distributed assets across my file
 sharing the global linking/memory logic across repositories AND across my owned Darwin hosts.
 Deemed too complex to address mid-flight; gets its own branch later.
 
-**What already exists (DONE, keep as-is — do NOT redo):**
-- rke2lab `refactor/config`: memory store tracked in-repo at `.claude/memory/`, home path
-  `~/.claude/projects/-private-var-lib-git-nxmatic-rke2lab/memory` symlinked to it
-  (commit `967388bc`). This WORKS and survived a window reload — leave it.
-- rke2lab `.claude/bin/link-memory.sh` (commit `a79c8fd2`): per-repo helper to recreate the
-  home→repo symlink on a fresh clone (symlink target is absolute, doesn't survive cloning).
-- Personal skill `~/.claude/skills/track-claude-memory-in-repo/` — the manual setup procedure
-  (move memory into repo, gitignore/visibility check, commit). Kept.
+**★ PARADIGM SHIFT (2026-08-14) — reframe before resuming this branch.** The symlink-based
+memory bridge is GONE: `autoMemoryDirectory` (native setting, absolute/~ path in
+`settings.local.json`, VERIFIED on darwin — see [[claude-auto-memory-mechanics]]) redirects
+auto-memory read+write straight into the tracked `<repo>/.claude/memory`. No symlink, no slug,
+no home-dir bridge. So the nix scan-and-link design below (symlink every `<repo>/.claude/memory`
+into the home path) is largely MOOT — the per-repo replacement is just writing one absolute
+`autoMemoryDirectory` line per checkout (the `worktree` skill already does this). The real
+remaining cross-host question is only how to seed/share that setting + the tracked content,
+not symlink plumbing.
+
+**What already exists (current reality):**
+- rke2lab: memory store tracked in-repo at `.claude/memory/`. The home→repo **symlink** and its
+  helper `link-memory.sh` are **DELETED** — superseded by `autoMemoryDirectory`.
+- Personal skill `track-claude-memory-in-repo` — REWRITTEN around `autoMemoryDirectory` (set the
+  absolute path in `settings.local.json`, gitignore/visibility check, commit `.claude/memory/`).
 
 **What was REVERTED (the postponed part):**
 - nix-darwin-home `modules/home-manager/claude-code.nix` was extended with `memoryScanRoots` +
@@ -33,7 +40,7 @@ Deemed too complex to address mid-flight; gets its own branch later.
   (non-symlink) home memory dir — it WARNs and defers to the operator. Reconciling/resetting
   memory on other hosts stays MANUAL so nothing is ever lost.
 
-**Open design questions for the branch:** dedup overlap between the nix module (linking) and
-the personal skill (initial setup) — they should be non-overlapping (Nix owns linking, skill
-owns the one-time move+commit). Also: the `a79c8fd2` per-repo helper becomes redundant with the
-nix module on nix-managed hosts but is the fallback on non-nix hosts.
+**Open design questions for the branch:** with `autoMemoryDirectory` replacing symlinks, the nix
+module no longer LINKS anything — the question shrinks to seeding/sharing the setting + tracked
+content across hosts (the skill owns the one-time move+commit; a host opts in). The old
+`a79c8fd2` / `link-memory.sh` per-repo symlink helper is deleted and no longer part of this.

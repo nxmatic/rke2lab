@@ -88,16 +88,30 @@ and **Claude backend** — then run the steps.
    ```bash
    .claude/hub/bin/link-sessions.sh        # ~/.claude/projects/<slug> -> <worktree>/.claude/projects/<slug>
    ```
-   This is the **session** bridge only. **Memory is separate**: it is tracked in
-   `<worktree>/.claude/memory` and read from the repo — do not bridge it through
-   `~/.claude/projects/<slug>/memory`.
-5. **Choose the Claude backend** and write per-worktree settings accordingly.
-   Ask: **AWS Bedrock** (the `ai-tools-shared` account) or the **enterprise
-   Anthropic** account (direct)?
-   - **Bedrock** → write a gitignored `.claude/settings.local.json`:
+   This is the **session** bridge only. **Memory is separate** and handled in the
+   next step via `autoMemoryDirectory` — do NOT symlink `~/.claude/projects/<slug>/memory`
+   (the old hack; slug-fragile, broke on non-main worktrees).
+5. **Write `.claude/settings.local.json`** (gitignored, per-checkout). It carries
+   two independent things:
+
+   **(a) Memory redirect — ALWAYS, regardless of backend.** Set
+   `autoMemoryDirectory` to the **absolute** path of this worktree's tracked
+   memory dir, so Claude's auto-memory reads/writes straight into
+   `<worktree>/.claude/memory/` (git-tracked → rides into the branch at merge)
+   instead of the repo-wide, reload-lost `~/.claude/projects/<slug>/memory`
+   default. The path **must be absolute** (`~/` also allowed; no relative /
+   `${workspaceFolder}`) — derive it from the worktree root, don't hardcode.
+   This replaces the old `link-memory.sh` symlink (slug-fragile, reader-dependent,
+   broke on non-main worktrees); an absolute path is slug- and reader-independent.
+
+   **(b) The Claude backend.** Ask: **AWS Bedrock** (`ai-tools-shared`) or the
+   **enterprise Anthropic** account (direct)?
+
+   - **Bedrock**:
      ```json
      {
        "model": "opus[1m]",
+       "autoMemoryDirectory": "<worktree-abs>/.claude/memory",
        "env": {
          "CLAUDE_CODE_USE_BEDROCK": "1",
          "AWS_PROFILE": "ai-tools-shared",
@@ -114,8 +128,12 @@ and **Claude backend** — then run the steps.
      account-specific — those above are for `ai-tools-shared`; `opus[1m]` overrides
      the committed direct model id (which Bedrock would reject). Confirm the real
      profile ids with `aws bedrock list-inference-profiles` if the account differs.
-   - **Enterprise Anthropic (direct)** → nothing to write; the committed
-     `.claude/settings.json` already uses the direct account.
+   - **Enterprise Anthropic (direct)** → still write the file, just the memory
+     redirect (the committed `.claude/settings.json` already selects the direct
+     account):
+     ```json
+     { "autoMemoryDirectory": "<worktree-abs>/.claude/memory" }
+     ```
 6. **Generate the `.code-workspace`** as a sibling of the worktree, inside the
    namespace dir: `<repo>.d/<namespace>/<slug>.code-workspace`. Name the file with
    the bare leaf slug (the namespace is already carried by the parent dir). Set the

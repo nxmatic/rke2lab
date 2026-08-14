@@ -26,23 +26,31 @@ reference for how it works; it is no longer an active chantier.
 `.claude/hub`). Env vars are injected verbatim (`String(value)`, NO `${workspaceFolder}` substitution
 → path must be absolute; fine since host-specific + known at generation). Effects: runtime
 (`projects/`, `sessions/`, …) lands under `.claude` (gitignored via `.claude/.gitignore`);
-`.claude/hub` is SINGLE-role (subtree content only); memory symlink at
-`.claude/projects/<slug>/memory -> .claude/memory`.
+`.claude/hub` is SINGLE-role (subtree content only); memory is pinned to the tracked
+`<wt>/.claude/memory` via `autoMemoryDirectory` in `settings.local.json` (no symlink).
 
-**Why the memory symlink is still needed** (despite the subtree being on the FS): the subtree gives
-`.claude/hub/memory/` (tier-2), but Claude auto-loads `.claude/projects/<slug>/memory/` — a DIFFERENT
-dir, gitignored + slug-keyed, NOT provided by the subtree. The symlink bridges that runtime path →
-`<wt>/.claude/memory` (tier-1, tracked, so it rides into main at merge).
+**How tier-1 memory is wired — `autoMemoryDirectory` (since 2026-08-14, supersedes the symlink):**
+the subtree gives `.claude/hub/memory/` (tier-2), but Claude's auto-memory defaults to a DIFFERENT
+dir — `~/.claude/projects/<slug>/memory/`, **repo-wide** (keyed off the git repository, shared across
+worktrees) + gitignored, NOT provided by the subtree. We set `autoMemoryDirectory` (in the
+per-worktree `.claude/settings.local.json`) to the **absolute** `<wt>/.claude/memory`, so auto-memory
+reads/writes straight into tier-1 (tracked → rides into main at merge). This REPLACED the old
+`~/.claude/projects/<slug>/memory -> <wt>/.claude/memory` symlink (deleted along with `link-memory.sh`):
+an absolute path is slug- and reader-independent, which is exactly why it fixes the defect below.
 
 **The 5 hard-won facts about Claude's file model (why it was hard):**
 1. *Slug encodes `/` AND `.` → `-`.* `rke2lab.d` → `rke2lab-d`. A `s:/:-:g` (only `/`) gives the wrong
-   slug → memory "lost" on reload. Correct: `s:[/.]:-:g`. See `link-memory.sh`.
+   slug. Correct: `s:[/.]:-:g`. Now only the SESSIONS bridge uses it (`link-sessions.sh`); memory is
+   slug-free (`autoMemoryDirectory`).
 2. *Config-home redirects everything.* Whatever sets `CLAUDE_CONFIG_DIR` decides where Claude reads
    conversations + memory. Pre-clean-split that was the wrapper → `.claude/hub`; now it's the
    `.code-workspace` env var → `.claude`.
-3. *Slug = working-tree root (`git rev-parse --show-toplevel`), NOT git-dir.* Per-worktree (isolates
-   conversations) — keep it. `--git-dir` was tried and abandoned; `--git-common-dir` would pool the
-   whole repo (unwanted).
+3. *Slug = working-tree root (`git rev-parse --show-toplevel`), governs SESSIONS only.* Per-worktree,
+   so transcripts + the Dock sidebar isolate per worktree (bridged by `link-sessions.sh`). **Memory
+   does NOT follow this slug** — auto-memory is repo-wide by default (docs: keyed off the git
+   repository, shared across worktrees); we pin it per-worktree via `autoMemoryDirectory` (an explicit
+   absolute path), which is precisely why it is slug-independent. The old belief that the slug isolated
+   memory was the root of the defect below.
 4. *Two concerns share `.claude`:* config-home runtime (`projects/`, `settings.json`, `plugins/` —
    gitignored) + subtree content under `.claude/hub` (`memory/`, `skills/`, `instructions.md` —
    versioned). The `.gitignore` files separate them.
@@ -56,21 +64,14 @@ a conversation across worktrees (a one-file transcript symlink was tried 2026-06
 broke the invariant). Cross-conversation continuity flows through COMMITTED MEMORY; the HUMAN carries
 the live thread between windows. A conversation is visible ONLY in its own workspace.
 
-**★ KNOWN DEFECT — handoff to the main workspace (fix before the next work worktree).** Observed
-2026-06-19 from worktree `feature/osgi-runtime-r3-consume-references`: the session's system prompt
-announced file-memory at `.claude/projects/-private-var-lib-git-nxmatic-rke2lab-d-MAIN/memory/` —
-i.e. the **main** worktree's slug, NOT this worktree's. The correct slug for this worktree (fact #3:
-`s:[/.]:-:g` over the working-tree root) is
-`-private-var-lib-git-nxmatic-rke2lab-d-feature-osgi-runtime-r3-consume-references`. So config-home /
-the runtime memory path resolved to MAIN's slug, and THIS worktree's
-`.claude/projects/<this-slug>/memory` symlink was absent → the announced path does not exist here.
-No data lost (committed `.claude/memory/` is the real source, read directly), but the auto-load
-bridge is broken for non-main worktrees. **Likely cause:** the per-worktree `.code-workspace` was
-generated with a `CLAUDE_CONFIG_DIR` / `link-memory.sh` slug that wasn't recomputed for this
-worktree (carried main's, or the symlink step was skipped). **Fix for the next work worktree:** when
-generating the worktree's `.code-workspace`, recompute the slug from THIS worktree's root and run
-`link-memory.sh` so `.claude/projects/<this-slug>/memory -> .claude/memory` exists and resolves;
-verify the announced path matches the worktree root, not `…-d-main`.
+**★ DEFECT RESOLVED (2026-08-14) — was: handoff to the main workspace.** Observed 2026-06-19 from a
+non-main worktree (`feature/osgi-runtime-r3-consume-references`): the system prompt announced
+file-memory at the **main** worktree's slug (`…-rke2lab-d-MAIN/memory`), not this worktree's, so the
+symlink bridge pointed at a non-existent path here. **Root cause:** the symlink model made the memory
+path slug-dependent, and the slug wasn't recomputed per worktree. **Fix:** `autoMemoryDirectory` pins
+memory to an explicit absolute `<wt>/.claude/memory` — no slug, no symlink, reader-independent — so
+the announced/auto-loaded path is always THIS worktree's tracked dir. The `worktree` skill writes the
+setting at worktree creation. Defect closed; `link-memory.sh` deleted.
 
 **Residual / not done:** the nix `claudeCodeSeedMemory` activation (minimal home-tier seed-if-absent)
 was never wired — revisit only if a fresh machine needs the home tier bootstrapped.

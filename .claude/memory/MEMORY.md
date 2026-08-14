@@ -183,7 +183,7 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 
 ## Memory / workspace mechanics (rke2lab-local; cross-cutting in hub)
 
-- [Claude memory cascade state](claude-memory-cascade-state.md) — reference: 3-tier cascade worktree→hub→home + clean-split. **★ DEFECT:** non-main worktrees get main's memory slug → symlink absent; fix = recompute slug + link-memory.sh at workspace generation. See [[hub:claude-auto-memory-mechanics]].
+- [Claude memory cascade state](claude-memory-cascade-state.md) — reference: 3-tier cascade worktree→hub→home + clean-split. **★ DEFECT RESOLVED (2026-08-14):** memory is pinned per-worktree via `autoMemoryDirectory` (absolute path in settings.local.json) — no slug, no symlink; `link-memory.sh` deleted. See [[hub:claude-auto-memory-mechanics]].
 - [JDT.LS heap in generated workspaces](jdtls-heap-workspace-generation.md) — **★ DEFECT+FIX:** folder-scoped `.vscode` -Xmx wins over `.code-workspace` → effective heap was the lower; set both ≥8G in lock-step. See [[claude-memory-cascade-state]].
 - [Worktree-provisioning handoff](worktree-provisioning-handoff.md) — **★ HANDOFF:** 3 worktree provisioning gaps fixed manually, must be automated (worktree:dir repoint; sops re-smudge; per-worktree Pulumi backend, stack named after branch slug). See [[sops-worktree-smudge-noise]] [[pulumi-stack-per-worktree-backlog]].
 - [Pulumi stack per worktree (BACKLOG)](pulumi-stack-per-worktree-backlog.md) — flox PULUMI_BACKEND_URL project-relative → each worktree empty state; real dev only in main.
