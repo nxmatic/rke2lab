@@ -246,12 +246,17 @@ Five decisions, taken together (2026-07-04), fix the model:
   production: `ClusterReadinessScenario` replays `SystemdAdapterScenario`). No mince scheduler survives
   (the POC confirmed the launcher + `@NestedSteps` carry all the ordering; there was nothing left for a
   grammar to do). *This reached the boot too — DONE:* the boot is no longer a `Topic.Execution`.
-  `FrameworkLaunch.embedded().launch()` is a plain launch operation invoked as the *first jGiven step
-  of the seed scenario* — "when the framework is launched" — a plain effect step (bouchonné-probe
-  pattern E2, no runbook value folded), already how `OsgiConnection.embedded()` opens the world. There
-  is no amorce paradox: the JUnit launcher runs on the HOST flat classpath, OUTSIDE Felix
-  (`Main` — `main()`, inside `Pulumi.run`, creates it), so launching Felix is a narrated step the
-  launcher plays, not a pre-amorce that must precede it. The fluent grammar had no surviving OSGi user
+  `FrameworkLaunch.embedded().launch()` is a plain launch operation performed by
+  `OsgiConnection.embedded()`, which a JUnit harness extension (`BaseWorldExtension`) opens and
+  injects into `ClusterSeedScenario` via `ConnectionReceiver.receiveConnection(...)` *before the
+  GIVEN* — an extension-driven pre-body effect (bouchonné-probe pattern E2, no runbook value folded),
+  NOT a narrated jGiven step. We lean on JUnit's extension lifecycle *precisely to control the
+  embedded OSGi framework* — open it, isolate the world, tear it down — around the scenario body, a
+  grip a narrated WHEN could not own as cleanly. `OsgiConnection.embedded()` names one variant on
+  purpose: *à terme* OSGi DS / Remote Services leave room for a **remote** framework — the harness
+  extension would still own the lifecycle, just across the wire. There is no amorce paradox: the JUnit launcher runs on the HOST flat
+  classpath, OUTSIDE Felix (`Main` — `main()`, inside `Pulumi.run`, creates it), so launching Felix
+  is a pre-body effect the harness performs, not a pre-amorce that must precede it. The fluent grammar had no surviving OSGi user
   once the boot was de-grammatised, so `pipeline-port` was dissolved: its engine relocated INTO
   `manifests-core` as un-exported internal synthesis (`Phase`/`PhaseRunner`), leaving the specs the
   moment the code stopped exporting it (the `SPEC_COVERAGE` code-first ratchet). The seed host's own
