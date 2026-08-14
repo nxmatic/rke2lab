@@ -25,7 +25,12 @@ repo_root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || (cd "
 slug="$(printf '%s' "$repo_root" | sed 's:[/.]:-:g')"
 
 wt_sessions="$repo_root/.claude/projects/$slug"
-config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+# Anchor at $HOME/.claude on purpose: the bridge exists FOR the Dock-launched
+# extension host, which reads its own $HOME/.claude (no shell env) — NOT the
+# workspace CLAUDE_CONFIG_DIR. Following CLAUDE_CONFIG_DIR here would place the
+# link in the CREATING window's config dir (it always has one set), where the
+# Dock sidebar never looks. See the header note.
+config_dir="$HOME/.claude"
 home_link="$config_dir/projects/$slug"
 
 mkdir -p "$wt_sessions"                 # so the symlink target exists for a fresh worktree

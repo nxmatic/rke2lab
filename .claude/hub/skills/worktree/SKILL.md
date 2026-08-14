@@ -161,6 +161,17 @@ cwd-inside the target:
 2. `git worktree remove [--force] <repo>.d/<namespace>/<slug>`
 3. `git worktree prune`
 4. `git branch -d <namespace>/<slug>` — use `-d` (refuses if unmerged).
+5. **Remove the session bridge.** `git worktree remove` deletes the worktree's
+   transcripts but NOT the home symlink `link-sessions.sh` created pointing at
+   them, which now dangles. Remove it (slug = the worktree path with `/` and `.`
+   → `-`):
+   ```bash
+   rm "$HOME/.claude/projects/$(printf '%s' <repo>.d/<namespace>/<slug> | sed 's:[/.]:-:g')"
+   ```
+6. **Remove the `.code-workspace`** sibling
+   (`<repo>.d/<namespace>/<slug>.code-workspace`) and close its VSCode window.
+   Orphan `closed - …` sidebar labels live in VSCode's `state.vscdb`
+   workspaceStorage and survive removal — purge there only if they bother you.
 
 A `<repo>.d/<namespace>/` parent that keeps a `.flox.d` symlink after removal is
 expected scaffolding for the next worktree placed there — leave it.
