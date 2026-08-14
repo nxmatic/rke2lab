@@ -62,21 +62,29 @@ All Maven commands must run through flox: `flox activate -- ./mvnw ...`
 - `<name>` in each pom is the relative directory path from the repo root.
 - Toolchain is JDK 25 via flox. Always run Maven through `flox activate -- ./mvnw …`. Claude may run any operation that does **not** mutate the provisioned system — compilation, tests, and dry-runs like `pulumi preview` are fine to run directly. Operations that change the live system (`pulumi up`, `kubectl apply`, and similar) are run by the user — propose them, don't execute them.
 
-## Pipeline architecture — BDD-as-engine (the seeding as jGiven scenarios)
+## Pipeline architecture — BDD-as-engine (jGiven + JUnit)
 
-The seeding pipeline is expressed as **jGiven scenarios orchestrated by the embedded JUnit Platform launcher** (GO reached 2026-07-04). A phase is a jGiven `Stage`; the tree is `@NestedSteps` composition; the value-DAG is carried by `@Provided/ExpectedScenarioState` + a build-time ASM DAG gate; the missing dynamics (temporal poll, live/preview gate, ambient) are contributed as Jupiter extensions. The full design lives at [docs/architecture/bdd/bdd.adoc](docs/architecture/bdd/bdd.adoc) (see § "The G/W/T phase rule" — WHEN fabricates, THEN seals); the discovery record (learnings E1–E10) at [docs/architecture/osgi/bdd-pipeline-poc-design.adoc](docs/architecture/osgi/bdd-pipeline-poc-design.adoc); the reference implementation is pinned at tag `spike/bdd-pipeline-poc`.
+The seeding pipeline is expressed as **jGiven scenarios run by the embedded JUnit
+Platform launcher** — the same jGiven + JUnit machinery we use to *test* rke2lab,
+reused as the runtime engine (dogfooding / re-entrance; no richer model-level
+alternative). The OSGi world owns the pipeline; the host (`seed-master` +
+`pulumi-edge`) boots the framework (`FrameworkLaunch.embedded().launch()`), injects
+the `RunMode` fact + Pulumi context, and renders/writes (`RunMode` selects a
+`PreviewExecutor` for preview — rendering decoupled from execution).
 
-- **Why these frameworks:** dogfooding / re-entrance — we already run jGiven (bundled by `jgiven-wrap`, wired through `osgi/runtime/scenario-testkit`) and the JUnit launcher (`InContainerJUnitRunner`) to *test* rke2lab; the runtime engine is the same machinery, at a second level. No richer model-level alternative exists.
-- **Owner:** the OSGi world owns the pipeline (scenarios + engine + reasoning). The host (`seed-master` + `pulumi-edge`) boots the framework, injects the `RunMode` fact + Pulumi context, renders/writes.
-- **Preview:** `RunMode` is an `ExecutionCondition` selecting a `PreviewExecutor` (rendering decoupled from execution — a rich PENDING plan). `LiveGate` is erased.
+`ClusterSeedScenario` is the root runbook; every domain has its own scenario
+(bbox, incus, systemd, cluster, manifests). The CLIs drive host-flat scenarios that
+sow a coordinate through the **`seed.broker.port` membrane** — the one host↔OSGi
+seam (JSON/Document only; never `awaitService` on a bundle-wired contract type).
+The former fluent `during/then` grammar is gone; its one internal remnant is
+`manifests-core`'s synthesis (`Phase`/`PhaseRunner`), un-exported and narrated by
+`ManifestSynthesisScenario`.
 
-**Migration DONE — every pipeline is a jGiven scenario; the fluent grammar is gone from the codebase.** ClusterSeed was transposed first (the POC) and productionised as `ClusterSeedScenario` — the mature root runbook (GIVEN + eight WHENs: the worktree survey (harvest + entry gate) → cellar-fetch → five sow-and-graft crossings bbox/incus-provision/incus-reconcile/systemd/cluster + host GROW, then the cellar-store THEN). Every domain has its own scenario (bbox, incus, systemd, cluster, manifests). The fluent `during/then` grammar and its whole vocabulary — `Topic`/`State<I,B>`, `PipelineContext`, `LiveGate`, `FluentTopicRunner`, and the boot's `FrameworkLaunchPipeline` — were **deleted** (dissolved at commit `fed16421f`). The boot is de-grammatised: `FrameworkLaunch.embedded().launch()` is a plain launch operation, invoked as the seed scenario's first jGiven step ("when the framework is launched") on the host flat classpath outside Felix — a narrated step, not a pre-amorce. The "avant" survives only as documentation (the correspondence table lives in `docs/architecture/atlas/seed.adoc`) and in git (`fluent-pipeline-grammar.adoc` at commit `39fe4d8a`).
-
-*One `during/then` remnant is NOT an orchestration pipeline and NOT a migration target:* `manifests-core`'s internal synthesis (`Phase`/`PhaseRunner`, `DefaultManifestSynthesisService`, `SystemdInfrastructureSynthesizer`) — the former `pipeline-port` engine relocated in-place as un-exported internal machinery, already narrated by `ManifestSynthesisScenario`; it is a value-threading synthesis core *inside* a scenario's WHEN, not an orchestrator.
-
-**The CLI execs are BDD-driven too — they DRIVE a host-flat scenario that sows through the broker, they do NOT `awaitService` a typed domain service.** A `type=contract` bundle's exported types (`manifests-contract`, `netplan-contract`) are bundle-wired, NOT a seam: a service registers with the bundle's class copy, so a flat host `awaitService(X.class)` on its own copy never matches (the old boot+awaitService CLI was structurally broken). Both CLIs now open the gardening and sow a coordinate through the `seed.broker.port` membrane (the ONE host↔OSGi seam), speaking only JSON/Document: `manifests-cli` drives `ManifestsCliScenario` (sows `manifests`); `netplan-cli`'s `yamlExport` drives `NetplanCliScenario` (sows `netplan`), growing the `netplan-bdd` scion `NetplanBlueprintScenario` in-container where `ClusterNetworkBlueprint` is reachable — the blueprint crosses back as JSON, which the CLI renders to YAML flat. So netplan IS a scion now (the former `SynthesisCommand`/`FrameworkLaunchPipeline` orphan is deleted; the "seed step vs scion" question is settled — scion). See `docs/architecture/osgi/netplan-bdd-spec.adoc`.
-
-*How `SPEC_COVERAGE` behaves (it is a code-first ratchet, NOT a violation counter):* the gate requires every type a bundle EXPORTS to be named in some `docs/` spec. The `pipeline-port` seam that once exported the fluent-grammar types was **dissolved** — its `Phase`/`PhaseRunner` engine relocated into `manifests-core`'s un-exported internal synthesis, so those exports (and their spec-coverage obligation) are gone. No bundle exports the former model any longer; the surviving synthesis machinery is internal and carries no coverage obligation. The ratchet still holds in general: while any bundle exports a type, the gate DEMANDS it stay documented — you cannot drop it from the specs before the CODE stops exporting it.
+- **Vision & rationale (why the runtime engine, not tests):**
+  [docs/architecture/bdd/bdd.adoc](docs/architecture/bdd/bdd.adoc); discovery record
+  [docs/architecture/osgi/bdd-pipeline-poc-design.adoc](docs/architecture/osgi/bdd-pipeline-poc-design.adoc).
+- **Code ↔ vision delta (before/after figures):** the atlas —
+  [docs/architecture/atlas/seed.adoc](docs/architecture/atlas/seed.adoc) and siblings.
 
 ## Code style
 

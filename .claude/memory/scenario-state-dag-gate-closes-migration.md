@@ -1,9 +1,17 @@
 ---
 name: scenario-state-dag-gate-closes-migration
-description: "The 6th staging gate — SCENARIO_STATE_DAG, the build-time topological check on @Provided/@ExpectedScenarioState order — is the CLOSING task of the ClusterSeed BDD migration, not a prerequisite. It's the only spike mechanism never productionised; the ASM engine + @GovernedBy ritual already exist (5 gates shipped), so it's a 6th instance of an existing mould, and it only has something to check once the phases are real @ScenarioStage with those annotations."
+description: "PARKED VISION (not built, not current — 2026-08-14). The would-be SCENARIO_STATE_DAG staging gate: a build-time topological check that a phase's @ExpectedScenarioState is produced by an upstream @ProvidedScenarioState. It was NEVER productionised (verified: the staging extension ships SPEC_COVERAGE + realm/instance gates, no scenario-state DAG gate) and the ClusterSeed migration is DONE and settled WITHOUT it — so it is NOT a pending 'closing task', it's a dormant idea. Body kept as the vision, not a live worklist."
 metadata:
   type: project
 ---
+
+**★ STATUS 2026-08-14 — PARKED VISION, not current.** This gate was never built —
+verified against code: the staging extension ships `SPEC_COVERAGE` + realm/instance
+gates, but NO scenario-state DAG gate exists. The ClusterSeed migration is DONE and
+settled *without* it, so it is not the pending "closing task" this note's filename
+implies — it is a dormant idea we may or may not pick up. The 5-gate enum list below
+is also stale (the `StagingGate` enum has since evolved). Everything after this banner
+is the original vision, kept for reference — **NOT** a live worklist.
 
 **What.** The build-time gate that walks a composing scenario's phase-call order and rejects a phase
 whose `@ExpectedScenarioState` type is not yet produced by an upstream `@ProvidedScenarioState` — the
