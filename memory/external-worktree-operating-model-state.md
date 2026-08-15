@@ -15,6 +15,21 @@ Claude's config is *worktree-rooted*, in three layers (read specific→general):
 2. **GENERAL** — a squashed git subtree of `claude-hub`'s `.claude/` at `<worktree>/.claude/hub` (shared `instructions.md`, USER-scope `settings.json` with `enabledPlugins`+marketplaces, `memory/`, `skills/`). Reached last.
 3. **EPHEMERAL** — gitignored, per-worktree (lands under `.claude/hub/` when that is the CONFIG_DIR).
 
+**★ STARTUP RECIPE — how to CREATE a worktree under this model (the gesture, not just the
+fact; learned 2026-06-16 when a cold session used the `EnterWorktree` harness tool and landed
+under `.claude/worktrees/` — the WRONG place this model rejects).** `EnterWorktree` hard-codes
+`.claude/worktrees/<branch>` and is FORBIDDEN here; use plain `git worktree add` at the external
+path. Run from `<repo>.d/main`:
+
+1. `git fetch origin <default-branch>` — base = fresh `origin/<default-branch>`.
+2. `git worktree add -b <namespace>/<slug> <repo>.d/<namespace>/<slug> origin/<default-branch>`
+   (namespace by kind: `feature/`/`chore/`/`design/`/`refactor/`/`spike/`).
+3. **Re-smudge sops** (the checkout precedes `.sops.yaml` visibility → secrets land ENCRYPTED):
+   for each still-encrypted sops file `rm <file> && git checkout -- <file>`; verify no real secret
+   keeps `ENC[` — beware false positives (docs/code/schemas can mention `ENC[` as literal text).
+   Full diagnosis in [[sops-worktree-smudge-noise]].
+4. `cd` into the new worktree. The cleanup/finish recipe (the mirror gesture) is below.
+
 **★ UPDATE 2026-06-16 — config-home SHIPPED; transcript + memory bridges restored;
 hub link-memory.sh FIXED (both repos, pushed).** The wrapper (`claudeProcessWrapper`
 in rke2lab.code-workspace → hub/bin/claude-config-home-wrapper.sh) is live: it sets
@@ -49,8 +64,8 @@ nix-darwin **keeps** providing Bedrock via `home.sessionVariables` (shell vars,
 location-independent); its settings.json-seeding becomes redundant (retire later).
 
 **ARTIFACTS (on branch `chore/worktree-config-home` in BOTH repos, NOT integrated):**
-- Hub spec: `docs/superpowers/specs/2026-06-15-worktree-config-home-design.adoc` (4 C4 figures).
-- Hub plan: `docs/superpowers/plans/2026-06-15-worktree-config-home-step1.md`.
+- Hub spec: `wip/specs/2026-06-15-worktree-config-home-design.adoc` (4 C4 figures).
+- Hub plan: `wip/plans/2026-06-15-worktree-config-home-step1.md`.
 - Hub `.claude/` now carries the shareable tree (instructions.md, settings.json with 3 plugins, skills/, bin/link-memory.sh CONFIG_DIR-aware, .gitignore); local split branch `split/claude-hub/dot-claude`.
 - rke2lab `chore/worktree-config-home` worktree has the subtree at `.claude/hub` (added from the LOCAL hub via remote `claude-hub-local`, squashed) + `@import` at CLAUDE.md tail + README-SUBTREE.md.
 - Disposable test workspace: `/private/var/lib/git/nxmatic/rke2lab-config-home-test.code-workspace`.
@@ -105,6 +120,64 @@ the test workspace shows the correct per-worktree config home.
 - Retire nix-darwin settings-seeding activations once committed hub settings prove they replace them.
 - Generalize to other repos (maven fleet, docrepo); write canonical `hub/docs/operating-model.adoc`.
 - The new permissions policy hasn't run a full real session yet — keep `~bak-perms` until validated in use.
+
+**★ CLEANUP / FINISHING PROVENANCE (cross-repo rule, learned 2026-06-16 rke2lab walker-retirement).**
+Because every worktree lives at `<repo>.d/<namespace>/<branch>` (sibling of `main`), NOT under
+`.claude/worktrees/`, the `superpowers:finishing-a-development-branch` skill's provenance check is
+WRONG for this operating model: that skill only treats worktrees under `.claude/worktrees/` (or
+`worktrees/`, `~/.config/superpowers/worktrees/`) as "ours to clean up" and leaves everything else
+as "harness-owned, do not remove". Under THIS model a `<repo>.d/<branch>` worktree IS user-managed
+and removing it once merged is the normal, expected finish — do not refuse on provenance grounds.
+Recipe (run from `<repo>.d/main`, never cwd-inside the target): confirm not-inside + branch merged
+(`git branch --merged HEAD`) + tree clean (ignore the expected `.flox/env/manifest.lock` + sops
+re-smudge noise, `--force` is fine for that) → `git worktree remove [--force] <repo>.d/<branch>` →
+`git worktree prune` → `git branch -d <branch>` (use `-d`, refuses if unmerged). NOTE: a
+`<repo>.d/<namespace>/` parent dir (e.g. `rke2lab.d/feature/`) legitimately retains a `.flox.d`
+symlink (→ fleet flox) after removal — that is the include-resolution scaffolding for the next
+worktree placed there, NOT residue; leave it. See [[rke2lab:sops-worktree-smudge-noise]].
+
+**★ DEV-FLOW DISCIPLINE — hub-subtree sync at BOTH ends of a session (the gap we hit 2026-06-16).**
+The hub subtree is BIDIRECTIONAL (see README-SUBTREE.md): a consumer like rke2lab can originate hub
+edits and push them up. The discipline that was MISSED must become systematic — belongs in the
+canonical `hub/docs/operating-model.adoc` (the open "generalize" item above):
+
+- **AT SESSION START** (opening a worktree): sync-down the hub subtree first
+  (`subtree pull --prefix=.claude/hub claude-hub split/claude-hub/dot-claude --squash`) so you build
+  on the current hub, not a stale squash. Also verify the standalone `claude-hub.d/main` has no
+  unpushed commits — if it does, that is an ERROR to fix (verify + push) before starting, else the
+  split you pull from is behind.
+- **DURING**: normally make hub edits in the CONSUMER subtree (`<repo>.d/main/.claude/hub/…`) and
+  publish them up via split. You MAY instead edit `claude-hub.d/main` directly — but then those
+  edits MUST be made available by an immediate `git push origin main` (the mirror of our case: a
+  direct hub edit left unpushed makes every consumer pull a split branch that is behind the real
+  hub). "Edited the hub directly" and "pushed the hub" are one atomic step.
+- **AT SESSION END, BEFORE THE MERGE**: sync-up — `subtree split --prefix=.claude/hub
+  --branch=split/<repo>/dot-claude --rejoin HEAD` → `git push claude-hub split/<repo>/dot-claude` →
+  in the hub `subtree pull --prefix=.claude origin split/<repo>/dot-claude --squash`, then push the
+  hub. Keep `--squash` consistent both directions; the `--rejoin` adds a merge commit on the source
+  side — push it too.
+- WHAT WENT WRONG this time: `claude-hub.d/main` carried 6 unpushed doc-only commits AND rke2lab's
+  subtree was behind the hub origin, so a naive sync-up would have built on a stale base. Proven
+  correct order: push the hub's pending commits → re-split + push the split branch → sync-down into
+  rke2lab (resolve the squash conflict, theirs = hub canonical) → THEN edit + sync-up.
+
+**★ FAILURE MODE — uncommitted memory in `main` desyncs the next session (named 2026-06-17).**
+Auto-memory writes land in `<repo>.d/main/.claude/memory` (the home symlink
+`~/.claude/projects/<slug>/memory` → main's `.claude/memory`). A session writes memory there but
+does NOT auto-commit; the NEXT session opens a fresh worktree off `origin/main`, which lacks those
+writes → it reads STALE committed memory while the live truth sits UNCOMMITTED in main's tree. Hit
+2026-06-17: the Step-2 "design SHIPPED, 3 tasks done" rewrite sat uncommitted in main for a whole
+session; my startup prompt (written before it) sent me to redo already-done work. The user's framing:
+"main always has the latest, but it never propagates." THE DISCIPLINE (make systematic):
+- **AT SESSION START**, before branching: in `<repo>.d/main` run `git status -s .claude/memory/` — if
+  dirty, that is the PREVIOUS session's unflushed truth. Read it, reconcile it, COMMIT + PUSH it to
+  `origin/main` BEFORE `git worktree add` (else the fresh worktree starts stale). This is the memory
+  analogue of the hub-subtree "verify claude-hub.d/main has no unpushed commits" start-gate above.
+- **AT SESSION END**: commit memory edits in main and `git push origin main` — "wrote memory" and
+  "pushed memory" are one atomic step, same rule as the direct-hub-edit rule below. A memory file left
+  uncommitted is indistinguishable to the next session from work never done.
+- Memory lives in main (single source of truth, home symlink), so committing it in `main` — not in the
+  feature worktree — is correct; do it from `<repo>.d/main`.
 
 **DESIGN PIVOTS (dead, do not revive):** old "single global CLAUDE_CONFIG_DIR=hub"
 runbook → SUPERSEDED by this worktree-rooted model. Per-branch/per-worktree memory

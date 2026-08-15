@@ -7,6 +7,15 @@ metadata:
   originSessionId: fad25661-6d06-4825-8ce2-6e3bbdbbafd5
 ---
 
+**★ UPDATE 2026-06-20 — the design is being UNIFIED INTO rke2lab (design-level).** rke2lab matured
+(R4 framework boots in prod, `UnitResolver` in prod, walker RETIRED — so the "NEXT = migration track"
+below is DONE). The atlas-additivity ritual was run against this spec: it HOLDS, additive, and HALF
+already shipped. The live unification work + the 2 settled decisions (mechanism C dropped; handler edge
+= 2 axes) + the capability-anchoring atlas device now live in
+[[rke2lab:unitrepo-design-unification-state]]. The paragraphs below are the 2026-06-13/15 design record
+(still valid as the deep model/why); read them as history where they say "NEXT = migration track".
+docrepo-dag-wip itself is STILL local-only/never-pushed — securing it is the standing risk.
+
 A NEW standalone repo **`/private/var/lib/git/nxmatic/docrepo-dag-wip`** (local only, no
 remote; working name, rename later). Reconstructs a design the user lost. Substrate under the
 user's existing federated OSGi system ([[rke2lab:serviceloader-specialist-spi]]). Generalizes the
@@ -358,7 +367,7 @@ it subsumes the hand-rolled `ManifestsUnitDependencyApplier` over real data. LAT
 already there; does NOT retire the walker — that's the migration track). Framework-free (zero spike
 exposure).
 
-**DESIGN DECISIONS (settled via brainstorming, all in the spec `docs/superpowers/specs/2026-06-15-
+**DESIGN DECISIONS (settled via brainstorming, all in the spec `wip/specs/2026-06-15-
 unitrepo-real-graph-resolution-design.md`):**
 - **Both layers, ONE universe** (user: "we're in the real OSGi world" — Core ch.6 generic capability
   model is built for heterogeneous namespaces at multiple granularities in one resolve). Coarse =
@@ -377,7 +386,7 @@ unitrepo-real-graph-resolution-design.md`):**
 - **Placement FORCED:** harness lives in **seed-master TEST scope** (only seed-master depends on both
   manifests + unitrepo-core; unitrepo-core sits below manifests). Sole prod change = `requireAll` verb.
 
-**THE PLAN = `docs/superpowers/plans/2026-06-15-unitrepo-real-graph-resolution.md`** (8 TDD tasks).
+**THE PLAN = `wip/plans/2026-06-15-unitrepo-real-graph-resolution.md`** (8 TDD tasks).
 **★ FINAL STATE — ALL GREEN, surefire-counted on a full-reactor `clean package -pl :seed-master -am
 -DskipTests=false` (BUILD SUCCESS):** UnitResolverTest **3**, ReactorModuleCatalogTest **1**,
 ManifestsUniverseTest **1**, UniverseBuilderTest **1**, RealGraphResolutionTest **2**. The universe =
@@ -550,7 +559,7 @@ prove bad frontiers). Same empirical-trigger logic already accepted for the mani
 ambiguity (the production universe = the FINE layer only — domains+units resolved from a root that
 `requireAll`s all domains, i.e. the walker's exact scope; NOT the module layer, which would drag Maven
 module→module edges synthesis doesn't need), then self-review + submit the spec
-`docs/superpowers/specs/2026-06-16-walker-retirement-design.md` (drafted on branch
+`wip/specs/2026-06-16-walker-retirement-design.md` (drafted on branch
 `design/step1-walker-retirement-spec`, base origin/main 7739d154, NOT yet committed). Preview-driven
 throughout, per [[decision-options-in-preview]] + [[diagram-preview-file]] (`.claude/claude-preview.adoc`,
 kroki-safe + en-US + faithful vocabulary).

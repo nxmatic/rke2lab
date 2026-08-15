@@ -20,6 +20,7 @@ The cross-cutting hub, auto-loaded as the session root. One line per entry (<~18
 - [[shared-artifacts-in-english]] — docs/comments/commits en-US, never French.
 - [[feedback-verify-working-directory]] — verify CWD before shell commands (sandbox can be in any directory).
 - [[standing-approval-subagent-execution]] — user pre-approves subagent-driven plan execution; default to it, don't re-ask approach (still review between tasks).
+- [[defer-memory-writes-to-session-end]] — don't write auto-memory mid-session (it dirties the main checkout via the home symlink); accumulate + flush ALL at session end in one commit+push. Composes with the start-gate in [[external-worktree-operating-model-state]].
 
 ## Cross-cutting: git / workspace / build
 
@@ -38,13 +39,16 @@ The cross-cutting hub, auto-loaded as the session root. One line per entry (<~18
 - [[review-scope-backlog]] — subagent quality reviewers use strict-diff scope; pre-existing code = non-blocking backlog at END, never refactored inline.
 - [[diagram-preview-file]] — present mermaid via in-workspace .claude/claude-preview.adoc (NOT /tmp); kroki bioskop-nixos.local:8000 + .asciidoctorconfig; safe dialect = solid arrows, nude edge labels, flowchart not classDiagram.
 - [[brainstorm-vocabulary-view-first]] — lead a new design with a code-faithful domain-vocabulary diagram (Diagram 0) so naming collisions surface at design time.
+- [[check-osgi-standard-before-modeling]] — before modeling any OSGi-ish mechanism (config/lifecycle/services/extenders/fragments), verify the standard on the REAL jars (~/.m2/org/osgi) FIRST; don't reinvent Config Admin/Metatype/DS. Four planes: resolution / delivery / activation / registry.
 - [[decision-options-in-preview]] — for non-trivial design choices, render the competing options as comparative diagrams in the preview BEFORE asking; user chooses against a visual, not prose.
+- [[dsl-term-introduction-ritual]] — when a TERM/verb enters the DSL/glossary, document it the same way every time: a vocabulary view + before/after capability sentences anchored to a real artifact, by horizon. A term is valid only if it makes the system SAY something new. Positive twin of monotone-additivity; unifies [[brainstorm-vocabulary-view-first]] + [[decision-options-in-preview]] + the capability map.
 - [[workspace-driven-by-need]] — VSCode workspaces composed by the NEED (active chantier), not a fixed domain taxonomy; a workspace = repos a task touches + claude-hub root; lean `.code-workspace`, strip unrelated folders.
 
 ## North-stars (design principles, active)
 
 - [[model-substrate-alignment]] — if a round-trip WRITES through path X but READS bypassing X, the model is mis-fitted to its substrate (the bypass IS the tell). See [[rke2lab:intervention-provenance-state]].
 - [[specialist-as-ledger-northstar]] — a knowledge-accumulating specialist IS a ledger (memory=a Pulumi stack, consulting=folding history); holds for drift/intervention subclass, NOT stateless reactive specialists. See [[rke2lab:intervention-provenance-state]].
+- [[reentrance-northstar]] — the system submits ITSELF to the rules it edicts for its domain (same machinery, different subject); a self-exemption is a blind spot, the tell. Already at work in 4 instances (self-hosting units / specialist-as-ledger / designer runbook / the term-ritual on its own term). Generalizes [[model-substrate-alignment]] + [[specialist-as-ledger-northstar]]. First materialization = the designer runbook.
 
 ## Cross-repo chantiers (detail)
 
@@ -59,4 +63,5 @@ The cross-cutting hub, auto-loaded as the session root. One line per entry (<~18
 ## Meta (this restructure)
 
 - [[MEMORY-STRUCTURE-SPEC]] — the DAG memory design (meta-hub + per-repo + scoped links).
-- [[MEMORY-STRUCTURE-PLAN]] — the migration plan; Tasks 1-9 DONE. Task 9 (rke2lab pruning: 23 files git-rm'd + MEMORY.md rewritten to rke2lab-only) is STAGED-NOT-COMMITTED in rke2lab. **2 PENDING gestures (user-gated):** (1) commit the rke2lab pruning; (2) `gh repo create nxmatic/claude-memory --private` + push this hub (currently local-only, never pushed). Workspaces: `rke2lab.code-workspace` trimmed 15→8 folders (rke2lab first = session anchor) + `nix-darwin-home.code-workspace` for provisioning. Convention recorded: [[workspace-driven-by-need]]. NEXT real work = resume [[pme-5.3-manipulated-pom-port]] (port the Mojo).
+- [[memory-auto-garbage]] — keep the index BALANCED with the DAG by routine garbage collection (s/cleanup/garbage/): reclaim index slots whose value moved to git history or a consolidated note; GC every flush, not only at overflow; reclaim implies edge-repair (no orphans, no dead links). Routine GC vs [[memory-synthesis-prune-the-how]]'s big periodic garden. A [[reentrance-northstar]] instance.
+- [[MEMORY-STRUCTURE-PLAN]] — the migration plan; Tasks 1-9 DONE. Task 9 (rke2lab pruning: 23 files git-rm'd + MEMORY.md rewritten to rke2lab-only) is STAGED-NOT-COMMITTED in rke2lab. DONE since: the hub IS pushed (origin github.com/nxmatic/claude-hub, pushed routinely this session). Workspaces: `rke2lab.code-workspace` trimmed 15→8 folders (rke2lab first = session anchor) + `nix-darwin-home.code-workspace` for provisioning. Convention recorded: [[workspace-driven-by-need]]. NEXT real work = resume [[pme-5.3-manipulated-pom-port]] (port the Mojo).

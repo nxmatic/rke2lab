@@ -17,7 +17,7 @@ set -euo pipefail
 
 root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ -n "$root" && -d "$root/.claude/hub" ]]; then
-  export CLAUDE_CONFIG_DIR="$root/.claude/hub"
+  export CLAUDE_CONFIG_DIR="$root/.claude"
 fi
 
 exec "$@"

@@ -27,3 +27,11 @@ asked that I ALWAYS state what I'm about to do and how I'm progressing.
 - Cap investigation: stop reading once I have enough to act. I over-read (8 files when ~4 sufficed) on the explode-annotation fix.
 - If genuinely stuck, say so explicitly and ask — don't deliberate silently.
 - A >~1 min silent gap is their cue to interrupt; interrupting costs nothing and doesn't lose my work.
+
+**This is a STANDING, RECURRING violation, not a one-off (restated with visible frustration 2026-06-20,
+rke2lab R4):** "à chaque fois c'est la même chose, tu pars dans des raisonnements et tu me laisses dans
+le noir." The danger zone is precisely the BIG read/carto/exploration phases — under that load I tend to
+chain several tool calls (esp. parallel Agent/Explore fan-outs) with no prose, then dump a wall of text
+at the end. The rule inverts exactly there: when a large investigation phase is coming, SLOW DOWN and
+narrate more (one line per batch, running progress), do not speed up silently. The reasoning itself is
+wanted — what's not wanted is doing it without keeping them in the loop.

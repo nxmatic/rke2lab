@@ -27,11 +27,13 @@ only the `memory/` subdir (distilled facts, typically <100KB).
 
 Create a TodoWrite item per step and do them in order.
 
-1. **Locate the source.** Find `~/.claude/projects/<slug>/memory`. The `<slug>` is the repo's
-   absolute path with `/` replaced by `-` (e.g. `/private/var/lib/git/nxmatic/rke2lab` →
-   `-private-var-lib-git-nxmatic-rke2lab`). Derive it from the repo root, don't guess:
-   `SLUG=$(pwd | sed 's:/:-:g')`. If no `memory/` exists yet, tell the user there's nothing to
-   track and stop.
+1. **Locate the source.** Find `<config>/projects/<slug>/memory`, where `<config>` is
+   `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` (clean-split model: the `.code-workspace` sets
+   `CLAUDE_CONFIG_DIR` = `<worktree>/.claude`, NOT `.claude/hub`). The `<slug>` is the worktree-root path with BOTH `/` AND `.`
+   replaced by `-` (e.g. `/private/var/lib/git/nxmatic/rke2lab.d/main` →
+   `-private-var-lib-git-nxmatic-rke2lab-d-main`, note `.d` → `-d`). Derive it from the worktree
+   root, don't guess: `SLUG=$(git rev-parse --show-toplevel | sed 's:[/.]:-:g')`. If no `memory/`
+   exists yet, tell the user there's nothing to track and stop.
 
 2. **Confirm visibility (BLOCKING for public repos).** Run `git remote -v` and check whether
    `origin` is public. If public, use AskUserQuestion to confirm the user accepts that memory
@@ -51,11 +53,13 @@ Create a TodoWrite item per step and do them in order.
    `git status --short .claude/memory/MEMORY.md` shows it as a repo change, then revert with
    `git checkout -- .claude/memory/MEMORY.md`. This proves the symlink resolves into git.
 
-7. **Drop the portable helper.** Copy `link-memory.sh` (next to this SKILL.md) into the repo's
-   `.claude/bin/`. It recreates the home→repo symlink on a fresh clone (the symlink target is
-   absolute, so it does not survive cloning to a new machine — only the content does). Ensure
-   `.claude/.gitignore` does not exclude it (repos often ignore `[Bb]in/`; add `!bin/` +
-   `!bin/*.sh` if so).
+7. **Use the canonical helper.** The re-link helper lives once, in the claude-hub subtree at
+   `.claude/hub/bin/link-memory.sh`, and travels with the subtree — do NOT copy it per repo.
+   It recreates the `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<slug>/memory` →
+   `<repo>/.claude/memory` symlink on a fresh clone/worktree (the target is absolute, so it does
+   not survive cloning to a new machine — only the content does). Run it with cwd inside the
+   worktree: `bash .claude/hub/bin/link-memory.sh`. It encodes the slug correctly (`/` and `.`
+   → `-`) and anchors under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`.
 
 8. **Remove backup + commit.** `diff -r "$SRC.bak" .claude/memory` to confirm nothing lost,
    then `rm -rf "$SRC.bak"`. Stage `.claude/memory/` (+ the helper script) ONLY — dry-run
