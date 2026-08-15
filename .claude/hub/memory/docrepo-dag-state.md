@@ -7,6 +7,15 @@ metadata:
   originSessionId: fad25661-6d06-4825-8ce2-6e3bbdbbafd5
 ---
 
+**★ UPDATE 2026-06-20 — the design is being UNIFIED INTO rke2lab (design-level).** rke2lab matured
+(R4 framework boots in prod, `UnitResolver` in prod, walker RETIRED — so the "NEXT = migration track"
+below is DONE). The atlas-additivity ritual was run against this spec: it HOLDS, additive, and HALF
+already shipped. The live unification work + the 2 settled decisions (mechanism C dropped; handler edge
+= 2 axes) + the capability-anchoring atlas device now live in
+[[rke2lab:unitrepo-design-unification-state]]. The paragraphs below are the 2026-06-13/15 design record
+(still valid as the deep model/why); read them as history where they say "NEXT = migration track".
+docrepo-dag-wip itself is STILL local-only/never-pushed — securing it is the standing risk.
+
 A NEW standalone repo **`/private/var/lib/git/nxmatic/docrepo-dag-wip`** (local only, no
 remote; working name, rename later). Reconstructs a design the user lost. Substrate under the
 user's existing federated OSGi system ([[rke2lab:serviceloader-specialist-spi]]). Generalizes the

@@ -175,6 +175,29 @@ canonical `hub/docs/operating-model.adoc` (the open "generalize" item above):
   correct order: push the hub's pending commits → re-split + push the split branch → sync-down into
   rke2lab (resolve the squash conflict, theirs = hub canonical) → THEN edit + sync-up.
 
+**★ SUPERSEDED 2026-08-14 by `autoMemoryDirectory`.** Memory is now per-worktree in the tracked
+`<worktree>/.claude/memory` (see the SUPERSEDED banner above), NOT in `main` via a home symlink — so
+the specific home-symlink→main desync below no longer occurs. What SURVIVES is the general hygiene:
+commit memory edits before finishing so they ride into `main` at MERGE — but you commit them in the
+worktree now, not directly in `<repo>.d/main`. Kept below for history:
+
+**★ FAILURE MODE — uncommitted memory in `main` desyncs the next session (named 2026-06-17).**
+Auto-memory writes land in `<repo>.d/main/.claude/memory` (the home symlink
+`~/.claude/projects/<slug>/memory` → main's `.claude/memory`). A session writes memory there but
+does NOT auto-commit; the NEXT session opens a fresh worktree off `origin/main`, which lacks those
+writes → it reads STALE committed memory while the live truth sits UNCOMMITTED in main's tree. Hit
+2026-06-17: the Step-2 "design SHIPPED, 3 tasks done" rewrite sat uncommitted in main for a whole
+session; my startup prompt (written before it) sent me to redo already-done work. The user's framing:
+"main always has the latest, but it never propagates." THE DISCIPLINE (make systematic):
+- **AT SESSION START**, before branching: in `<repo>.d/main` run `git status -s .claude/memory/` — if
+  dirty, that is the PREVIOUS session's unflushed truth. Read it, reconcile it, COMMIT + PUSH it to
+  `origin/main` BEFORE `git worktree add` (else the fresh worktree starts stale). This is the memory
+  analogue of the hub-subtree "verify claude-hub.d/main has no unpushed commits" start-gate above.
+- **AT SESSION END**: commit memory edits in main and `git push origin main` — "wrote memory" and
+  "pushed memory" are one atomic step, same rule as the direct-hub-edit rule below. A memory file left
+  uncommitted is indistinguishable to the next session from work never done.
+- Memory lives in main (single source of truth, home symlink), so committing it in `main` — not in the
+  feature worktree — is correct; do it from `<repo>.d/main`.
 **DESIGN PIVOTS (dead, do not revive):** old "single global CLAUDE_CONFIG_DIR=hub"
 runbook → SUPERSEDED by this worktree-rooted model. Per-branch/per-worktree memory
 isolation = IMPOSSIBLE (auto-memory is repo-wide, [[claude-auto-memory-mechanics]]).
