@@ -54,10 +54,13 @@ enforces:
 - **Sync DOWN first**, at session start, *before* touching the subtree. Building on the
   current hub is what **AVOIDS the merge conflicts** a late sync-up otherwise hits (learned
   the hard way 2026-08-15 — skipping it forced a full down-then-up reconciliation).
-- **Always `--ignore-joins`** on `subtree split`; **never `--rejoin`** (after a `--squash`
-  pull it fails with "refusing to merge unrelated histories"). `--ignore-joins` recomputes
-  from scratch, so it never needs the base SHAs recorded in past squash commits — immune to
-  the `could not rev-parse split hash` trap that a deleted+GC'd split branch causes.
+- **Always `--ignore-joins`** on `subtree split` (split-only — `subtree pull` rejects it);
+  **never `--rejoin`** (after a `--squash` pull it fails with "refusing to merge unrelated
+  histories").
+- **Never delete the split branches.** `subtree pull` runs an internal split that walks every
+  `Squashed … from A..B` marker and needs each recorded base SHA reachable; deleting them GC's
+  the bases → `could not rev-parse split hash` (the trap we hit, escaped by recovering `d29f295`
+  from bioskop). Keep them + any `refs/recovered/*`.
 - Keep **`--squash`** in both directions.
 - The only **outward** step is `git -C <hub> push origin main`; everything else is local.
 

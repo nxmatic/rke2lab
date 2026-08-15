@@ -31,14 +31,15 @@ If you skipped the start-sync and only discover it at the end, you MUST still do
 down first (a naive up would regress the hub — dropping notes it has and you lack) —
 and you'll pay for it in conflicts you could have avoided by syncing down up front.
 
-## The two hard rules
+## The hard rules
 
-- **Always `--ignore-joins` on `subtree split`.** It recomputes from scratch, so it
-  never needs the base subtree SHAs recorded in past `--squash` commits — immune to
-  the trap below.
+- **Always `--ignore-joins` on `subtree split`** (it recomputes from scratch, so the
+  split side never depends on old base SHAs). **`--ignore-joins` is split-only** — it
+  is rejected by `subtree pull`.
 - **NEVER `--rejoin`.** After a `--squash` pull it fails with `refusing to merge
   unrelated histories`.
 - Keep `--squash` in **both** directions.
+- **NEVER delete the split branches** (see *Cleanup*) — the pull needs their base SHAs.
 
 ## Topology (nikopol; check per host)
 
@@ -94,10 +95,16 @@ git -C <bare> fetch ssh://<user>@<host>/<path-to-that-clone> refs/heads/recover-
 Keep the `refs/recovered/<sha>` ref so GC can't drop it again. (Done 2026-08-15:
 recovered `d29f295` from bioskop to unblock a hub sync-up.)
 
-## Cleanup
+## Cleanup — do NOT delete the split branches
 
-With `--ignore-joins` in force, deleting the ephemeral split branches after a
-transfer is safe (they are recomputed next time). Keep any `refs/recovered/*` refs.
+**Keep every split branch** (up and down) plus any `refs/recovered/*`. `subtree pull`
+runs an internal split of the local history to find its merge base, walking each
+`Squashed … from A..B` marker — it needs every recorded base SHA (A/B) reachable.
+Deleting the "ephemeral" split branch after a transfer (as older docs said) GC's
+those bases, so the next pull dies with `could not rev-parse split hash <sha>`.
+That is exactly the trap we hit — recovering `d29f295` from bioskop to escape it.
+The branches are tiny; keep them. (`--ignore-joins` rescues the *split* side, but the
+*pull* can't take it, so the bases must persist.)
 
 ## Editing rules (so the flow stays clean)
 
