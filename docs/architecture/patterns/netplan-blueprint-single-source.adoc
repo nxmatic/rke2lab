@@ -157,15 +157,40 @@ The YAML carries the full contract (from `NetplanBlueprintScenario`): `clusters`
 `deriveMacs cluster node` resolves a `{lan, wan}` pair from the cluster/node IDs.
 
 Alongside the per-node addressing the export also carries the cluster-owned
-`segments` — a list of `{cidr, name, asn}` spans (the per-cluster LAN `/27` and
-LB `/27`, plus the vmnet, pod, service, gateway and ULA facts) — and the `asns`
-dictionary (`asn` → AS name). These are the single source the netflow collector
-(ndh projects them, `nnh` consumes) derives its flow→AS labelling from, so it no
-longer hardcodes the segment→ASN map. The AS numbering is the `ClusterAsn` enum
-(`RKE2_CLUSTER` 65010, `GATEWAY` 65020); the pod/service CIDRs and the gateway
-address are constants on `ClusterNetworkBlueprint`, previously scattered as
-literals across the Cilium manifests and the node-env. The home AS (65000) is
-ndh's — it is unioned in on ndh's side, not owned by rke2lab.
+`segments` and the `asns` dictionary (`asn` → AS name). These are the single
+source the netflow collector (ndh projects them, `nnh` consumes) derives its
+flow→AS labelling from, so it no longer hardcodes the segment→ASN map. The AS
+numbering is the `ClusterAsn` enum (`RKE2_CLUSTER` 65010, `GATEWAY` 65020); the
+pod/service CIDRs and the gateway address are constants on
+`ClusterNetworkBlueprint`, previously scattered as literals across the Cilium
+manifests and the node-env. The home AS (65000) is ndh's — it is unioned in on
+ndh's side, not owned by rke2lab.
+
+Each segment is `{cidr, name, asn, gateway?, dhcp?, domain?, hosts[]}` — the
+*uniform* shape ndh's baremetal segments also expose, so both repos' spans read
+the same way. Beyond the attribution triple (`cidr → name → asn`), a segment
+carries the managed-network facts *when rke2lab actually runs that network's
+gateway/DHCP*:
+
+* `gateway` — the segment gateway address (present only where rke2lab owns it);
+* `dhcp` — the DHCP range served (the `ipv4.dhcp.ranges` string);
+* `domain` — the dnsmasq DNS zone (absent for the cluster nets, whose Incus
+  bridge runs `dns.mode=none`);
+* `hosts[]` — the static reservations, each `{name, mac?, ip}`: a `dhcp-host`
+  when `mac` is present (the MAC-known cluster nodes) or a `host-record` when it
+  is absent (ndh's `vz.<host>`, kept uniform).
+
+These optional facts are `Optional<String>` on the record — never nulls — so an
+attribution-only span (the `/18` vmnet supernet, the LAN/LB `/27`s, `pod`,
+`service`, `gateway`, `ula`) serialises back to just `cidr/name/asn` with an
+empty `hosts` list (Jackson's jdk8 module omits an empty Optional's key). The
+managed facts land on the *per-cluster vmnet `/21`* segment
+(`<cluster>-cluster-net`, e.g. `nikopol-cluster-net` = `10.80.8.0/21`, gateway
+`.1`, the WAN DHCP range, and one `dhcp-host` per canonical node) — the same
+tuples `GrowNetworkResolver` emits into the Incus bridge's `raw.dnsmasq`,
+projected here from the one blueprint source. This mirrors ndh's model exactly:
+a broad attribution supernet plus per-owner managed nets carrying gateway + DHCP
++ reservations.
 
 === The IFD tradeoff (accepted)
 

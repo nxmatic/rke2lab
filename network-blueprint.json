@@ -390,47 +390,134 @@
     {
       "cidr": "192.168.1.128/27",
       "name": "bioskop-cluster-lan",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
     },
     {
       "cidr": "192.168.1.192/27",
       "name": "bioskop-lb",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
+    },
+    {
+      "cidr": "10.80.0.0/21",
+      "name": "bioskop-cluster-net",
+      "asn": 65010,
+      "gateway": "10.80.0.1",
+      "dhcp": "10.80.0.2-10.80.0.9,10.80.0.31-10.80.7.254",
+      "hosts": [
+        {
+          "name": "bioskop-master",
+          "mac": "52:54:00:00:00:00",
+          "ip": "10.80.0.10"
+        },
+        {
+          "name": "bioskop-peer1",
+          "mac": "52:54:00:00:00:01",
+          "ip": "10.80.0.11"
+        },
+        {
+          "name": "bioskop-peer2",
+          "mac": "52:54:00:00:00:02",
+          "ip": "10.80.0.12"
+        },
+        {
+          "name": "bioskop-peer3",
+          "mac": "52:54:00:00:00:03",
+          "ip": "10.80.0.13"
+        },
+        {
+          "name": "bioskop-worker1",
+          "mac": "52:54:00:00:01:0a",
+          "ip": "10.80.0.20"
+        },
+        {
+          "name": "bioskop-worker2",
+          "mac": "52:54:00:00:01:0b",
+          "ip": "10.80.0.21"
+        }
+      ]
     },
     {
       "cidr": "192.168.1.96/27",
       "name": "nikopol-cluster-lan",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
     },
     {
       "cidr": "192.168.1.160/27",
       "name": "nikopol-lb",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
+    },
+    {
+      "cidr": "10.80.8.0/21",
+      "name": "nikopol-cluster-net",
+      "asn": 65010,
+      "gateway": "10.80.8.1",
+      "dhcp": "10.80.8.2-10.80.8.9,10.80.8.31-10.80.15.254",
+      "hosts": [
+        {
+          "name": "nikopol-master",
+          "mac": "52:54:00:01:00:00",
+          "ip": "10.80.8.10"
+        },
+        {
+          "name": "nikopol-peer1",
+          "mac": "52:54:00:01:00:01",
+          "ip": "10.80.8.11"
+        },
+        {
+          "name": "nikopol-peer2",
+          "mac": "52:54:00:01:00:02",
+          "ip": "10.80.8.12"
+        },
+        {
+          "name": "nikopol-peer3",
+          "mac": "52:54:00:01:00:03",
+          "ip": "10.80.8.13"
+        },
+        {
+          "name": "nikopol-worker1",
+          "mac": "52:54:00:01:01:0a",
+          "ip": "10.80.8.20"
+        },
+        {
+          "name": "nikopol-worker2",
+          "mac": "52:54:00:01:01:0b",
+          "ip": "10.80.8.21"
+        }
+      ]
     },
     {
       "cidr": "10.80.0.0/18",
       "name": "vmnet",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
     },
     {
       "cidr": "10.80.0.1/32",
       "name": "gateway",
-      "asn": 65020
+      "asn": 65020,
+      "hosts": []
     },
     {
       "cidr": "10.42.0.0/16",
       "name": "pod",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
     },
     {
       "cidr": "10.43.0.0/16",
       "name": "service",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
     },
     {
       "cidr": "fd96:6924:3693::/48",
       "name": "ula",
-      "asn": 65010
+      "asn": 65010,
+      "hosts": []
     }
   ],
   "asns": {

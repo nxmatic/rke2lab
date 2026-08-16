@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -186,10 +187,12 @@ public class NetplanBlueprintScenario
         allAddressing.put(cluster, clusterAddressing);
       }
 
-      // Cluster-owned network SEGMENTS (cidr → name → asn) — the single source nnh/ndh derive the
-      // flow→AS labelling from. rke2lab publishes ONLY what it owns (ClusterAsn 65010/65020); the
-      // home segments (65000) belong to ndh. Per-cluster LAN /27 + LB /27 come from the blueprint;
-      // the vmnet/pod/service/gateway/ULA facts from ClusterNetworkBlueprint + ClusterAsn.
+      // Cluster-owned network SEGMENTS — the single source nnh/ndh derive the flow→AS labelling
+      // from, now in the uniform shape ndh's baremetal segments share (see the Segment record).
+      // rke2lab publishes ONLY what it owns (ClusterAsn 65010/65020); the home segments (65000)
+      // belong to ndh. Per cluster: the LAN /27 + LB /27 (bbox-served — attribution only; ndh owns
+      // their reservations) and the vmnet /21 rke2lab actually manages (gateway + DHCP + a
+      // dhcp-host per node). The /18 supernet + pod/service/gateway/ULA are attribution spans.
       final List<Segment> segments = new ArrayList<>();
       for (String cluster : clusters.keySet()) {
         final ClusterNetworkBlueprint bp =
@@ -199,13 +202,40 @@ public class NetplanBlueprintScenario
                 .deriveRecipeModel()
                 .build();
         segments.add(
-            new Segment(
+            Segment.attribution(
                 bp.lan().nodeCidr().toString(),
                 cluster + "-cluster-lan",
                 ClusterAsn.RKE2_CLUSTER.number()));
         segments.add(
-            new Segment(
+            Segment.attribution(
                 bp.lan().lbCidr().toString(), cluster + "-lb", ClusterAsn.RKE2_CLUSTER.number()));
+
+        // The per-cluster vmnet /21 (Incus dnsmasq): gateway .1, the WAN DHCP range, and one
+        // dhcp-host reservation per canonical node — the SAME tuples GrowNetworkResolver emits into
+        // raw.dnsmasq, derived here from the same blueprint source (dns.mode=none → no DNS domain).
+        final List<SegmentHost> nodeHosts = new ArrayList<>();
+        for (String node : ClusterNetworkBlueprint.CANONICAL_NODE_NAMES) {
+          final ClusterNetworkBlueprint nodeBp =
+              ClusterNetworkBlueprint.builder()
+                  .cluster(cluster)
+                  .node(node)
+                  .deriveRecipeModel()
+                  .build();
+          nodeHosts.add(
+              new SegmentHost(
+                  cluster + "-" + node,
+                  Optional.of(nodeBp.wan().hostMacaddr().value()),
+                  nodeBp.nodeNetwork().nodeHostInetaddr().getHostAddress()));
+        }
+        segments.add(
+            new Segment(
+                bp.host().clusterCidr().toString(),
+                cluster + "-cluster-net",
+                ClusterAsn.RKE2_CLUSTER.number(),
+                Optional.of(bp.host().clusterGatewayInetaddr().getHostAddress()),
+                Optional.of(bp.wan().dhcpRange()),
+                Optional.empty(),
+                nodeHosts));
       }
       final ClusterNetworkBlueprint anyNode =
           ClusterNetworkBlueprint.builder()
@@ -214,22 +244,23 @@ public class NetplanBlueprintScenario
               .deriveRecipeModel()
               .build();
       segments.add(
-          new Segment(
+          Segment.attribution(
               anyNode.host().superNetworkCidr().toString(),
               "vmnet",
               ClusterAsn.RKE2_CLUSTER.number()));
       segments.add(
-          new Segment(
+          Segment.attribution(
               ClusterNetworkBlueprint.GATEWAY_ADDRESS + "/32",
               ClusterAsn.GATEWAY.asName(),
               ClusterAsn.GATEWAY.number()));
       segments.add(
-          new Segment(ClusterNetworkBlueprint.POD_CIDR, "pod", ClusterAsn.RKE2_CLUSTER.number()));
+          Segment.attribution(
+              ClusterNetworkBlueprint.POD_CIDR, "pod", ClusterAsn.RKE2_CLUSTER.number()));
       segments.add(
-          new Segment(
+          Segment.attribution(
               ClusterNetworkBlueprint.SERVICE_CIDR, "service", ClusterAsn.RKE2_CLUSTER.number()));
       segments.add(
-          new Segment(
+          Segment.attribution(
               ClusterNetworkBlueprint.ULA_PREFIX + "::/48",
               "ula",
               ClusterAsn.RKE2_CLUSTER.number()));
@@ -321,8 +352,40 @@ public class NetplanBlueprintScenario
       List<Segment> segments,
       Map<String, String> asns) {}
 
-  /** A network span the cluster owns, labelled for flow attribution: {@code cidr → name → asn}. */
-  record Segment(String cidr, String name, int asn) {}
+  /**
+   * A network span the cluster owns — uniform with ndh's baremetal segments: the attribution triple
+   * ({@code cidr → name → asn}) plus the managed-network facts a segment's dnsmasq carries — a
+   * {@code gateway}, the DHCP range ({@code dhcp}), a DNS {@code domain}, and the static {@code
+   * hosts} reservations. The rich fields are present ONLY for a network rke2lab actually runs a
+   * gateway/DHCP for (the per-cluster vmnet {@code /21}); pure attribution spans (the {@code /18}
+   * supernet, the LAN/LB {@code /27}s, pod, service, ula, the gateway {@code /32}) carry empty
+   * Optionals and an empty host list — see {@link #attribution}. Optionals (not nulls) so a record
+   * built on this JSON stays null-free; Jackson's jdk8 module omits an empty Optional's key
+   * (NON_ABSENT), so an attribution span serialises back to just {@code cidr/name/asn/hosts:[]}.
+   */
+  record Segment(
+      String cidr,
+      String name,
+      int asn,
+      Optional<String> gateway,
+      Optional<String> dhcp,
+      Optional<String> domain,
+      List<SegmentHost> hosts) {
+
+    /** An attribution-only span: no gateway/DHCP/domain and no static reservations. */
+    static Segment attribution(String cidr, String name, int asn) {
+      return new Segment(
+          cidr, name, asn, Optional.empty(), Optional.empty(), Optional.empty(), List.of());
+    }
+  }
+
+  /**
+   * A static reservation on a segment's dnsmasq: a {@code dhcp-host} (a MAC-known cluster node —
+   * {@code mac} present) or a {@code host-record} (a MAC-less name — {@code mac} empty). rke2lab
+   * emits only dhcp-host nodes; the empty-mac form keeps the shape uniform with ndh's {@code
+   * vz.<host>} host-record.
+   */
+  record SegmentHost(String name, Optional<String> mac, String ip) {}
 
   record NodeAddressing(NodeMacs macs, NodeIPs ips, NodeLeases leases) {}
 

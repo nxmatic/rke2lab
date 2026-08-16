@@ -121,3 +121,15 @@ loss. Fix (user, admin console): disable key expiry for the fleet nodes.
 - CHORE (separate worktree): migrate ndh flox `[include]` from absolute bioskop paths to
   relative (like rke2lab); refactor the remaining YAML-string builders
   (Headscale/Headplane/Envoy manifests) to snakeyaml/Jackson or cdk8s typed constructs.
+- DONE: `nix-repo-setup` skill authored in the hub (.claude/hub/skills/nix-repo-setup) +
+  the worktree skill re-smudge generalisation — both committed on this branch (hub commits
+  68b2e4a1, 94ad4fcc) to publish up together at sync.
+- BLOCKED / DEFER TO A NIX-CAPABLE CHECKOUT (bioskop): apply `nix-repo-setup` to rke2lab
+  (treefmt.nix + flake `formatter` + treefmt-nix input + .githooks/pre-commit, then
+  `nix flake lock` + `nix fmt` normalize commit). Can't do it in THIS worktree: rke2lab's
+  bare carries the `extensions.relativeworktrees` git extension, so nix can't open the
+  worktree (`nix flake lock`/`nix fmt` fail; `path:` is read-only so can't write flake.lock).
+  ndh is unaffected (its bare lacks the extension) — nix fmt already gates ndh. NB: the
+  global `~/.config/git/hooks` dispatcher execs the on-disk `.githooks/pre-commit`, so do NOT
+  drop that file into rke2lab until the `formatter` is locked & verified — an unlocked hook
+  blocks every commit.
