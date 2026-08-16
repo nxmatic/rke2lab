@@ -156,6 +156,17 @@ The YAML carries the full contract (from `NetplanBlueprintScenario`): `clusters`
 `nodes`, `macPatterns`, `nodeTypes`, and per-node `addressing` (macs/ips/leases).
 `deriveMacs cluster node` resolves a `{lan, wan}` pair from the cluster/node IDs.
 
+Alongside the per-node addressing the export also carries the cluster-owned
+`segments` — a list of `{cidr, name, asn}` spans (the per-cluster LAN `/27` and
+LB `/27`, plus the vmnet, pod, service, gateway and ULA facts) — and the `asns`
+dictionary (`asn` → AS name). These are the single source the netflow collector
+(ndh projects them, `nnh` consumes) derives its flow→AS labelling from, so it no
+longer hardcodes the segment→ASN map. The AS numbering is the `ClusterAsn` enum
+(`RKE2_CLUSTER` 65010, `GATEWAY` 65020); the pod/service CIDRs and the gateway
+address are constants on `ClusterNetworkBlueprint`, previously scattered as
+literals across the Cilium manifests and the node-env. The home AS (65000) is
+ndh's — it is unioned in on ndh's side, not owned by rke2lab.
+
 === The IFD tradeoff (accepted)
 
 Consuming `lib.networkBlueprint` triggers import-from-derivation: nix builds the

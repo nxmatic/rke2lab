@@ -5,6 +5,8 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import io.seedmatic.rke2lab.netplan.contract.ClusterAsn;
+import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -213,7 +215,7 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
                 List.of(
                     Map.of(
                         "localASN",
-                        65010,
+                        ClusterAsn.RKE2_CLUSTER.number(),
                         "name",
                         "control-plane-bgp",
                         "peers",
@@ -222,9 +224,9 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
                                 "name",
                                 "gateway-peer",
                                 "peerASN",
-                                65020,
+                                ClusterAsn.GATEWAY.number(),
                                 "peerAddress",
-                                "10.80.0.1",
+                                ClusterNetworkBlueprint.GATEWAY_ADDRESS,
                                 "peerConfigRef",
                                 Map.of("name", "cilium-peer"))))),
                 "nodeSelector",

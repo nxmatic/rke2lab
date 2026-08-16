@@ -7,6 +7,7 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import inet.ipaddr.IPAddressString;
+import io.seedmatic.rke2lab.netplan.contract.ClusterAsn;
 import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import io.seedmatic.rke2lab.netplan.contract.NetplanRunbookInput;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
@@ -19,7 +20,9 @@ import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -183,8 +186,64 @@ public class NetplanBlueprintScenario
         allAddressing.put(cluster, clusterAddressing);
       }
 
+      // Cluster-owned network SEGMENTS (cidr → name → asn) — the single source nnh/ndh derive the
+      // flow→AS labelling from. rke2lab publishes ONLY what it owns (ClusterAsn 65010/65020); the
+      // home segments (65000) belong to ndh. Per-cluster LAN /27 + LB /27 come from the blueprint;
+      // the vmnet/pod/service/gateway/ULA facts from ClusterNetworkBlueprint + ClusterAsn.
+      final List<Segment> segments = new ArrayList<>();
+      for (String cluster : clusters.keySet()) {
+        final ClusterNetworkBlueprint bp =
+            ClusterNetworkBlueprint.builder()
+                .cluster(cluster)
+                .node("master")
+                .deriveRecipeModel()
+                .build();
+        segments.add(
+            new Segment(
+                bp.lan().nodeCidr().toString(),
+                cluster + "-cluster-lan",
+                ClusterAsn.RKE2_CLUSTER.number()));
+        segments.add(
+            new Segment(
+                bp.lan().lbCidr().toString(), cluster + "-lb", ClusterAsn.RKE2_CLUSTER.number()));
+      }
+      final ClusterNetworkBlueprint anyNode =
+          ClusterNetworkBlueprint.builder()
+              .cluster("bioskop")
+              .node("master")
+              .deriveRecipeModel()
+              .build();
+      segments.add(
+          new Segment(
+              anyNode.host().superNetworkCidr().toString(),
+              "vmnet",
+              ClusterAsn.RKE2_CLUSTER.number()));
+      segments.add(
+          new Segment(
+              ClusterNetworkBlueprint.GATEWAY_ADDRESS + "/32",
+              ClusterAsn.GATEWAY.asName(),
+              ClusterAsn.GATEWAY.number()));
+      segments.add(
+          new Segment(ClusterNetworkBlueprint.POD_CIDR, "pod", ClusterAsn.RKE2_CLUSTER.number()));
+      segments.add(
+          new Segment(
+              ClusterNetworkBlueprint.SERVICE_CIDR, "service", ClusterAsn.RKE2_CLUSTER.number()));
+      segments.add(
+          new Segment(
+              ClusterNetworkBlueprint.ULA_PREFIX + "::/48",
+              "ula",
+              ClusterAsn.RKE2_CLUSTER.number()));
+
+      // asn → canonical AS name (the 'asns' dictionary nnh renders), derived from the enum. Home
+      // (65000) is ndh's, added by its catalog when it unions the home segments.
+      final Map<String, String> asns = new LinkedHashMap<>();
+      for (ClusterAsn asn : ClusterAsn.values()) {
+        asns.put(Integer.toString(asn.number()), asn.asName());
+      }
+
       this.metadata =
-          new NetworkBlueprintMetadata(clusters, nodes, macPatterns, nodeTypes, allAddressing);
+          new NetworkBlueprintMetadata(
+              clusters, nodes, macPatterns, nodeTypes, allAddressing, segments, asns);
       return self();
     }
 
@@ -258,7 +317,12 @@ public class NetplanBlueprintScenario
       Map<String, Integer> nodes,
       Map<String, String> macPatterns,
       Map<String, Integer> nodeTypes,
-      Map<String, Map<String, NodeAddressing>> addressing) {}
+      Map<String, Map<String, NodeAddressing>> addressing,
+      List<Segment> segments,
+      Map<String, String> asns) {}
+
+  /** A network span the cluster owns, labelled for flow attribution: {@code cidr → name → asn}. */
+  record Segment(String cidr, String name, int asn) {}
 
   record NodeAddressing(NodeMacs macs, NodeIPs ips, NodeLeases leases) {}
 

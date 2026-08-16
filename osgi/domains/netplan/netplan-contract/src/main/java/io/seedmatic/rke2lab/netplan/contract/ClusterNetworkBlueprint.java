@@ -43,6 +43,20 @@ public record ClusterNetworkBlueprint(
    */
   public static final String ULA_PREFIX = "fd96:6924:3693";
 
+  /**
+   * Pod CIDR — Cilium {@code ipv4NativeRoutingCIDR} and the rke2 node-env {@code clusterPodCidr}.
+   */
+  public static final String POD_CIDR = "10.42.0.0/16";
+
+  /** Service CIDR — the rke2 node-env {@code clusterServiceCidr}. */
+  public static final String SERVICE_CIDR = "10.43.0.0/16";
+
+  /**
+   * vmnet gateway address — Cilium BGP {@code peerAddress}; equals cluster 0's {@code
+   * clusterCidr.gateway()}.
+   */
+  public static final String GATEWAY_ADDRESS = "10.80.0.1";
+
   private static final int ROLE_NODE = 0x20;
   private static final int ROLE_VIP = 0x30;
   private static final int ROLE_LB = 0x40;

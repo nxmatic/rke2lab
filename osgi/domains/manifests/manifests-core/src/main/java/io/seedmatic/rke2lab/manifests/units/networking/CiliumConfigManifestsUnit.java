@@ -5,6 +5,7 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -75,75 +76,77 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
             "/spec",
             Map.of(
                 "valuesContent",
-                "installCRDs: true\n"
-                    + "k8sServiceHost: \"127.0.0.1\"\n"
-                    + "k8sServicePort: \"6443\"\n"
-                    + "debug:\n"
-                    + "  enabled: true\n"
-                    + "  verbose: datapath\n"
-                    + "bpf:\n"
-                    + "  hostLegacyRouting: false\n"
-                    + "bgpControlPlane:\n"
-                    + "  enabled: true\n"
-                    + "cluster:\n"
-                    + "  name: sample\n"
-                    + "  id: 7\n"
-                    + "clustermesh:\n"
-                    + "  enabled: true\n"
-                    + "  useAPIServer: true\n"
-                    + "  apiserver:\n"
-                    + "    enabled: true\n"
-                    + "    service:\n"
-                    + "      type: LoadBalancer\n"
-                    + "      # Using BGP announcements for cluster mesh\n"
-                    + "envoy:\n"
-                    + "  enabled: true\n"
-                    + "gatewayAPI:\n"
-                    + "  enabled: true\n"
-                    + "ingressController:\n"
-                    + "  default: true\n"
-                    + "  enabled: true\n"
-                    + "  loadBalancerMode: dedicated\n"
-                    + "  service:\n"
-                    + "    annotations:\n"
-                    + "      io.cilium/lb-ipam-pool: lan\n"
-                    + "      io.cilium/lb-ipam-ips: lan-headplane-inetaddr\n"
-                    + "hubble:\n"
-                    + "  enabled: true\n"
-                    + "  relay:\n"
-                    + "    enabled: true\n"
-                    + "  ui:\n"
-                    + "    enabled: true\n"
-                    + "ipv4:\n"
-                    + "  enabled: true\n"
-                    + "ipv6:\n"
-                    + "  enabled: false\n"
-                    + "kubeProxyReplacement: true\n"
-                    + "l2announcements:\n"
-                    + "  enabled: true\n"
-                    + "  leaseDuration: 15s\n"
-                    + "  leaseRenewDeadline: 5s\n"
-                    + "  leaseRetryPeriod: 2s\n"
-                    + "l2NeighDiscovery:\n"
-                    + "  enabled: true\n"
-                    + "  refresh: true\n"
-                    + "  refreshPeriod: 30s\n"
-                    + "l7Proxy: true\n"
-                    + "# routingMode: tunnel mode (vxlan/geneve) initially failed in LXC/Incus\n"
-                    + "# containers with 'protocol not supported' error in route reconciler netlink\n"
-                    + "# initialization. Root cause was missing ip_set kernel modules on the NixOS\n"
-                    + "# host (now fixed in nix-darwin-home cilium-kernel-modules.nix). Tunnel mode\n"
-                    + "# may work now but native routing is more appropriate: all control nodes run\n"
-                    + "# as containers on the same host, so native routing is more efficient and\n"
-                    + "# avoids encapsulation overhead. Cluster mesh works via apiserver regardless.\n"
-                    + "routingMode: native\n"
-                    + "autoDirectNodeRoutes: true\n"
-                    + "ipv4NativeRoutingCIDR: 10.42.0.0/16\n"
-                    + "operator:\n"
-                    + "  replicas: 1\n"
-                    + "  podDisruptionBudget:\n"
-                    + "    enabled: true\n"
-                    + "socketLB:\n"
-                    + "  enabled: true")));
+                """
+                installCRDs: true
+                k8sServiceHost: "127.0.0.1"
+                k8sServicePort: "6443"
+                debug:
+                  enabled: true
+                  verbose: datapath
+                bpf:
+                  hostLegacyRouting: false
+                bgpControlPlane:
+                  enabled: true
+                cluster:
+                  name: sample
+                  id: 7
+                clustermesh:
+                  enabled: true
+                  useAPIServer: true
+                  apiserver:
+                    enabled: true
+                    service:
+                      type: LoadBalancer
+                      # Using BGP announcements for cluster mesh
+                envoy:
+                  enabled: true
+                gatewayAPI:
+                  enabled: true
+                ingressController:
+                  default: true
+                  enabled: true
+                  loadBalancerMode: dedicated
+                  service:
+                    annotations:
+                      io.cilium/lb-ipam-pool: lan
+                      io.cilium/lb-ipam-ips: lan-headplane-inetaddr
+                hubble:
+                  enabled: true
+                  relay:
+                    enabled: true
+                  ui:
+                    enabled: true
+                ipv4:
+                  enabled: true
+                ipv6:
+                  enabled: false
+                kubeProxyReplacement: true
+                l2announcements:
+                  enabled: true
+                  leaseDuration: 15s
+                  leaseRenewDeadline: 5s
+                  leaseRetryPeriod: 2s
+                l2NeighDiscovery:
+                  enabled: true
+                  refresh: true
+                  refreshPeriod: 30s
+                l7Proxy: true
+                # routingMode: tunnel mode (vxlan/geneve) initially failed in LXC/Incus
+                # containers with 'protocol not supported' error in route reconciler netlink
+                # initialization. Root cause was missing ip_set kernel modules on the NixOS
+                # host (now fixed in nix-darwin-home cilium-kernel-modules.nix). Tunnel mode
+                # may work now but native routing is more appropriate: all control nodes run
+                # as containers on the same host, so native routing is more efficient and
+                # avoids encapsulation overhead. Cluster mesh works via apiserver regardless.
+                routingMode: native
+                autoDirectNodeRoutes: true
+                ipv4NativeRoutingCIDR: %s
+                operator:
+                  replicas: 1
+                  podDisruptionBudget:
+                    enabled: true
+                socketLB:
+                  enabled: true"""
+                    .formatted(ClusterNetworkBlueprint.POD_CIDR))));
   }
 }

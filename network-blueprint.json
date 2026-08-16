@@ -385,5 +385,56 @@
         }
       }
     }
+  },
+  "segments": [
+    {
+      "cidr": "192.168.1.128/27",
+      "name": "bioskop-cluster-lan",
+      "asn": 65010
+    },
+    {
+      "cidr": "192.168.1.192/27",
+      "name": "bioskop-lb",
+      "asn": 65010
+    },
+    {
+      "cidr": "192.168.1.96/27",
+      "name": "nikopol-cluster-lan",
+      "asn": 65010
+    },
+    {
+      "cidr": "192.168.1.160/27",
+      "name": "nikopol-lb",
+      "asn": 65010
+    },
+    {
+      "cidr": "10.80.0.0/18",
+      "name": "vmnet",
+      "asn": 65010
+    },
+    {
+      "cidr": "10.80.0.1/32",
+      "name": "gateway",
+      "asn": 65020
+    },
+    {
+      "cidr": "10.42.0.0/16",
+      "name": "pod",
+      "asn": 65010
+    },
+    {
+      "cidr": "10.43.0.0/16",
+      "name": "service",
+      "asn": 65010
+    },
+    {
+      "cidr": "fd96:6924:3693::/48",
+      "name": "ula",
+      "asn": 65010
+    }
+  ],
+  "asns": {
+    "65010": "rke2-cluster",
+    "65020": "gateway"
   }
 }
