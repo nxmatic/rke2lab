@@ -66,18 +66,25 @@ and **Claude backend** — then run the steps.
    ```bash
    git worktree add -b <namespace>/<slug> <worktree-store>/<org>/<repo>.d/<namespace>/<slug> "$src"
    ```
-3. **Re-smudge sops** (rke2lab family). `git worktree add` checks files out
-   **before** `.sops.yaml` is visible to the smudge filter, so sops-governed
-   files land ENCRYPTED and are unusable until re-smudged. Governed paths come
-   from `.gitattributes` (`filter=sops-yaml`) — currently `.secrets`,
-   `.ndh-ssh.d/keys.yaml`, `**/01-secret-*.yaml`. For each, re-decrypt:
+3. **Re-smudge sops** (any repo whose `.gitattributes` wires a sops smudge/clean
+   filter). `git worktree add` checks files out **before** `.sops.yaml` is visible
+   to the smudge filter, so sops-governed files land ENCRYPTED and are unusable
+   until re-smudged. Don't hardcode the file list — derive it from git's OWN
+   attribute resolution, so it auto-covers new paths, honours globs
+   (`**/01-secret-*.yaml`), and is a correct **no-op** for repos that DISABLE the
+   filter (e.g. `ndh`, whose `.gitattributes` intentionally carries no
+   `filter=sops-*` — its worktree MUST stay encrypted for eval-time `readFile`):
    ```bash
-   rm <file> && git checkout -- <file>
+   git ls-files -z | git check-attr --stdin -z filter \
+     | while IFS= read -r -d '' path; do
+         IFS= read -r -d '' _attr; IFS= read -r -d '' value
+         case "$value" in sops*) rm -f "$path" && git checkout -- "$path" ;; esac
+       done
    ```
-   Then verify no real secret still contains `ENC[`. **Mind false positives**:
-   schemas/docs may contain `ENC[` as literal text (e.g.
-   `.ndh-ssh.d/keys.schema.yaml`) and are NOT governed — trust `.gitattributes`,
-   not a blind `grep`. A clean `git status --porcelain` after this step confirms it.
+   Then verify: a clean `git status --porcelain` confirms every governed file
+   re-smudged. (Don't grep for `ENC[` blindly — schemas/docs like
+   `.ndh-ssh.d/keys.schema.yaml` carry it as literal text and are NOT governed;
+   the loop keys on the `filter` attribute itself, which is exactly right.)
 4. **Bridge the session history to your home config.** The Dock-launched VSCode
    extension host lists sessions from `$HOME/.claude/projects/<slug>/` — its own
    `$HOME/.claude`, not the workspace-scoped `CLAUDE_CONFIG_DIR`. The canonical
