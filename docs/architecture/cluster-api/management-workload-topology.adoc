@@ -171,11 +171,16 @@ on-demand management cluster — stopping that cluster cannot take the workload 
 [NOTE]
 ====
 The two-plane split (nodes on `mammoth-skate` / workloads on Headscale) and Headscale's host (the
-always-live `bioskop-wrkld`) are decided. What remains a separate concern, not yet fixed in the specs,
-is the internal/LAN vs external split (self-hosted Headscale for internal, Tailscale for outside) and
-whether a given bare-metal is LAN-local or remote. It gets its own refinement. This document relies
-only on the *property*: every node is reachable on the `mammoth-skate` node plane, so the management
-cluster can reach each workload node regardless of host.
+always-live `bioskop-wrkld`) are decided. What remains a separate concern is the internal/LAN vs
+external split (self-hosted Headscale for internal, Tailscale for outside) and whether a given
+bare-metal is LAN-local or remote. Its first concrete instance is the corp bare-metal Mac (`vz.nikopol`)
+that hosts `nikopol-nixos`: JAMF-managed, it cannot be a `mammoth-skate` member, so it is reached
+*locally* — a static `172.16.6` overlay on the shared Wi-Fi L2, plus `ProxyJump` through the personal
+`nikopol` VM for remote operators — *not* as a tailnet peer and *not* via any advertised subnet route.
+That transport is specified in `nix-darwin-home`'s `docs/network-topology-c4.adoc`. This does not touch
+the *property* this document relies on: every *node* (the bare-metal hypervisors and every cluster node)
+is a `mammoth-skate` member, so the management cluster reaches each workload node regardless of host —
+the off-mesh case is the bare-metal Mac, never a node.
 ====
 
 [[why-separation]]
