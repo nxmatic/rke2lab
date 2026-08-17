@@ -154,6 +154,37 @@ and **Claude backend** — then run the steps.
 7. **Open** that `.code-workspace` in a **new** VSCode window (one window = one
    worktree). Then `cd` into the worktree for any terminal work.
 
+## Merge / land the branch (squash by default)
+
+Squash is the default — one clean commit on the base. From the **base branch's**
+worktree (never squash-merge into a branch you're standing on inside the topic
+worktree):
+
+```bash
+git merge --squash <namespace>/<slug> && git commit    # on the base worktree
+```
+
+**⚠️ Subtree guard — applies ONLY if the branch touched `.claude/hub/`.** A squash
+flattens the subtree sync commits (`Squashed '.claude/hub/' …`, the sync-down
+merges) into one, orphaning `subtree pull` on the base (it loses the recorded
+base → messy re-merge, or `could not rev-parse split hash`). Two safe ways:
+
+- **Cheapest — don't squash *that* branch.** Plain `git merge` (or a fast-forward
+  when the base is an ancestor) carries the subtree markers along intact. Only
+  hub-touching branches need this; everything else squashes freely.
+- **Keep squash-by-default — re-anchor after.** First **sync the branch's hub edits
+  up** via the `hub-subtree-sync` skill (so the split reflects them), *then* on the
+  base:
+  ```bash
+  git rm -r .claude/hub && git commit -m "chore: re-anchor hub subtree"
+  git subtree add --prefix=.claude/hub claude-hub split/<hub-org>/dot-claude --squash
+  ```
+  This re-establishes a clean sync base at the current (synced) hub content. The
+  sync-up **must** precede the re-add, or the re-add overwrites your hub edits with
+  the stale split.
+
+Push the base, then tear down the worktree below.
+
 ## Finish / tear down
 
 A merged `<repo>.d/<namespace>/<slug>` worktree is **user-managed** under this
@@ -186,15 +217,14 @@ expected scaffolding for the next worktree placed there — leave it.
 ## Hub-subtree sync (only if this session edited `.claude/hub/…`)
 
 The `.claude/hub/` tree is a shared subtree of `claude-hub`. If you changed hub
-content, publish it **up** at session end, before merging the consumer branch.
-`.claude/hub/README-SUBTREE.md` is authoritative; the essentials:
+content, publish it **up** before landing the consumer branch — via the
+**`hub-subtree-sync` skill**, which owns the hardened procedure. Two invariants
+that bite if ignored:
 
-```bash
-git subtree split --prefix=.claude/hub --branch=split/<repo>/dot-claude   # NO --rejoin
-git push claude-hub split/<repo>/dot-claude
-# in the hub checkout: subtree pull --prefix=.claude … --squash, then push origin main
-git branch -D split/<repo>/dot-claude && git push claude-hub --delete split/<repo>/dot-claude
-```
-
-Keep `--squash` in **both** directions; **never** `--rejoin` (it fails with
-"refusing to merge unrelated histories" after a squash pull).
+- **NEVER delete the split branches** (`split/<org>/dot-claude*`). `subtree pull`
+  walks their recorded `Squashed … from A..B` bases; deleting a split GC's those
+  bases → `could not rev-parse split hash`. They are permanent anchors — keep them
+  (and any `refs/recovered/*`) forever, **including when you delete the consumer
+  branch or worktree** (teardown removes the worktree, never its split).
+- **`--squash` both directions, `--ignore-joins` on split, NEVER `--rejoin`** (it
+  fails "refusing to merge unrelated histories" after a squash pull).
