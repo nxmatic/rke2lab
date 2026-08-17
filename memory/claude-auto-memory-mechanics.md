@@ -1,6 +1,6 @@
 ---
 name: claude-auto-memory-mechanics
-description: "How Claude Code resolves auto-memory + config dirs — the hard facts learned 2026-06-15. Auto-memory is REPO-WIDE (one dir per git repo, shared across all worktrees, keyed off git common-dir). autoMemoryDirectory setting: UNVERIFIED on darwin (two probes contaminated by an existing slug symlink — never cleanly tested). link-memory.sh slug = replace BOTH / and . with -. CLAUDE_CONFIG_DIR exists but macOS scope undocumented."
+description: "How Claude Code resolves auto-memory + config dirs. Auto-memory is REPO-WIDE by default (one dir per git repo, shared across all worktrees, keyed off the git repository). autoMemoryDirectory setting (absolute or ~/ path, honored from settings.local.json under workspace-trust): VERIFIED on darwin 2026-08-14 — redirects BOTH read and write; it is THE mechanism to pin memory into a tracked per-worktree dir, and it REPLACED the old link-memory.sh symlink hack (now deleted). Only MEMORY.md auto-loads at start (first 200 lines / 25KB). CLAUDE_CONFIG_DIR is not documented to affect memory."
 metadata:
   node_type: memory
   type: reference
@@ -27,23 +27,26 @@ the repo-root memory (proven: a "remember X" in a worktree wrote to the MAIN
 checkout's `.claude/memory`). External vs nested worktree location does NOT change
 this (same git common-dir → same slug).
 
-**2. `autoMemoryDirectory` setting — UNVERIFIED, not proven dead.** Docs: absolute
-or `~/`-path, any settings scope, honored only after the trust dialog. We probed
-twice (worktree subdir + project root); BOTH probes were CONTAMINATED — a slug
-symlink already existed at the resolved path and plausibly SHADOWS the setting, so
-it was never cleanly tested. Earlier "it's dead" was retracted. The clean test
-(never yet run): REMOVE the slug symlink first, then set autoMemoryDirectory, then
-fresh session. Reads can also be confounded — the model will read `.claude/memory`
-files directly when asked, which looks like auto-load but isn't.
+**2. `autoMemoryDirectory` setting — VERIFIED on darwin (2026-08-14).** Docs:
+absolute or `~/`-path, honored from any settings scope INCLUDING
+`settings.local.json` under the workspace-trust rule, redirects **both read and
+write**. Clean probe on the `refactor/claude-instructions-to-skills` worktree (no
+contaminating slug symlink this time): set `autoMemoryDirectory` to the tracked
+`<wt>/.claude/memory`, reloaded, asked to remember a marker → the write landed in
+the **tracked** dir (git saw the new file + MEMORY.md index entry) and NO `memory/`
+appeared at the default `projects/<slug>/memory`. So this is THE mechanism to pin
+memory into a tracked per-worktree dir; the old `link-memory.sh` symlink is now
+DELETED. (The two June probes read as UNVERIFIED only because a pre-existing slug
+symlink shadowed the resolved path.)
 
-**3. `link-memory.sh` slug bug (FIXED 2026-06-15).** Claude derives the slug by
-replacing BOTH `/` AND `.` with `-` (`/…/rke2lab.d/main` → `-…-rke2lab-d-main`).
-The script did `sed 's:/:-:g'` (only `/`) → once the path had a dot it computed a
-WRONG slug, made a stray dir, left the real one dangling. Fixed to
-`sed 's:[/.]:-:g'`. **Fix currently lives ONLY on the uncommitted rke2lab branch
-`chore/external-worktree-operating-model` (`.claude/bin/link-memory.sh`,
-commit b49895fd).** The hub has NO link-memory.sh yet — needs one before the hub
-itself migrates to a dotted path. See [[external-worktree-operating-model-state]].
+**3. Slug derivation — still relevant for the SESSIONS bridge, not for memory.**
+Claude derives the `<slug>` by replacing BOTH `/` AND `.` with `-`
+(`/…/rke2lab.d/main` → `-…-rke2lab-d-main`); a `sed 's:/:-:g'` that misses the dot
+computes a WRONG slug. Correct: `sed 's:[/.]:-:g'`. **Memory no longer uses the
+slug at all** — `autoMemoryDirectory` (fact #2) is an explicit absolute path, and
+`link-memory.sh` is DELETED. The slug still matters for `link-sessions.sh` (the
+Dock-sidebar transcript bridge `~/.claude/projects/<slug>` → `<wt>/.claude/projects/<slug>`),
+which keeps this derivation. See [[external-worktree-operating-model-state]].
 
 **4. `CLAUDE_CONFIG_DIR` — exists, macOS scope UNDOCUMENTED.** Docs mention it once
 (credentials, scoped to "Linux or Windows" — macOS conspicuously absent). Claimed

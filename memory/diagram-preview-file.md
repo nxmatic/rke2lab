@@ -1,11 +1,38 @@
 ---
 name: diagram-preview-file
-description: "When presenting mermaid/diagrams to the user, write them to a single stable scratch file so they can use the VSCode preview pane"
+description: "When presenting mermaid/diagrams to the user, build a Claude artifact (self-contained HTML + mermaid, published via the Artifact tool) — more readable than the old kroki/VSCode preview; the .claude/claude-preview.adoc scratch file + kroki is now the offline/in-editor fallback"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 4d3d8a2e-f292-4cbe-a699-fb4abfbd1e6c
 ---
+
+**★ MAJOR UPDATE 2026-07-28 — prefer CLAUDE ARTIFACTS over the kroki/asciidoc preview.** The user
+discovered Claude UI *artifacts* (self-contained HTML published via the Artifact tool, rendered on
+claude.ai): they render mermaid NATIVELY, are far more readable than the VSCode asciidoctor+kroki
+preview, and sidestep the ENTIRE kroki-server / CSP / local-vs-online / long-label / subgraph-label
+saga below (all of which was kroki-BUILD-specific, never a universal mermaid rule). **New default for
+whiteboards / design diagrams:**
+
+- Build a **self-contained HTML artifact** — inline CSS/JS, mermaid in `<pre class="mermaid">` (the
+  artifact runtime renders it; no kroki, no server, no CSP). Publish with the Artifact tool;
+  **republishing the SAME file path keeps the SAME URL**, so the user re-looks at a pinned browser tab
+  exactly as with the old pinned preview.
+- Refinements that landed well (2026-07): draw each mermaid on a **fixed-white "board"** (a literal
+  whiteboard) so figures read in both light/dark while the page chrome stays theme-aware via CSS
+  tokens; a **click-to-zoom lightbox** (clone the figure into a full-screen overlay with +/−/reset,
+  Esc/backdrop to close) makes dense diagrams legible — the user explicitly liked this; a stable
+  `<title>` + emoji `favicon` + one-line `description`; C4 levels (context/containers/components) + a
+  flow/sequence + a decision panel (composes with [[decision-options-in-preview]] /
+  [[options-always-as-c4-diagrams]]).
+- The kroki **safe-dialect constraints below DO NOT apply** to the artifact's mermaid (it is a full
+  build): `subgraph id["Title"]`, parentheses in edge labels, long labels, non-ascii all render fine.
+  Keep labels reasonably short for READABILITY, not as a hard limit.
+- Still load the `artifact-design` skill before authoring (it calibrates the treatment), and remember
+  the artifact is private until the user shares it.
+- `.claude/claude-preview.adoc` + the VSCode kroki preview is **retained as the offline / in-editor
+  fallback**; everything below is kept as history for that path. The artifact is the default because it
+  is more readable with zero server/CSP setup.
 
 When I present a mermaid diagram (or any schema) for the user to look at, I must ALSO write it to a
 single stable scratch file INSIDE THE WORKSPACE: **`.claude/claude-preview.adoc`** (NOT /tmp — the

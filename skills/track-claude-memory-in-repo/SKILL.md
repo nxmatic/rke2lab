@@ -1,80 +1,96 @@
 ---
 name: track-claude-memory-in-repo
-description: Use when the user wants Claude's memory persisted/version-controlled in a git repo so it survives window reloads, compaction, or machine changes. Moves the home-dir memory/ into the repo's .claude/memory/, symlinks the home path back to it, and commits memory/ only (never the session transcripts). Triggers on phrasing like "track memory in git", "persist memory in the repo", "symlink the memory folder", "I lost my memory on reload", or wanting the same memory setup applied to another repository.
-tools: Bash, Read, Edit, AskUserQuestion
+description: Use when the user wants Claude's memory persisted/version-controlled in a git repo so it survives window reloads, compaction, or machine changes. Points Claude's auto-memory at the repo's tracked .claude/memory/ via the native autoMemoryDirectory setting (absolute path in .claude/settings.local.json), then commits memory/ only. Triggers on phrasing like "track memory in git", "persist memory in the repo", "version-control my memory", "I lost my memory on reload", or wanting the same memory setup applied to another repository.
+tools: Bash, Read, Edit, Write, AskUserQuestion
 ---
 
 # Track Claude memory in a git repo
 
-Claude's distilled memory lives at `~/.claude/projects/<repo-slug>/memory/`. It is lost on
-window reloads and is not version-controlled. This skill makes the **real files live in the
-repo** (`<repo>/.claude/memory/`) and turns the home path into a **symlink** pointing at them,
-so the memory system keeps its usual read/write path while git tracks the content.
+Claude's auto-memory (the `MEMORY.md` index + topic files) defaults to
+`~/.claude/projects/<repo-slug>/memory/` — outside git, lost on reload, and
+**repo-wide** (all worktrees of a repo share one dir, keyed off the git
+repository, not the worktree). This skill relocates it into the repo's tracked
+`<repo>/.claude/memory/` so git version-controls it and it rides along at merge.
 
-## Why this direction (real files in repo, symlink at home)
+## Mechanism: the native `autoMemoryDirectory` setting
 
-A committed symlink stores only its *target path string* — git does NOT follow it to track
-content. So the real files MUST live in the repo for git to track them; the home path becomes
-the symlink. Do not reverse this.
+`autoMemoryDirectory` (Claude Code settings) redirects **both reading and
+writing** of auto-memory to a directory you name. It accepts an **absolute path
+or a `~/`-prefixed path** (no relative paths) and is honored from
+`.claude/settings.json` or `.claude/settings.local.json` under the same
+workspace-trust rule as hooks. Point it at the repo's tracked memory dir and
+Claude writes straight there — **no symlink, no slug computation, no home-dir
+bridge.** Verified working on darwin (2026-08-14).
 
-## Scope: memory/ ONLY
+Because the path must be absolute, it is host- and worktree-specific → it lives
+in the gitignored, per-checkout **`.claude/settings.local.json`** (the same file
+that carries the Bedrock env), not the committed `settings.json`. In the
+external-worktree model the `worktree` skill writes this line at worktree
+creation, so a fresh checkout is wired automatically; this skill is the manual
+once-per-repo setup for repos that don't use that flow.
 
-The `~/.claude/projects/<slug>/` directory also holds raw session transcripts (`*.jsonl` +
-`tool-results/` subdirs) — often tens of MB that churn every session. NEVER track those. Track
-only the `memory/` subdir (distilled facts, typically <100KB).
+## Scope: memory/ ONLY — never the transcripts
+
+Session transcripts (`*.jsonl`, `tool-results/`) live under
+`~/.claude/projects/<slug>/` (or the `CLAUDE_CONFIG_DIR` equivalent) and are NOT
+memory — often tens of MB churning every session. `autoMemoryDirectory` moves
+**only** the memory dir; transcripts stay where they are (surface them in the
+Dock sidebar with `link-sessions.sh` if needed — a separate concern). Track only
+`<repo>/.claude/memory/`.
 
 ## Checklist
 
 Create a TodoWrite item per step and do them in order.
 
-1. **Locate the source.** Find `<config>/projects/<slug>/memory`, where `<config>` is
-   `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` (clean-split model: the `.code-workspace` sets
-   `CLAUDE_CONFIG_DIR` = `<worktree>/.claude`, NOT `.claude/hub`). The `<slug>` is the worktree-root path with BOTH `/` AND `.`
-   replaced by `-` (e.g. `/private/var/lib/git/nxmatic/rke2lab.d/main` →
-   `-private-var-lib-git-nxmatic-rke2lab-d-main`, note `.d` → `-d`). Derive it from the worktree
-   root, don't guess: `SLUG=$(git rev-parse --show-toplevel | sed 's:[/.]:-:g')`. If no `memory/`
-   exists yet, tell the user there's nothing to track and stop.
+1. **Confirm visibility (BLOCKING for public repos).** `git remote -v`; if
+   `origin` is public, use AskUserQuestion to confirm the user accepts that
+   memory notes (provisioning state, working-style prefs, design decisions)
+   become publicly visible. Do not proceed on a public repo without it.
 
-2. **Confirm visibility (BLOCKING for public repos).** Run `git remote -v` and check whether
-   `origin` is public. If public, use AskUserQuestion to confirm the user accepts that memory
-   notes (which may include provisioning state, working-style prefs, design decisions) become
-   publicly visible. Do not proceed on a public repo without explicit confirmation.
+2. **gitignore check.** `git check-ignore -v .claude/memory/probe.md` — exit 1 /
+   no output means not ignored (good). If ignored, surface the rule and resolve
+   before continuing; the whole point is that git tracks this dir.
 
-3. **gitignore check.** `git check-ignore -v .claude/memory/probe.md` — exit 1 / no output
-   means not ignored (good). If ignored, surface the rule and resolve before continuing.
+3. **Ensure the dir exists.** `mkdir -p .claude/memory`. If migrating from the
+   old default location, copy existing notes in first:
+   `cp -a "$HOME/.claude/projects/$(git rev-parse --show-toplevel | sed 's:[/.]:-:g')/memory/." .claude/memory/`
+   (skip if there's nothing to migrate).
 
-4. **Copy + verify identical.** `mkdir -p .claude/memory && cp -a "$SRC"/. .claude/memory/`,
-   then `diff -r "$SRC" .claude/memory && echo IDENTICAL`. Do not proceed unless identical.
+4. **Set `autoMemoryDirectory`** to the **absolute** repo memory path in
+   `.claude/settings.local.json` (create the file or merge the key into it):
+   ```json
+   { "autoMemoryDirectory": "<abs-repo-root>/.claude/memory" }
+   ```
+   Derive the absolute root with `pwd` / `git rev-parse --show-toplevel`; do not
+   hardcode. `settings.local.json` is gitignored — the setting is not committed;
+   the **content** in `.claude/memory/` is what git tracks.
 
-5. **Backup + symlink.** `mv "$SRC" "$SRC.bak"; ln -s "$(pwd)/.claude/memory" "$SRC"`. Verify
-   with `ls -ld "$SRC"`.
+5. **Reload + verify the write path.** The setting is read at session start, so
+   reload the window. Then confirm a memory write lands in the tracked dir:
+   ask Claude to remember a throwaway marker, then
+   `git status --short .claude/memory/` must show the change (and no `memory/`
+   dir appears at the old `projects/<slug>/memory` default). Revert the marker
+   once confirmed.
 
-6. **Roundtrip test.** Append a marker to `"$SRC/MEMORY.md"` (the home path), confirm
-   `git status --short .claude/memory/MEMORY.md` shows it as a repo change, then revert with
-   `git checkout -- .claude/memory/MEMORY.md`. This proves the symlink resolves into git.
-
-7. **Use the canonical helper.** The re-link helper lives once, in the claude-hub subtree at
-   `.claude/hub/bin/link-memory.sh`, and travels with the subtree — do NOT copy it per repo.
-   It recreates the `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<slug>/memory` →
-   `<repo>/.claude/memory` symlink on a fresh clone/worktree (the target is absolute, so it does
-   not survive cloning to a new machine — only the content does). Run it with cwd inside the
-   worktree: `bash .claude/hub/bin/link-memory.sh`. It encodes the slug correctly (`/` and `.`
-   → `-`) and anchors under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`.
-
-8. **Remove backup + commit.** `diff -r "$SRC.bak" .claude/memory` to confirm nothing lost,
-   then `rm -rf "$SRC.bak"`. Stage `.claude/memory/` (+ the helper script) ONLY — dry-run
-   `git add -n .claude/memory/ | grep -iE 'jsonl|tool-results'` must be empty. Commit; do not
-   push unless the user asks.
+6. **Commit `.claude/memory/` ONLY.** Dry-run `git add -n .claude/memory/ |
+   grep -iE 'jsonl|tool-results'` must be empty. Stage and commit `.claude/memory/`;
+   do not push unless the user asks.
 
 ## Anti-patterns
 
-- ❌ Symlinking the *whole* `projects/<slug>/` dir — drags in transcripts (huge, churning).
-- ❌ Committing a symlink and expecting git to track the target's content — it won't.
-- ❌ Pushing to a public repo without the visibility confirmation in step 2.
-- ❌ Skipping the copy-verify / roundtrip / backup-compare safety checks.
+- ❌ Symlinking `~/.claude/projects/<slug>/memory` → repo (the old hack:
+   slug-fragile, reader-dependent, broke on non-main worktrees). `autoMemoryDirectory`
+   replaces it — an absolute path is reader- and slug-independent.
+- ❌ A relative or `${workspaceFolder}` path in `autoMemoryDirectory` — only
+   absolute or `~/` are accepted.
+- ❌ Putting `autoMemoryDirectory` in the committed `settings.json` — the path is
+   host-specific; it belongs in per-checkout `settings.local.json`.
+- ❌ Tracking `projects/<slug>/` — drags in churning transcripts.
+- ❌ Pushing to a public repo without the step-1 visibility confirmation.
 
 ## Applying to a new repository
 
-This is a once-per-repo setup. Run the full checklist in each repo where durable memory is
-wanted. The helper script (step 7) handles re-linking after a clone; the content itself rides
-along in git.
+Once-per-repo: run the checklist. In the external-worktree family this is
+automatic — the `worktree` skill writes `autoMemoryDirectory` into each new
+checkout's `settings.local.json` at creation, and the tracked `.claude/memory/`
+content rides along in git.

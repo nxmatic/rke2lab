@@ -44,7 +44,7 @@ branch (spike/ included) and are blocked only from reaching main. Durable findin
 `docs/` before any promotion; the spike's code itself may be deleted.
 
 **`@Spike("spike/…")` annotation (durable repo convention, added 2026-06-10):** the source-level
-marker for spike CODE, at `io.nxmatic.rke2lab.controlplane.meta.Spike` (seed-master) — the repo's
+marker for spike CODE, at `io.seedmatic.rke2lab.controlplane.meta.Spike` (seed-master) — the repo's
 FIRST custom annotation. `@Retention(SOURCE)`, targets type/method/ctor/field/param, `value()` =
 the spike branch. Replaces ad-hoc prose `SPIKE (...)` tags: the footprint is greppable
 (`grep -rn '@Spike('`) AND machine-checkable, so a future guard can refuse `@Spike` reaching main —

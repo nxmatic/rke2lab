@@ -6,7 +6,7 @@
 
 **Architecture:** New git repo `claude-memory` becomes the auto-loaded session root. Cross-cutting + cross-repo memory moves there; rke2lab keeps only rke2lab-specific notes. Cross-repo links get re-scoped `[[hub:...]]`/`[[repo:...]]`. The session-path symlink is repointed so launching from `claude-memory` auto-loads the hub.
 
-**Tech Stack:** git, filesystem symlinks, Claude file-memory (`.claude/memory/MEMORY.md` index + topic files), the `track-claude-memory-in-repo` skill pattern (`link-memory.sh`).
+**Tech Stack:** git, Claude file-memory (`.claude/memory/MEMORY.md` index + topic files), the native `autoMemoryDirectory` setting (pins auto-memory read+write to a tracked dir; replaced the old symlink + deleted `link-memory.sh`), the `track-claude-memory-in-repo` skill pattern.
 
 **Source spec:** `MEMORY-STRUCTURE-SPEC.md` (same dir).
 
@@ -462,4 +462,4 @@ Leave the changes staged. Tell the user: rke2lab memory pruned + MEMORY.md rewri
 - **Spec coverage:** model (Tasks 1,6,8), per-repo split (Tasks 3,4,9), scoped DAG links (Tasks 6,7), registry-map (Task 6), migration of 56 files (Tasks 3,4,5,9), java-systemd orphan (Task 5), symlink/launch (Task 8), coordination constraint (Task 9 gated). ✓
 - **No data loss:** Task 9 deletes from rke2lab ONLY after Task 9 Step 1 confirms each file exists in the hub. ✓
 - **GitHub push:** intentionally NOT in this plan — creating the remote `nxmatic/claude-memory` + push is a separate outward-facing step the user authorises later.
-- **Open item:** the `track-claude-memory-in-repo` skill's `link-memory.sh` could replace Task 8's manual symlink if the user prefers the skill path — noted, not required for v1.
+- **Open item (updated 2026-08-14):** `autoMemoryDirectory` (an absolute path in `settings.local.json`) now replaces Task 8's manual symlink outright — the `track-claude-memory-in-repo` skill was rewritten around it and `link-memory.sh` is deleted. Revisit Task 8 (and the line-7 "session-path symlink repoint") to point the setting at the memory dir instead of symlinking.

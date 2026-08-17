@@ -21,8 +21,9 @@ draw the options faithfully, I don't understand them well enough to ask yet.
 
 **How to apply:** (1) for each option, draw a small flowchart showing how that option shapes the
 model (one diagram per option, or a split view); (2) overwrite `.claude/claude-preview.adoc` with
-them, kroki-safe dialect per [[diagram-preview-file]]; (3) THEN use AskUserQuestion, referencing
-what is on screen. Authored in American English (content may feed real docs later). This composes
+them — DEFAULT NOW: render them as a **Claude artifact** (self-contained HTML + mermaid, per
+[[diagram-preview-file]]); the `.claude/claude-preview.adoc` kroki preview is the offline fallback;
+(3) THEN use AskUserQuestion, referencing what is on screen. Authored in American English (content may feed real docs later). This composes
 with [[brainstorm-vocabulary-view-first]] (vocabulary view first, then option views, then the
 chosen design).
 

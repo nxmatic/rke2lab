@@ -19,10 +19,14 @@ Claude's config is *worktree-rooted*, in three layers (read specific→general):
 fact; learned 2026-06-16 when a cold session used the `EnterWorktree` harness tool and landed
 under `.claude/worktrees/` — the WRONG place this model rejects).** `EnterWorktree` hard-codes
 `.claude/worktrees/<branch>` and is FORBIDDEN here; use plain `git worktree add` at the external
-path. Run from `<repo>.d/main`:
+path. **The `worktree` skill is now the canonical create/teardown recipe — follow it; this note
+keeps only the state/history.** Run from any existing worktree of the repo (or `<repo>.d/main`):
 
-1. `git fetch origin <default-branch>` — base = fresh `origin/<default-branch>`.
-2. `git worktree add -b <namespace>/<slug> <repo>.d/<namespace>/<slug> origin/<default-branch>`
+1. **Source branch = the branch you're currently on, by default** (new work stacks on top):
+   `src="$(git rev-parse --abbrev-ref HEAD)"`. Use `origin/<default-branch>` as base ONLY when you
+   explicitly want a fresh trunk base — then `git fetch origin <default-branch>` first. (Corrected
+   2026-08-14 — earlier this recipe hardcoded `origin/<default-branch>`.)
+2. `git worktree add -b <namespace>/<slug> <repo>.d/<namespace>/<slug> "$src"`
    (namespace by kind: `feature/`/`chore/`/`design/`/`refactor/`/`spike/`).
 3. **Re-smudge sops** (the checkout precedes `.sops.yaml` visibility → secrets land ENCRYPTED):
    for each still-encrypted sops file `rm <file> && git checkout -- <file>`; verify no real secret
@@ -54,6 +58,15 @@ the memory bridge. Memory bridge also restored: `hub/projects/<slug>/memory` →
 (computed `<root>/.claude` → bogus `.claude/.claude/memory` + wrong slug). Now derives
 root via `git rev-parse --show-toplevel` (correct at any depth). Shipped to main in BOTH
 repos + resynced via subtree split/push/pull. See [[claude-auto-memory-mechanics]].
+
+**★ SUPERSEDED 2026-08-14 — the memory bridge + `link-memory.sh` are REMOVED.** Everything
+about the *memory* symlink above is history: `autoMemoryDirectory` (absolute path in the
+per-worktree `.claude/settings.local.json`) now pins auto-memory read+write to the tracked
+`<wt>/.claude/memory` directly — slug- and reader-independent (VERIFIED on darwin). `link-memory.sh`
+is DELETED. Only the SESSIONS transcript bridge survives, now as `link-sessions.sh`. Likewise the
+`claudeProcessWrapper`/`claude-config-home-wrapper.sh` and `CONFIG_DIR=<wt>/.claude/hub` described
+above were replaced by the clean-split `.code-workspace` env var (`CLAUDE_CONFIG_DIR=<wt>/.claude`,
+NOT `.claude/hub`). Current reference: [[claude-memory-cascade-state]].
 
 Wiring: `CLAUDE_CONFIG_DIR=<worktree>/.claude/hub` → hub=USER scope, worktree=PROJECT
 scope; Claude **deep-merges natively** (no build step — there is NO `include` in
@@ -152,14 +165,21 @@ canonical `hub/docs/operating-model.adoc` (the open "generalize" item above):
   direct hub edit left unpushed makes every consumer pull a split branch that is behind the real
   hub). "Edited the hub directly" and "pushed the hub" are one atomic step.
 - **AT SESSION END, BEFORE THE MERGE**: sync-up — `subtree split --prefix=.claude/hub
-  --branch=split/<repo>/dot-claude --rejoin HEAD` → `git push claude-hub split/<repo>/dot-claude` →
-  in the hub `subtree pull --prefix=.claude origin split/<repo>/dot-claude --squash`, then push the
-  hub. Keep `--squash` consistent both directions; the `--rejoin` adds a merge commit on the source
-  side — push it too.
+  --branch=split/<repo>/dot-claude` (**NO `--rejoin`**) → `git push claude-hub split/<repo>/dot-claude`
+  → in the hub `subtree pull --prefix=.claude origin split/<repo>/dot-claude --squash`, then push the
+  hub. Keep `--squash` consistent both directions; **never `--rejoin`** — after a squash pull it fails
+  with "refusing to merge unrelated histories" (corrected 2026-08-14; `README-SUBTREE.md` and the
+  `worktree` skill are authoritative).
 - WHAT WENT WRONG this time: `claude-hub.d/main` carried 6 unpushed doc-only commits AND rke2lab's
   subtree was behind the hub origin, so a naive sync-up would have built on a stale base. Proven
   correct order: push the hub's pending commits → re-split + push the split branch → sync-down into
   rke2lab (resolve the squash conflict, theirs = hub canonical) → THEN edit + sync-up.
+
+**★ SUPERSEDED 2026-08-14 by `autoMemoryDirectory`.** Memory is now per-worktree in the tracked
+`<worktree>/.claude/memory` (see the SUPERSEDED banner above), NOT in `main` via a home symlink — so
+the specific home-symlink→main desync below no longer occurs. What SURVIVES is the general hygiene:
+commit memory edits before finishing so they ride into `main` at MERGE — but you commit them in the
+worktree now, not directly in `<repo>.d/main`. Kept below for history:
 
 **★ FAILURE MODE — uncommitted memory in `main` desyncs the next session (named 2026-06-17).**
 Auto-memory writes land in `<repo>.d/main/.claude/memory` (the home symlink
@@ -178,7 +198,6 @@ session; my startup prompt (written before it) sent me to redo already-done work
   uncommitted is indistinguishable to the next session from work never done.
 - Memory lives in main (single source of truth, home symlink), so committing it in `main` — not in the
   feature worktree — is correct; do it from `<repo>.d/main`.
-
 **DESIGN PIVOTS (dead, do not revive):** old "single global CLAUDE_CONFIG_DIR=hub"
 runbook → SUPERSEDED by this worktree-rooted model. Per-branch/per-worktree memory
 isolation = IMPOSSIBLE (auto-memory is repo-wide, [[claude-auto-memory-mechanics]]).
