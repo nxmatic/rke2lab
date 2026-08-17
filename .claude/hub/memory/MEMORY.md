@@ -31,6 +31,7 @@ The cross-cutting hub, auto-loaded as the session root. One line per entry (<~18
 - [[superpowers-assets-in-wip]] — writing-plans/brainstorming plans+specs in wip/superpowers/, NOT docs/; kept off main by wip-guard.
 - [[wip-guard-hooks]] — .githooks pre-commit+pre-push block wip/ reaching protected branches; via core.hooksPath in flox on-activate.
 - [[bedrock-compaction-issue]] — auto-compaction fails; proactively warn at 80k/120k tokens before "input too long".
+- [[flake-mutual-dependency-follows-root]] — mutual/cyclic flake dep resolved by reciprocal `inputs.<other>.inputs.<self>.follows = ""` (empty follows = ROOT flake, a fixpoint); both sides see real cross-data, lock terminates, no snapshot/subtree/getFlake; fails only on a true VALUE cycle. Validated 2026-08-17. Used by the seedmatic catalog federation (ndh↔nnh↔rke2lab).
 
 ## Cross-cutting: design + doc conventions
 
