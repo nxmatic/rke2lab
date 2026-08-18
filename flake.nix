@@ -56,10 +56,11 @@
     # back-reference to rke2lab follows THIS root, which breaks the lock cycle
     # while both flakes still build standalone. Consume ONLY `.lan` (a
     # self-contained constant); NEVER `.segments`/`.asns` (they union
-    # networkBlueprint → value cycle). Local path: for prototyping; flips to
-    # github:seedmatic/ndh/develop once the cut is proven.
-    ndh.url = "path:/Volumes/git-worktree-store/seedmatic/ndh.d/develop";
+    # networkBlueprint → value cycle). Pinned as a github rev now that the cut is
+    # proven (a local path during prototyping).
+    ndh.url = "github:seedmatic/ndh/develop";
     ndh.inputs.rke2lab.follows = "";
+    ndh.inputs.flake-commons.follows = "flake-commons";
   };
 
   outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox, sops-nix, ... }:
