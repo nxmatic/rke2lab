@@ -49,6 +49,17 @@
     flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
     flox-runtime.inputs.flake-utils.follows = "flake-utils";
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
+
+    # Federation (Direction A): rke2lab consumes ndh's home-LAN facts
+    # (catalog.netplan.lan). ndh already imports rke2lab's lib.networkBlueprint,
+    # so this closes a mutual edge — cut with a reciprocal EMPTY follows: ndh's
+    # back-reference to rke2lab follows THIS root, which breaks the lock cycle
+    # while both flakes still build standalone. Consume ONLY `.lan` (a
+    # self-contained constant); NEVER `.segments`/`.asns` (they union
+    # networkBlueprint → value cycle). Local path: for prototyping; flips to
+    # github:seedmatic/ndh/develop once the cut is proven.
+    ndh.url = "path:/Volumes/git-worktree-store/seedmatic/ndh.d/develop";
+    ndh.inputs.rke2lab.follows = "";
   };
 
   outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox, sops-nix, ... }:
@@ -537,5 +548,9 @@
         # Raw YAML store path for inspection (the pinned, canonical build).
         networkBlueprintYamlPath = "${networkBlueprintYaml}/network-blueprint.yaml";
       };
+
+      # TEMP federation probe (Phase 1): proves rke2lab sees ndh's home-LAN facts
+      # across the follows="" cut. Removed once real consumption is wired.
+      _federationProbe = { ndhLan = inputs.ndh.catalog.netplan.lan; };
     };
 }
