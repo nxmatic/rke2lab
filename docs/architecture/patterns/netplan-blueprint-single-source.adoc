@@ -178,7 +178,7 @@ gateway/DHCP*:
   bridge runs `dns.mode=none`);
 * `hosts[]` — the static reservations, each `{name, mac?, ip}`: a `dhcp-host`
   when `mac` is present (the MAC-known cluster nodes) or a `host-record` when it
-  is absent (ndh's `vz.<host>`, kept uniform).
+  is absent (ndh's `vzhost.<host>`, kept uniform).
 
 These optional facts are `Optional<String>` on the record — never nulls — so an
 attribution-only span (the `/18` vmnet supernet, the LAN/LB `/27`s, `pod`,

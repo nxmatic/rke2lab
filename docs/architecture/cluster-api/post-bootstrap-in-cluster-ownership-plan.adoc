@@ -147,7 +147,7 @@ flowchart LR
         mgmt[Management cluster<br/>CAPI · CAPN · CAPRKE2<br/>single node · on-demand]
         bwrkld[bioskop-wrkld<br/>always-live · Flux + apps + Headscale]
     end
-    subgraph BM2[vz.nikopol bare-metal · nikopol-nixos incus]
+    subgraph BM2[vzhost.nikopol bare-metal · nikopol-nixos incus]
         nwrkld[nikopol-wrkld<br/>Flux + apps]
     end
 

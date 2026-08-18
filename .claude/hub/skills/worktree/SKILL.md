@@ -32,7 +32,7 @@ place the new worktree as a sibling under the same `<repo>.d/` container as
 
 - Pattern: `<worktree-store>/<org>/<repo>.d/<namespace>/<slug>` for worktrees,
   `<bare-store>/<org>/<repo>.git` for the bare repo.
-- **nikopol** (darwin VM on a tart/vz engine, host `vz.nikopol`) — the migrated
+- **nikopol** (darwin VM on a tart/vz engine, host `vzhost.nikopol`) — the migrated
   layout: `<worktree-store>` = `/Volumes/git-worktree-store`,
   `<bare-store>` = `/Volumes/git-bare-store`.
 - **bioskop** — not yet migrated to this volume layout; its roots differ, so
