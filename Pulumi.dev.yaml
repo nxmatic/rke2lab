@@ -19,11 +19,11 @@ config:
   rke2lab:network:
     lanBridgeParent: lan-br
     vmnetNetworkName: vmnet-br
-  rke2lab:api:
-    # endpoint: https://{netplan.vipHost}:6443
-  rke2lab:systemd:
-    # dbusHost: "{cluster}-{node.name}"
-    # dbusPort: "12434"
+  # rke2lab:api:
+  #   endpoint: https://{netplan.vipHost}:6443
+  # rke2lab:systemd:
+  #   dbusHost: "{cluster}-{node.name}"
+  #   dbusPort: "12434"
   rke2lab:manifests:
     # Which domain manifest layers the master publishes (stows via symlink) into RKE2's
     # server-manifests directory, and per-layer synthesis debug. NOTE: not yet wired — the seed
