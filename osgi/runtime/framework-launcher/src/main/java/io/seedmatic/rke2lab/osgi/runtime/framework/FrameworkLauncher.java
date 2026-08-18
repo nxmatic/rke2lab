@@ -64,6 +64,17 @@ public final class FrameworkLauncher {
     try {
       final Framework framework = factory.newFramework(frameworkConfig(plan, storage));
       framework.init();
+      // Write pax's bootstrap logback config AFTER init(): FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT
+      // wipes
+      // the storage dir DURING init, so a file written before it is gone before pax reads
+      // StaticLogbackFile at start() — the boot then silently falls back to pax's ConsoleAppender.
+      // Post-init the dir is stable until FelixStorage.delete() sweeps it, so the file both
+      // survives
+      // to pax's read AND rides the storage's own cleanup — no leaked temp (the reason it lives in
+      // the storage dir rather than a standalone temp file).
+      if (plan.paxPresent()) {
+        writePaxLogbackConfig(storage);
+      }
 
       // Install everything pinned to its layer and marked persistently-started; the framework's
       // native start-level machinery — not a hand-ordered loop — drives activation in level order
@@ -151,10 +162,11 @@ public final class FrameworkLauncher {
       // default (a ConsoleAppender whose native stdout write wedges the boot under a remote
       // debugger). The noise-suppression POLICY (the per-tree levels) is applied AFTER start by the
       // pax-logback-config fragment's PaxLogbackConfigurer, in Java — see applyPaxLogbackPolicy.
-      // And
+      // Only the PATH is baked here; the file itself is written AFTER init() (see the call site) —
+      // init's FRAMEWORK_STORAGE_CLEAN would wipe a file written now. And
       // drain framework/bundle/service events at WARN into the LogService.
       config.put(
-          "org.ops4j.pax.logging.StaticLogbackFile", writePaxLogbackConfig(storage).toString());
+          "org.ops4j.pax.logging.StaticLogbackFile", logbackBootstrapFile(storage).toString());
       config.put("org.ops4j.pax.logging.service.frameworkEventsLogLevel", "WARN");
       // pax's fallback logger (used before Config Admin — which we do not install — and while it
       // applies StaticLogbackFile) echoes logback's Joran config status to the console at INFO
@@ -193,10 +205,12 @@ public final class FrameworkLauncher {
         continue;
       }
       try {
-        bundle
-            .loadClass("io.seedmatic.rke2lab.osgi.runtime.logback.PaxLogbackConfigurer")
+        final Class<?> configurer =
+            bundle.loadClass("io.seedmatic.rke2lab.osgi.runtime.logback.PaxLogbackConfigurer");
+        final Object singleton = configurer.getMethod("instance").invoke(null);
+        configurer
             .getMethod("configure", Bundle.class, String.class)
-            .invoke(null, bundle, rootLevel);
+            .invoke(singleton, bundle, rootLevel);
       } catch (InvocationTargetException ex) {
         LOG.warn("pax logback policy not applied", ex.getCause());
       } catch (ReflectiveOperationException | LinkageError ex) {
@@ -220,12 +234,21 @@ public final class FrameworkLauncher {
    * stays ignorant of the host/Pulumi. This is the ONE logback in the process: it drains the JDK
    * JUL bus (host + Felix) via pax's JdkHandler AND the OSGi LogService.
    */
-  private Path writePaxLogbackConfig(FelixStorage storage) throws IOException {
-    final Path file = storage.path().resolve("logback-bootstrap.xml");
+  /**
+   * The bootstrap logback config's path in the Felix storage dir — the ONE source shared by the
+   * {@code StaticLogbackFile} property (baked in {@code frameworkConfig} before init) and {@link
+   * #writePaxLogbackConfig} (written after init). In the storage dir so {@code
+   * FelixStorage.delete()} sweeps it with everything else — no standalone temp file leaked.
+   */
+  private Path logbackBootstrapFile(FelixStorage storage) {
+    return storage.path().resolve("logback-bootstrap.xml");
+  }
+
+  private void writePaxLogbackConfig(FelixStorage storage) throws IOException {
     final String rootLevel =
         config().frameworkLogLevel().map(LaunchConfig::logbackLevelOf).orElse("INFO");
     Files.writeString(
-        file,
+        logbackBootstrapFile(storage),
         """
         <configuration>
           <appender name="FILE" class="ch.qos.logback.core.FileAppender">
@@ -242,7 +265,6 @@ public final class FrameworkLauncher {
         """
             .replace("__LOG_FILE__", config().logFile())
             .replace("__ROOT_LEVEL__", rootLevel));
-    return file;
   }
 
   /**

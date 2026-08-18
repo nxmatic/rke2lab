@@ -6,7 +6,7 @@ import ch.qos.logback.classic.LoggerContext;
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.jspecify.annotations.Nullable;
+import java.util.Optional;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
@@ -32,15 +32,27 @@ import org.osgi.framework.ServiceReference;
 public final class PaxLogbackConfigurer {
 
   /**
+   * The one configurer the launcher reaches across the realm seam — loaded through the pax bundle's
+   * classloader and invoked on THIS instance ({@code instance().configure(...)}), never as a static
+   * call (the project's instance-passing discipline).
+   */
+  public static final PaxLogbackConfigurer INSTANCE = new PaxLogbackConfigurer();
+
+  /**
    * The noisy third-party trees, quieted so an INFO root never drowns the file. Coded here, in
    * Java: the policy the old inlined logback config carried, now the one source. Insertion order
    * (broadest first) is irrelevant to logback but reads as intent.
    */
-  private static final Map<String, Level> TREE_LEVELS = treeLevels();
+  protected final Map<String, Level> treeLevels = treeLevels();
 
-  private PaxLogbackConfigurer() {}
+  protected PaxLogbackConfigurer() {}
 
-  private static Map<String, Level> treeLevels() {
+  /** The singleton the launcher invokes reflectively across the host↔pax realm seam. */
+  public static PaxLogbackConfigurer instance() {
+    return INSTANCE;
+  }
+
+  protected Map<String, Level> treeLevels() {
     final Map<String, Level> levels = new LinkedHashMap<>();
     levels.put("io.netty", Level.ERROR);
     levels.put("io.netty.util.internal", Level.ERROR);
@@ -59,29 +71,30 @@ public final class PaxLogbackConfigurer {
    * logs it as a WARN (to the file), so a logging-config slip degrades to pax's bootstrap config
    * rather than felling the boot.
    */
-  public static void configure(Bundle paxBundle, String rootLevelName) {
+  public void configure(Bundle paxBundle, String rootLevelName) {
     final LoggerContext context = resolveContext(paxBundle);
-    TREE_LEVELS.forEach((name, level) -> context.getLogger(name).setLevel(level));
+    treeLevels.forEach((name, level) -> context.getLogger(name).setLevel(level));
     context.getLogger(Logger.ROOT_LOGGER_NAME).setLevel(Level.toLevel(rootLevelName, Level.INFO));
   }
 
   /**
    * Reach the ONE {@code LoggerContext} pax logs through. pax's {@code PaxLoggingServiceImpl} holds
-   * it in its private instance field {@code m_logbackContext}, and its {@code Activator} publishes
-   * that impl — wrapped in a local {@code $1ManagedPaxLoggingService} — under its logservice names.
-   * So scan the services pax registered and let {@link #contextFieldOf} pull the field off the
-   * impl, unwrapping the wrapper's synthetic enclosing reference. This handles both pax context
-   * modes: the instance field carries the live context whether or not {@code StaticLogbackContext}
-   * is set.
+   * it in its protected instance field {@code m_logbackContext}, and its {@code Activator}
+   * publishes that impl — wrapped in a local {@code $1ManagedPaxLoggingService} — under its
+   * logservice names. So scan the services pax registered and let {@link #contextFieldOf} pull the
+   * field off the impl, unwrapping the wrapper's synthetic enclosing reference. This handles both
+   * pax context modes: the instance field carries the live context whether or not {@code
+   * StaticLogbackContext} is set.
    */
-  private static LoggerContext resolveContext(Bundle paxBundle) {
+  protected LoggerContext resolveContext(Bundle paxBundle) {
     final ServiceReference<?>[] registered = paxBundle.getRegisteredServices();
     final BundleContext bundleContext = paxBundle.getBundleContext();
     if (registered != null && bundleContext != null) {
       for (ServiceReference<?> ref : registered) {
-        final LoggerContext context = contextFieldOf(bundleContext.getService(ref));
-        if (context != null) {
-          return context;
+        final Optional<LoggerContext> context =
+            Optional.ofNullable(bundleContext.getService(ref)).flatMap(this::contextFieldOf);
+        if (context.isPresent()) {
+          return context.orElseThrow();
         }
       }
     }
@@ -96,37 +109,30 @@ public final class PaxLogbackConfigurer {
    * ({@code this$0}) IS the {@code PaxLoggingServiceImpl} that owns the context — so try the field
    * directly, then through that enclosing instance.
    */
-  private static @Nullable LoggerContext contextFieldOf(@Nullable Object service) {
-    if (service == null) {
-      return null;
-    }
-    final LoggerContext direct = loggerContextOf(service);
-    if (direct != null) {
-      return direct;
-    }
-    final Object enclosing = readField(service, "this$0");
-    return enclosing == null ? null : loggerContextOf(enclosing);
+  protected Optional<LoggerContext> contextFieldOf(Object service) {
+    return loggerContextOf(service)
+        .or(() -> readField(service, "this$0").flatMap(this::loggerContextOf));
   }
 
-  private static @Nullable LoggerContext loggerContextOf(Object target) {
-    return readField(target, "m_logbackContext") instanceof LoggerContext context ? context : null;
+  protected Optional<LoggerContext> loggerContextOf(Object target) {
+    return readField(target, "m_logbackContext")
+        .filter(LoggerContext.class::isInstance)
+        .map(LoggerContext.class::cast);
   }
 
-  /**
-   * The value of field {@code name} on {@code target} (walking its supertypes), or {@code null}.
-   */
-  private static @Nullable Object readField(Object target, String name) {
+  /** The value of field {@code name} on {@code target} (walking its supertypes), if present. */
+  protected Optional<Object> readField(Object target, String name) {
     for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
       try {
         final Field field = type.getDeclaredField(name);
         field.setAccessible(true);
-        return field.get(target);
+        return Optional.ofNullable(field.get(target));
       } catch (NoSuchFieldException walkUp) {
         // declared higher up — keep walking
       } catch (IllegalAccessException blocked) {
-        return null;
+        return Optional.empty();
       }
     }
-    return null;
+    return Optional.empty();
   }
 }

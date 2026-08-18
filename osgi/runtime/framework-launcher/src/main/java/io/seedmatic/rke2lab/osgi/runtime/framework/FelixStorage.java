@@ -10,11 +10,13 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A Felix framework's on-disk storage dir, owned for the lifetime of ONE boot. Created under the
- * system temp dir and destroyed when the framework stops ({@link #delete()}). A JVM shutdown hook
- * is the backstop: a boot that never reaches its stop path — a killed test, a detached debugger, an
- * aborted CLI — still has its storage swept on exit, so runs cannot accrete the {@code
- * osgi-*-felix*} caches that otherwise silently fill the temp volume (Felix's {@code
- * STORAGE_CLEAN_ONFIRSTINIT} only cleans a dir it REUSES, and every boot mints a unique one).
+ * system temp dir ({@code java.io.tmpdir}) — the tmpdir's nature (a plain volume, or a tmpfs the
+ * operator's host provides) is NOT this consumer's concern — and destroyed when the framework stops
+ * ({@link #delete()}): the consumer always sweeps its own storage, so a leak is caught whatever the
+ * tmpdir is. A JVM shutdown hook is the backstop: a boot that never reaches its stop path — a
+ * killed test, a detached debugger, an aborted CLI — still has its storage swept on exit, so runs
+ * cannot accrete the {@code osgi-*-felix*} caches (Felix's {@code STORAGE_CLEAN_ONFIRSTINIT} only
+ * cleans a dir it REUSES, and every boot mints a unique one).
  */
 public final class FelixStorage {
 
