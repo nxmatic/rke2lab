@@ -2,7 +2,7 @@
   description = "Flox runtime: NRI plugin + per-workload packages (kdns, headplane, ...) used by the rke2lab cluster";
 
   inputs = {
-    flake-commons.url = "github:nxmatic/nix-flake-commons/develop";
+    flake-commons.url = "github:seedmatic/nix-flake-commons/develop";
     nixpkgs.follows = "flake-commons/nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
 

@@ -73,10 +73,10 @@
         "outputs": "all"
       },
       "incus-client": {
-        "flake": "github:nxmatic/rke2lab#incus-client"
+        "flake": "github:seedmatic/rke2lab#incus-client"
       },
       "jdk25": {
-        "flake": "github:nxmatic/rke2lab#jdk25",
+        "flake": "github:seedmatic/rke2lab#jdk25",
         "priority": 1
       },
       "keychain": {
@@ -152,7 +152,7 @@
         "pkg-path": "lazygit"
       },
       "maven": {
-        "flake": "github:nxmatic/rke2lab#maven"
+        "flake": "github:seedmatic/rke2lab#maven"
       },
       "moreutils": {
         "pkg-path": "moreutils"
@@ -193,10 +193,10 @@
         "pkg-path": "screen"
       },
       "shellcheck": {
-        "flake": "github:nxmatic/rke2lab#shellcheck"
+        "flake": "github:seedmatic/rke2lab#shellcheck"
       },
       "shfmt": {
-        "flake": "github:nxmatic/rke2lab#shfmt"
+        "flake": "github:seedmatic/rke2lab#shfmt"
       },
       "socat": {
         "pkg-path": "socat"
@@ -228,7 +228,7 @@
       }
     },
     "vars": {
-      "GITHUB_OWNER": "nxmatic",
+      "GITHUB_OWNER": "seedmatic",
       "JAVA_TOOL_OPTIONS": "${JAVA_TOOL_OPTIONS:-} --enable-native-access=ALL-UNNAMED",
       "M2_REPO": "${HOME}/.m2/repository",
       "PULUMI_BACKEND_URL": "file://${FLOX_ENV_PROJECT}/.pulumi-state",
@@ -3109,182 +3109,6 @@
       "priority": 5
     },
     {
-      "install_id": "incus-client",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.incus-client",
-      "derivation": "/nix/store/xkmqiqkhdw1jfkfyanq04gbcmkikdpqv-incus-client-7.0.0.drv",
-      "outputs": {
-        "out": "/nix/store/rhfy794ls0fyy452za70mwzqg41714k3-incus-client-7.0.0"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "incus-client-7.0.0",
-      "pname": "incus-client",
-      "version": "7.0.0",
-      "description": "Powerful system container and virtual machine manager",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "incus-client",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.incus-client",
-      "derivation": "/nix/store/yqi01xbli6dha4zwqirjnw7yivdkpsz0-incus-client-7.0.0.drv",
-      "outputs": {
-        "out": "/nix/store/snxkbj03l5szzqjsczf6zy1w27fimisr-incus-client-7.0.0"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "incus-client-7.0.0",
-      "pname": "incus-client",
-      "version": "7.0.0",
-      "description": "Powerful system container and virtual machine manager",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "jdk25",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.jdk25",
-      "derivation": "/nix/store/m2c0cgjyg7ixazl8wf2p9g3kbah9hk3f-zulu-ca-jdk-25.0.0.drv",
-      "outputs": {
-        "out": "/nix/store/h6ff74586l9p2nvxa9j93nbngpnpw703-zulu-ca-jdk-25.0.0"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "zulu-ca-jdk-25.0.0",
-      "pname": "zulu-ca-jdk",
-      "version": "25.0.0",
-      "description": "Certified builds of OpenJDK",
-      "licenses": [
-        "GPL-2.0-only"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 1
-    },
-    {
-      "install_id": "jdk25",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.jdk25",
-      "derivation": "/nix/store/8n8xkbnvc2hn8sfp0m9haxyqxvrrf686-openjdk-25.0.2+10.drv",
-      "outputs": {
-        "debug": "/nix/store/zyc6ig0xgxq0y67l12v9xshl1z86d7xp-openjdk-25.0.2+10-debug",
-        "out": "/nix/store/a94v8iv5daxd1ba55jhzbppivnra9qds-openjdk-25.0.2+10"
-      },
-      "output-names": [
-        "out",
-        "debug"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "openjdk-25.0.2+10",
-      "pname": "openjdk",
-      "version": "25.0.2+10",
-      "description": "Open-source Java Development Kit",
-      "licenses": [
-        "GPL-2.0-only"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 1
-    },
-    {
-      "install_id": "maven",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
-      "derivation": "/nix/store/h9axl6drwfh94xi6kpv93920apjg0pdv-maven-3.9.11.drv",
-      "outputs": {
-        "out": "/nix/store/rhdcf51rndrisr6wz4lhbib6ghhfqrn4-maven-3.9.11"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "maven-3.9.11",
-      "pname": "maven",
-      "version": "3.9.11",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "maven",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.maven",
-      "derivation": "/nix/store/vll9r13jidmx4nndh0aa6qkq2521mpi2-maven-3.9.11.drv",
-      "outputs": {
-        "out": "/nix/store/r2lkjdqmnyw7wyvld5j59xka4yq7m1h6-maven-3.9.11"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "maven-3.9.11",
-      "pname": "maven",
-      "version": "3.9.11",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
       "install_id": "podman-wrapper",
       "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=00ae90b5d944841cc679b9f5264ebc7720dad3fd",
       "flake-description": "podman-wrapper flake for k8s env",
@@ -3331,16 +3155,192 @@
       "priority": 5
     },
     {
+      "install_id": "incus-client",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.incus-client",
+      "derivation": "/nix/store/59bysy70zwz68n6nr7kpa8jkl9xrrggq-incus-client-7.3.0.drv",
+      "outputs": {
+        "out": "/nix/store/1l9ibfncw0lhhzhdvkcxj9nf42yhs1rq-incus-client-7.3.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "incus-client-7.3.0",
+      "pname": "incus-client",
+      "version": "7.3.0",
+      "description": "Powerful system container and virtual machine manager",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "incus-client",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.incus-client",
+      "derivation": "/nix/store/q5326wnw2kdkmfb1dinssx8xgimvysbl-incus-client-7.3.0.drv",
+      "outputs": {
+        "out": "/nix/store/nsrfqhqbd47h31ndmvr485lr6c5rzwgh-incus-client-7.3.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "incus-client-7.3.0",
+      "pname": "incus-client",
+      "version": "7.3.0",
+      "description": "Powerful system container and virtual machine manager",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "jdk25",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.jdk25",
+      "derivation": "/nix/store/9pfqdpb0x5f0s58r4adp1zn19ga1ba4c-zulu-ca-jdk-25.0.3.drv",
+      "outputs": {
+        "out": "/nix/store/9565pvdvb9gmsmxf5hx33j4fk3cpid4p-zulu-ca-jdk-25.0.3"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "zulu-ca-jdk-25.0.3",
+      "pname": "zulu-ca-jdk",
+      "version": "25.0.3",
+      "description": "Certified builds of OpenJDK",
+      "licenses": [
+        "GPL-2.0-only"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 1
+    },
+    {
+      "install_id": "jdk25",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.jdk25",
+      "derivation": "/nix/store/aw8jan0rsfw1isf2ndrkxmj3zhfmaxmg-openjdk-25.0.4+7.drv",
+      "outputs": {
+        "debug": "/nix/store/mh5gkw2ncpn4wlzmy81kmddna4pa4n1s-openjdk-25.0.4+7-debug",
+        "out": "/nix/store/b0z3vw1477m8h47ppw1k1iz2sngcnvb3-openjdk-25.0.4+7"
+      },
+      "output-names": [
+        "out",
+        "debug"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "openjdk-25.0.4+7",
+      "pname": "openjdk",
+      "version": "25.0.4+7",
+      "description": "Open-source Java Development Kit",
+      "licenses": [
+        "GPL-2.0-only"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 1
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
+      "derivation": "/nix/store/xk214dgi8hg42nac5lgsd9cg62zwlgfg-maven-3.9.12.drv",
+      "outputs": {
+        "out": "/nix/store/1m1mahbpa2wmb9vmfp1rrlgx02wnx940-maven-3.9.12"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "version": "3.9.12",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.maven",
+      "derivation": "/nix/store/nqixjh9v5985ldh5z9c869rp8ir5105l-maven-3.9.12.drv",
+      "outputs": {
+        "out": "/nix/store/5k41ab1i4yyla7gavqy9kj0g3mig7fa0-maven-3.9.12"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "version": "3.9.12",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
       "install_id": "shellcheck",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-darwin.shellcheck",
-      "derivation": "/nix/store/jxcwclwrlv33aa8zmbwd6alm96dybpjm-shellcheck-0.11.0.drv",
+      "derivation": "/nix/store/hq5gi9b466f3ia9fn535jc3gy6kmm8sw-shellcheck-0.11.0.drv",
       "outputs": {
-        "bin": "/nix/store/7zaq834a8sc9fkarsywjgfbivi5m1rmp-shellcheck-0.11.0-bin",
-        "doc": "/nix/store/f1bcll4qhg8rjhzfbvys78kxji2i58k9-shellcheck-0.11.0-doc",
-        "man": "/nix/store/jvx9763hyf7vcfdpr3lxn1hh26yqgvc8-shellcheck-0.11.0-man",
-        "out": "/nix/store/1ab88ml7xnfqgs2vn216cl226z84g30i-shellcheck-0.11.0"
+        "bin": "/nix/store/q6cvklywhlz099dwlhxy6fv3fzkjh859-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/y6q7b2s2wmxiqxdadckxllkzpr4sx3k1-shellcheck-0.11.0-doc",
+        "man": "/nix/store/zf3fhq79q4pwy7ahddd94s8hryykjqjk-shellcheck-0.11.0-man",
+        "out": "/nix/store/4mk816ryd151nifkjvbhp61san68laxh-shellcheck-0.11.0"
       },
       "output-names": [
         "bin",
@@ -3369,15 +3369,15 @@
     },
     {
       "install_id": "shellcheck",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-linux.shellcheck",
-      "derivation": "/nix/store/4ki35fksjllcfab7iwddszqj2bq1y1ks-shellcheck-0.11.0.drv",
+      "derivation": "/nix/store/xjv2szc3pll98vzhcscfx99dr6ll27kq-shellcheck-0.11.0.drv",
       "outputs": {
-        "bin": "/nix/store/jxny30kladfhiwwnf7flbzinzaxdfml2-shellcheck-0.11.0-bin",
-        "doc": "/nix/store/jp41ky8459f65dnzlp5vgj8lab396xvp-shellcheck-0.11.0-doc",
-        "man": "/nix/store/jlsx03al08ppagcpg176icr6lh436xhj-shellcheck-0.11.0-man",
-        "out": "/nix/store/m1rjazid0wzdnxwg3mcrdk8cgk5rna1a-shellcheck-0.11.0"
+        "bin": "/nix/store/b4m9ph27g0l6b35jcdnyvv5qcjgc8jn0-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/wnbvrv36j23ch8ni89i2kc503aiawf7k-shellcheck-0.11.0-doc",
+        "man": "/nix/store/f0dwnyy4kf3xwv3yq4wjrw9l8r1qa7fy-shellcheck-0.11.0-man",
+        "out": "/nix/store/ca0apclqhv4wwd5j764awivln1jbff8i-shellcheck-0.11.0"
       },
       "output-names": [
         "bin",
@@ -3406,12 +3406,12 @@
     },
     {
       "install_id": "shfmt",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-darwin.shfmt",
-      "derivation": "/nix/store/imi2igyyrjjg8j76aiv403xx4wwr9igj-shfmt-3.12.0.drv",
+      "derivation": "/nix/store/80wz8ib3b8kybyx5q01vhja4ys0d4b2b-shfmt-3.13.1.drv",
       "outputs": {
-        "out": "/nix/store/9gnpg8zw829a5vplb272q0axdsli4iqm-shfmt-3.12.0"
+        "out": "/nix/store/1dlii4r4k4dx4jma0wr0chcgp5q1y5yn-shfmt-3.13.1"
       },
       "output-names": [
         "out"
@@ -3422,9 +3422,9 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-darwin",
       "system": "aarch64-darwin",
-      "name": "shfmt-3.12.0",
+      "name": "shfmt-3.13.1",
       "pname": "shfmt",
-      "version": "3.12.0",
+      "version": "3.13.1",
       "description": "Shell parser and formatter",
       "licenses": [
         "BSD-3-Clause"
@@ -3435,12 +3435,12 @@
     },
     {
       "install_id": "shfmt",
-      "locked-url": "github:nxmatic/rke2lab/4ab151040b2ea39231637fc17e745425453712f9?narHash=sha256-I7JtaTz52vMuf3SUrcLSgZAXaJOCz%2BeeEp5HHRbqVqA%3D",
+      "locked-url": "github:seedmatic/rke2lab/e5669f112b830746bfe01174cd4408db164ccfd4?narHash=sha256-sCxaf3Bvl02BMway3SVaQ6fbE265vPq%2BfYmVE2jR2YE%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-linux.shfmt",
-      "derivation": "/nix/store/kjwvnnyfy7fmm5dhyak7kri6qs1z09ij-shfmt-3.12.0.drv",
+      "derivation": "/nix/store/7ahmd94pg06p9wn688rf3w87wz87428w-shfmt-3.13.1.drv",
       "outputs": {
-        "out": "/nix/store/y7g38ki1wx58g4c13c1dsmijqnwdp0jb-shfmt-3.12.0"
+        "out": "/nix/store/pa8ss8h9dgzaq8iy3s14fy093y4yqrmp-shfmt-3.13.1"
       },
       "output-names": [
         "out"
@@ -3451,9 +3451,9 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-linux",
       "system": "aarch64-linux",
-      "name": "shfmt-3.12.0",
+      "name": "shfmt-3.13.1",
       "pname": "shfmt",
-      "version": "3.12.0",
+      "version": "3.13.1",
       "description": "Shell parser and formatter",
       "licenses": [
         "BSD-3-Clause"
@@ -3481,14 +3481,14 @@
           "pkg-path": "graphviz"
         },
         "incus-client": {
-          "flake": "github:nxmatic/rke2lab#incus-client"
+          "flake": "github:seedmatic/rke2lab#incus-client"
         },
         "jdk25": {
-          "flake": "github:nxmatic/rke2lab#jdk25",
+          "flake": "github:seedmatic/rke2lab#jdk25",
           "priority": 1
         },
         "maven": {
-          "flake": "github:nxmatic/rke2lab#maven"
+          "flake": "github:seedmatic/rke2lab#maven"
         },
         "pulumi": {
           "pkg-path": "pulumi-bin"
@@ -3497,14 +3497,14 @@
           "pkg-path": "pulumictl"
         },
         "shellcheck": {
-          "flake": "github:nxmatic/rke2lab#shellcheck"
+          "flake": "github:seedmatic/rke2lab#shellcheck"
         },
         "shfmt": {
-          "flake": "github:nxmatic/rke2lab#shfmt"
+          "flake": "github:seedmatic/rke2lab#shfmt"
         }
       },
       "vars": {
-        "GITHUB_OWNER": "nxmatic",
+        "GITHUB_OWNER": "seedmatic",
         "M2_REPO": "${HOME}/.m2/repository",
         "PULUMI_BACKEND_URL": "file://${FLOX_ENV_PROJECT}/.pulumi-state",
         "PULUMI_CONFIG_PASSPHRASE": "",

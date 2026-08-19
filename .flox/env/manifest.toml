@@ -25,7 +25,7 @@ graphviz.pkg-path = "graphviz"
 ## image-builder host (which only sees the repo via NFS at a different
 ## absolute path). Bumping: `flox upgrade` or `flox update` picks up
 ## new commits on main.
-incus-client.flake = "github:nxmatic/rke2lab#incus-client"
+incus-client.flake = "github:seedmatic/rke2lab#incus-client"
 
 ## Maven-build toolchain consumed from the rke2lab flake, which is the single
 ## source of truth (see `mavenToolchain` / `devShells.default` in flake.nix).
@@ -37,11 +37,11 @@ incus-client.flake = "github:nxmatic/rke2lab#incus-client"
 ## matched to the Maven spotless gate (`<shfmt.version>` in pom.xml). Same
 ## `github:` (not `path:.`) rationale as incus-client above; bump with
 ## `flox upgrade` after pushing flake changes.
-jdk25.flake = "github:nxmatic/rke2lab#jdk25"
+jdk25.flake = "github:seedmatic/rke2lab#jdk25"
 jdk25.priority = 1
-maven.flake = "github:nxmatic/rke2lab#maven"
-shfmt.flake = "github:nxmatic/rke2lab#shfmt"
-shellcheck.flake = "github:nxmatic/rke2lab#shellcheck"
+maven.flake = "github:seedmatic/rke2lab#maven"
+shfmt.flake = "github:seedmatic/rke2lab#shfmt"
+shellcheck.flake = "github:seedmatic/rke2lab#shellcheck"
 claude-code.pkg-path = "claude-code"
 
 
@@ -53,7 +53,7 @@ claude-code.pkg-path = "claude-code"
   PULUMI_CONFIG_PASSPHRASE=''
   PULUMI_HOME='${XDG_STATE_HOME:-$HOME/.local/state}/pulumi'
   PULUMI_BACKEND_URL='file://${FLOX_ENV_PROJECT}/.pulumi-state'
-  GITHUB_OWNER='nxmatic'
+  GITHUB_OWNER='seedmatic'
   M2_REPO="${HOME}/.m2/repository"
 
 
