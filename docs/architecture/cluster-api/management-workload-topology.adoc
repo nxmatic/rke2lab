@@ -40,7 +40,7 @@ flowchart TB
     MG["MANAGEMENT cluster<br/>CAPI · CAPN · CAPRKE2<br/>single node · on-demand"]
     BW["bioskop-wrkld<br/>Flux + apps"]
   end
-  subgraph BM2["vz.nikopol bare-metal · nikopol-nixos (incus)"]
+  subgraph BM2["vzhost.nikopol bare-metal · nikopol-nixos (incus)"]
     NW["nikopol-wrkld<br/>Flux + apps"]
   end
   OP -->|"commits desired state"| GH
@@ -124,7 +124,7 @@ flowchart TB
     MG["bioskop-mgmt<br/>(target placement)"]
     B1["bioskop-wrkld"]
   end
-  subgraph BM2["bare-metal: vz.nikopol → nikopol-nixos (incus)"]
+  subgraph BM2["bare-metal: vzhost.nikopol → nikopol-nixos (incus)"]
     N1["nikopol-wrkld"]
   end
   MG -.->|"reconciles (same host)"| B1
@@ -173,10 +173,10 @@ on-demand management cluster — stopping that cluster cannot take the workload 
 The two-plane split (nodes on `mammoth-skate` / workloads on Headscale) and Headscale's host (the
 always-live `bioskop-wrkld`) are decided. What remains a separate concern is the internal/LAN vs
 external split (self-hosted Headscale for internal, Tailscale for outside) and whether a given
-bare-metal is LAN-local or remote. Its first concrete instance is the corp bare-metal Mac (`vz.nikopol`)
+bare-metal is LAN-local or remote. Its first concrete instance is the corp bare-metal Mac (`vzhost.nikopol`)
 that hosts `nikopol-nixos`: JAMF-managed, it cannot be a `mammoth-skate` member. Instead it lives on
 `nikopol-nixos`'s *baremetal instance segment* (`172.16.6.0/24`), which `nikopol-nixos` advertises into
-the tailnet with a split-DNS `.nikopol` zone — so peers resolve and reach `vz.nikopol` (and the segment's
+the tailnet with a split-DNS `.nikopol` zone — so peers resolve and reach `vzhost.nikopol` (and the segment's
 instances) by name, over the advertised route, without the Mac being a tailnet member. That transport is
 specified in `nix-darwin-home`'s `docs/network-topology-c4.adoc`. This does not touch the *property* this
 document relies on: every *node* (the bare-metal hypervisors and every cluster node) is a `mammoth-skate`

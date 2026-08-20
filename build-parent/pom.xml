@@ -84,7 +84,7 @@
     <!-- Tracks the flake's nixpkgs shfmt (the toolchain source of truth);
          the nix build also passes -Dshfmt.version=${pkgs.shfmt.version} so the
          spotless gate's binary and config always agree. Bump together. -->
-    <shfmt.version>3.12.0</shfmt.version>
+    <shfmt.version>3.13.1</shfmt.version>
   </properties>
 
   <!--

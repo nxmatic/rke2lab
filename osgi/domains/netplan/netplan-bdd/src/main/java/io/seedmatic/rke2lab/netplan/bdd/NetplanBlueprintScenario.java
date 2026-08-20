@@ -383,7 +383,7 @@ public class NetplanBlueprintScenario
    * A static reservation on a segment's dnsmasq: a {@code dhcp-host} (a MAC-known cluster node —
    * {@code mac} present) or a {@code host-record} (a MAC-less name — {@code mac} empty). rke2lab
    * emits only dhcp-host nodes; the empty-mac form keeps the shape uniform with ndh's {@code
-   * vz.<host>} host-record.
+   * vzhost.<host>} host-record.
    */
   record SegmentHost(String name, Optional<String> mac, String ip) {}
 
