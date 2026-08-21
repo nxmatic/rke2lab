@@ -324,6 +324,11 @@ monotone before/after figures.
   secrets/filter subsystem: stack config + worktree secrets unified on the one amendment channel
   (coordinate = domain · role = kind · sensitivity = attribute); the git-modelled cellar clean/smudge
   filter and the recipient gap the `bench-cellar` proof closes.
+* link:atlas/nixos-substrate.adoc[NixOS node substrate view] — the node OS becoming a declarative
+  NixOS closure: the imperative materialisation apparatus (`distrobuilder`, cloud-init, the 28 host
+  scripts, `/srv/host` staging) collapsing into the image + a devlxd-delivered per-node/bootstrap
+  residue. The node-bootstrap seam is shipped; CAPN-grown fleet is the open gate. See
+  link:nixos-substrate/substrate-model.adoc[the substrate model].
 
 == Related documentation
 

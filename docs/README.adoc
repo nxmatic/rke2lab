@@ -28,6 +28,14 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:architecture/osgi/host-cellar-realisation-spec.adoc[Host Cellar realisation] - the host tree the instance mounts: staging slots, promotion, drift
 * link:architecture/cluster-api/deterministic-cluster-access.adoc[Deterministic cluster access] (🎯 target vision) - the operator holds a valid, natively-trusted admin kubeconfig the instant a cluster is grown: a pre-seeded PKI rooted in the ndh `mammoth-skate-tls` root, the cluster-CA bundle a sops view onto ndh key material, delivered to the node over the devlxd secrets membrane. Retires the `/srv/host/kubeconfig` mount + `kubectl` shelling.
 
+=== NixOS node substrate
+
+* link:architecture/nixos-substrate/substrate-model.adoc[Substrate model] - the vision: every RKE2 node runs the same NixOS Incus image, role is config not OS, `chacun son rôle`; the node model + image factoring (base → control/worker)
+* link:architecture/nixos-substrate/concern-ownership.adoc[Concern ownership] - the old→new redistribution table: where each provisioning responsibility lands once the substrate is declarative
+* link:architecture/nixos-substrate/node-bootstrap-delivery.adoc[Node-side bootstrap delivery] - how the CNI (cilium) + Flux reach a grown node's `server/manifests` over devlxd, now that cloud-init + `/srv/host` are gone
+* link:architecture/nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] - the nix-native runtime baked into the base closure; the dev→prod build trajectory
+* link:architecture/atlas/nixos-substrate.adoc[Atlas — NixOS substrate] - the codebase↔vision before/after delta (C4 figures)
+
 === Policies & Configuration
 
 * link:architecture/config/config-restructuring-spec.adoc[Configuration Restructuring Spec] - The `Rke2labConfig` DTO + `InfraDomain` model + doctor entry-gate: the single-source-of-truth operator config architecture

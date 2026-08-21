@@ -7,9 +7,9 @@
 This spec covers ONE seam of the NixOS node substrate: how the small *bootstrap set*
 (the CNI + Flux) reaches a freshly-grown node's RKE2 auto-deploy directory now that
 cloud-init and the `/srv/host` mount are gone. The broader substrate vision (homogeneous
-image, `role is config not OS`, `chacun son rôle`) lived in a `target-vision.adoc` that
-was removed in the `io.seedmatic` org rename and is to be re-graved; this document is the
-first re-established piece.
+image, `role is config not OS`, `chacun son rôle`) lives in link:substrate-model.adoc[the
+substrate model]; where each concern lands is link:concern-ownership.adoc[concern
+ownership]; the before/after delta is the link:../atlas/nixos-substrate.adoc[atlas view].
 ====
 
 == The problem
@@ -105,6 +105,9 @@ flowchart LR
 
 == Related
 
+* link:substrate-model.adoc[The substrate model] — the vision this seam serves.
+* link:concern-ownership.adoc[Concern ownership] — the CNI + Flux row of the redistribution table.
+* link:../atlas/nixos-substrate.adoc[Atlas — NixOS substrate] — the before/after delta.
 * `nixos/bootstrap-manifests.nix` — the guest oneshot (the consuming end of the devlxd key).
 * `nixos/rke2.nix` — `cni = "cilium"`, so the bundled CNI the `HelmChartConfig` customises
   brings the node Ready before Flux.

@@ -1,0 +1,179 @@
+= Atlas L1 — NixOS node substrate view (the node OS, image-side)
+:toc: left
+:toclevels: 3
+
+_Level-1 (per-subsystem) view of the link:../integration-atlas.adoc[integration atlas] (L0)._
+_L0 shows how this subsystem integrates with the others and the value that emerges; this file is the detail._
+
+The node substrate, image-side — the process that turns "what a node is" from an imperative
+materialisation apparatus into a declarative NixOS closure. The vision it renders lives in
+link:../nixos-substrate/substrate-model.adoc[the substrate model]; this view carries the
+codebase↔vision delta as before/after figures.
+
+== The thesis — the closure is the config; the materialisation apparatus is deleted
+
+Each figure carries its own before/after in one frame (atlas convention). The red `BEFORE` block is
+the imperative materialisation apparatus the transition *deletes*; the green `AFTER` block is the
+declarative substrate that replaces it. The simplification of rke2lab is the red block collapsing
+into the green one: no synthesis-of-a-tree, no `/srv/host` staging, no stow-then-activate — the image
+IS the tree, and the small per-node + bootstrap residue reaches the node over *devlxd*.
+
+=== Diagram A — System context: BEFORE vs AFTER
+
+Reads: the BEFORE choreographs three engines per node (Pulumi+OSGi materialisation → distrobuilder
+image+cloud-init → an `/srv/host` tree stowed then rke2); the AFTER builds one image, references it,
+and splits the rest by realm (Pulumi-thin for master, CAPN greenfield for the fleet, Flux + a
+controller post-join). The dashed edge `the layer underneath is removed` is the whole point — the
+survivors (Pulumi graph, CAPN, Flux) stay; the layer under them goes.
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — multi-engine choreography, per node]
+    b1["seed-master<br/>Pulumi graph + OSGi materialisation scions<br/>+ promotion host.live.d + checksum glue"]
+    b2["distrobuilder Debian image<br/>+ cloud-init NoCloud, 28 host scripts"]
+    b3["master: /srv/host materialised tree<br/>stow into /etc/systemd/system, then rke2"]
+    b1 --> b2 --> b3
+  end
+  subgraph AFTER[After — build once, reference, split by realm]
+    a1["rke2lab flake<br/>nixos-generators, into Incus image store"]
+    a2["management node seeded by Pulumi thin<br/>all workload nodes grown greenfield by CAPN, same images"]
+    a3["Flux in each cluster · controller for host mutation<br/>flox runtime baked in the image"]
+    a1 --> a2 --> a3
+  end
+  BEFORE -.the layer underneath is removed.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== Diagram B — Container: BEFORE vs AFTER
+
+Reads: the BEFORE is a long materialisation pipe (OSGi synthesis → 28-script materializer into
+`/srv/host` → jsync promotion into `host.live.d` + checksum → on-node stow then rke2); the AFTER is
+`the closure IS the config` — the flake's node-base/control/worker modules build via
+`nixos-generators` into the image store, the node applies its baked config at boot, and the two
+residues arrive on their own channels: the *per-node seed* (hostname·role·token·dataset) and the
+*node-side bootstrap set* (CNI + Flux) both over devlxd, then Flux Kustomizations + a controller
+post-join. The dashed edge `no tree, no stow, no promotion` names the erased apparatus.
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — a long materialisation pipe]
+    b1["OSGi synthesis<br/>SystemdChart + 4 phases + cloud-config"]
+    b2["host-asset materializer<br/>28 scripts into /srv/host + units.d"]
+    b3["promotion jsync into host.live.d<br/>+ checksum into replaceOnChanges"]
+    b4["on node: stow into /etc/systemd/system, then rke2"]
+    b1 --> b2 --> b3 --> b4
+  end
+  subgraph AFTER[After — the closure is the config]
+    a1["flake: node-base module<br/>+ control / worker modules"]
+    a2["nixos-generators, into image store"]
+    a3["node: declarative config at boot<br/>+ per-node seed: hostname·role·token·dataset (devlxd)"]
+    a4["node-side bootstrap set (devlxd):<br/>cilium HelmChartConfig + Flux + secrets<br/>into server/manifests before rke2-server"]
+    a5["post-join: Flux Kustomizations · Go controller + CRD"]
+    a1 --> a2 --> a3
+    a4 --> a3
+    a5 --> a3
+  end
+  BEFORE -.no tree, no stow, no promotion.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== Diagram C — Component: BEFORE vs AFTER
+
+Reads: the BEFORE is synthesis + scripts + materializer (SystemdChart + 4 phases →
+SystemdUnitSynthesizer; CloudConfig + HostAssetProviders → BootstrapHostAssetMaterializer;
+`rke2lab-systemd-link` + `rke2lab-activate` + 26 scripts); the AFTER is NixOS modules + the
+node-bootstrap seam + Flux/controller — `rke2lab-node-base` (nix-env·host-access·zfs·containerd·flox
+runtime·`systemd.services.*`), the control/worker modules, the exploder's `NODE_BOOTSTRAP` lane filed
+through the cellar and posed on devlxd, and Flux + a controller for the rest. The dashed edge names
+the collapse: 4 phases + 28 scripts → modules.
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — synthesis + scripts + materializer]
+    b1["SystemdChart + Network/Tools/Rke2Install/Storage phases<br/>to SystemdUnitSynthesizer"]
+    b2["CloudConfigManifestsUnit · HostAssetProviders<br/>· BootstrapHostAssetMaterializer"]
+    b3["rke2lab-systemd-link + rke2lab-activate<br/>+ 26 scripts: nix·flox·network·config·gates"]
+    b1 --> b3
+    b2 --> b3
+  end
+  subgraph AFTER[After — NixOS modules + node-bootstrap seam + Flux]
+    a1["rke2lab-node-base<br/>nix-env·host-access·zfs·containerd<br/>flox runtime · systemd.services.*"]
+    a2["control: rke2 server·kube-vip<br/>worker: rke2 agent"]
+    a3["NODE_BOOTSTRAP lane: exploder → cellar (SEALED)<br/>→ GROW poses user.rke2lab.server-manifests<br/>→ rke2lab-server-manifests.service"]
+    a4["Flux: manifests·secrets·gates (rendered branch)<br/>+ Go controller for host mutation"]
+    a1 --> a2
+    a3 --> a1
+    a4 --> a1
+  end
+  BEFORE -.4 phases + 28 scripts collapse.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
+=== What the transition deletes
+
+The simplification, stated as removals — each is a red box above with no successor:
+
+[cols="2,1",options="header"]
+|===
+| Deleted apparatus | Replaced by
+
+| `distrobuilder` Debian image + its post-unpack/post-files actions
+| `nixos-generators` image build
+
+| `cloud-init` NoCloud seed (user-data + network-config)
+| baked NixOS config + per-node devlxd seed
+
+| the 28 host systemd scripts + the 4 synthesis phases
+| `systemd.services.*` + the `nixos/` modules
+
+| `rke2lab-systemd-link` + `rke2lab-activate` (materialise → stow → activate)
+| the closure *is* the config; nothing to stow
+
+| `/srv/host` staging tree + `host.live.d` promotion (jsync)
+| no materialised tree — the image is the tree; the node-side residue rides devlxd
+
+| checksum → `replaceOnChanges` glue (nocloud drift → instance replace)
+| image digest *is* the identity; a new image is a new instance by construction
+
+| the runtime `nix flake build` of the flox shim on the host (DaemonSet trampoline)
+| the shim baked into the base image at build time
+|===
+
+What *survives*, unchanged in role: the Pulumi Incus graph for the management node (thin, host-side),
+and CAPN + CAPRKE2 + Flux for the fleet. The substrate does not rebuild these — it *removes the layer
+underneath them*.
+
+== Verdict — does it hold?
+
+Shipped, on the codebase today (the green blocks are not all vision):
+
+* the `nixos/` per-concern modules build the node-base image via nix (`CultivatingNixosImageBuilder`);
+  it boots in Incus with rke2-server + containerd up (iteration 1, proven).
+* per-node identity + cluster PKI arrive over devlxd (`nixos/identity.nix`, `nixos/sops.nix`) — the
+  `/srv/host` mount and cloud-init are gone from `InstanceGrow`.
+* the *node-side bootstrap seam* of Diagram B/C is now real in code: the exploder carves the
+  `NODE_BOOTSTRAP` lane, the synthesis scion files it (SEALED) through the cellar, the host GROW poses
+  `user.rke2lab.server-manifests`, and `nixos/bootstrap-manifests.nix` writes it into
+  `server/manifests` before rke2-server (`cni="cilium"`). See
+  link:../nixos-substrate/node-bootstrap-delivery.adoc[node-bootstrap delivery].
+
+Still vision (the red block has not fully collapsed): CAPN growing peers/workers from the published
+images (the management cluster is not yet wired to grow the fleet), and the Go controller for
+post-join host mutation (still the DaemonSet stage). The e2e LIVE proof — grow a real node to Ready —
+is the open gate.
+
+== Related documentation
+
+* link:../nixos-substrate/substrate-model.adoc[The substrate model] — the vision this delta renders.
+* link:../nixos-substrate/concern-ownership.adoc[Concern ownership] — the old→new redistribution table.
+* link:../nixos-substrate/node-bootstrap-delivery.adoc[Node-side bootstrap delivery] — the shipped CNI/Flux seam.
+* link:seed.adoc[Seed orchestration L1] — the host pipeline that seeds master and runs the GROW.
