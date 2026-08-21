@@ -19,7 +19,7 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.NETWORKING + "/cilium-config";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("networking", "cilium-config");
+      new PackageMetadataProfile("networking", "cilium-config", true);
 
   public CiliumConfigManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

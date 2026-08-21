@@ -20,7 +20,7 @@ public final class FluxOperatorManifestsUnit extends AbstractManifestsUnit {
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/flux-operator";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("gitops", "flux-operator");
+      new PackageMetadataProfile("gitops", "flux-operator", true);
 
   public FluxOperatorManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

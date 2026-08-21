@@ -1,13 +1,15 @@
 # RKE2 server + the node's substrate-ready target. cidrs baked DUAL-STACK — the spike proved a
 # single-family node-ip crashes kube-apiserver ("service IP family must match public address
-# family"). IPv4 primary, IPv6 secondary. cni="none" for now (cilium arrives with our manifests);
-# the node stays NotReady until a CNI is present, which is expected.
+# family"). IPv4 primary, IPv6 secondary. cni="cilium" so rke2 deploys its bundled cilium as the CNI
+# (the node reaches Ready WITHOUT waiting on Flux); the bootstrap lane (bootstrap-manifests.nix) seeds
+# the HelmChartConfig rke2-cilium that customises that addon (BGP, clustermesh, gatewayAPI, …), and
+# the seeded Flux operator then reconciles the rest from the rendered branch.
 { ... }:
 {
   services.rke2 = {
     enable = true;
     role = "server";
-    cni = "none";
+    cni = "cilium";
   };
   environment.etc."rancher/rke2/config.yaml.d/10-dualstack.yaml".text = ''
     cluster-cidr: 10.42.0.0/16,fd00:42::/56

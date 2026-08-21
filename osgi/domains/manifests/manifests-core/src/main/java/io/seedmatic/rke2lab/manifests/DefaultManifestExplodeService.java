@@ -6,6 +6,7 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeService;
+import io.seedmatic.rke2lab.manifests.contract.NodeBootstrapArtifact;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -74,6 +75,12 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     Files.createDirectories(target);
 
     final List<Path> written = new ArrayList<>();
+    // The node-side bootstrap lane: resources marked NODE_BOOTSTRAP are NOT written into the
+    // per-resource branch tree (they are never committed nor applied from the rendered branch).
+    // They are collected here and emitted as a single multi-doc file OUTSIDE that tree, for the
+    // host
+    // to seed onto the node over devlxd (see nixos/bootstrap-manifests.nix).
+    final List<JsonNode> bootstrapDocuments = new ArrayList<>();
 
     yaml.read(source)
         .nodes()
@@ -82,6 +89,10 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
             document -> {
               final Optional<String> kind = text(document.get("kind"));
               if (kind.isEmpty()) {
+                return;
+              }
+              if (isAnnotated(document, ManifestAnnotations.NODE_BOOTSTRAP)) {
+                bootstrapDocuments.add(document);
                 return;
               }
               final String domain = annotation(document, ManifestAnnotations.DOMAIN, "default");
@@ -98,6 +109,16 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     written.sort(Comparator.naturalOrder());
 
     LOG.info("Exploded {} resources from {} into {}", written.size(), source.getFileName(), target);
+
+    if (!bootstrapDocuments.isEmpty()) {
+      final Path bootstrapFile = NodeBootstrapArtifact.MANIFESTS.in(target);
+      Files.createDirectories(bootstrapFile.getParent());
+      yaml.write(bootstrapFile).documents(bootstrapDocuments);
+      LOG.info(
+          "Collected {} node-bootstrap resources into {}",
+          bootstrapDocuments.size(),
+          bootstrapFile);
+    }
 
     return new ManifestExplodeResult(target, written);
   }

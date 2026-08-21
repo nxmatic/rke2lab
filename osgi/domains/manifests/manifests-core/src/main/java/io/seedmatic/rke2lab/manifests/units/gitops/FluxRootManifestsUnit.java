@@ -43,7 +43,7 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   private static final String SOPS_AGE_SECRET = "sops-age";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("gitops", "flux-root");
+      new PackageMetadataProfile("gitops", "flux-root", true);
 
   public FluxRootManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of(FluxInstanceManifestsUnit.MANIFEST_UNIT_ID));

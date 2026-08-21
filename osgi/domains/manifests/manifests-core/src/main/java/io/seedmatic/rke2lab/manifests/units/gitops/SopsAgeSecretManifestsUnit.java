@@ -44,7 +44,7 @@ public final class SopsAgeSecretManifestsUnit extends AbstractManifestsUnit {
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/sops-age";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("gitops", "sops-age");
+      new PackageMetadataProfile("gitops", "sops-age", true);
 
   public SopsAgeSecretManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

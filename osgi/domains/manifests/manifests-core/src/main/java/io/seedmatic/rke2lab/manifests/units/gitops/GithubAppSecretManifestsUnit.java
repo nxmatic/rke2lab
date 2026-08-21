@@ -48,7 +48,7 @@ public final class GithubAppSecretManifestsUnit extends AbstractManifestsUnit {
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/githubapp";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("gitops", "githubapp");
+      new PackageMetadataProfile("gitops", "githubapp", true);
 
   public GithubAppSecretManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

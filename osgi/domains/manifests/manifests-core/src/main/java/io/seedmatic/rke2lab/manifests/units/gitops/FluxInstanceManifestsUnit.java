@@ -4,9 +4,9 @@ package io.seedmatic.rke2lab.manifests.units.gitops;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
+import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -19,10 +19,8 @@ public final class FluxInstanceManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/flux-instance";
 
-  private static final String DOMAIN_NAME = "gitops";
-  private static final String PACKAGE_NAME = "flux-instance";
-
-  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile("gitops", "flux-instance", true);
 
   public FluxInstanceManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of(FluxOperatorManifestsUnit.MANIFEST_UNIT_ID));
@@ -48,7 +46,8 @@ public final class FluxInstanceManifestsUnit extends AbstractManifestsUnit {
                         .name("flux")
                         .namespace("flux-system")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
+                            packageProfile.packageAnnotations(
+                                "fluxcd.controlplane.io|FluxInstance|flux-system|flux"))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/instance",

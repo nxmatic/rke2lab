@@ -15,10 +15,13 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.seedmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
+import io.seedmatic.rke2lab.manifests.contract.NodeBootstrapArtifact;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
+import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsBundle;
+import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsCoordinate;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.CellarReceiver;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.InputReceiver;
@@ -29,6 +32,7 @@ import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlaye
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
+import io.seedmatic.rke2lab.seed.broker.port.Sensitivity;
 import io.seedmatic.rke2lab.worktree.GitIdentity;
 import io.seedmatic.rke2lab.worktree.LinkedWorktree;
 import io.seedmatic.rke2lab.worktree.RenderedBranch;
@@ -311,6 +315,36 @@ public class ManifestSynthesisScenario
         .the_manifests_file_is_written()
         .and()
         .the_rendered_branch_is_delivered(rendered, deliveryPlan(facet, rendered));
+    fileNodeBootstrap(rendered);
+  }
+
+  /**
+   * File the node-side bootstrap set the exploder carved out ({@code .bootstrap/rke2lab-bootstrap
+   * .yaml}, a sibling of the rendered tree — never committed to the branch) into the transactional
+   * cellar under {@link ServerManifestsCoordinate#SERVER_MANIFESTS}, SEALED (it carries the App
+   * private key and the cluster age identity). The host GROW reveals it a few steps on and poses it
+   * on the instance's {@code user.rke2lab.server-manifests} devlxd key — the same cross-realm seam
+   * the cluster-pki cases ride. A no-op on a bare survey / the standalone CLI (no worktree, no
+   * parcel) and when no unit marked anything node-bootstrap (the file is absent).
+   */
+  private void fileNodeBootstrap(Optional<LinkedWorktree> rendered) {
+    if (rendered.isEmpty() || cellar == null || parcel.isEmpty()) {
+      return;
+    }
+    final Path bootstrapFile = NodeBootstrapArtifact.MANIFESTS.in(rendered.orElseThrow().path());
+    if (!Files.exists(bootstrapFile)) {
+      return;
+    }
+    try {
+      cellar.store(
+          parcel.orElseThrow(),
+          ServerManifestsCoordinate.SERVER_MANIFESTS,
+          new ServerManifestsBundle(Files.readString(bootstrapFile)),
+          Sensitivity.SEALED);
+    } catch (IOException ex) {
+      throw new UncheckedIOException(
+          "cannot read the node-bootstrap manifests: " + bootstrapFile, ex);
+    }
   }
 
   /** Given: the activation facet and the synthesis collaborators. */

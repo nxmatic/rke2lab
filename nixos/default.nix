@@ -12,6 +12,7 @@
     ./rke2.nix # rke2-server + dual-stack + rke2lab.target
     ./identity.nix # per-node identity from devlxd (node.env + hostname)
     ./sops.nix # sops-nix: PKI secret declaration + runtime devlxd delivery
+    ./bootstrap-manifests.nix # devlxd → rke2 server/manifests: the node-side bootstrap lane (Flux + cilium config)
     ./containerd.nix # flox NRI runtime + zfs snapshotter + dataset mount
     ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node
     ./nix-env.nix # nix.settings + the node toolbox on PATH

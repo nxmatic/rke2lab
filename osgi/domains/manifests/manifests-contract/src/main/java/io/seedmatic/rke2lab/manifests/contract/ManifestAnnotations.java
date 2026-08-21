@@ -41,6 +41,17 @@ public record ManifestAnnotations() {
    */
   public static final String MANIFEST_GROUP = "io.seedmatic.rke2lab/manifest-group";
 
+  /**
+   * Marks a resource on the node-side bootstrap lane — the small set the host seeds into the node's
+   * RKE2 {@code server/manifests} over devlxd at grow time (Flux operator/instance/root, the
+   * bootstrap Secrets, the cilium {@code HelmChartConfig}), so the CNI and Flux come up before the
+   * rendered branch is reachable. The exploder collects these into a single {@code
+   * .bootstrap/rke2lab-bootstrap.yaml} multi-doc file OUTSIDE the committed branch tree, rather
+   * than the per-resource cluster-apply tree — they are delivered node-side, never committed nor
+   * applied from the branch.
+   */
+  public static final String NODE_BOOTSTRAP = "io.seedmatic.rke2lab/node-bootstrap";
+
   public Map<String, String> packageAnnotations(final String domain, final String packageName) {
     return packageAnnotations(domain, packageName, Map.of());
   }

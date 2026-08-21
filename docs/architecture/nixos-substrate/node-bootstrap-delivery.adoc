@@ -1,0 +1,112 @@
+= Node-side bootstrap delivery — closing the substrate loop
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+This spec covers ONE seam of the NixOS node substrate: how the small *bootstrap set*
+(the CNI + Flux) reaches a freshly-grown node's RKE2 auto-deploy directory now that
+cloud-init and the `/srv/host` mount are gone. The broader substrate vision (homogeneous
+image, `role is config not OS`, `chacun son rôle`) lived in a `target-vision.adoc` that
+was removed in the `io.seedmatic` org rename and is to be re-graved; this document is the
+first re-established piece.
+====
+
+== The problem
+
+Every RKE2 server auto-deploys any YAML placed under
+`/var/lib/rancher/rke2/server/manifests/` at boot. Under the old model the manifests
+scion rendered the tree and the incus GROW *mounted* it into the node via `/srv/host`.
+That mount — and cloud-init — were dissolved by the NixOS-substrate refactor, leaving
+NOTHING that writes to the node's `server/manifests`. The consequence: with
+`services.rke2.cni = "cilium"` the node would still not converge the way the lab needs
+(no HelmChartConfig, no Flux), and nothing seeds the GitOps bootstrap. The loop was open.
+
+== The rule — bootstrap set vs the rendered branch
+
+The synthesis produces the whole cdk8s tree, but delivery splits by *when* a resource is
+needed:
+
+* the *rendered branch* (git, opt-in push) carries everything Flux reconciles POST-join —
+  the workload manifests. Unchanged.
+* the *node-side bootstrap set* carries the few resources that must exist BEFORE Flux can
+  run: the cilium `HelmChartConfig` (customising RKE2's bundled cilium — the CNI, so the
+  node reaches Ready without waiting on Flux), the Flux operator/instance/root, and the
+  `sops-age` + `githubapp` Secrets Flux needs to pull and decrypt the branch.
+
+A unit joins the bootstrap set by carrying the `io.seedmatic.rke2lab/node-bootstrap`
+annotation (`ManifestAnnotations.NODE_BOOTSTRAP`), stamped once per unit by its
+`PackageMetadataProfile(..., nodeBootstrap = true)` so no resource of a bootstrap unit
+can escape the lane.
+
+== The seam — synth carves, host poses, node writes
+
+[mermaid]
+----
+flowchart LR
+  subgraph osgi["OSGi realm (in-container)"]
+    synth["synthesis scion"]
+    explode["exploder"]
+    file["NodeBootstrapArtifact.MANIFESTS<br/>.bootstrap/rke2lab-bootstrap.yaml"]
+    cellar["ScenarioCellar<br/>SERVER_MANIFESTS (SEALED)"]
+    synth --> explode
+    explode -->|"NODE_BOOTSTRAP docs"| file
+    file -->|"scion reads + files"| cellar
+  end
+  subgraph host["FLAT realm (host)"]
+    grow["InstanceGrow"]
+  end
+  subgraph node["node (guest)"]
+    unit["rke2lab-server-manifests.service<br/>(devlxd oneshot)"]
+    dir["server/manifests/rke2lab-bootstrap.yaml"]
+    rke2["rke2-server"]
+  end
+  cellar -->|"grow fetches (revealed)"| grow
+  grow -->|"user.rke2lab.server-manifests"| unit
+  unit -->|"writes, before"| dir
+  dir --> rke2
+----
+
+. The *exploder* routes `NODE_BOOTSTRAP`-marked documents out of the per-resource branch
+  tree into one multi-doc file, `NodeBootstrapArtifact.MANIFESTS` — a sibling one level
+  above the exploded tree, so it is never committed.
+. The *synthesis scion* reads that file and files it in the transactional cellar under
+  `ServerManifestsCoordinate.SERVER_MANIFESTS` as a `ServerManifestsBundle`, SEALED (it
+  carries the App private key and the cluster age identity).
+. The pure-host *GROW* fetches it (revealed across the graft) and poses it on the
+  instance's `user.rke2lab.server-manifests` devlxd key — alongside the cluster-PKI cases,
+  the same dual-realm cellar crossing.
+. The node's `rke2lab-server-manifests.service` (a devlxd oneshot, ordered BEFORE
+  `rke2-server`) reads the key and writes `server/manifests/rke2lab-bootstrap.yaml`, so
+  RKE2 auto-deploys the CNI + Flux on first boot.
+
+== The types
+
+[cols="1,2,2",options="header"]
+|===
+| Type | Module | Role
+
+| `NodeBootstrapArtifact`
+| `manifests-contract` (bundle-only)
+| Enum whose one instance resolves the bootstrap file's path from an exploded tree — an
+  instance, not a static path helper (instance-discipline). Used by the exploder (writes)
+  and the synthesis scion (reads).
+
+| `ServerManifestsCoordinate`
+| `manifests-ingress-contract` (`type=dual-realm`)
+| The `SeedCoordinate` the scion files under and the host GROW fetches by — dual-realm so
+  the FLAT-realm GROW may reference it (the `ClusterPkiCoordinate` lesson).
+
+| `ServerManifestsBundle`
+| `manifests-ingress-contract` (`type=dual-realm`)
+| The `@SeedContract("server-manifests")` record carrying the multi-doc YAML across the
+  cellar; SEALED at rest.
+|===
+
+== Related
+
+* `nixos/bootstrap-manifests.nix` — the guest oneshot (the consuming end of the devlxd key).
+* `nixos/rke2.nix` — `cni = "cilium"`, so the bundled CNI the `HelmChartConfig` customises
+  brings the node Ready before Flux.
+* link:../cluster-api/deterministic-cluster-access.adoc[deterministic-cluster-access] — the
+  sibling dual-realm cellar crossing (cluster PKI) the GROW poses on devlxd the same way.
