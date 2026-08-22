@@ -1,15 +1,14 @@
 #!/usr/bin/env sh
 set -eu
 
-if [ "$#" -ne 4 ]; then
-    echo "usage: $0 <workspace> <artifact-dir> <nix-binary> <incus-project>" >&2
+if [ "$#" -ne 3 ]; then
+    echo "usage: $0 <workspace> <artifact-dir> <nix-binary>" >&2
     exit 2
 fi
 
 workspace="$1"
 artifact_dir="$2"
 nix_bin="${3:-nix}"
-incus_project="$4"
 
 export PATH="/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
@@ -93,37 +92,9 @@ else
     printf '%s\n' "$source_digest" >"$checksum_file"
 fi
 
-# Register the freshly-built image in the incus daemon the operator's `incus` speaks to (its default
-# remote — on the Mac that is the LAN daemon reached over mDNS; the import uploads the artifacts to
-# it, a round-trip accepted on a LAN). One image for now — the homogeneous node-base substrate every
-# node boots from — so the alias is hardcoded to node-base (the host GROW ADOPTS it by the SAME
-# alias; keep this in sync with rke2lab:image:alias in the stack config).
-image_alias="node-base"
-
-# incus derives a SPLIT image's fingerprint as sha256(metadata.tar.xz ++ rootfs.squashfs), metadata
-# first (verified empirically against a stored image — it is NOT the sha256 of either file alone).
-# Compute it ourselves so the whole flow is deterministic and never parses an incus message: the
-# older code guessed sha256(metadata) and only ever produced "Image not found" at alias-create time,
-# and incus 7.3's duplicate error carries no fingerprint to recover.
-image_fingerprint="$(cat "$artifact_dir/$metadata_name" "$artifact_dir/$rootfs_name" |
-    sha256sum | awk '{print $1}')"
-
-# Import only when absent. The nix build is reproducible, so an unchanged tree re-imports
-# byte-identical artifacts under this SAME fingerprint — skip the redundant import (and the daemon's
-# duplicate rejection) when it is already in the store.
-if ! incus image info "$image_fingerprint" --project "$incus_project" >/dev/null 2>&1; then
-    import_out="$(incus image import \
-        "$artifact_dir/$metadata_name" "$artifact_dir/$rootfs_name" \
-        --project "$incus_project" 2>&1)" || {
-        echo "failed to import the built image into incus" >&2
-        printf '%s\n' "$import_out" >&2
-        exit 5
-    }
-fi
-
-# (Re)point the alias at the fingerprint — the SAME step whether we just imported or found it
-# present. Deleting then creating the ALIAS never touches the (possibly in-use) image it points at,
-# so this is safe while a prior instance still runs on the old image; and the fingerprint is in hand
-# before any delete, so a failure can never orphan the alias.
-incus image alias delete "$image_alias" --project "$incus_project" >/dev/null 2>&1 || true
-incus image alias create "$image_alias" "$image_fingerprint" --project "$incus_project"
+# Build-only: the two artifacts ($metadata_name + $rootfs_name) and their freshness checksum are the
+# whole output. The image is NOT imported here — that is the incus PROVIDER's job (the host GROW
+# declares an `Image` resource sourcing these files, so the provider orders Project → Image → Instance
+# and the import rides the provider's own channel). This keeps the build a pure artifact producer with
+# no incus coupling and no out-of-graph side effect. See
+# docs/architecture/nixos-substrate/node-bootstrap-delivery.adoc's sibling — the substrate model.

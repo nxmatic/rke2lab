@@ -18,11 +18,12 @@ import org.osgi.service.component.annotations.Component;
  * The CULTIVATING incus image-build edge — the single live door. Builds the NixOS node substrate's
  * Incus artifacts ({@code incus.tar.xz} + {@code rootfs.squashfs}) by running the bundled nix build
  * script: {@code nix build …#nixosConfigurations.rke2-node-base.config.system.build.{metadata,
- * squashfs}}, then {@code incus image import} + alias. It runs the script LOCALLY when both {@code
- * nix} and {@code incus} resolve on {@code PATH} — nix offloads the aarch64-linux build to its
- * configured remote builder and incus imports to its default remote daemon, the operator's OWN
- * channels (the import uploads the artifacts over the incus remote); otherwise it streams the same
- * script over {@code ssh} to the configured builder host.
+ * squashfs}}. It is BUILD-ONLY — it does NOT import the image; the incus PROVIDER does that (the
+ * host GROW declares an {@code Image} resource sourcing these artifacts, so the engine orders
+ * Project → Image → Instance and the import rides the provider's channel). It runs the script
+ * LOCALLY when {@code nix} resolves on {@code PATH} — nix offloads the aarch64-linux build to its
+ * configured remote builder, the operator's OWN channel; otherwise it streams the same script over
+ * {@code ssh} to the configured builder host.
  *
  * <p>One of the ImageBuilder PAIR: registered with {@code rke2lab.gardening=cultivating} so the
  * frontier picks it when the ambient RunGate is cultivating. Its twin, {@link
@@ -30,10 +31,10 @@ import org.osgi.service.component.annotations.Component;
  * resource) is owned by the shared {@link BuildRecipe}, so both impls report the SAME {@link
  * #recipeDigest()} — the host's image-cache key must not move between the two modes.
  *
- * <p><b>Runtime dependency:</b> {@code nix} and {@code incus} locally, or {@code ssh} and key-based
- * access to the builder host. Unlike the former distrobuilder edge it needs no root and no tmpfs
- * scratch: nix realises the artifacts into {@code /nix/store} and only the two finished files are
- * published to the artifact dir.
+ * <p><b>Runtime dependency:</b> {@code nix} locally, or {@code ssh} and key-based access to the
+ * builder host. No incus dependency (the provider imports). Unlike the former distrobuilder edge it
+ * needs no root and no tmpfs scratch: nix realises the artifacts into {@code /nix/store} and only
+ * the two finished files are published to the artifact dir.
  */
 @Component(service = ImageBuilder.class, property = "rke2lab.gardening=cultivating")
 public final class CultivatingNixosImageBuilder implements ImageBuilder {
@@ -53,15 +54,15 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
     // distrobuilder run always rebuilt from scratch; nix does not, and keying a cache on the build
     // script's hash alone would serve a STALE image whenever only the committed sources changed.)
     //
-    // Build through the operator's OWN nix + incus channels: when both resolve locally (the
-    // seed-master host — the Mac — has them), run the script HERE. nix offloads the aarch64-linux
-    // build to its configured remote builder, and incus imports to its default remote daemon — the
-    // SAME channels every other nix/incus op uses, no bespoke ssh (the import uploads the artifacts
-    // over the incus remote; the round-trip is accepted on a LAN). Only when the tools are NOT both
-    // local do we stream the build over ssh to the configured builder host.
+    // Build through the operator's OWN nix channel: when nix resolves locally (the seed-master host
+    // — the Mac — has it), run the script HERE. nix offloads the aarch64-linux build to its
+    // configured remote builder. The script is now a pure ARTIFACT producer — it does NOT touch
+    // incus; importing the built image is the incus PROVIDER's job (the host GROW declares an Image
+    // resource sourcing the artifacts), so the build no longer needs a local incus daemon. Only
+    // when
+    // nix is NOT local do we stream the build over ssh to the configured builder host.
     final String localNix = tryResolveExecutable(request.builderBinary());
-    final String localIncus = tryResolveExecutable("incus");
-    if (!localNix.isBlank() && !localIncus.isBlank()) {
+    if (!localNix.isBlank()) {
       runLocalBuildOrThrow(request, localNix);
     } else {
       runRemoteBuildOrThrow(request);
@@ -83,8 +84,7 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
               script.toString(),
               request.workspaceDir(),
               request.localArtifactDir(),
-              nixExecutable,
-              request.incusProject()),
+              nixExecutable),
           "Failed to build the NixOS node image with nix");
     } finally {
       try {
@@ -99,8 +99,7 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
     final String remoteHost = request.remoteHost();
     if (remoteHost.isBlank()) {
       throw new ImageBuildException(
-          "nix is not available locally (or there is no local incus daemon to import into) and no"
-              + " remote image.builderHost is configured");
+          "nix is not available locally and no remote image.builderHost is configured");
     }
 
     final String binary = request.builderBinary().isBlank() ? "nix" : request.builderBinary();
@@ -108,11 +107,7 @@ public final class CultivatingNixosImageBuilder implements ImageBuilder {
     runRemoteBootstrapOverSshOrThrow(
         Path.of(request.workspaceDir()),
         remoteHost,
-        List.of(
-            request.remoteWorkspaceDir(),
-            request.remoteArtifactDir(),
-            binary,
-            request.incusProject()),
+        List.of(request.remoteWorkspaceDir(), request.remoteArtifactDir(), binary),
         "Failed to build the NixOS node image on remote builder host " + remoteHost);
   }
 

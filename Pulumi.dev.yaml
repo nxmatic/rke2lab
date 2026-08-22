@@ -1,7 +1,7 @@
 encryptionsalt: v1:egSmVjEn+Rc=:v1:tDy9P3PFPKGpSmW7:ohDWaFDPxvO+kWbTRVEh6BJCDHHuag==
 config:
   rke2lab:cluster:
-    name: nikopol
+    name: bioskop
   rke2lab:node:
     name: master
   rke2lab:profile:
@@ -13,6 +13,10 @@ config:
     # ~ expands to the operator's home at load time, so the same value resolves
     # per-host (/Users/<user> on bioskop, /Volumes/user-home on nikopol).
     configDir: ~/.config/incus
+    # The SAME endpoint `incus remote` uses (the tailnet MagicDNS bare name), NOT the mDNS
+    # <host>.local default: the Go incus provider does not resolve .local reliably (the CLI does via
+    # Bonjour), which broke the Image upload with "Unable to connect to bioskop-nixos.local:8443".
+    remoteAddress: https://bioskop-nixos:8443
   rke2lab:image:
     alias: control-node
     sharedFolder: .local.d/images

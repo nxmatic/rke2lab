@@ -11,7 +11,6 @@ import com.pulumi.incus.Profile;
 import com.pulumi.incus.ProfileArgs;
 import com.pulumi.incus.Project;
 import com.pulumi.incus.ProjectArgs;
-import com.pulumi.incus.inputs.ImageAliasArgs;
 import com.pulumi.incus.inputs.ImageSourceFileArgs;
 import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
@@ -22,11 +21,17 @@ import io.seedmatic.rke2lab.incus.ingress.GrowImageView;
 import io.seedmatic.rke2lab.incus.ingress.GrowNetworkView;
 import io.seedmatic.rke2lab.incus.ingress.IngressConfig;
 import io.seedmatic.rke2lab.incus.ingress.InstanceGrowPlan;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -176,31 +181,44 @@ public final class InstanceGrow {
   }
 
   /**
-   * Return the seed image's fingerprint {@link Output} for the instance. The edge {@code
-   * ImageBuilder} builds the artifacts AND registers the image directly in the daemon (the builder
-   * host IS the incus daemon host), so the GROW ADOPTS it by alias via a provider invoke — no
-   * {@code Image} resource, no client-side upload of bytes the daemon already holds. The {@code
-   * sourceFile} path survives ONLY as a fallback: when no daemon-side image exists (a local build
-   * with no reachable daemon), the host declares an {@code Image} that uploads the artifacts — the
-   * one case the client→daemon transfer is genuinely needed.
+   * Declare the seed image as a provider {@code Image} resource sourcing the edge-built artifacts,
+   * and return its fingerprint {@link Output} for the instance. The edge {@code ImageBuilder} now
+   * only BUILDS the artifacts (nix → metadata.tar.xz + rootfs.squashfs); the IMPORT is the
+   * provider's — so the engine orders {@code Project → Image → Instance} in one graph, with no
+   * out-of-graph CLI import that would require the project to pre-exist (the defect when the
+   * operator recreates the incus project).
+   *
+   * <p>The resource NAME carries the {@code buildChecksum} (the content key the scion computes): an
+   * unchanged tree keeps the same name → the same {@code Image}, a no-op with no redundant upload;
+   * a content change is a NEW resource → a fresh upload and a new daemon-computed fingerprint,
+   * which arms the instance's {@code replaceOnChanges} on {@code user.rke2lab.imageBuildChecksum}
+   * to recreate it. No {@code aliases}: the instance references the image by the fingerprint {@link
+   * Output} returned here, and a stable alias carried across content changes would collide on the
+   * daemon's per-project alias uniqueness when the old and new images coexist at replace time (the
+   * alias is a future CAPN concern, re-introduced then as its own stable resource).
    */
   private Output<String> ensureImage(GrowImageView view, Resource projectDependency) {
-    final Optional<String> adopted =
-        importLookup.existingImageFingerprint(view.imageAlias(), config.incusProject());
-    if (adopted.isPresent()) {
-      return Output.of(adopted.get());
+    // Content-addressed: incus derives a SPLIT image's fingerprint as sha256(metadata.tar.xz ++
+    // rootfs.squashfs), metadata first (verified against the live daemon). Compute it host-side to
+    // decide whether the daemon already holds this exact content before deciding to upload.
+    final String fingerprint = splitImageFingerprint(view.metadataPath(), view.dataPath());
+    // Adopt BY OMISSION when the daemon already holds it (a prior run, or the retired CLI-import
+    // era): reference the fingerprint, declare NO Image — re-uploading identical bytes is rejected
+    // as
+    // a duplicate. Self-healing against an out-of-graph image, and idempotent (an unchanged build
+    // hashes to the same fingerprint), mirroring ensureProfile/ensureNetwork's adopt-by-omission.
+    if (importLookup.imageExists(fingerprint, config.incusProject())) {
+      return Output.of(fingerprint);
     }
-
-    log.accept(
-        "incus image ensure: no daemon-side image for alias '"
-            + view.imageAlias()
-            + "', uploading from client artifacts");
+    // Absent → the provider uploads it, ordered AFTER the project. retainOnDelete so the next run's
+    // adopt-by-omission (which no longer declares this resource) drops it from state WITHOUT
+    // deleting
+    // the daemon image the instance now runs on.
     final Image image =
         new Image(
-            "seed-image",
+            "seed-image-" + fingerprint,
             ImageArgs.builder()
                 .project(config.incusProject())
-                .aliases(ImageAliasArgs.builder().name(view.imageAlias()).build())
                 .sourceFile(
                     ImageSourceFileArgs.builder()
                         .metadataPath(view.metadataPath())
@@ -209,9 +227,35 @@ public final class InstanceGrow {
                 .build(),
             CustomResourceOptions.builder()
                 .provider(providerContext.provider())
+                .retainOnDelete(true)
                 .dependsOn(List.of(projectDependency))
                 .build());
     return image.fingerprint();
+  }
+
+  /**
+   * The incus SPLIT-image fingerprint of the built artifacts: {@code sha256(metadata.tar.xz ++
+   * rootfs.squashfs)}, metadata first — the exact value the daemon stores (verified empirically),
+   * so the GROW can look the image up before uploading. Streamed so the ~GB rootfs never loads
+   * whole.
+   */
+  private static String splitImageFingerprint(String metadataPath, String dataPath) {
+    try {
+      final MessageDigest sha = MessageDigest.getInstance("SHA-256");
+      final byte[] buffer = new byte[1 << 16];
+      for (String path : List.of(metadataPath, dataPath)) {
+        try (InputStream in = Files.newInputStream(Path.of(path))) {
+          int read;
+          while ((read = in.read(buffer)) > 0) {
+            sha.update(buffer, 0, read);
+          }
+        }
+      }
+      return HexFormat.of().formatHex(sha.digest());
+    } catch (IOException | NoSuchAlgorithmException ex) {
+      throw new IllegalStateException(
+          "cannot compute the incus image fingerprint from " + metadataPath + " + " + dataPath, ex);
+    }
   }
 
   private void createInstance(

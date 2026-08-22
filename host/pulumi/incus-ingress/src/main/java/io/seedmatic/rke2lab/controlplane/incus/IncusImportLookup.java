@@ -100,27 +100,31 @@ public final class IncusImportLookup {
   }
 
   /**
-   * The fingerprint of the image the builder already registered daemon-side under this alias, or
-   * empty when none is found. The GROW adopts this fingerprint for the instance instead of
-   * declaring an {@code Image} that uploads the artifacts from the Pulumi client (the builder host
-   * IS the daemon host, so the image is already local to the daemon).
+   * Whether the daemon already holds an image under this content {@code fingerprint} in the
+   * project. The GROW then references it (adopt by omission) instead of re-declaring an {@code
+   * Image} that would re-upload identical bytes and be rejected as a duplicate. Content-addressed:
+   * an unchanged build resolves to the same fingerprint (present → adopt), a changed build to a new
+   * one (absent → upload). Matched on the {@code fingerprint} field, NOT {@code name}: {@code name}
+   * matches an ALIAS, and this image carries none (the retired CLI import set one, the provider
+   * path does not) — a miss throws, caught as absent.
    */
-  public Optional<String> existingImageFingerprint(String imageAlias, String incusProject) {
-    log.accept("incus lookup getImage: start alias=" + imageAlias + " project=" + incusProject);
+  public boolean imageExists(String fingerprint, String incusProject) {
+    log.accept(
+        "incus lookup getImage: start fingerprint=" + fingerprint + " project=" + incusProject);
     try {
       final var image =
           IncusFunctions.getImagePlain(
-                  GetImagePlainArgs.builder().name(imageAlias).project(incusProject).build(),
+                  GetImagePlainArgs.builder()
+                      .fingerprint(fingerprint)
+                      .project(incusProject)
+                      .build(),
                   context.invokeOptions())
               .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
               .join();
-      if (image == null) {
-        return Optional.empty();
-      }
-      return normalizeImportId(image.fingerprint());
+      return image != null && image.fingerprint() != null;
     } catch (Exception ex) {
-      log.accept("incus lookup getImage: failed (" + summarizeLookupFailure(ex) + ")");
-      return Optional.empty();
+      log.accept("incus lookup getImage: absent (" + summarizeLookupFailure(ex) + ")");
+      return false;
     }
   }
 
