@@ -39,6 +39,19 @@ annotation (`ManifestAnnotations.NODE_BOOTSTRAP`), stamped once per unit by its
 `PackageMetadataProfile(..., nodeBootstrap = true)` so no resource of a bootstrap unit
 can escape the lane.
 
+[IMPORTANT]
+====
+*Cilium native routing is DUAL-STACK, coupled to `nixos/rke2.nix`.* The node's
+`cluster-cidr` is baked dual-stack (`10.42.0.0/16,fd00:42::/56`), so the cilium
+`HelmChartConfig` MUST enable IPv6 and set both native-routing CIDRs — cilium's
+`routingMode: native` template hard-fails the helm install
+(`ipv6NativeRoutingCIDR must be set when routingMode is native`) the moment
+`ipv6.enabled` is true, and a v4-only config leaves the node NotReady. Both CIDRs come
+from one source, `ClusterNetworkBlueprint` (`POD_CIDR` / `POD_CIDR_V6`), which the
+`CiliumConfigManifestsUnit` interpolates — those constants must track the nix
+`cluster-cidr`, since the two live in different languages and cannot import each other.
+====
+
 == The seam — synth carves, host poses, node writes
 
 [mermaid]

@@ -119,7 +119,7 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
                 ipv4:
                   enabled: true
                 ipv6:
-                  enabled: false
+                  enabled: true
                 kubeProxyReplacement: true
                 l2announcements:
                   enabled: true
@@ -141,12 +141,14 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
                 routingMode: native
                 autoDirectNodeRoutes: true
                 ipv4NativeRoutingCIDR: %s
+                ipv6NativeRoutingCIDR: %s
                 operator:
                   replicas: 1
                   podDisruptionBudget:
                     enabled: true
                 socketLB:
                   enabled: true"""
-                    .formatted(ClusterNetworkBlueprint.POD_CIDR))));
+                    .formatted(
+                        ClusterNetworkBlueprint.POD_CIDR, ClusterNetworkBlueprint.POD_CIDR_V6))));
   }
 }

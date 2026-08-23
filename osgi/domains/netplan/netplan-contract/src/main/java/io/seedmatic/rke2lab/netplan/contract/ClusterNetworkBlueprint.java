@@ -48,8 +48,23 @@ public record ClusterNetworkBlueprint(
    */
   public static final String POD_CIDR = "10.42.0.0/16";
 
+  /**
+   * IPv6 pod CIDR — the v6 half of the dual-stack {@code cluster-cidr} baked in {@code
+   * nixos/rke2.nix} ({@code 10.42.0.0/16,fd00:42::/56}). Cilium {@code routingMode: native}
+   * REQUIRES {@code ipv6NativeRoutingCIDR} whenever {@code ipv6.enabled}, so this must track that
+   * nix value. Distinct from {@link #ULA_PREFIX} (the LAN/WAN underlay) — this is the in-cluster
+   * overlay.
+   */
+  public static final String POD_CIDR_V6 = "fd00:42::/56";
+
   /** Service CIDR — the rke2 node-env {@code clusterServiceCidr}. */
   public static final String SERVICE_CIDR = "10.43.0.0/16";
+
+  /**
+   * IPv6 service CIDR — the v6 half of the dual-stack {@code service-cidr} in {@code
+   * nixos/rke2.nix}.
+   */
+  public static final String SERVICE_CIDR_V6 = "fd00:43::/112";
 
   /**
    * vmnet gateway address — Cilium BGP {@code peerAddress}; equals cluster 0's {@code
