@@ -104,9 +104,17 @@ public final class IncusImportLookup {
    * project. The GROW then references it (adopt by omission) instead of re-declaring an {@code
    * Image} that would re-upload identical bytes and be rejected as a duplicate. Content-addressed:
    * an unchanged build resolves to the same fingerprint (present → adopt), a changed build to a new
-   * one (absent → upload). Matched on the {@code fingerprint} field, NOT {@code name}: {@code name}
-   * matches an ALIAS, and this image carries none (the retired CLI import set one, the provider
-   * path does not) — a miss throws, caught as absent.
+   * one (absent → upload).
+   *
+   * <p>STOPGAP: queried on {@code name} (which matches an ALIAS), NOT {@code fingerprint}, because
+   * terraform-provider-incus v1.1.1's {@code incus_image} data source SIGSEGVs (nil deref,
+   * datasource_image.go:207) when queried by {@code fingerprint} alone — the panic kills the plugin
+   * and poisons every later RPC (surfaced downstream as "ValidateResourceConfig ... connection
+   * refused"). Our images carry no alias, so this lookup returns absent for them and the GROW
+   * always takes the create path — correct while no duplicate exists, but it does NOT adopt a
+   * pre-existing alias-less image (that hits "already exists" instead). Proper
+   * fingerprint-existence needs a non-crashing path (provider v1.0.2, an alias, or a resource
+   * import); revisit once the upload itself is confirmed. A miss throws, caught as absent.
    */
   public boolean imageExists(String fingerprint, String incusProject) {
     log.accept(
@@ -114,10 +122,7 @@ public final class IncusImportLookup {
     try {
       final var image =
           IncusFunctions.getImagePlain(
-                  GetImagePlainArgs.builder()
-                      .fingerprint(fingerprint)
-                      .project(incusProject)
-                      .build(),
+                  GetImagePlainArgs.builder().name(fingerprint).project(incusProject).build(),
                   context.invokeOptions())
               .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
               .join();

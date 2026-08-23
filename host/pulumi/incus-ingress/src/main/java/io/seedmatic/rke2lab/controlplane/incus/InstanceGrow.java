@@ -307,7 +307,17 @@ public final class InstanceGrow {
             .provider(providerContext.provider())
             .deleteBeforeReplace(true)
             .replaceOnChanges(List.of("config", "config.*"))
-            .ignoreChanges(List.of("image"))
+            // Ignore drift on `image` (the fingerprint is adopted, not managed) AND `devices`:
+            // incus
+            // stores devices as a MAP (keyed by name, unordered), but the provider models them as
+            // an
+            // ORDERED List, so a refresh returns them in the daemon's order — never our declared
+            // order — and Pulumi reads the whole list as changed, replacing the instance every run
+            // (kill + recreate → the node never stays up long enough to become ready). No declared
+            // order can win against the daemon's map; the device SET is fixed and applied at
+            // create,
+            // so ignoring post-create drift is correct.
+            .ignoreChanges(List.of("image", "devices"))
             .build());
   }
 

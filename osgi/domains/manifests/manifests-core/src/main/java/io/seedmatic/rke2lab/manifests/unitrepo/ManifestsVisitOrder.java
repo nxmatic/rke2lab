@@ -1,13 +1,12 @@
 package io.seedmatic.rke2lab.manifests.unitrepo;
 
 import io.seedmatic.rke2lab.unitrepo.core.UnitResource;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import org.osgi.resource.Namespace;
 import org.osgi.resource.Resource;
@@ -58,7 +57,12 @@ public final class ManifestsVisitOrder {
       }
     }
 
-    Deque<String> ready = new ArrayDeque<>();
+    // A PriorityQueue (natural id order), NOT a FIFO deque: Kahn's algorithm is free to emit any
+    // ready unit, so the tie-break decides the order of independent/sibling units. Insertion order
+    // would inherit the non-deterministic iteration order of the upstream resolver maps (byId /
+    // wiring), churning the synthesis output run to run; a sorted tie-break makes the visit order
+    // CANONICAL by construction — deterministic regardless of any upstream HashMap.
+    PriorityQueue<String> ready = new PriorityQueue<>();
     for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
       if (entry.getValue() == 0) {
         ready.add(entry.getKey());

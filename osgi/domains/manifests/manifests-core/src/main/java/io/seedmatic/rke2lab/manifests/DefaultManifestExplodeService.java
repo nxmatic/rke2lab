@@ -111,6 +111,11 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     LOG.info("Exploded {} resources from {} into {}", written.size(), source.getFileName(), target);
 
     if (!bootstrapDocuments.isEmpty()) {
+      // Collected in the consolidated file's document order, which follows the canonical
+      // manifest-unit visit order (deterministic + dependency-respecting — see ManifestsVisitOrder,
+      // Kahn with a sorted tie-break). So this concatenated file's bytes are stable run to run (no
+      // instance-config churn) AND apply in dependency order (e.g. the flux-system Namespace before
+      // the FluxInstance that lands in it). No re-sort here would only break that dependency order.
       final Path bootstrapFile = NodeBootstrapArtifact.MANIFESTS.in(target);
       Files.createDirectories(bootstrapFile.getParent());
       yaml.write(bootstrapFile).documents(bootstrapDocuments);
