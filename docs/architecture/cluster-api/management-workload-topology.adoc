@@ -29,19 +29,19 @@ never adopts an externally-bootstrapped node, and holds no application workloads
 textbook Cluster API management/workload split, and it is what makes the whole design tractable
 (see <<why-separation>>).
 
-== System context
+== System context (C4 L1 — context)
 
 [mermaid,topology-system-context,svg]
 ----
 flowchart TB
-  OP["Operator"]
-  GH[("git / GitHub<br/>desired state + sops secrets")]
-  subgraph BM1["bioskop bare-metal · bioskop-nixos (incus)"]
-    MG["MANAGEMENT cluster<br/>CAPI · CAPN · CAPRKE2<br/>single node · on-demand"]
-    BW["bioskop-wrkld<br/>Flux + apps"]
+  OP["«person»<br/>Operator"]
+  GH[("«external system»<br/>git / GitHub<br/>desired state + sops secrets")]
+  subgraph BM1["«deployment node» bioskop bare-metal · bioskop-nixos (incus)"]
+    MG["«software system»<br/>MANAGEMENT cluster<br/>CAPI · CAPN · CAPRKE2<br/>single node · on-demand"]
+    BW["«software system»<br/>bioskop-wrkld<br/>Flux + apps"]
   end
-  subgraph BM2["vzhost.nikopol bare-metal · nikopol-nixos (incus)"]
-    NW["nikopol-wrkld<br/>Flux + apps"]
+  subgraph BM2["«deployment node» vzhost.nikopol bare-metal · nikopol-nixos (incus)"]
+    NW["«software system»<br/>nikopol-wrkld<br/>Flux + apps"]
   end
   OP -->|"commits desired state"| GH
   MG -->|"reads CRs + secrets"| GH
@@ -90,18 +90,18 @@ is `<cluster>-<node>`, e.g. `nikopol-mgmt-master`, `bioskop-wrkld-peer1`.
 NOTE: `nikopol` was formerly `alcide`; `alcide` is retired (`ClusterNetworkBlueprint` keeps the
 cluster id, renamed the name). Use `nikopol`.
 
-== Logical topology
+== Logical topology (C4 L2 — containers)
 
 CAPI/CAPN/CAPRKE2 live **only** in the management cluster. The workloads do not run them.
 
 [mermaid,topology-logical,svg]
 ----
 flowchart TB
-  subgraph MGMT["management cluster — single node, run-on-demand"]
-    CAPI["CAPI · CAPN · CAPRKE2"]
+  subgraph MGMT["«software system» management cluster — single node, run-on-demand"]
+    CAPI["«container»<br/>CAPI · CAPN · CAPRKE2"]
   end
-  BWL["bioskop-wrkld<br/>master + peer1 + peer2 (+ workers)"]
-  NWL["nikopol-wrkld<br/>master + peer1 + peer2 (+ workers)"]
+  BWL["«software system»<br/>bioskop-wrkld<br/>master + peer1 + peer2 (+ workers)"]
+  NWL["«software system»<br/>nikopol-wrkld<br/>master + peer1 + peer2 (+ workers)"]
   CAPI -->|"reconciles GREENFIELD<br/>RKE2ControlPlane init + scaleUp<br/>CAPN provisions from node-base"| BWL
   CAPI -->|"reconciles GREENFIELD"| NWL
 ----
@@ -111,7 +111,7 @@ replica (`cluster-init`) and scales up the peers that join it; CAPN provisions t
 instances from the shared `node-base` image. No node of a workload is ever the management
 cluster's node, so there is no adoption and no "mixed management mode".
 
-== Physical placement
+== Physical placement (C4 L3 — deployment)
 
 The two bare-metal hosts each run a NixOS hypervisor (`<host>-nixos`) that hosts Incus; the
 clusters are Incus instances on those hypervisors. The management cluster co-locates with a
@@ -120,12 +120,12 @@ workload on whichever host it is placed, and reaches the *other* host over the m
 [mermaid,topology-physical-placement,svg]
 ----
 flowchart TB
-  subgraph BM1["bare-metal: bioskop → bioskop-nixos (incus)"]
-    MG["bioskop-mgmt<br/>(target placement)"]
-    B1["bioskop-wrkld"]
+  subgraph BM1["«deployment node» bare-metal: bioskop → bioskop-nixos (incus)"]
+    MG["«container»<br/>bioskop-mgmt<br/>(target placement)"]
+    B1["«container»<br/>bioskop-wrkld"]
   end
-  subgraph BM2["bare-metal: vzhost.nikopol → nikopol-nixos (incus)"]
-    N1["nikopol-wrkld"]
+  subgraph BM2["«deployment node» bare-metal: vzhost.nikopol → nikopol-nixos (incus)"]
+    N1["«container»<br/>nikopol-wrkld"]
   end
   MG -.->|"reconciles (same host)"| B1
   MG ==>|"reconciles OVER THE MESH<br/>(cross bare-metal)"| N1
@@ -136,6 +136,105 @@ workload on a different bare-metal. The relevant plane here is the *node* plane 
 `mammoth-skate` tailnet, on which every node is a permanent member — so this hop works at bootstrap and
 in steady state alike, independent of whether any Headscale workload plane exists yet. Without it, a
 management cluster on one host cannot reach a workload's API or the Incus host on another.
+
+[[incus-tenancy]]
+== Incus tenancy — a project per cluster, engines not nested (C4 L3 — deployment)
+
+Each host runs *one* Incus engine, and the clusters that share it are isolated by an
+*Incus project per cluster* — not by nested Incus engines. The project is a logical
+tenant boundary on a shared engine: it cloisons what must be isolated (instances,
+storage volumes / quotas) while *mutualising* the two invariants this document already
+relies on — the homogeneous `node-base` image and the shared node fabric.
+
+The C4 deployment diagram nests the deployment nodes — `bioskop` bare-metal → the
+`bioskop-nixos` hypervisor's single Incus engine → the projects — and places the instances
+as «container» elements inside the per-cluster projects. The shared `default` project holds
+the `node-base` image («artifact») and the fabric («network»); each per-cluster project
+(`bioskop-mgmt`, `bioskop-wrkld`) reaches *back* to `default` — `resolves` the image and
+`attaches` the fabric — while its own «container» instances and «volume» storage stay
+project-local.
+
+[mermaid,topology-incus-tenancy,svg]
+----
+flowchart TB
+  subgraph BM["«deployment node»<br/>bioskop bare-metal"]
+    subgraph HV["«deployment node»<br/>bioskop-nixos · one Incus engine"]
+      subgraph DEF["«project» default — shared tenant"]
+        IMG["«artifact»<br/>node-base image"]
+        NET["«network»<br/>fabric<br/>(cilium BGP / clustermesh)"]
+      end
+      subgraph PMG["«project» bioskop-mgmt"]
+        MGI["«container»<br/>mgmt node<br/>[NixOS · Incus/LXC]"]
+        MGV[("«volume»<br/>mgmt storage")]
+      end
+      subgraph PWL["«project» bioskop-wrkld"]
+        WLI["«container»<br/>master + peer1 + peer2 (+ workers)<br/>[NixOS · Incus/LXC]"]
+        WLV[("«volume»<br/>wrkld storage")]
+      end
+    end
+  end
+  MGI -. "features.images=false<br/>resolves" .-> IMG
+  WLI -. "features.images=false<br/>resolves" .-> IMG
+  MGI -- "features.networks=false<br/>attaches" --> NET
+  WLI -- "features.networks=false<br/>attaches" --> NET
+  MGI --- MGV
+  WLI --- WLV
+  classDef dnode fill:#f5f5f5,stroke:#888,stroke-width:1px;
+  classDef shared stroke:#888,stroke-dasharray:4 3;
+  classDef mgmt stroke:#2f6f8f,stroke-width:1.6px;
+  classDef wl stroke:#2e7d5b,stroke-width:1.2px;
+  class BM,HV dnode; class DEF,IMG,NET shared; class PMG,MGI,MGV mgmt; class PWL,WLI,WLV wl;
+----
+
+*Legend*: grey boxes = «deployment node» nesting (bare-metal → hypervisor/engine); dashed grey
+= the shared `default` project and its «artifact»/«network»; blue = the management project;
+green = the workload project. Dashed edges `resolves` the image, solid edges `attaches` the
+fabric — both pointing *back* at `default` (`features.images=false` / `features.networks=false`);
+plain links join each instance to its project-local «volume». Only «container» instances and
+«volume» storage are project-local.
+
+The feature split is what makes the boundary a *tenant* boundary and not a *silo*:
+
+[cols="2,1,3",options="header"]
+|===
+|Incus project feature |Setting |Effect
+
+|`features.images`
+|`false`
+|The project has no image store of its own → it resolves images from `default` → the *one*
+`node-base` image is published once and shared read-only by every cluster (the homogeneous-image
+invariant, not duplicated per tenant).
+|`features.networks`
+|`false`
+|The project has no network of its own → instances attach `default`'s fabric → nodes of
+*different* clusters stay L2/L3 peers on one bridge, so cilium BGP / clustermesh / per-node ASN
+work across clusters.
+|instances
+|(native)
+|Each cluster sees only its own instances — the isolation the operator wants.
+|`features.storage.volumes`
+|`true`
+|Volumes and quotas are project-local → per-cluster resource isolation.
+|===
+
+CAPN consumes this directly: a workload's `LXCCluster` remote is scoped to *its* project on the
+target host's engine (see the CAPN materialization consequence below), so CAPN provisions into
+`bioskop-wrkld` without ever seeing the management project's instances.
+
+.Anti-pattern — do NOT nest the Incus engines
+[WARNING]
+====
+It is tempting to have the management node run its *own* Incus and grow the workload *inside*
+itself (nested engines), since the node is itself NixOS. Do **not**. Nesting makes the management
+node a *single point of failure for the whole workload*: stopping it, rebooting it, rebuilding its
+image, or an OOM on its root cgroup takes every workload node with it — the exact opposite of the
+<<operating-model,on-demand management>> invariant (workloads must *survive* management churn, the
+management cluster is stopped when idle). Nesting also buries the workers behind the management
+node's internal bridge, breaking the shared-fabric peering (BGP/clustermesh) this topology depends
+on; and because the outer NixOS runs under vz on Apple Silicon (no nested virtualization), nested
+instances could only ever be containers — a permanent ceiling. The correct isolation primitive is
+the *Incus project* above: a logical tenant on a shared engine, with independent lifecycles.
+====
 
 [[mesh]]
 == The mesh — a virtual network (detail deferred)
@@ -374,8 +473,9 @@ This topology changes three materialization surfaces:
   management node's dataset + the `bioskop-wrkld` datasets; `nikopol-nixos` carries the
   `nikopol-wrkld` datasets — ideally projected from `ClusterNetworkBlueprint` rather than
   hand-listed. `peer3` is dropped (three etcd members, odd quorum).
-. *CAPN — two incus remotes (one per host).* CAPN in the management cluster provisions instances on
-  *both* hypervisors — `bioskop-nixos`'s incus and `nikopol-nixos`'s incus — so each workload's
+. *CAPN — two incus remotes (one per host), scoped per project.* CAPN in the management cluster
+  provisions instances on *both* hypervisors — `bioskop-nixos`'s incus and `nikopol-nixos`'s incus —
+  each remote scoped to the workload's own <<incus-tenancy,Incus project>>, so each workload's
   `LXCCluster.secretRef` points at its own incus-identity Secret (`server`/`server-crt` per remote;
   the `client-crt`/`client-key` CAPN identity can be shared, trusted by both hypervisors). The
   cross-host remote (`nikopol-nixos`) is reached over the tailnet at a stable address. Today's
@@ -401,3 +501,6 @@ This topology changes three materialization surfaces:
   generalises.
 * link:../atlas/cellar-secrets.adoc[Cellar Secrets] — the travelling cellar that lets the
   management cluster (and its sealed CAs) move between hosts and seed each workload.
+* link:cilium-bgp-multi-host-topology.adoc[Cilium BGP Multi-Host Topology] — the shared node
+  fabric that the <<incus-tenancy,per-cluster Incus projects>> keep unfragmented
+  (`features.networks=false`), so nodes of different clusters remain BGP/clustermesh peers.

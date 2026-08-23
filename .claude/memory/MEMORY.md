@@ -143,6 +143,7 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 
 ## Infra / manifests / config
 
+- [★ NixOS node substrate (CURRENT chantier)](nixos-node-substrate-state.md) — **the post-June trunk: every RKE2 node = same NixOS Incus image (nixos-generators), role is config not OS; cloud-init + distrobuilder + /srv/host systemd all collapse.** Base = `feature/cluster-seed-scenario` (not main). Substrate MATURE (nix build, devlxd identity, deterministic PKI, rendered-branch Flux). GAP = no management cluster to grow workloads; node NotReady (`cni="none"`, cilium only an rke2 addon override). Baremetal nikopol→bioskop. NEXT = boucler le substrat (cilium/CNI Ready + validate the Flux loop). See [[cluster-seed-execution-state]] [[master-execution-stage-missing-state]] [[gitops-cluster-api-transition-plan]].
 - [OSGi-idiom debt: logging + shadowed services](osgi-logging-and-cli-debt.md) — TRIAGED: no standalone debt remains. Log→LogService via Pax (R4/R6); ServiceLoader→DS = the runtime trunk; the rk2lab typo is dead. See [[check-osgi-standard-before-modeling]].
 - [Coherence-rules coordinator](coherence-rules-coordinator.md) — walker-retirement: cross-domain rule = explicit pure check that REPORTS (option B), not silent Felix prune; `resolve()` = single coherence gate. CoherenceRule interface deferred to rule-of-three.
 - [Config restructuring state](config-restructuring-state.md) — Inc1 (Rke2labConfig DTO + InfraDomain enum) MERGED; Inc2 (doctor remediation) waits on doctor work.
@@ -153,7 +154,7 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 - [Package-private sweep](package-private-sweep.md) — remove non-essential private; exemplar = DefaultManifestSynthesisService.
 - [Domain registry abstraction](domain-registry-abstraction.md) — DEFERRED; unify Manifest+Infra registry pairs at rule-of-three.
 - [seed-vcluster](seed-vcluster.md) — next chantier: bootstrap vCluster gitops-mgmt + Flux; needs vcluster operator unit + pulumi-command.
-- [GitOps + Cluster API transition plan (re-homed design record)](gitops-cluster-api-transition-plan.md) — peer1+ provisioning design (seed-peers + GitOps + CAPI + Tekton-reactive); Phase 1 done (as-built in cluster-api-bootstrap-requirements.adoc), Phase 2+ status unresolved; re-homed from docs/, awaits the future seed-peers module + a memory-cleanup verdict.
+- [GitOps + Cluster API transition plan (re-homed design record)](gitops-cluster-api-transition-plan.md) — **STALE (2026-06):** peer1+ provisioning via seed-peers + GitOps + CAPI + Tekton, over distrobuilder + cloud-init + `/srv/host` + `nxmatic/rke2lab` — nearly all superseded/deleted by [[nixos-node-substrate-state]]. Read as history; the live delivery model is now rendered-branch Flux.
 
 ## Rules / patterns / gotchas
 

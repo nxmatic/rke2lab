@@ -281,3 +281,6 @@ Routing:  Network: Native   Host: Legacy
 * Kernel modules: `nix-darwin-home/modules/nixos/cilium-kernel-modules.nix`
 * Cilium Helm config: `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/networking/CiliumConfigLayer.java`
 * Cilium BGP Control Plane docs: https://docs.cilium.io/en/stable/network/bgp-control-plane/
+* link:management-workload-topology.adoc#incus-tenancy[Incus tenancy] — why per-cluster Incus
+  projects share this fabric (`features.networks=false`) instead of nesting engines, keeping
+  cross-cluster nodes BGP peers on one bridge.
