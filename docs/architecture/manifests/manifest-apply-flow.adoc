@@ -700,7 +700,6 @@ Common causes:
 
 == Related Documentation
 
-* link:staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Detailed pattern documentation
 * link:manifests-architecture.adoc[Manifests Architecture] - How CDK8s synthesis works (the upstream of this pipeline)
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context injection for synthesis
 * link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - How systemd units/scripts are deployed
