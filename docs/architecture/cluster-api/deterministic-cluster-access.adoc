@@ -215,6 +215,15 @@ bullet above still named it). That is a cluster-readiness integration, tracked s
 
 == Related documentation
 
+NOTE: Throughout this document `<cluster>` is the full cluster identity `<host>-<role>` (e.g.
+`bioskop-mgmt`), so the node mDNS endpoint is `<host>-<role>-<node>.local` (e.g.
+`bioskop-mgmt-master.local`) and the derived names are `<host>-<role>` / `<host>-<role>-admin` /
+`<host>-<role>-kubeconfig`. The slug *formula* `<cluster>-<node>` is unchanged; `<cluster>` simply
+carries the role. See link:cluster-addressing-plan.adoc[Cluster Addressing Plan] for the identity
+encoding.
+
+* link:cluster-addressing-plan.adoc[Cluster Addressing Plan] — the `<host>-<role>` identity these
+  deterministic names derive from, and every network span the cluster owns.
 * link:../atlas/cellar-secrets.adoc[Cellar secrets & the clean/smudge filter] — the secrets subsystem
   this rides on; the cluster age recipient and the sops channel are of the same family.
 * link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] — the devlxd

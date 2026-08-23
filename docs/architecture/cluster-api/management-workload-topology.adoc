@@ -501,6 +501,10 @@ This topology changes three materialization surfaces:
   generalises.
 * link:../atlas/cellar-secrets.adoc[Cellar Secrets] — the travelling cellar that lets the
   management cluster (and its sealed CAs) move between hosts and seed each workload.
+* link:cluster-addressing-plan.adoc[Cluster Addressing Plan] — how each `<host>-<role>` cluster's
+  network spans (node/pod/service/ULA, clustermesh `cluster.id`, BGP ASN) derive deterministically
+  from identity, so the four clusters stay collision-free on the shared fabric and federate in two
+  role-partitioned meshes.
 * link:cilium-bgp-multi-host-topology.adoc[Cilium BGP Multi-Host Topology] — the shared node
   fabric that the <<incus-tenancy,per-cluster Incus projects>> keep unfragmented
   (`features.networks=false`), so nodes of different clusters remain BGP/clustermesh peers.

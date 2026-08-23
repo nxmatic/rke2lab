@@ -418,10 +418,16 @@ Before implementation, understand the key architectural choice:
 
 The normal synthesis flow uses ManifestSynthesisContext which bundles:
 - FloxDebugPolicy
-- BootstrapIdentity (9 fields: clusterName, clusterId, clusterToken, ...)
+- BootstrapIdentity (clusterName, clusterId, clusterToken, ... + the role dimension)
 - NetworkTopology
 - ComponentVersions
 - ImageState
+
+NOTE: Under the multi-cluster topology `clusterName` is the full identity `<host>-<role>` (e.g.
+`bioskop-mgmt`), not a bare host/node literal — so the image-state ConfigMap is
+`<host>-<role>-image-state` (e.g. `bioskop-mgmt-image-state`), and `BootstrapIdentity` carries the
+role dimension. The illustrative `master` literals below predate that and read as `<host>-<role>`.
+See link:cluster-addressing-plan.adoc[Cluster Addressing Plan] for the identity encoding.
 
 Staged synthesis only needs:
 - `clusterName` (1 field)
@@ -523,7 +529,6 @@ private String synthesizeImageStateConfigMapYaml(
 ----
 
 **Key insight:** Staged synthesis is a **separate entrypoint**, not a variant of normal synthesis. Don't force-fit ManifestSynthesisContext/AbstractManifestUnit when you only need CDK8s primitives. The structure matches ImageStateConfigMapManifestUnit but without the context dependency.
-----
 
 === Step 3: Write the Manifest YAML During Pulumi Apply
 

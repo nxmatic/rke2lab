@@ -284,3 +284,6 @@ Routing:  Network: Native   Host: Legacy
 * link:management-workload-topology.adoc#incus-tenancy[Incus tenancy] — why per-cluster Incus
   projects share this fabric (`features.networks=false`) instead of nesting engines, keeping
   cross-cluster nodes BGP peers on one bridge.
+* link:cluster-addressing-plan.adoc[Cluster Addressing Plan] — the deterministic per-cluster
+  allocation of the pod `/24`s advertised here, plus the per-cluster BGP `localASN` (`64512+clusterId`)
+  that keeps sessions unambiguous when clusters sharing this fabric both run BGP on it.

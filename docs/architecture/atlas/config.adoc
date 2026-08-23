@@ -185,6 +185,15 @@ flowchart TB
 Conclusion: the value-channel half shipped as the seed-broker amendment channel — the leak fix (State
 A) is live; the `ClusterConfiguration` service is superseded, not pending.
 
+. *Next shift (NOT yet shipped) — the identity view gains a role dimension.* The single-cluster
+  identity (`cluster.name` → one `NodeEnvContext`) is about to become per-`<host>-<role>`: the
+  keystone of the management-cluster chantier adds a *role* to the identity so a cluster is
+  `<host>-<role>` and its network spans derive from `clusterId = (host<<1)|role`. When it lands this
+  diagram's `Pulumi single source cluster.name` box becomes `host + role`, and `NodeEnvContext`'s
+  identity view carries the role. Vision:
+  link:../cluster-api/cluster-addressing-plan.adoc[Cluster Addressing Plan] +
+  link:../cluster-api/management-workload-topology.adoc[Management / Workload Topology].
+
 [NOTE]
 ====
 *State A shipped; the mechanism is the amendment channel, not a `ClusterConfiguration` service.* The
