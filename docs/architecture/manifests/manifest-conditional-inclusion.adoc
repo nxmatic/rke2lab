@@ -211,66 +211,40 @@ sequenceDiagram
 
 === ManifestsDomainRegistrar Interface
 
-The link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar] interface provides two methods:
+The link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar] interface provides two methods — the shape is the teaching point:
 
 [source,java]
 ----
 public interface ManifestsDomainRegistrar {
-  // Legacy method - no policy awareness
+  // Fixed unit list — most registrars implement only this
   ManifestsDomain domain();
 
-  // Policy-aware method - override for conditional inclusion
+  // Policy-aware — override for conditional inclusion; default delegates
   default ManifestsDomain domain(ManifestDomainPolicy policy) {
     return domain();
   }
 }
 ----
 
-**Backwards compatibility**: Existing registrars that don't need conditional logic continue using the no-arg `domain()` method. The default implementation calls it automatically.
-
-**See also**: The interface JavaDoc includes a component diagram showing the policy flow. Navigate to link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] for implementation details.
+A registrar that needs no conditional logic implements only the no-arg `domain()`; the default `domain(policy)` delegates to it. Each registrar is an SCR `@Component(service = ManifestsDomainRegistrar.class)`, collected by `DefaultManifestSynthesisService` (a `@Reference(MULTIPLE)`) which calls `domain(policy)` on each — see the interface JavaDoc for the component diagram.
 
 === Registrar Implementation Pattern
 
-❌ **Don't do this** (separate domain per feature):
+The choice is between a **separate domain per optional feature** (❌ — domain
+proliferation, cross-domain dependency edges for tightly-coupled units) and
+**conditional inclusion of a unit within its owning domain** (✅). The Component
+and Sequence figures above show the ✅ shape: the registrar receives the run
+`policy` and folds the optional unit into the domain's unit list only when the
+flag is set. The one line that IS the pattern:
 
 [source,java]
 ----
-// Creates domain proliferation
-public class OptionalDomainRegistrar implements ManifestsDomainRegistrar {
-  public ManifestsDomain domain() {
-    return new ManifestsDomain("optional-unit",
-      List.of("gitops"),
-      List.of(new OptionalManifestsUnit()));
-  }
+if (policy.isEnabled(/* an optional-unit flag */)) {
+  units.add(/* the optional unit */);   // else the domain omits it
 }
 ----
 
-✅ **Do this** (conditional inclusion within domain):
-
-[source,java]
-----
-public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
-  @Override
-  public ManifestsDomain domain(ManifestDomainPolicy policy) {
-    List<ManifestsUnit> units = new ArrayList<>();
-
-    // Mandatory units
-    units.add(new FluxInstanceManifestsUnit());
-    units.add(new SopsAgeSecretManifestsUnit());
-    units.add(new FluxRootManifestsUnit());
-
-    // Optional units based on policy
-    if (policy.isEnabled("optional-unit")) {
-      units.add(new OptionalManifestsUnit());
-    }
-
-    return new ManifestsDomain("gitops", List.of("replication"), units);
-  }
-}
-----
-
-**Real implementation**: See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] for the actual gitops registrar (note: it uses the plain `domain()` form today — the policy-aware variant above is the intended design, not current code), and link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain overview.
+**Real implementation**: link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar] contributes a fixed unit list (Flux operator/instance/root, SOPS-age and GitHub-app secrets) via the plain `domain()` — it does *not* override `domain(policy)` today, so the conditional branch above is the intended design, not current code. See link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain overview.
 
 **Why this is better**:
 
@@ -283,27 +257,33 @@ public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
 
 The policy is defined in two layers:
 
-**1. ManifestDomainCatalog** (domain registry):
+**1. ManifestDomainCatalog** (single source of truth for identifiers): the real
+link:../../../osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/ManifestDomainCatalog.java[ManifestDomainCatalog]
+exposes accessors that return *domain* IDs (`gitops()`, `mesh()`, `clusterApi()`, …),
+each backed by a `public static final String` constant. A per-*unit* flag such as the
+one below is a **placeholder** — there is no such accessor today:
 
 [source,java]
 ----
+// PLACEHOLDER — not a real catalog method; a per-unit flag would look like this
 public String optionalUnit() {
   return "optional-unit";
 }
 ----
 
-**2. ManifestSynthesisScenario** (the scion derives the domain policy from its sown publish facet):
+**2. ManifestSynthesisScenario** (the scion derives the domain policy from its sown publish facet — see link:../../../osgi/domains/manifests/manifests-bdd/src/main/java/io/seedmatic/rke2lab/manifests/bdd/ManifestSynthesisScenario.java[ManifestSynthesisScenario]):
 
 [source,java]
 ----
-// ManifestSynthesisScenario.the_policy_is_derived_from_the_facet
-final ManifestsRunbookInput.PublishFacet publish = facet.publish();
-ManifestDomainPolicy domains =
+// ManifestSynthesisScenario ... the_policy_is_derived_from_the_facet()
+final ManifestsRunbookInput.PublishFacet publish = facet.facets().publish();
+this.domainPolicy =
     ManifestDomainPolicy.builder()
         .domainCatalog(CATALOG)
         .stageADefaults()
-        .gitops(publish.gitops())            // <-- flat boolean read straight off the facet
-        .networking(publish.networking())    // <-- the remaining domain flags follow the facet
+        .cluster(true).runtime(true).platform(true)  // base infra always on
+        .gitops(publish.gitops())                     // <-- flat boolean read straight off the facet
+        .networking(publish.networking())             // <-- the remaining domain flags follow the facet
         .build();
 ----
 
@@ -322,48 +302,42 @@ config:
 
 === Accessing Bootstrap Identity for Infrastructure Configuration
 
-Manifest units that need infrastructure configuration (Incus remote name, cluster name, etc.) access it via `bootstrapIdentity()`:
-
-✅ **Do this** (use link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/profiles/BootstrapIdentity.java[BootstrapIdentity] for infrastructure context):
+A manifest unit reads infrastructure identity off the synthesis context — the
+per-run coordinate sown across the host↔OSGi membrane — not off the unit itself.
+Units extend `AbstractManifestsUnit` and override `doSynthesize(Construct, ManifestsUnitContext)`;
+they reach the identity through `ManifestSynthesisContext.current()`. The teaching
+point is the accessor path and the ephemeral guard:
 
 [source,java]
 ----
-public class IncusIdentitySecretManifestsUnit extends AbstractManifestsUnit {
-  @Override
-  public void apply(final Chart chart) {
-    final BootstrapIdentity identity = bootstrapIdentity();
-    final String clusterName = identity.clusterName();           // "bioskop"
-    final String incusRemoteName = identity.incusRemoteName();   // "bioskop-nixos"
+final String clusterName =
+    ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
 
-    // Skip synthesis when running in ephemeral/test mode
-    if (BootstrapIdentity.UNKNOWN.equals(clusterName)) {
-      return;
-    }
-
-    // Read operator's Incus config using the remote name
-    final Path incusConfigDir = Path.of(System.getProperty("user.home"), ".config", "incus");
-    final String remoteAddress = readRemoteAddress(incusRemoteName, incusConfigDir);
-
-    // Create secret with resolved infrastructure identity
-    createIncusIdentitySecret(chart, clusterName, remoteAddress, ...);
-  }
+// Skip in ephemeral/test mode: no real cluster (or no material supplied)
+if (BootstrapIdentity.UNKNOWN.equals(clusterName)) {
+  return;
 }
 ----
 
-**Real implementation**: See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] for the complete implementation, and link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] for the domain overview.
+link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit]
+renders the `<cluster>-incus-identity` Secret in `capn-system` from the
+`IncusIdentityMaterial` seed-master assembled host-side and handed across on the
+request — the unit never reads a host file or classpath resource itself. It guards
+on `BootstrapIdentity.UNKNOWN` **and** on the material being absent. See
+link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] for the domain overview.
 
 **Why this pattern**:
 
-* **Separation of concerns**: Infrastructure identity comes from operator config, not hardcoded
+* **Separation of concerns**: Infrastructure identity arrives on the synthesis context, not hardcoded in the unit
 * **Testable**: Units can run in ephemeral mode (smoke tests) by checking for `UNKNOWN`
-* **Flexible**: Cluster name ≠ remote name; operator configures the mapping via Pulumi config
-* **Fail-fast**: Missing config caught at synthesis time, not runtime
+* **Frontier-clean**: the host assembles the material; the unit only renders — no host I/O in the OSGi world
+* **Fail-fast**: A missing coordinate is caught at synthesis time, not runtime
 
-**BootstrapIdentity fields**:
+**BootstrapIdentity fields** (see link:../../../osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/profiles/BootstrapIdentity.java[BootstrapIdentity]):
 
 * `clusterName` - Logical cluster name ("bioskop")
 * `incusRemoteName` - Incus remote name from config ("bioskop-nixos")
-* `clusterToken`, `clusterDomain`, `nodeName`, `nodeId`, `nodeKind` - See BootstrapIdentity.java
+* `clusterToken`, `clusterDomain`, `nodeName`, `nodeId`, `nodeKind` - See BootstrapIdentity
 
 == Usage Patterns
 
@@ -376,26 +350,17 @@ To add a new optional feature to an existing domain:
 3. **Check policy flag** before adding the unit to the list
 4. **Map the facet key** in the scion's policy derivation (`ManifestSynthesisScenario`)
 
-Example: Making mesh headplane optional:
+Example: making the mesh **headplane** unit optional. The
+link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/MeshDomainRegistrar.java[MeshDomainRegistrar]
+today contributes all four mesh units (namespace, Headscale, Headplane, Tailscale)
+unconditionally via the plain `domain()`. To stage the headplane, it would override
+`domain(policy)` and gate only that unit — the same one-line branch as the ✅ pattern
+above, applied to `HeadplaneManifestsUnit`:
 
 [source,java]
 ----
-public class MeshDomainRegistrar implements ManifestsDomainRegistrar {
-  @Override
-  public ManifestsDomain domain(ManifestDomainPolicy policy) {
-    List<ManifestsUnit> units = new ArrayList<>();
-    units.add(new MeshSystemNamespaceManifestsUnit());
-    units.add(new HeadscaleManifestsUnit());
-    units.add(new TailscaleManifestsUnit());
-
-    if (policy.isEnabled("headplane")) {
-      units.add(new HeadplaneManifestsUnit());
-    }
-
-    return new ManifestsDomain("mesh",
-      List.of("networking", "replication"),
-      units);
-  }
+if (policy.isEnabled(/* a headplane flag */)) {
+  units.add(new HeadplaneManifestsUnit());   // else mesh ships without it
 }
 ----
 
@@ -497,28 +462,28 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 **Core Interfaces**:
 
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] - Policy-aware registration interface with component diagram
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistryBuilder.java[ManifestsDomainRegistryBuilder.java] - Builds domain registry with policy
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Policy API with enable/disable flags
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] - Policy-aware registration interface with component diagram
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistry.java[ManifestsDomainRegistry.java] - The assembled registry (built by `DefaultManifestSynthesisService` from the collected registrars)
+* link:../../../osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Policy API with enable/disable flags
 
 **Domain Implementations**:
 
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] - GitOps domain (plain `domain()`, fixed unit list via `ManifestsUnit.lazy`)
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/ClusterApiDomainRegistrar.java[ClusterApiDomainRegistrar.java] - Cluster API domain registrar
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] - GitOps domain (plain `domain()`, fixed unit list)
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/ClusterApiDomainRegistrar.java[ClusterApiDomainRegistrar.java] - Cluster API domain registrar
 
 **Bootstrap Identity**:
 
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
-* link:../seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
+* link:../../../osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
+* link:../../../osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/node/DefaultNodeEnvContext.java[DefaultNodeEnvContext.java] - Where `incusRemoteName()` is provided
 
 **Manifest Units** (showing patterns):
 
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] - Bootstrap identity access + ephemeral guard
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[IncusIdentitySecretManifestsUnit.java] - Bootstrap identity access + ephemeral guard
 
 **Orchestration**:
 
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that collects registrars and distributes policy
 
 == Related Documentation
 
@@ -551,7 +516,7 @@ grep "Applying manifest-domain policy" /tmp/rke2lab.log
 
 # Verify registrar override
 grep -A 10 "domain(ManifestDomainPolicy" \
-  manifests/src/main/java/.../GitopsDomainRegistrar.java
+  osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java
 ----
 
 === Optional Unit Never Included
@@ -571,12 +536,13 @@ grep -A 10 "domain(ManifestDomainPolicy" \
 # Check domain-level policy
 pulumi config get rke2lab:manifests.publish.gitops  # Must be true
 
-# Check policy flag matches catalog
-grep 'public String optionalUnit()' \
-  manifests/src/main/java/.../ManifestDomainCatalog.java
+# Check the flag name matches the catalog's single source of truth
+# (real accessors return domain IDs — gitops(), mesh(), …; a per-unit flag is a placeholder)
+grep 'public String' \
+  osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/ManifestDomainCatalog.java
 
-# Check for synthesis exceptions
-grep "OptionalManifestsUnit" /tmp/maven.log
+# Check for synthesis exceptions (substitute the real optional unit's class name)
+grep "ManifestsUnit" /tmp/maven.log
 ----
 
 === Policy Changes Not Reflected
@@ -624,18 +590,21 @@ pulumi config get rke2lab:incus.defaultRemote
 grep -A 3 "^remotes:" ~/.config/incus/config.yml
 
 # Verify BootstrapConfig loads the remote name
-grep "incusDefaultRemote" seed-master/src/main/java/.../BootstrapConfig.java
+grep "incusDefaultRemote" \
+  exec/seed-master/src/main/java/io/seedmatic/rke2lab/controlplane/config/BootstrapConfig.java
 ----
 
-**In manifest units**, always use `incusRemoteName()` not `clusterName()`:
+**In manifest units**, resolve identity off the synthesis context and use `incusRemoteName()` not `clusterName()`:
 
 [source,java]
 ----
+final BootstrapIdentity identity = ManifestSynthesisContext.current().bootstrapIdentity();
+
 // ❌ Wrong - assumes cluster name = remote name
-final String remoteName = bootstrapIdentity().clusterName();
+final String remoteName = identity.clusterName();
 
 // ✅ Correct - uses configured remote name
-final String remoteName = bootstrapIdentity().incusRemoteName();
+final String remoteName = identity.incusRemoteName();
 ----
 
 == Related Documentation

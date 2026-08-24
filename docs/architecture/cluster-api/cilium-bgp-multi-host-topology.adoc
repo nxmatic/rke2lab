@@ -1,289 +1,164 @@
-= Cilium BGP Configuration for Multi-Host Cluster Mesh
-:toc:
+= Cilium BGP — the multi-host cluster-mesh fabric
+:toc: left
 :toclevels: 3
 
 == Overview
 
-This document describes the BGP configuration strategy for multi-host RKE2 clusters where nodes run as Incus containers across multiple bare metal hosts.
+RKE2 nodes run as Incus containers spread across bare-metal hosts that share one L2 segment
+(the physical LAN, `192.168.1.0/24`). Cilium runs in *native routing* mode (no VXLAN/Geneve
+encapsulation) and distributes pod routes with BGP: each node advertises its own pod prefix, so a
+pod on one host reaches a pod on another directly over the LAN. This document explains that fabric —
+Router-ID allocation, the eBGP-to-gateway vs iBGP-mesh choice, and how routing survives
+multi-homed nodes.
 
-== Target Topology
+The concrete *numbers* (per-cluster pod CIDR, BGP `localASN`) are NOT fixed here — they are a
+function of cluster identity, owned by link:cluster-addressing-plan.adoc[the Cluster Addressing
+Plan]. This doc describes the mechanism; that doc assigns the values.
 
-[source]
+== Target topology
+
+[mermaid,cilium-bgp-topology,svg]
 ----
-Bare Metal Host 1 (Mac + Tart VM + bioskop-nixos)
-  └─ Incus Container
-       └─ master node
-            - InternalIP: 10.80.0.10 (vmnet0)
-            - LAN IP: 192.168.1.13 (lan0)
-            - Pod CIDR: 10.42.0.0/24
-
-Bare Metal Host 2 (Physical server)
-  └─ Incus Container
-       └─ node-2
-            - InternalIP: 10.80.0.X (vmnet0 or equivalent)
-            - LAN IP: 192.168.1.Y (lan0 or eth0)
-            - Pod CIDR: 10.42.1.0/24
-
-Physical LAN: 192.168.1.0/24 (shared L2 network)
-----
-
-=== Key Characteristics
-
-* **Multi-homed nodes**: Each node has both internal network interface and physical LAN interface
-* **Symmetric setup**: All nodes are Incus containers with similar networking
-* **Shared L2**: Physical LAN (192.168.1.0/24) provides connectivity between hosts
-* **Native routing**: Cilium uses native routing mode with BGP for route distribution
-
-== BGP Router ID Allocation
-
-=== Automatic Assignment
-
-Cilium automatically derives the BGP Router ID from the node's **InternalIP** address.
-
-[source,bash]
-----
-# Router ID comes from:
-$ kubectl get node <node-name> -o wide
-NAME      INTERNAL-IP   ...
-master    10.80.0.10    ...
-
-# Router ID = 10.80.0.10
+flowchart TB
+  subgraph LAN["physical LAN 192.168.1.0/24 — shared L2"]
+    subgraph H1["«deployment node» bioskop-nixos (incus)"]
+      N1["«container» node A<br/>InternalIP 10.80.x (vmnet0)<br/>LAN IP 192.168.1.x (lan0)<br/>pod CIDR = per-node /24"]
+    end
+    subgraph H2["«deployment node» nikopol-nixos (incus)"]
+      N2["«container» node B<br/>InternalIP 10.80.y (vmnet0)<br/>LAN IP 192.168.1.y (lan0)<br/>pod CIDR = per-node /24"]
+    end
+    N1 <-->|"BGP session over lan0 · pod routes"| N2
+  end
+  classDef host fill:#f5f5f5,stroke:#888;
+  class H1,H2 host;
 ----
 
-=== Key Points
+Each node is *multi-homed*: an internal interface (`vmnet0`, the `10.80.x` InternalIP) and the
+physical LAN interface (`lan0`, the `192.168.1.x` address). The two roles are deliberately split —
+see <<multihoming>>.
 
-* **No manual configuration**: Router ID is automatically set from InternalIP
-* **Uniqueness**: Guaranteed by distinct node IP addresses
-* **Persistence**: Stable as long as node InternalIP doesn't change
-* **Independent of peering**: Router ID (10.80.x) differs from peering address (192.168.1.x)
+== Router ID — automatic, from InternalIP
 
-== BGP Configuration Options
+Cilium derives each node's BGP Router ID from its Kubernetes *InternalIP* (the `10.80.x`
+`vmnet0` address). No manual configuration: uniqueness is guaranteed by distinct node InternalIPs,
+and the value is stable as long as the InternalIP is. The Router ID (`10.80.x`) is intentionally
+distinct from the *peering address* (`192.168.1.x`, `lan0`) — see <<multihoming>>.
 
-=== Option 1: eBGP with External Gateway (Current)
+== BGP configuration — two modes
 
-Current configuration peers with an external gateway for network integration.
+The cilium BGP config is rendered by `CiliumAdvancedManifestsUnit`
+(`osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/networking/CiliumAdvancedManifestsUnit.java`),
+which emits the `CiliumBGP*` CRs via cdk8s (an `ApiObject` + `JsonPatch`, a `peerConfigRef` — not a
+hand-written config map). It supports two modes; the ASN values come from
+link:cluster-addressing-plan.adoc[the addressing plan] (`localASN = 64512 + clusterId`), NOT the
+literals shown in older revisions of this doc.
+
+=== eBGP to an external gateway (current)
+
+The cluster peers with the vmnet gateway to integrate cluster routing with the surrounding network.
+The rendered shape (values from the addressing plan / `ClusterNetworkBlueprint.GATEWAY_ADDRESS`):
 
 [source,yaml]
 ----
 bgpInstances:
-- localASN: 65010
+- localASN: <cluster localASN>        # 64512 + clusterId (addressing plan)
   name: control-plane-bgp
   peers:
   - name: gateway-peer
-    peerASN: 65020          # Different AS = eBGP
-    peerAddress: 10.80.0.1  # Static external gateway
+    peerASN: <gateway ASN>            # the fixed fabric gateway AS
+    peerAddress: <vmnet gateway>      # ClusterNetworkBlueprint.GATEWAY_ADDRESS
 ----
 
-**Use case**: Integrate cluster routing with existing network infrastructure
+=== iBGP mesh across hosts (proposed)
 
-=== Option 2: iBGP Mesh (Recommended for Multi-Host)
-
-Nodes peer with each other using the same AS, exchanging pod routes directly.
+Nodes peer with each other under the *same* AS, exchanging pod routes directly — self-contained
+routing across hosts, no external gateway dependency. This variant is *not yet implemented* in
+`CiliumAdvancedManifestsUnit` (the rendered config today is the eBGP gateway peer above); it is the
+intended shape once cross-host workloads land:
 
 [source,yaml]
 ----
 bgpInstances:
-- localASN: 65010
+- localASN: <cluster localASN>
   name: control-plane-bgp
   peers:
   - name: cluster-peers
-    peerASN: 65010                    # Same AS = iBGP
+    peerASN: <same localASN>          # same AS = iBGP
     peerSelector:
-      matchLabels:
-        node-role.kubernetes.io/control-plane: "true"
+      matchLabels: { node-role.kubernetes.io/control-plane: "true" }
     transport:
-      sourceInterface: lan0           # Prefer LAN for peering
+      sourceInterface: lan0           # peer over the LAN, not the InternalIP
 ----
 
-**Use case**: Self-contained cluster routing across multiple physical hosts
+[[multihoming]]
+== How routing survives multi-homed nodes
 
-== How iBGP Mesh Works with Multi-Homed Nodes
+The split of Router ID (`10.80.x`) from peering address (`192.168.1.x`) is what makes native
+routing work across hosts: sessions establish over the *reachable* interface (the shared LAN),
+while the Router ID stays a stable per-node identifier independent of any per-host `10.80.x`
+isolation.
 
-=== Session Establishment
-
-Despite nodes having different InternalIPs (used as Router IDs), BGP sessions are established over the shared physical LAN:
-
-[source]
+[mermaid,cilium-bgp-route-flow,svg]
 ----
-Node 1 (master):
-  Router ID: 10.80.0.10         ← From InternalIP
-  BGP Peer Address: 192.168.1.13 ← From lan0 interface
-
-Node 2:
-  Router ID: 10.80.0.X
-  BGP Peer Address: 192.168.1.Y
-
-BGP Session: 192.168.1.13 ↔ 192.168.1.Y (over physical LAN)
-----
-
-=== Route Advertisement
-
-Each node advertises its pod CIDR with itself as the next hop:
-
-[source]
-----
-Node 1 advertises:
-  10.42.0.0/24 via 192.168.1.13
-
-Node 2 advertises:
-  10.42.1.0/24 via 192.168.1.Y
+flowchart LR
+  subgraph A["node A"]
+    PA["pod 10.x.0.5"]
+  end
+  subgraph B["node B"]
+    PB["pod 10.y.1.8"]
+  end
+  PA -->|"1 · dst 10.y.1.0/24"| RA["node A route table<br/>10.y.1.0/24 via 192.168.1.y"]
+  RA -->|"2 · over LAN"| LANK["192.168.1.x → 192.168.1.y"]
+  LANK -->|"3 · deliver"| PB
 ----
 
-=== Packet Flow
+Each node advertises its own pod `/24` with itself (its `lan0` address) as the next hop; a peer
+installs `dst-pod-/24 via <peer lan0>` and forwards over the LAN. Without the LAN interface, peering
+would fail whenever the `10.80.x` networks are isolated per host, forcing tunnel-mode encapsulation
+— which native routing avoids.
 
-When a pod on Node 1 communicates with a pod on Node 2:
+== Prerequisites
 
-[source]
-----
-1. Pod 10.42.0.5 (Node 1) → Pod 10.42.1.8 (Node 2)
-2. Node 1 looks up route: 10.42.1.0/24 via 192.168.1.Y
-3. Packet sent over physical LAN (192.168.1.13 → 192.168.1.Y)
-4. Node 2 receives packet and delivers to pod
-----
+* *Kernel modules* on the hypervisor: `ip_set`, `nf_conntrack` (provisioned by ndh —
+  `modules/nixos/cilium-kernel-modules.nix`). Their absence was the historical `protocol not
+  supported` route-reconciler failure.
+* *LAN reachability* between all hosts on `192.168.1.0/24`.
+* *Cilium BGP control plane* enabled — `bgpControlPlane.enabled: true` in the cilium
+  `HelmChartConfig` (`CiliumConfigManifestsUnit`).
 
-== Implementation Guide
-
-=== Enabling iBGP Mesh
-
-Edit `CiliumAdvancedLayer.java` and modify the BGP cluster config:
-
-[source,java]
-----
-Map.of(
-    "localASN", 65010,
-    "name", "ibgp-mesh",
-    "peers", List.of(
-        Map.of(
-            "name", "cluster-peers",
-            "peerASN", 65010,  // Same AS = iBGP
-            "peerSelector", Map.of(
-                "matchLabels", Map.of(
-                    "node-role.kubernetes.io/control-plane", "true"
-                )
-            ),
-            "transport", Map.of(
-                "sourceInterface", "lan0"  // Prefer LAN interface
-            )
-        )
-    )
-)
-----
-
-=== Prerequisites
-
-* **Kernel modules**: Ensure `ip_set`, `nf_conntrack` modules are loaded (see `nix-darwin-home/modules/nixos/cilium-kernel-modules.nix`)
-* **Network connectivity**: Physical LAN (192.168.1.0/24) must be reachable between all hosts
-* **Cilium BGP control plane**: Enabled in Helm values (`bgpControlPlane.enabled: true`)
-
-=== Verification
-
-After enabling iBGP mesh:
+== Verification
 
 [source,bash]
 ----
-# Check BGP peers
-$ kubectl exec -n kube-system <cilium-pod> -- cilium bgp peers
-Local AS   Peer AS   Peer Address   Session   Uptime   Family   Received   Advertised
-65010      65010     192.168.1.Y    Up        10m      ipv4     1          1
+# BGP peers (session Up, families exchanged)
+kubectl exec -n kube-system <cilium-pod> -- cilium bgp peers
 
-# Check advertised routes
-$ kubectl exec -n kube-system <cilium-pod> -- cilium bgp routes advertised ipv4 unicast
-VRouter   Prefix         NextHop        Age   Attrs
-65010     10.42.0.0/24   192.168.1.13   10m   ...
-
-# Check learned routes
-$ kubectl exec -n kube-system <cilium-pod> -- cilium bgp routes available ipv4 unicast
-VRouter   Prefix         NextHop      Age   Attrs
-65010     10.42.1.0/24   192.168.1.Y  10m   ...
+# routes advertised / learned
+kubectl exec -n kube-system <cilium-pod> -- cilium bgp routes advertised ipv4 unicast
+kubectl exec -n kube-system <cilium-pod> -- cilium bgp routes available  ipv4 unicast
 ----
-
-== Why This Works
-
-=== Multi-Homing Benefits
-
-* **Router ID uniqueness**: Internal IPs (10.80.x) provide unique identifiers
-* **Reachability**: Physical LAN (192.168.1.x) provides actual connectivity
-* **Flexibility**: Works across different internal network configurations
-* **No conflicts**: Router IDs and peering addresses serve different purposes
-
-=== Compared to Single-Homed Nodes
-
-If nodes only had InternalIP (10.80.x) without LAN interface:
-* BGP peering would fail if 10.80.x networks are isolated per host
-* Would require VXLAN/Geneve tunneling instead of native routing
-* Less efficient due to encapsulation overhead
-
-With multi-homed nodes:
-* Native routing works perfectly
-* No encapsulation overhead
-* BGP naturally uses the reachable interface (LAN)
 
 == Troubleshooting
 
-=== BGP Sessions Not Establishing
+[cols="1,2",options="header"]
+|===
+|Symptom |Check
 
-Check node addresses:
-[source,bash]
-----
-$ kubectl get nodes -o wide
-# Verify LAN IPs are visible and reachable
+|Sessions not establishing
+|`kubectl get nodes -o wide` — LAN IPs visible/reachable; `ping <peer lan0>`; `kubectl get ciliumnode <node> -o yaml` addresses.
+|Routes not advertised
+|`kubectl get ciliumbgpclusterconfig -o yaml` / `ciliumbgpadvertisements -o yaml` — nodeSelector/peerSelector match, PodCIDR advertisement configured.
+|Packets not routing
+|`lsmod \| grep -E 'ip_set\|nf_conntrack'`; `cilium status \| grep Routing` should show `Network: Native`.
+|===
 
-$ kubectl get ciliumnode <node> -o yaml | grep addresses: -A 5
-# Check both InternalIP and other addresses
-----
+== Related Documentation
 
-Test connectivity:
-[source,bash]
-----
-# From Node 1, ping Node 2's LAN IP
-$ ping 192.168.1.Y
-----
-
-=== Routes Not Being Advertised
-
-Check BGP configuration applied:
-[source,bash]
-----
-$ kubectl get ciliumbgpclusterconfig -o yaml
-# Verify nodeSelector matches your nodes
-# Verify peerSelector matches peer nodes
-----
-
-Check advertisements:
-[source,bash]
-----
-$ kubectl get ciliumbgpadvertisements -o yaml
-# Verify PodCIDR advertisement is configured
-----
-
-=== Packet Routing Issues
-
-Verify kernel modules:
-[source,bash]
-----
-$ lsmod | grep ip_set
-ip_set    65536  0
-
-$ lsmod | grep nf_conntrack
-nf_conntrack  ...
-----
-
-Check Cilium status:
-[source,bash]
-----
-$ kubectl exec -n kube-system <cilium-pod> -- cilium status | grep Routing
-Routing:  Network: Native   Host: Legacy
-----
-
-== References
-
-* Implementation: `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/networking/CiliumAdvancedLayer.java`
-* Kernel modules: `nix-darwin-home/modules/nixos/cilium-kernel-modules.nix`
-* Cilium Helm config: `manifests/src/main/java/io/seedmatic/rke2lab/manifests/layers/networking/CiliumConfigLayer.java`
-* Cilium BGP Control Plane docs: https://docs.cilium.io/en/stable/network/bgp-control-plane/
-* link:management-workload-topology.adoc#incus-tenancy[Incus tenancy] — why per-cluster Incus
-  projects share this fabric (`features.networks=false`) instead of nesting engines, keeping
-  cross-cluster nodes BGP peers on one bridge.
-* link:cluster-addressing-plan.adoc[Cluster Addressing Plan] — the deterministic per-cluster
-  allocation of the pod `/24`s advertised here, plus the per-cluster BGP `localASN` (`64512+clusterId`)
-  that keeps sessions unambiguous when clusters sharing this fabric both run BGP on it.
+* link:cluster-addressing-plan.adoc[Cluster Addressing Plan] — assigns the per-cluster `localASN`
+  (`64512+clusterId`) and the per-node pod `/24` this fabric advertises; the SSOT for the numbers.
+* link:management-workload-topology.adoc#incus-tenancy[Management / Workload Topology — Incus tenancy]
+  — why per-cluster Incus projects share this fabric (`features.networks=false`) instead of nesting
+  engines, keeping cross-cluster nodes BGP peers on one bridge.
+* Implementation: `CiliumAdvancedManifestsUnit` / `CiliumConfigManifestsUnit`
+  (`osgi/domains/manifests/manifests-core/.../units/networking/`).
+* https://docs.cilium.io/en/stable/network/bgp-control-plane/[Cilium BGP Control Plane docs].

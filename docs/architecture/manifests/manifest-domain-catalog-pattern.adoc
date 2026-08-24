@@ -14,134 +14,94 @@
 
 === Catalog as Single Source
 
+A domain string is spelled exactly once — in a `public static final String` constant on the record. Two faces read those constants, and each face has one consumer shape. The figure below traces the `cluster-api` string from its single definition to both faces.
+
 [mermaid]
 ....
-graph TD
-    Catalog[ManifestDomainCatalog]
-    Catalog -->|clusterApi| ClusterApiReg[ClusterApiDomainRegistrar]
-    Catalog -->|clusterApi| HostManifest[HostSlotManifest]
-    Catalog -->|clusterApi| Policy[ManifestSynthesisScenario<br/>scion policy derivation]
+flowchart TD
+    subgraph ssot["ManifestDomainCatalog (contract record)"]
+        Const["CLUSTER_API = &quot;cluster-api&quot;<br/><i>public static final String</i>"]
+        Acc["clusterApi()<br/><i>instance accessor</i>"]
+        Const -.->|returned by| Acc
+    end
 
-    style Catalog fill:#4a90e2,color:#fff
-    style ClusterApiReg fill:#7ed321
-    style HostManifest fill:#7ed321
-    style Policy fill:#7ed321
+    subgraph regface["Registrar face — direct constant"]
+        Reg["ClusterApiDomainRegistrar<br/>new ManifestsDomain(CLUSTER_API, …)"]
+    end
+
+    subgraph polface["Policy face — via accessor"]
+        Pol["ManifestDomainPolicy.Builder.clusterApi(b)<br/>put(catalog.clusterApi(), b)"]
+        Scion["ManifestSynthesisScenario<br/>.clusterApi(publish.clusterApi())"]
+        Scion -->|drives| Pol
+    end
+
+    Const -->|referenced by| Reg
+    Acc -->|consumed by| Pol
 
     classDef source fill:#4a90e2,color:#fff
     classDef consumer fill:#7ed321,color:#000
+    class Const,Acc source
+    class Reg,Pol,Scion consumer
 ....
 
-**Key principle**: Domain IDs are *data*, not code. They should be defined once and referenced everywhere.
+**Key principle**: Domain IDs are *data*, not code — defined once, referenced everywhere. Registrars reference the *constants* directly (they compose `"<domain>/<leaf>"` unit IDs at static-init time, which the accessors cannot). The *instance accessors* live one level down, inside the `ManifestDomainPolicy.Builder` setters, so the scion drives the policy with type-safe per-domain methods rather than strings. Both faces resolve to the same constant, so a mismatch is impossible.
 
 === Domain ID Formats
 
-[cols="1,2,2", options="header"]
+[cols="1,2,2,2", options="header"]
 |===
-| Domain | Catalog Method | Actual ID String
-| Cluster API | `catalog.clusterApi()` | `"cluster-api"` (kebab-case)
-| High Availability | `catalog.highAvailability()` | `"high-availability"` (kebab-case)
-| Networking | `catalog.networking()` | `"networking"` (single word)
-| All others | camelCase method | lowercase string
+| Domain | Constant (SSOT) | Instance Accessor | Actual ID String
+| Cluster API | `CLUSTER_API` | `catalog.clusterApi()` | `"cluster-api"` (kebab-case)
+| High Availability | `HIGH_AVAILABILITY` | `catalog.highAvailability()` | `"high-availability"` (kebab-case)
+| Networking | `NETWORKING` | `catalog.networking()` | `"networking"` (single word)
+| All others | UPPER_SNAKE constant | camelCase accessor | lowercase string
 |===
 
-**Critical**: Multi-word domains use *kebab-case* strings but *camelCase* methods. Hardcoding the string directly causes mismatches.
+**Critical**: Multi-word domains use *kebab-case* strings but *camelCase* accessors (and *UPPER_SNAKE* constants). Hardcoding the string directly — in any casing — causes mismatches. The accessor merely returns its constant, so the two are always in lock-step.
 
 == Usage Patterns
 
-=== ✅ Correct: Use Catalog Methods
+=== ✅ Registrar face: reference the constants
+
+A `ManifestsDomainRegistrar` declares its domain ID and its dependency IDs from the constants — no `policy` parameter, units built with plain `new`. See `GitopsDomainRegistrar` / `ClusterApiDomainRegistrar`. The teaching shape:
 
 [source,java]
 ----
-public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
-  private static final ManifestDomainCatalog CATALOG =
-      ManifestDomainCatalog.builder()
-          .addDefaultDomains()
-          .addDefaultStageALinkableDomains()
-          .build();
-
-  @Override
-  public ManifestsDomain domain(ManifestDomainPolicy policy) {
-    List<ManifestsUnit> units = new ArrayList<>();
-    units.add(ManifestsUnit.lazy(
-        FluxInstanceManifestsUnit.MANIFEST_UNIT_ID, List.of(), FluxInstanceManifestsUnit::new));
-
-    if (policy.isEnabled(CATALOG.clusterApi())) {  // ✅ Type-safe, no mismatch possible
-      units.add(ManifestsUnit.lazy(
-          ClusterApiManifestsUnit.MANIFEST_UNIT_ID, List.of(), ClusterApiManifestsUnit::new));
-    }
-
-    return new ManifestsDomain(
-        CATALOG.gitops(),                      // ✅ Single source
-        List.of(CATALOG.platform()),           // ✅ All IDs from catalog
-        units);
-  }
-}
+return new ManifestsDomain(
+    ManifestDomainCatalog.GITOPS,                 // ✅ single source
+    List.of(ManifestDomainCatalog.PLATFORM),      // ✅ dependency ID from the same constant
+    List.of(new FluxOperatorManifestsUnit(), new FluxInstanceManifestsUnit(), …));
 ----
 
-=== ❌ Wrong: Hardcoded Strings
+The constants (not the accessors) are used here because a manifest unit composes its `"<domain>/<leaf>"` ID from `CLUSTER_API + "/operator"` at static-initialization time — a `static final String` can do that, a built-catalog accessor cannot.
+
+=== ✅ Policy face: drive the typed setters
+
+The scion never touches strings either. `ManifestDomainPolicy.Builder` exposes one boolean setter per domain (`clusterApi(b)`, `gitops(b)`, …), each of which stores `put(catalog.clusterApi(), b)` internally — that is the *only* place the instance accessors are consumed. `ManifestSynthesisScenario.the_policy_is_derived_from_the_facet` wires each setter to the operator's publish facet:
 
 [source,java]
 ----
-public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
-  @Override
-  public ManifestsDomain domain(ManifestDomainPolicy policy) {
-    List<ManifestsUnit> units = new ArrayList<>();
-    units.add(ManifestsUnit.lazy(
-        FluxInstanceManifestsUnit.MANIFEST_UNIT_ID, List.of(), FluxInstanceManifestsUnit::new));
-
-    if (policy.isEnabled("cluster-api")) {  // ❌ Magic string - could typo to "clusterApi"
-      units.add(ManifestsUnit.lazy(
-          ClusterApiManifestsUnit.MANIFEST_UNIT_ID, List.of(), ClusterApiManifestsUnit::new));
-    }
-
-    return new ManifestsDomain(
-        "gitops",                      // ❌ Duplicates catalog definition
-        List.of("platform"),           // ❌ Could mismatch if catalog changes
-        units);
-  }
-}
+ManifestDomainPolicy.builder()
+    .domainCatalog(CATALOG)
+    .stageADefaults()
+    .gitops(publish.gitops())
+    .clusterApi(publish.clusterApi())
+    // … one line per publishable domain
+    .build();
 ----
 
-=== ❌ Wrong: Mixed camelCase/kebab-case
+=== ❌ Wrong: hardcoded strings
+
+Any string literal for a domain ID re-derives what the catalog already owns and can drift from it:
 
 [source,java]
 ----
-// ACTUAL BUG that caused clusterApi to show false:
-manifestDomain.put("clusterApi", policy.isEnabled("clusterApi"));
-// The string "clusterApi" doesn't exist in the catalog!
-// The real ID is "cluster-api" (kebab-case).
-// Result: isEnabled("clusterApi") → false (default)
-
-// ✅ CORRECT:
-manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
-// catalog.clusterApi() returns "cluster-api" - guaranteed match
+new ManifestsDomain("gitops", List.of("platform"), units);  // ❌ duplicates the catalog
 ----
 
 == The Bug We Fixed
 
-**Symptom** (May 2026):
-- Pulumi output showed `policyLinkClusterApiEnabled: true` (correct)
-- MANIFEST.yaml showed `clusterApi: false` (wrong)
-- Cluster API manifests weren't being deployed
-
-**Root cause**: `HostSlotManifest.Builder.policy()` used hardcoded strings:
-
-[source,java]
-----
-manifestDomain.put("clusterApi", policy.isEnabled("clusterApi"));
-//                                                  ^^^^^^^^^^^
-// This string doesn't match the catalog's "cluster-api"!
-----
-
-**Fix**: Import catalog and use methods:
-
-[source,java]
-----
-final ManifestDomainCatalog catalog = ManifestDomainCatalog.builder()...build();
-manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
-//                                                  ^^^^^^^^^^^^^^^^^^^^
-// Returns "cluster-api" - guaranteed to match policy map
-----
+In May 2026 `clusterApi` showed `false` in `MANIFEST.yaml` even though Pulumi reported it enabled: the serialization code carried the literal `"clusterApi"`, which is *not* a catalog ID — the real ID is `"cluster-api"` (kebab-case) — so the lookup silently fell through to the default `false`. The lesson survives even though the offending call site (a host-side `HostSlotManifest` policy map) is no longer in the exec path: a domain string written by hand, in any casing, is a mismatch waiting to happen. Route every reference through the constant or its accessor and the compiler guarantees the match.
 
 == Enforcement Rules
 
@@ -150,96 +110,93 @@ manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
 **What**: Domain IDs like `"cluster-api"`, `"gitops"`, `"networking"` must NEVER appear as string literals in domain-related code.
 
 **Where it applies**:
-- `ManifestsDomainRegistrar` implementations (in the `domain/` package)
-- `ManifestDomainPolicy` queries (`isEnabled()` calls)
-- Policy serialization (`HostSlotManifest`, etc.)
-- Policy derivation in the manifests scion (`ManifestSynthesisScenario.the_policy_is_derived_from_the_facet`)
+- `ManifestsDomainRegistrar` implementations (in the `domain/` package) — reference the *constants* (`ManifestDomainCatalog.GITOPS`).
+- Manifest-unit ID composition — build `"<domain>/<leaf>"` from a constant.
+- Policy derivation in the manifests scion (`ManifestSynthesisScenario.the_policy_is_derived_from_the_facet`) — use the typed `ManifestDomainPolicy.Builder` setters, which reference the *accessors* internally.
 
 **Exceptions**:
-- The catalog's own builder methods (`addDefaultDomains()` implementation)
-- Test fixtures where IDs are explicitly being tested
+- The catalog's own constants and default-domain lists (`addDefaultDomains()` — the one place the literals are declared).
+- Test fixtures where IDs are explicitly being tested.
 
-**Violation examples**:
+**Violation vs correct**:
 [source,java]
 ----
-new ManifestsDomain("gitops", ...)        // ❌ Hardcoded
-policy.isEnabled("cluster-api")           // ❌ Hardcoded
-manifestDomain.put("mesh", ...)           // ❌ Hardcoded
+new ManifestsDomain("gitops", …)                 // ❌ hardcoded
+new ManifestsDomain(ManifestDomainCatalog.GITOPS, …)  // ✅ constant
 ----
 
-**Correct**:
-[source,java]
-----
-new ManifestsDomain(CATALOG.gitops(), ...)              // ✅
-policy.isEnabled(CATALOG.clusterApi())                  // ✅
-manifestDomain.put("mesh", policy.isEnabled(CATALOG.mesh()))  // ✅
-----
+=== Rule 2: Initialize Catalog as Static Final Where a Built Instance Is Needed
 
-=== Rule 2: Initialize Catalog as Static Final
+Registrars need only the constants, so most do not hold a catalog instance. The scion, which drives the policy builder, keeps one immutable instance:
 
-**Pattern**:
 [source,java]
 ----
 private static final ManifestDomainCatalog CATALOG =
     ManifestDomainCatalog.builder()
         .addDefaultDomains()
-        .addDefaultStageALinkableDomains()  // If Stage A linkable needed
+        .addDefaultStageALinkableDomains()  // publishable facet domains
         .build();
 ----
 
-**Why**: Catalog is immutable once built. Share one instance per class. Reduces overhead and signals immutability.
+**Why**: the catalog is immutable once built — share one instance, and let `build()` validate that every Stage-A-linkable domain is registered.
 
 === Rule 3: Grep for Violations in CI
 
-Add to CI pipeline (example):
+Add to the CI pipeline (example):
 
 [source,bash]
 ----
-# Fail if any Java file uses hardcoded domain strings in wrong contexts
-! grep -r 'isEnabled("' manifests/src/ seed-master/src/
-! grep -r 'new ManifestsDomain("' manifests/src/
+# Fail if any registrar constructs a domain from a string literal
+! grep -rn 'new ManifestsDomain("' osgi/domains/manifests/
 ----
 
 == Adding a New Domain
 
 **Steps**:
 
-1. Add accessor method to `ManifestDomainCatalog`:
+1. Add the constant, then its accessor, to `ManifestDomainCatalog`:
 +
 [source,java]
 ----
+public static final String MY_NEW_DOMAIN = "my-new-domain";  // kebab-case for multi-word
+
 public String myNewDomain() {
-  return "my-new-domain";  // Use kebab-case for multi-word
+  return MY_NEW_DOMAIN;
 }
 ----
 
-2. Add to default domains list in `Builder.addDefaultDomains()`:
+2. Add the constant to `Builder.addDefaultDomains()` (and to `addDefaultStageALinkableDomains()` if the operator toggles it):
 +
 [source,java]
 ----
-.addAllDomains(List.of(
-    "cluster", "storage", ...,
-    "my-new-domain"  // Add here
-))
+return addAllDomains(List.of(CLUSTER, STORAGE, …, MY_NEW_DOMAIN));
 ----
 
-3. Optionally add to Stage A linkable list if applicable.
-
-4. Create the domain registrar using the catalog method:
+3. Add the typed boolean setter to `ManifestDomainPolicy.Builder`, delegating to the accessor:
 +
 [source,java]
 ----
-return new ManifestsDomain(CATALOG.myNewDomain(), ...);
+public Builder myNewDomain(boolean enabled) {
+  put(domainCatalog.myNewDomain(), enabled);
+  return this;
+}
 ----
 
-5. Map the facet key in the scion's policy derivation (`ManifestSynthesisScenario`), keyed by the catalog accessor:
+4. Build the domain registrar from the constant:
 +
 [source,java]
 ----
-.myNewDomain(link.enabled(CATALOG.myNewDomain()))
+return new ManifestsDomain(ManifestDomainCatalog.MY_NEW_DOMAIN, …);
 ----
 
-**That's it!** All existing consumers will automatically have access via the catalog.
+5. Wire the new setter to the publish facet in the scion's policy derivation (`ManifestSynthesisScenario.the_policy_is_derived_from_the_facet`):
++
+[source,java]
+----
+.myNewDomain(publish.myNewDomain())
+----
+
+**That's it!** All existing consumers reference the same constant, so they stay in lock-step.
 
 == Related Documentation
 

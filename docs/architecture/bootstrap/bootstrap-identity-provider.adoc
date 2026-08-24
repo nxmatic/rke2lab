@@ -16,7 +16,7 @@ The bootstrap identity provider is a **thread-local context** that supplies clus
 ----
 graph TB
     subgraph Synthesis["Manifest Synthesis Process"]
-        Bootstrap[IncusResourceBootstrap<br/><i>Builds identity</i>]
+        Bootstrap[seed-master synthesis entry<br/><i>Builds identity</i>]
         Service[DefaultManifestSynthesisService<br/><i>Binds context</i>]
         Context[ManifestSynthesisContext<br/><i>ThreadLocal provider</i>]
         Units[ManifestUnits<br/><i>Consume identity</i>]
@@ -25,7 +25,7 @@ graph TB
     subgraph Identity["Bootstrap Identity Record"]
         ClusterID[Cluster Identity<br/>name, id, token, domain]
         NodeID[Node Identity<br/>name, id, kind]
-        InfraID[Infrastructure Identity<br/>Incus remote = cluster name]
+        InfraID[Infrastructure Identity<br/>Incus remote, per-cluster<br/>may differ from cluster name]
     end
 
     subgraph Operator["Operator / host world (seed-master reads here)"]
@@ -41,7 +41,7 @@ graph TB
     Context -->|provides| NodeID
     Context -->|provides| InfraID
 
-    Units -->|reads via helper| Context
+    Units -->|reads via current()| Context
 
     Bootstrap -.->|reads from| Secrets
     Bootstrap -.->|reads from| IncusConfig
@@ -58,13 +58,13 @@ graph TB
 * Green: Context provider (thread-local, synthesis-scoped)
 * Blue: Operator environment (filesystem-resident)
 * Solid lines: Data flow during synthesis
-* Dashed lines: File reads during manifest unit apply
+* Dashed lines: File reads by seed-master (host side) while assembling the identity material — never by the manifest unit
 
 **Key Separation of Concerns:**
 
 1. **Cluster Identity** (what) - Cluster name, token, domain - varies per cluster
 2. **Node Identity** (where) - Seed node name, role - varies per node
-3. **Infrastructure Identity** (how) - Incus remote derived from cluster name
+3. **Infrastructure Identity** (how) - Incus remote configured per cluster (`incusRemoteName`), may differ from cluster name
 4. **Operator Environment** (secrets) - Credentials from filesystem - constant location
 5. **Context Provider** (mechanism) - ThreadLocal injection - synthesis-scoped
 
@@ -74,7 +74,7 @@ graph TB
 ----
 sequenceDiagram
     participant Config as Pulumi Config
-    participant Bootstrap as IncusResourceBootstrap
+    participant Bootstrap as seed-master synthesis entry
     participant Request as ManifestSynthesisRequest
     participant Service as ManifestSynthesisService
     participant Context as ManifestSynthesisContext
@@ -86,31 +86,32 @@ sequenceDiagram
 
     Note over Bootstrap: Identity is immutable record
 
-    Bootstrap->>Request: withBootstrapIdentity(identity)
+    Bootstrap->>FS: Read .secrets (incus.capn.clientKey)
+    FS-->>Bootstrap: Private key PEM
+    Bootstrap->>FS: Read ~/.config/incus/ (remote addr + server cert)
+    FS-->>Bootstrap: Address + server certificate
+
+    Note over Bootstrap: Assemble IncusIdentityMaterial<br/>(host side reads the filesystem, not the unit)
+
+    Bootstrap->>Request: withBootstrapIdentity(identity)<br/>+ withIncusIdentity(material)
     Bootstrap->>Service: synthesize(request)
 
-    Service->>Context: bind(identity, versions, topology...)
+    Service->>Context: of(request, ...).bind()
     activate Context
 
     Note over Context: ThreadLocal scope:<br/>duration of synthesize()
 
-    Service->>Unit: apply(chart)
+    Service->>Unit: apply(context) → doSynthesize(scope, context)
 
     Note over Unit: No constructor params!
 
     Unit->>Context: bootstrapIdentity().clusterName()
     Context-->>Unit: "bioskop"
 
-    Unit->>FS: Read .secrets (incus.capn.clientKey)
-    FS-->>Unit: Private key PEM
+    Unit->>Context: incusIdentity()
+    Context-->>Unit: IncusIdentityMaterial (PEM + addr)
 
-    Unit->>FS: Read ~/.config/incus/config.yml
-    FS-->>Unit: Remote address
-
-    Unit->>FS: Read ~/.config/incus/servercerts/...
-    FS-->>Unit: Server certificate
-
-    Unit->>Unit: Create K8s Secret with identity
+    Unit->>Unit: Render K8s Secret from material
 
     deactivate Context
 
@@ -119,7 +120,7 @@ sequenceDiagram
 
 === What BootstrapIdentity Provides
 
-`BootstrapIdentity` is a record in `ManifestSynthesisContext` that exposes:
+`BootstrapIdentity` is a record in the `manifests.contract.profiles` package (exposed to units via `ManifestSynthesisContext`) that carries these nine components:
 
 [cols="1,3",options="header"]
 |===
@@ -132,13 +133,14 @@ sequenceDiagram
 |`nodeName` |Node identifier for seed node
 |`nodeId` |Numeric node identifier
 |`nodeKind` |Node role (e.g., "master", "worker")
+|`incusRemoteName` |Configured Incus remote for this cluster — may differ from `clusterName` (e.g., cluster "bioskop" uses remote "bioskop-nixos")
 |===
 
 === Incus Infrastructure Identity
 
 Each cluster uses its own Incus remote, but all clusters share a single CAPN identity:
 
-* **Remote naming**: Remote name = cluster name (bioskop cluster → bioskop remote)
+* **Remote naming**: The remote is configured per cluster in the `incusRemoteName` field and MAY differ from the cluster name (e.g., cluster "bioskop" uses remote "bioskop-nixos") — which is exactly why the dedicated field exists rather than deriving the remote from `clusterName`
 * **Single CAPN identity**: All clusters use identity name `"capn"` for Cluster API Provider Incus
 * **Operator environment**: Credentials stored in operator's environment (`.secrets`, `~/.config/incus`)
 
@@ -185,12 +187,12 @@ graph LR
 
 [source,java]
 ----
-public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
+public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUnit {
 
   private final String clusterName;  // ❌ Constructor parameter
   private final String remoteAddress;  // ❌ Constructor parameter
 
-  public IncusIdentitySecretManifestUnit(String clusterName, String remoteAddress) {
+  public IncusIdentitySecretManifestsUnit(String clusterName, String remoteAddress) {
     super(MANIFEST_UNIT_ID, List.of());
     this.clusterName = clusterName;
     this.remoteAddress = remoteAddress;
@@ -210,25 +212,27 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
 
 [source,java]
 ----
-public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
+public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUnit {
 
-  public IncusIdentitySecretManifestUnit() {
+  public IncusIdentitySecretManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override
-  public void apply(Chart chart) {
-    // Access identity from context during apply()
-    String clusterName = bootstrapIdentity().clusterName();
+  protected void doSynthesize(Construct scope, ManifestsUnitContext context) {
+    // Identity + material come from the synthesis context — never the filesystem.
+    String clusterName = ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
+    Optional<IncusIdentityMaterial> material =
+        ManifestSynthesisContext.current().incusIdentity();
 
-    // Derive remote name from cluster name
-    String remoteName = clusterName;  // bioskop → bioskop remote
+    // Ephemeral/test runs carry no identity: nothing to render.
+    if (BootstrapIdentity.UNKNOWN.equals(clusterName) || material.isEmpty()) {
+      return;
+    }
 
-    // Read from operator environment
-    Path incusConfigDir = Path.of(System.getProperty("user.home"), ".config", "incus");
-    String remoteAddress = readRemoteAddress(remoteName, incusConfigDir);
-
-    // ... create secret ...
+    // Render the <cluster>-incus-identity Secret from the material seed-master handed over.
+    // (base64-encode the raw PEM/address blobs at render time — a Secret encoding concern)
+    new ApiObject(scope, "secret-incus-identity", /* Secret props from material.orElseThrow() */ ...);
   }
 }
 ----
@@ -240,31 +244,30 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
 3. Clear separation: structure (constructor) vs. data (context)
 4. Runtime configuration injected via thread-local context
 
-=== Available Helper Methods
+=== Reaching Context From a Unit
 
-`AbstractManifestUnit` provides these helpers for accessing context:
+`AbstractManifestsUnit` provides NO identity accessors — the base is a template method
+(`apply(ManifestsUnitContext)`) that only creates the unit's CDK8s scope and emits its group
+marker. Units reach synthesis-scoped data directly through the thread-local
+`ManifestSynthesisContext.current()`, which delegates each slice to the bound
+`ManifestSynthesisRequest`:
 
 [source,java]
 ----
-// Cluster + node identity
-protected final BootstrapIdentity bootstrapIdentity() {
-    return ManifestSynthesisContext.current().bootstrapIdentity();
-}
+// Cluster + node identity (manifests.contract.profiles.BootstrapIdentity)
+ManifestSynthesisContext.current().bootstrapIdentity();
 
 // Network topology (CIDRs, interfaces, gateway addresses)
-protected final NetworkTopology networkTopology() {
-    return ManifestSynthesisContext.current().networkTopology();
-}
+ManifestSynthesisContext.current().networkTopology();
 
 // Component versions (kube-vip, tailscale, operators, ...)
-protected final ComponentVersions componentVersions() {
-    return ManifestSynthesisContext.current().componentVersions();
-}
+ManifestSynthesisContext.current().componentVersions();
 
-// Debug toggles for development
-protected final FloxDebugPolicy floxDebugPolicy() {
-    return ManifestSynthesisContext.current().floxDebugPolicy();
-}
+// Incus identity material for the CAPN Secret (Optional — empty on ephemeral runs)
+ManifestSynthesisContext.current().incusIdentity();
+
+// Flox NRI debug toggles for development
+ManifestSynthesisContext.current().floxDebugPolicy();
 ----
 
 == Incus Identity Setup (One-Time Bootstrap)
@@ -381,36 +384,41 @@ incus config trust list
 [mermaid]
 ----
 sequenceDiagram
-    participant Bootstrap as IncusResourceBootstrap
+    participant Bootstrap as seed-master synthesis entry
     participant Service as DefaultManifestSynthesisService
     participant Context as ManifestSynthesisContext
-    participant Unit as IncusIdentitySecretManifestUnit
+    participant Unit as IncusIdentitySecretManifestsUnit
 
     Bootstrap->>Service: synthesize(request)
-    Note over Bootstrap,Service: Request includes BootstrapIdentity
+    Note over Bootstrap,Service: Request carries BootstrapIdentity<br/>+ IncusIdentityMaterial (assembled host-side)
 
-    Service->>Context: bind(context)
+    Service->>Context: of(request, ...).bind()
     activate Context
 
     Note over Service: Create cdk8s App + Chart
 
-    Service->>Unit: apply(chart)
+    Service->>Unit: apply(context) → doSynthesize(scope, context)
 
     Note over Unit: No constructor parameters!
 
     Unit->>Context: bootstrapIdentity().clusterName()
     Context-->>Unit: "bioskop"
 
-    Note over Unit: Read operator environment:<br/>~/.config/incus/config.yml<br/>.secrets
+    Unit->>Context: incusIdentity()
+    Context-->>Unit: IncusIdentityMaterial (PEM + addr)
 
-    Unit->>Unit: createIncusIdentitySecret(chart, ...)
+    Note over Unit: Render from material — no filesystem read
+
+    Unit->>Unit: Create <cluster>-incus-identity Secret
 
     deactivate Context
 ----
 
-=== Entry Point: IncusResourceBootstrap
+=== Entry Point: the seed-master synthesis entry
 
-The seed-master module builds the `ManifestSynthesisRequest`:
+The seed-master synthesis entry point builds the `ManifestSynthesisRequest`, populating its
+`BootstrapIdentity` (and the Incus identity material) before handing it across the host→OSGi
+frontier:
 
 [source,java]
 ----
@@ -431,39 +439,35 @@ synthesisService.synthesize(request);
 
 === Context Binding: DefaultManifestSynthesisService
 
-The service binds the context for the duration of synthesis:
+The context wraps the whole `ManifestSynthesisRequest` (plus the pre-synthesis-resolved age
+material), and `bind()` is an instance method publishing it on the thread-local for the duration of
+synthesis, returning a `Scope` that restores the previous binding on close:
 
 [source,java]
 ----
-final ManifestSynthesisContext context = ManifestSynthesisContext.of(
-    request.floxDebugPolicy(),
-    request.bootstrapIdentity(),  // ← Identity injected here
-    request.networkTopology(),
-    request.componentVersions());
-
-try (var scope = ManifestSynthesisContext.bind(context)) {
-    // All manifest units can now access bootstrapIdentity()
-    for (ManifestUnit unit : manifestUnits) {
-        unit.apply(chart);
-    }
-    app.synth();
+final var contextScope =
+    ManifestSynthesisContext.of(request, sopsAgeMaterial).bind();  // ← identity injected via the request
+try (contextScope) {
+    // All manifest units can now reach ManifestSynthesisContext.current()
+    return synthesizeInContext(request);
 }
 ----
 
-=== Unit Access: During apply()
+=== Unit Access: During doSynthesize()
 
-Manifest units access identity during `apply(chart)`:
+Manifest units read identity in their `doSynthesize(scope, context)` hook (the `apply(...)` template
+method is `final` on the base and only frames the scope + group marker):
 
 [source,java]
 ----
 @Override
-public void apply(Chart chart) {
+protected void doSynthesize(Construct scope, ManifestsUnitContext context) {
     // Context access - no constructor parameters needed
-    String clusterName = bootstrapIdentity().clusterName();
-    String version = componentVersions().clusterApiOperator();
+    String clusterName = ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
+    String version = ManifestSynthesisContext.current().componentVersions().clusterApiOperator();
 
-    // Create K8s resources
-    new ApiObject(chart, "provider", ...);
+    // Create K8s resources under the unit's scope
+    new ApiObject(scope, "provider", ...);
 }
 ----
 
@@ -480,7 +484,7 @@ The manifest synthesis expects the following operator environment:
 └── ~/.config/incus/
     ├── config.yml                     # Incus remote configuration
     │   └── remotes:
-    │       ├── bioskop:               # Remote name = cluster name
+    │       ├── bioskop-nixos:         # Configured Incus remote (incusRemoteName), may differ from cluster name
     │       │   addr: https://192.168.1.1:8443
     │       │   protocol: lxd
     │       │   ...
@@ -510,7 +514,7 @@ public record BootstrapIdentity(
 }
 ----
 
-2. **Update entry point** (`IncusResourceBootstrap`):
+2. **Update the seed-master synthesis entry point**:
 +
 [source,java]
 ----
@@ -574,7 +578,7 @@ No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapId
 
 **Fix**:
 1. Add remote: `incus remote add nikopol https://192.168.1.2:8443`
-2. Verify remote name matches cluster name exactly
+2. Verify the configured `incusRemoteName` matches a remote in `config.yml` (it need not equal the cluster name)
 3. Check `incus remote list` to see configured remotes
 
 == Related Documentation
