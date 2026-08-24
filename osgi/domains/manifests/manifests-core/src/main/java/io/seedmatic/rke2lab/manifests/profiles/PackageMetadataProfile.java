@@ -12,6 +12,9 @@ public final class PackageMetadataProfile {
   // When set, every resource this profile stamps carries the NODE_BOOTSTRAP lane annotation, so the
   // exploder routes it into the node-side bootstrap file instead of the committed branch tree.
   private final boolean nodeBootstrap;
+  // The reconcile layer this unit's resources default to (crds/operators/workloads); workloads when
+  // unset. A per-resource call may override it via an extraAnnotations MANIFEST_LAYER entry.
+  private final String defaultLayer;
   private final ManifestAnnotations manifestAnnotations;
 
   public PackageMetadataProfile(final String layerName, final String packageName) {
@@ -20,21 +23,33 @@ public final class PackageMetadataProfile {
 
   public PackageMetadataProfile(
       final String layerName, final String packageName, final boolean nodeBootstrap) {
+    this(layerName, packageName, nodeBootstrap, ManifestAnnotations.LAYER_WORKLOADS);
+  }
+
+  public PackageMetadataProfile(
+      final String layerName,
+      final String packageName,
+      final boolean nodeBootstrap,
+      final String defaultLayer) {
     this.layerName = layerName;
     this.packageName = packageName;
     this.nodeBootstrap = nodeBootstrap;
+    this.defaultLayer = defaultLayer;
     this.manifestAnnotations = new ManifestAnnotations();
   }
 
-  // Merge the lane marker into whatever the caller passed — a single seam so no call site can
-  // forget
-  // it and no resource of a bootstrap unit escapes the lane.
+  // Merge the lane + layer markers into whatever the caller passed — a single seam so no call site
+  // can forget them. A per-resource MANIFEST_LAYER in extraAnnotations always wins; otherwise the
+  // unit's non-default layer is stamped (workloads stays implicit — absent means workloads).
   private Map<String, String> withLane(final Map<String, String> extraAnnotations) {
-    if (!nodeBootstrap) {
-      return extraAnnotations;
-    }
     final LinkedHashMap<String, String> merged = new LinkedHashMap<>(extraAnnotations);
-    merged.put(ManifestAnnotations.NODE_BOOTSTRAP, "true");
+    if (nodeBootstrap) {
+      merged.put(ManifestAnnotations.NODE_BOOTSTRAP, "true");
+    }
+    if (!merged.containsKey(ManifestAnnotations.MANIFEST_LAYER)
+        && !ManifestAnnotations.LAYER_WORKLOADS.equals(defaultLayer)) {
+      merged.put(ManifestAnnotations.MANIFEST_LAYER, defaultLayer);
+    }
     return merged;
   }
 

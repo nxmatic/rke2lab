@@ -4,6 +4,7 @@ package io.seedmatic.rke2lab.manifests.units.networking;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -19,8 +20,12 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.NETWORKING + "/envoy-gateway";
 
+  // The installer resources (Job + its namespace/SA/CRB/ConfigMap) belong to the operators layer —
+  // they register the Gateway API CRDs at runtime; the GatewayClass overrides itself back to
+  // workloads (below), so it dry-runs only after this installer has run.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("networking", "envoy-gateway");
+      new PackageMetadataProfile(
+          "networking", "envoy-gateway", false, ManifestAnnotations.LAYER_OPERATORS);
 
   public EnvoyGatewayManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of(CiliumAdvancedManifestsUnit.MANIFEST_UNIT_ID));
@@ -95,7 +100,10 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
                         .name("envoy")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "gateway.networking.k8s.io|GatewayClass|default|envoy"))
+                                "gateway.networking.k8s.io|GatewayClass|default|envoy",
+                                Map.of(
+                                    ManifestAnnotations.MANIFEST_LAYER,
+                                    ManifestAnnotations.LAYER_WORKLOADS)))
                         .build())
                 .build());
 

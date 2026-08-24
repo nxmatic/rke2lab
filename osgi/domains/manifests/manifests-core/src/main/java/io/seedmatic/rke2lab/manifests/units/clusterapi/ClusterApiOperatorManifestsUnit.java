@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests.units.clusterapi;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -22,8 +23,14 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
   /** Exploded package dir (relative to the cluster-api domain); diverges from the id segment. */
   public static final String OUTPUT_DIR = "cluster-api-operator";
 
+  // The operator install + provider CRs register the CAPI/CAPN/CAPRKE2 CRDs at runtime → operators
+  // layer, so any workload CR that targets those CRDs dry-runs only after this layer is healthy.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile(ManifestDomainCatalog.CLUSTER_API, OUTPUT_DIR);
+      new PackageMetadataProfile(
+          ManifestDomainCatalog.CLUSTER_API,
+          OUTPUT_DIR,
+          false,
+          ManifestAnnotations.LAYER_OPERATORS);
 
   public ClusterApiOperatorManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

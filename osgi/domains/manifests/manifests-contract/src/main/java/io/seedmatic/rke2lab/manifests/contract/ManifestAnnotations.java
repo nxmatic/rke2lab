@@ -52,6 +52,25 @@ public record ManifestAnnotations() {
    */
   public static final String NODE_BOOTSTRAP = "io.seedmatic.rke2lab/node-bootstrap";
 
+  /**
+   * The reconcile LAYER a rendered resource belongs to — the exploder routes it into {@code
+   * <layer>/<domain>/<package>/…} and {@code FluxRootManifestsUnit} emits one {@code Kustomization}
+   * per layer, chained by {@code dependsOn} so a CR's CRD (rendered OR registered at runtime by an
+   * operator/installer in an earlier layer) exists before the CR is dry-run. Absent ⇒ {@link
+   * #LAYER_WORKLOADS}; a {@code CustomResourceDefinition} is forced to {@link #LAYER_CRDS} by kind
+   * regardless. See {@code docs/architecture/cluster-api/manifests-rendered-branches.adoc} §layers.
+   */
+  public static final String MANIFEST_LAYER = "io.seedmatic.rke2lab/layer";
+
+  /** Layer 1 — rendered {@code CustomResourceDefinition}s (applied first). */
+  public static final String LAYER_CRDS = "crds";
+
+  /** Layer 2 — operator/installer resources that register CRDs / controllers at runtime. */
+  public static final String LAYER_OPERATORS = "operators";
+
+  /** Layer 3 (default) — the CRs that depend on a CRD from layer 1 or 2. */
+  public static final String LAYER_WORKLOADS = "workloads";
+
   public Map<String, String> packageAnnotations(final String domain, final String packageName) {
     return packageAnnotations(domain, packageName, Map.of());
   }

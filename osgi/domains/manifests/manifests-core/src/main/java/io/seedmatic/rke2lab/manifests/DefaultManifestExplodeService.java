@@ -101,7 +101,9 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
               final String name = sanitizeFileSegment(text(document.path("metadata").get("name")));
 
               final String fileName = fileNameFor(document, kind.get(), namespace, name);
-              final Path outFile = target.resolve(domain).resolve(pkg).resolve(fileName);
+              final String layer = layerFor(document, kind.get());
+              final Path outFile =
+                  target.resolve(layer).resolve(domain).resolve(pkg).resolve(fileName);
               yaml.write(outFile).document(document);
               written.add(outFile);
             });
@@ -139,7 +141,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
    *   <li>otherwise: {@code <order>-<kind>-<name>.yml} for cluster apply.
    * </ul>
    */
-  private static String fileNameFor(
+  private String fileNameFor(
       JsonNode document, String kind, Optional<String> namespace, String name) {
     if (isAnnotated(document, ManifestAnnotations.RKE2_CONFIG)) {
       return name;
@@ -152,27 +154,42 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     return order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
   }
 
-  private static boolean isAnnotated(JsonNode document, String key) {
+  private boolean isAnnotated(JsonNode document, String key) {
     return "true".equalsIgnoreCase(annotation(document, key, "false"));
   }
 
-  private static String orderPrefixFor(String kind, Optional<String> namespace) {
+  /**
+   * The reconcile layer sub-dir a resource explodes into: a {@code CustomResourceDefinition} is
+   * forced to {@code crds} by kind (so it applies before any CR, regardless of its unit's
+   * annotation); everything else takes its {@link ManifestAnnotations#MANIFEST_LAYER} annotation,
+   * defaulting to {@code workloads}. {@code FluxRootManifestsUnit} emits one {@code Kustomization}
+   * per layer, chained by {@code dependsOn}.
+   */
+  private String layerFor(JsonNode document, String kind) {
+    if (CRD_KIND.equals(kind)) {
+      return ManifestAnnotations.LAYER_CRDS;
+    }
+    return annotation(
+        document, ManifestAnnotations.MANIFEST_LAYER, ManifestAnnotations.LAYER_WORKLOADS);
+  }
+
+  private String orderPrefixFor(String kind, Optional<String> namespace) {
     if (CRD_KIND.equals(kind)) {
       return "00";
     }
     return namespace.filter(ns -> !ns.isBlank()).isPresent() ? "02" : "01";
   }
 
-  private static String annotation(JsonNode document, String key, String fallback) {
+  private String annotation(JsonNode document, String key, String fallback) {
     final JsonNode value = document.path("metadata").path("annotations").get(key);
     return value == null || value.isNull() ? fallback : value.asText();
   }
 
-  private static Optional<String> text(JsonNode node) {
+  private Optional<String> text(JsonNode node) {
     return Optional.ofNullable(node).filter(n -> !n.isNull()).map(JsonNode::asText);
   }
 
-  private static String sanitizeFileSegment(Optional<String> value) {
+  private String sanitizeFileSegment(Optional<String> value) {
     return value
         .filter(v -> !v.isBlank())
         .map(v -> v.toLowerCase(Locale.ROOT).replace(':', '-').replace('/', '-'))

@@ -3,10 +3,13 @@ package io.seedmatic.rke2lab.manifests.units.gitops;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -14,11 +17,11 @@ import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
 /**
- * The chicken-and-egg solver for the rendered-branch GitOps model: the single bootstrap object — a
- * {@code GitRepository} on THIS cluster's rendered branch plus a root {@code Kustomization} — that,
- * once seeded from the node's local-only server-manifests, lets Flux self-manage everything else
- * from the branch (see {@code docs/architecture/cluster-api/manifests-rendered-branches.adoc} and
- * {@code github-credential-model.adoc}).
+ * The chicken-and-egg solver for the rendered-branch GitOps model: the bootstrap objects — a {@code
+ * GitRepository} on THIS cluster's rendered branch plus a layered {@code Kustomization} stack —
+ * that, once seeded from the node's local-only server-manifests, let Flux self-manage everything
+ * else from the branch (see {@code docs/architecture/cluster-api/manifests-rendered-branches.adoc}
+ * §layers and {@code github-credential-model.adoc}).
  *
  * <p><b>GitRepository:</b> {@code https://github.com/seedmatic/rke2lab.git} (HTTPS — App auth, not
  * SSH), tracking {@code ref.branch: manifests/<host>-<role>} (this cluster's rendered branch, the
@@ -30,9 +33,12 @@ import software.constructs.Construct;
  * {@code contents:read} pull token. The {@code provider: github} is mandatory — source-controller
  * rejects an App-data secret without it.
  *
- * <p><b>Root Kustomization:</b> watches the branch root ({@code path: ./}) with {@code prune: true}
- * and SOPS decryption via the {@code sops-age} Secret — the two Secrets (App-auth + age) ride the
- * same local-only bootstrap lane so Flux comes up able to both pull and decrypt.
+ * <p><b>Layered Kustomizations:</b> one per reconcile layer ({@code ./crds} → {@code ./operators} →
+ * {@code ./workloads}), chained by {@code dependsOn} with {@code wait: true}, each pruned and
+ * SOPS-decrypting via the {@code sops-age} Secret — so a CR dry-runs only once its CRD (rendered in
+ * {@code crds}, or registered at runtime by an operator/installer in {@code operators}) exists. The
+ * two Secrets (App-auth + age) ride the same local-only bootstrap lane so Flux comes up able to
+ * both pull and decrypt.
  */
 public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
@@ -55,7 +61,20 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String clusterSlug = ManifestSynthesisContext.current().bootstrapIdentity().clusterSlug();
     createGitRepository(scope, clusterSlug);
-    createRootKustomization(scope, clusterSlug);
+    // The layered stack: crds → operators → workloads, chained by dependsOn (+wait) so a CR's CRD —
+    // rendered (crds) or registered at runtime by an operator/installer (operators) — exists before
+    // the CR is dry-run. See manifests-rendered-branches.adoc §layers.
+    createLayerKustomization(scope, clusterSlug, ManifestAnnotations.LAYER_CRDS, Optional.empty());
+    createLayerKustomization(
+        scope,
+        clusterSlug,
+        ManifestAnnotations.LAYER_OPERATORS,
+        Optional.of(ManifestAnnotations.LAYER_CRDS));
+    createLayerKustomization(
+        scope,
+        clusterSlug,
+        ManifestAnnotations.LAYER_WORKLOADS,
+        Optional.of(ManifestAnnotations.LAYER_OPERATORS));
   }
 
   private void createGitRepository(Construct scope, String clusterSlug) {
@@ -96,38 +115,43 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
                 Map.of("name", APP_AUTH_SECRET))));
   }
 
-  private void createRootKustomization(Construct scope, String clusterSlug) {
+  /**
+   * One layer's {@code Kustomization} over {@code ./<layer>} — pruned, waited (Ready only when its
+   * objects are healthy) and SOPS-decrypting. {@code dependsOnLayer} chains it after the prior
+   * layer ({@code Optional.empty()} for the first, {@code crds}), so its CRs dry-run only once the
+   * earlier layer's CRDs — rendered or operator-registered — exist.
+   */
+  private void createLayerKustomization(
+      Construct scope, String clusterSlug, String layer, Optional<String> dependsOnLayer) {
+    final String name = clusterSlug + "-" + layer;
     final ApiObject kustomization =
         new ApiObject(
             scope,
-            "kustomization-root",
+            "kustomization-" + layer,
             ApiObjectProps.builder()
                 .apiVersion("kustomize.toolkit.fluxcd.io/v1")
                 .kind("Kustomization")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name(clusterSlug)
+                        .name(name)
                         .namespace("flux-system")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "kustomize.toolkit.fluxcd.io|Kustomization|flux-system|"
-                                    + clusterSlug))
+                                "kustomize.toolkit.fluxcd.io|Kustomization|flux-system|" + name))
                         .build())
                 .build());
 
-    kustomization.addJsonPatch(
-        JsonPatch.add(
-            "/spec",
-            Map.of(
-                "interval",
-                "5m",
-                "path",
-                "./",
-                "prune",
-                true,
-                "sourceRef",
-                Map.of("kind", "GitRepository", "name", GIT_REPOSITORY_NAME),
-                "decryption",
-                Map.of("provider", "sops", "secretRef", Map.of("name", SOPS_AGE_SECRET)))));
+    final LinkedHashMap<String, Object> spec = new LinkedHashMap<>();
+    spec.put("interval", "5m");
+    spec.put("path", "./" + layer);
+    spec.put("prune", true);
+    spec.put("wait", true);
+    spec.put("sourceRef", Map.of("kind", "GitRepository", "name", GIT_REPOSITORY_NAME));
+    spec.put(
+        "decryption", Map.of("provider", "sops", "secretRef", Map.of("name", SOPS_AGE_SECRET)));
+    dependsOnLayer.ifPresent(
+        dep -> spec.put("dependsOn", List.of(Map.of("name", clusterSlug + "-" + dep))));
+
+    kustomization.addJsonPatch(JsonPatch.add("/spec", spec));
   }
 }
