@@ -238,6 +238,60 @@ flowchart TB
 pointing at the cluster's rendered branch + a root `Kustomization` with `prune` and SOPS
 decryption) that, once seeded, lets Flux self-manage everything else from the branch.
 
+[[layers]]
+== The branch reconciles in layers, not one atomic apply
+
+A single `Kustomization` over `path: ./` applies the WHOLE branch atomically with an up-front
+server-side dry-run — and that dry-run *hard-fails on any CR whose CRD is not yet registered*
+(`no matches for kind "GatewayClass" in gateway.networking.k8s.io/v1`). Because the apply is
+atomic, one such resource blocks the entire branch. This is structural, not incidental: the branch
+mixes CRDs, the operators/installers that register *more* CRDs at runtime, and the CRs that need
+those CRDs — an ordering the flat model cannot express.
+
+So `FluxRoot` seeds not one root `Kustomization` but a **layered stack**, each layer a
+`Kustomization` over its own sub-path, chained by `dependsOn` with `wait: true` (a layer is Ready
+only once its objects are applied AND healthy):
+
+[mermaid,rendered-branches-layers,svg]
+----
+flowchart TB
+  subgraph BR["manifests/&lt;host&gt;-&lt;role&gt;"]
+    C["./crds"]
+    O["./operators"]
+    W["./workloads"]
+  end
+  KC["Kustomization: crds<br/>(rendered CustomResourceDefinitions)"]
+  KO["Kustomization: operators<br/>dependsOn crds · wait<br/>(flux-operator, capi-operator, envoy-gateway installer…)"]
+  KW["Kustomization: workloads<br/>dependsOn operators · wait<br/>(GatewayClass, Cluster CRs, HelmReleases…)"]
+  C --> KC
+  O --> KO
+  W --> KW
+  KC -->|"dependsOn"| KO
+  KO -->|"dependsOn"| KW
+----
+
+. *crds* — every rendered `CustomResourceDefinition`. Applied first; Flux's own CRD-first ordering
+  plus this explicit layer means a CR's *rendered* CRD is always established before the CR.
+. *operators* — the installs that register CRDs / bring controllers *at runtime* (the flux-operator
+  `HelmChart`, the Cluster API operator + provider CRs, the envoy-gateway installer `Job`). `wait:
+  true` blocks until they are healthy — e.g. the envoy-gateway installer `Job` has completed, so the
+  Gateway API CRDs it applies exist. This is the layer that covers CRDs NOT carried as rendered
+  manifests but registered by an in-cluster actor.
+. *workloads* — everything else: the CRs that depend on an operator-registered CRD (`GatewayClass`,
+  the CAPI `Cluster`/`RKE2ControlPlane`/`LXCCluster` set, `HelmRelease`s, plain app YAML). By the
+  time this layer applies, both rendered CRDs (layer 1) and runtime-registered CRDs (layer 2, waited
+  on) exist, so the dry-run passes.
+
+*Layer assignment* is annotation-driven, mirroring the node-bootstrap lane
+(link:../nixos-substrate/node-bootstrap-delivery.adoc[node-bootstrap delivery]): the default is
+`workloads`; a `CustomResourceDefinition` is routed to `crds` by kind; a unit that installs an
+operator/CRD-registrar carries a `layer=operators` annotation (`PackageMetadataProfile`). The
+exploder writes each resource under `&lt;layer&gt;/&lt;domain&gt;/&lt;package&gt;/…`, and `FluxRoot`
+emits one `Kustomization` per layer pointing at `./&lt;layer&gt;`.
+
+This is the durable answer to the recurring CRD↔CR ordering problem — not a per-resource patch. A
+new operator only needs its `layer=operators` mark; its CRs stay in `workloads` and wait for it.
+
 == The management cluster is function-of-git too
 
 Because the management cluster now runs Flux against `manifests/nikopol-mgmt`, the workload CAPI CRs
