@@ -257,26 +257,35 @@ only once its objects are applied AND healthy):
 flowchart TB
   subgraph BR["manifests/&lt;host&gt;-&lt;role&gt;"]
     C["./crds"]
+    F["./foundation"]
     O["./operators"]
     W["./workloads"]
   end
   KC["Kustomization: crds<br/>(rendered CustomResourceDefinitions)"]
-  KO["Kustomization: operators<br/>dependsOn crds · wait<br/>(flux-operator, capi-operator, envoy-gateway installer…)"]
+  KF["Kustomization: foundation<br/>dependsOn crds · wait<br/>(cert-manager — CRDs + issuer)"]
+  KO["Kustomization: operators<br/>dependsOn foundation · wait<br/>(capi-operator, envoy-gateway installer…)"]
   KW["Kustomization: workloads<br/>dependsOn operators · wait<br/>(GatewayClass, Cluster CRs, HelmReleases…)"]
   C --> KC
+  F --> KF
   O --> KO
   W --> KW
-  KC -->|"dependsOn"| KO
+  KC -->|"dependsOn"| KF
+  KF -->|"dependsOn"| KO
   KO -->|"dependsOn"| KW
 ----
 
 . *crds* — every rendered `CustomResourceDefinition`. Applied first; Flux's own CRD-first ordering
   plus this explicit layer means a CR's *rendered* CRD is always established before the CR.
-. *operators* — the installs that register CRDs / bring controllers *at runtime* (the flux-operator
-  `HelmChart`, the Cluster API operator + provider CRs, the envoy-gateway installer `Job`). `wait:
-  true` blocks until they are healthy — e.g. the envoy-gateway installer `Job` has completed, so the
-  Gateway API CRDs it applies exist. This is the layer that covers CRDs NOT carried as rendered
-  manifests but registered by an in-cluster actor.
+. *foundation* — the cluster-wide providers later operators depend on. Today that is *cert-manager*
+  (a `HelmChart` that registers the `cert-manager.io` CRDs and runs the issuer). It is distinct from
+  `operators` because an operator's install bundles a `Certificate` whose CRD must be registered —
+  and whose issuer must be running — before that operator layer can even dry-run. `wait: true` holds
+  the chain until cert-manager is healthy.
+. *operators* — the installs that register CRDs / bring controllers *at runtime* (the Cluster API
+  operator + provider CRs, the envoy-gateway installer `Job`). `wait: true` blocks until they are
+  healthy — e.g. the envoy-gateway installer `Job` has completed, so the Gateway API CRDs it applies
+  exist. This is the layer that covers CRDs NOT carried as rendered manifests but registered by an
+  in-cluster actor. (flux-operator itself is in the node-side bootstrap lane, not this branch.)
 . *workloads* — everything else: the CRs that depend on an operator-registered CRD (`GatewayClass`,
   the CAPI `Cluster`/`RKE2ControlPlane`/`LXCCluster` set, `HelmRelease`s, plain app YAML). By the
   time this layer applies, both rendered CRDs (layer 1) and runtime-registered CRDs (layer 2, waited

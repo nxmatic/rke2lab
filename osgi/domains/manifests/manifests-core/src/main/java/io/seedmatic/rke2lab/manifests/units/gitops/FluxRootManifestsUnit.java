@@ -33,12 +33,12 @@ import software.constructs.Construct;
  * {@code contents:read} pull token. The {@code provider: github} is mandatory — source-controller
  * rejects an App-data secret without it.
  *
- * <p><b>Layered Kustomizations:</b> one per reconcile layer ({@code ./crds} → {@code ./operators} →
- * {@code ./workloads}), chained by {@code dependsOn} with {@code wait: true}, each pruned and
- * SOPS-decrypting via the {@code sops-age} Secret — so a CR dry-runs only once its CRD (rendered in
- * {@code crds}, or registered at runtime by an operator/installer in {@code operators}) exists. The
- * two Secrets (App-auth + age) ride the same local-only bootstrap lane so Flux comes up able to
- * both pull and decrypt.
+ * <p><b>Layered Kustomizations:</b> one per reconcile layer ({@code ./crds} → {@code ./foundation}
+ * → {@code ./operators} → {@code ./workloads}), chained by {@code dependsOn} with {@code wait:
+ * true}, each pruned and SOPS-decrypting via the {@code sops-age} Secret — so a CR dry-runs only
+ * once its CRD (rendered in {@code crds}, or registered at runtime by cert-manager in {@code
+ * foundation} / an operator-installer in {@code operators}) exists. The two Secrets (App-auth +
+ * age) ride the same local-only bootstrap lane so Flux comes up able to both pull and decrypt.
  */
 public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
@@ -61,15 +61,22 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String clusterSlug = ManifestSynthesisContext.current().bootstrapIdentity().clusterSlug();
     createGitRepository(scope, clusterSlug);
-    // The layered stack: crds → operators → workloads, chained by dependsOn (+wait) so a CR's CRD —
-    // rendered (crds) or registered at runtime by an operator/installer (operators) — exists before
-    // the CR is dry-run. See manifests-rendered-branches.adoc §layers.
+    // The layered stack: crds → foundation → operators → workloads, chained by dependsOn (+wait) so
+    // a CR's CRD — rendered (crds), or registered at runtime by a foundation provider
+    // (cert-manager)
+    // / an operator-installer — exists before the CR is dry-run. See
+    // manifests-rendered-branches.adoc §layers.
     createLayerKustomization(scope, clusterSlug, ManifestAnnotations.LAYER_CRDS, Optional.empty());
     createLayerKustomization(
         scope,
         clusterSlug,
-        ManifestAnnotations.LAYER_OPERATORS,
+        ManifestAnnotations.LAYER_FOUNDATION,
         Optional.of(ManifestAnnotations.LAYER_CRDS));
+    createLayerKustomization(
+        scope,
+        clusterSlug,
+        ManifestAnnotations.LAYER_OPERATORS,
+        Optional.of(ManifestAnnotations.LAYER_FOUNDATION));
     createLayerKustomization(
         scope,
         clusterSlug,

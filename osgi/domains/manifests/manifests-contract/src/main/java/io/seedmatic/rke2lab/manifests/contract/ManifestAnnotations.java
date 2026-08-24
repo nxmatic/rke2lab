@@ -65,10 +65,18 @@ public record ManifestAnnotations() {
   /** Layer 1 — rendered {@code CustomResourceDefinition}s (applied first). */
   public static final String LAYER_CRDS = "crds";
 
-  /** Layer 2 — operator/installer resources that register CRDs / controllers at runtime. */
+  /**
+   * Layer 2 — cluster-wide providers that later operators depend on (cert-manager, whose HelmChart
+   * registers the {@code cert-manager.io} CRDs + runs the issuer that signs operator webhook
+   * certs). It sits before {@link #LAYER_OPERATORS} because an operator's install bundles a {@code
+   * Certificate} whose CRD must be registered — and controller running — before it dry-runs.
+   */
+  public static final String LAYER_FOUNDATION = "foundation";
+
+  /** Layer 3 — operator/installer resources that register CRDs / controllers at runtime. */
   public static final String LAYER_OPERATORS = "operators";
 
-  /** Layer 3 (default) — the CRs that depend on a CRD from layer 1 or 2. */
+  /** Layer 4 (default) — the CRs that depend on a CRD from an earlier layer. */
   public static final String LAYER_WORKLOADS = "workloads";
 
   public Map<String, String> packageAnnotations(final String domain, final String packageName) {

@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests.units.platform;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -18,8 +19,12 @@ public final class CertManagerManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.PLATFORM + "/cert-manager";
 
+  // Foundation layer: cert-manager's chart registers the cert-manager.io CRDs + runs the issuer
+  // that signs operator webhook certs, so it must be up before the operators layer — whose installs
+  // bundle a Certificate that dry-runs against those CRDs.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("platform", "cert-manager");
+      new PackageMetadataProfile(
+          "platform", "cert-manager", false, ManifestAnnotations.LAYER_FOUNDATION);
 
   public CertManagerManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
