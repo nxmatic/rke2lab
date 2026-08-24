@@ -63,11 +63,16 @@
     pkgs.gh
     pkgs.kubectl
     pkgs.kubernetes-helm
+    # cilium-cli — `cilium status`, `cilium bgp peers`, `clustermesh` from the node's root shell.
+    pkgs.cilium-cli
     # zfs userspace: the containerd zfs snapshotter shells `zfs`/`zpool` for its per-container
     # datasets, and rke2lab-zfs-containerd.service needs `mount.zfs` to mount the legacy dataset (it
     # also carries pkgs.zfs on its own unit PATH). The kernel module comes from the host (this is an
     # incus container with /dev/zfs passed in) — only the userspace tools belong here.
     pkgs.zfs
   ];
-  environment.shellAliases.k = "KUBECONFIG=/etc/rancher/rke2/rke2.yaml kubectl";
+  # KUBECONFIG ambient for root's shell, so kubectl AND cilium work bare (no `flox activate`, no
+  # per-command KUBECONFIG= prefix) — the node's admin kubeconfig rke2 writes at boot.
+  environment.sessionVariables.KUBECONFIG = "/etc/rancher/rke2/rke2.yaml";
+  environment.shellAliases.k = "kubectl";
 }
