@@ -119,6 +119,9 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                         .build())
                 .build());
 
+    // The CAPI operator resolves a non-clusterctl provider from a GitHub release URL that must
+    // point at the components file itself (…/releases/<tag>/infrastructure-components.yaml); it
+    // reads metadata.yaml from the same release. A bare …/releases base is rejected.
     provider.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -126,7 +129,11 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                 "version",
                 version,
                 "fetchConfig",
-                Map.of("url", "https://github.com/lxc/cluster-api-provider-incus/releases"))));
+                Map.of(
+                    "url",
+                    "https://github.com/lxc/cluster-api-provider-incus/releases/"
+                        + version
+                        + "/infrastructure-components.yaml"))));
   }
 
   private void createControlPlaneProvider(final Construct scope, final String version) {
@@ -147,9 +154,7 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                         .build())
                 .build());
 
-    provider.addJsonPatch(
-        JsonPatch.add(
-            "/spec", Map.of("version", version, "configSecret", Map.of("name", "rke2-config"))));
+    provider.addJsonPatch(JsonPatch.add("/spec", Map.of("version", version)));
   }
 
   private void createBootstrapProvider(final Construct scope, final String version) {
@@ -170,8 +175,6 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                         .build())
                 .build());
 
-    provider.addJsonPatch(
-        JsonPatch.add(
-            "/spec", Map.of("version", version, "configSecret", Map.of("name", "rke2-config"))));
+    provider.addJsonPatch(JsonPatch.add("/spec", Map.of("version", version)));
   }
 }
