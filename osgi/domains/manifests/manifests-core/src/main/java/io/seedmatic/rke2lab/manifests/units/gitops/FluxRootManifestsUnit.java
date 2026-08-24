@@ -24,9 +24,11 @@ import software.constructs.Construct;
  * SSH), tracking {@code ref.branch: manifests/<host>-<role>} (this cluster's rendered branch, the
  * EXACT branch the manifests scion pushes — {@link
  * io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity#clusterSlug()}). It
- * authenticates as the one org-owned GitHub App via {@code spec.secretRef} → the {@code githubapp}
- * Secret ({@code githubAppID}, {@code githubAppInstallationID}, {@code githubAppPrivateKey}); Flux
- * self-mints and self-refreshes a {@code contents:read} pull token.
+ * authenticates as the one org-owned GitHub App via {@code spec.provider: github} + {@code
+ * spec.secretRef} → the {@code githubapp} Secret ({@code githubAppID}, {@code
+ * githubAppInstallationID}, {@code githubAppPrivateKey}); Flux self-mints and self-refreshes a
+ * {@code contents:read} pull token. The {@code provider: github} is mandatory — source-controller
+ * rejects an App-data secret without it.
  *
  * <p><b>Root Kustomization:</b> watches the branch root ({@code path: ./}) with {@code prune: true}
  * and SOPS decryption via the {@code sops-age} Secret — the two Secrets (App-auth + age) ride the
@@ -85,6 +87,11 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
                 REPO_URL,
                 "ref",
                 Map.of("branch", BRANCH_PREFIX + clusterSlug),
+                // GitHub App auth REQUIRES provider=github; without it source-controller rejects
+                // the
+                // App-data secret ("has github app data but provider is not set to github").
+                "provider",
+                "github",
                 "secretRef",
                 Map.of("name", APP_AUTH_SECRET))));
   }
