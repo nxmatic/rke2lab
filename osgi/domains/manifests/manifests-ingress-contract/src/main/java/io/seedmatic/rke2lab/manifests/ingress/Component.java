@@ -33,7 +33,7 @@ public enum Component implements WireEnum {
   KUBE_VIP("kubeVip", "v0.9.2", "kube-vip/kube-vip"),
   OPENEBS_ZFS_CHART("openebsZfsChart", "2.8.0"),
   KUBERNETES_REPLICATOR("kubernetesReplicator", "v2.12.4", "mittwald/kubernetes-replicator"),
-  FLUX_OPERATOR("fluxOperator", "v0.58.0", "controlplaneio-fluxcd/flux-operator"),
+  FLUX_OPERATOR("fluxOperator", "v0.58.1", "controlplaneio-fluxcd/flux-operator"),
   ENVOY_GATEWAY("envoyGateway", "v1.8.3", "envoyproxy/gateway"),
   TAILSCALE("tailscale", "1.102.2", "tailscale/tailscale"),
   CLUSTER_API_OPERATOR(

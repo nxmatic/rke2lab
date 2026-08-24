@@ -32,8 +32,13 @@ public final class FluxOperatorManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createManifests(final Construct scope) {
+    // The component pin carries the GitHub release tag (v-prefixed, what the bumper diffs); the OCI
+    // chart tag has no v (0.52.0, not v0.52.0), so strip it — a v-prefixed version 404s the pull.
     final String version =
-        ManifestSynthesisContext.current().componentVersions().of(Component.FLUX_OPERATOR);
+        ManifestSynthesisContext.current()
+            .componentVersions()
+            .of(Component.FLUX_OPERATOR)
+            .replaceFirst("^v", "");
 
     // flux-system namespace
     ApiObject namespace =
