@@ -41,6 +41,11 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
         "/upstream/cicd/tekton-operator/release-" + operatorVersion + ".yaml";
     new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile, context.yaml());
 
+    // The operator CREATES targetNamespace (tekton-pipelines) only when it reconciles TektonConfig,
+    // but our replicated Secrets target it in the same layer. Pre-create it here so Flux — which
+    // applies Namespaces before namespaced resources — lands the Secrets; the operator then adopts
+    // the existing namespace as its targetNamespace.
+    createTargetNamespace(scope);
     createReplicatedSecret(
         scope,
         "tekton-git-auth",
@@ -52,6 +57,21 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
         "kubernetes.io/dockerconfigjson",
         "rke2lab-replicator-source/tekton-docker-config");
     createTektonConfig(scope);
+  }
+
+  private void createTargetNamespace(final Construct scope) {
+    new ApiObject(
+        scope,
+        "namespace-tekton-pipelines",
+        ApiObjectProps.builder()
+            .apiVersion("v1")
+            .kind("Namespace")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name("tekton-pipelines")
+                    .annotations(packageProfile.packageAnnotations("|Namespace||tekton-pipelines"))
+                    .build())
+            .build());
   }
 
   private void createReplicatedSecret(
@@ -75,10 +95,13 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                         .build())
                 .build());
 
+    // Valid placeholders until the mittwald replicator overwrites the data from the source secret:
+    // a dockerconfigjson value MUST parse as JSON (an empty string fails apiserver validation with
+    // "unexpected end of JSON input"), so seed the canonical empty docker config.
     Map<String, String> emptyData =
         switch (type) {
           case "kubernetes.io/basic-auth" -> Map.of("username", "", "password", "");
-          case "kubernetes.io/dockerconfigjson" -> Map.of(".dockerconfigjson", "");
+          case "kubernetes.io/dockerconfigjson" -> Map.of(".dockerconfigjson", "{\"auths\":{}}");
           default -> Map.of();
         };
 
@@ -110,10 +133,16 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                 "all",
                 "targetNamespace",
                 "tekton-pipelines",
+                // The TektonConfig CRD requires result.{disabled,is_external_db,options} and
+                // pruner.disabled (no schema defaults) — a bare result.disabled fails dry-run.
+                // Results feature off (disabled) with an internal-DB posture + empty options;
+                // pruner active (disabled=false) with our keep/schedule.
                 "result",
-                Map.of("disabled", true),
+                Map.of("disabled", true, "is_external_db", false, "options", Map.of()),
                 "pruner",
                 Map.of(
+                    "disabled",
+                    false,
                     "resources",
                     List.of("taskrun", "pipelinerun"),
                     "keep",

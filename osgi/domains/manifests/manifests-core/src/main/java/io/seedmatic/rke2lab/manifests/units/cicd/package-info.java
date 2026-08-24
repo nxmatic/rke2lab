@@ -5,8 +5,6 @@
  * <ul>
  *   <li>{@link io.seedmatic.rke2lab.manifests.units.cicd.TektonPipelinesManifestsUnit} — Tekton
  *       Pipelines.
- *   <li>{@link io.seedmatic.rke2lab.manifests.units.cicd.TektonDashboardManifestsUnit} — Tekton
- *       Dashboard.
  * </ul>
  *
  * <p>Registered by {@link io.seedmatic.rke2lab.manifests.domain.CicdDomainRegistrar}.

@@ -71,7 +71,6 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
         orderedMap(
             entry("write-kubeconfig-mode", "0640"),
             entry("bind-address", "0.0.0.0"),
-            entry("ingress-controller", "traefik"),
             entry("cni", "cilium")));
     createConfigMap(
         scope,
