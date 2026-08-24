@@ -7,6 +7,7 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.seedmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
+import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ComponentVersions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -29,7 +30,8 @@ public record ManifestSynthesisRequest(
     Optional<ImageState> imageState,
     Optional<IncusIdentityMaterial> incusIdentity,
     Optional<OperatorPkiMaterial> operatorPki,
-    Optional<GithubAppMaterial> githubApp)
+    Optional<GithubAppMaterial> githubApp,
+    Optional<ReplicatorSourceSecretsMaterial> replicatorSources)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rke2lab.manifests.policy.enabledDomains";
@@ -59,6 +61,7 @@ public record ManifestSynthesisRequest(
     incusIdentity = incusIdentity == null ? Optional.empty() : incusIdentity;
     operatorPki = operatorPki == null ? Optional.empty() : operatorPki;
     githubApp = githubApp == null ? Optional.empty() : githubApp;
+    replicatorSources = replicatorSources == null ? Optional.empty() : replicatorSources;
   }
 
   public static Builder builder(Path synthOutdir, Path synthManifestFile) {
@@ -76,7 +79,8 @@ public record ManifestSynthesisRequest(
         .imageState(imageState)
         .incusIdentity(incusIdentity)
         .operatorPki(operatorPki)
-        .githubApp(githubApp);
+        .githubApp(githubApp)
+        .replicatorSources(replicatorSources);
   }
 
   // Immutable transformations: each returns a new request with one slice replaced. They delegate to
@@ -116,6 +120,10 @@ public record ManifestSynthesisRequest(
 
   public ManifestSynthesisRequest withGithubApp(GithubAppMaterial material) {
     return toBuilder().githubApp(Optional.of(material)).build();
+  }
+
+  public ManifestSynthesisRequest withReplicatorSources(ReplicatorSourceSecretsMaterial material) {
+    return toBuilder().replicatorSources(Optional.of(material)).build();
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -182,6 +190,7 @@ public record ManifestSynthesisRequest(
     private Optional<IncusIdentityMaterial> incusIdentity = Optional.empty();
     private Optional<OperatorPkiMaterial> operatorPki = Optional.empty();
     private Optional<GithubAppMaterial> githubApp = Optional.empty();
+    private Optional<ReplicatorSourceSecretsMaterial> replicatorSources = Optional.empty();
 
     private Builder(Path synthOutdir, Path synthManifestFile) {
       this.synthOutdir = synthOutdir;
@@ -233,6 +242,11 @@ public record ManifestSynthesisRequest(
       return this;
     }
 
+    public Builder replicatorSources(final Optional<ReplicatorSourceSecretsMaterial> v) {
+      this.replicatorSources = v;
+      return this;
+    }
+
     public ManifestSynthesisRequest build() {
       return new ManifestSynthesisRequest(
           synthOutdir,
@@ -245,7 +259,8 @@ public record ManifestSynthesisRequest(
           imageState,
           incusIdentity,
           operatorPki,
-          githubApp);
+          githubApp,
+          replicatorSources);
     }
   }
 

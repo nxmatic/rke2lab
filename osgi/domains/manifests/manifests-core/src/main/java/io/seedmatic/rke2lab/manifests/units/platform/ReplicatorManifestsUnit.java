@@ -5,9 +5,12 @@ import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -32,15 +35,67 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
     final String replicatorVersion =
         ManifestSynthesisContext.current().componentVersions().of(Component.KUBERNETES_REPLICATOR);
 
-    createSourceNamespace(scope);
+    final ApiObject sourceNamespace = createSourceNamespace(scope);
     ApiObject clusterRole = createClusterRole(scope, replicatorVersion);
     ApiObject serviceAccount = createServiceAccount(scope, replicatorVersion);
     createClusterRoleBinding(scope, clusterRole, serviceAccount, replicatorVersion);
     createDeployment(scope, serviceAccount, replicatorVersion);
+    createSourceSecrets(scope, sourceNamespace);
   }
 
-  private void createSourceNamespace(final Construct scope) {
-    new ApiObject(
+  /**
+   * The SOURCE secrets (git auth, docker config, tailscale oauth) the seal rehydrated from {@code
+   * .secrets} and the manifests scion revealed onto the context. Rendered on the NODE_BOOTSTRAP
+   * lane — seeded node-side over devlxd, NEVER committed to the branch (real credentials) — and
+   * annotated so the mittwald replicator fans each out to the target namespaces where the {@code
+   * replicate-from} placeholders live. Absent material (a bare survey / before the seal filed) ⇒
+   * nothing rendered; the source namespace still stands for the controller.
+   */
+  private void createSourceSecrets(final Construct scope, final ApiObject sourceNamespace) {
+    final Optional<ReplicatorSourceSecretsMaterial> material =
+        ManifestSynthesisContext.current().replicatorSources();
+    if (material.isEmpty()) {
+      return;
+    }
+    for (final ReplicatorSourceSecretsMaterial.SourceSecret source :
+        material.orElseThrow().sources()) {
+      final Map<String, String> extra = new LinkedHashMap<>();
+      extra.put(ManifestAnnotations.NODE_BOOTSTRAP, "true");
+      extra.put("replicator.v1.mittwald.de/replication-allowed", "true");
+      extra.put(
+          "replicator.v1.mittwald.de/replication-allowed-namespaces",
+          String.join(",", source.replicationAllowedNamespaces()));
+
+      final ApiObject secret =
+          new ApiObject(
+              scope,
+              "secret-" + source.name(),
+              ApiObjectProps.builder()
+                  .apiVersion("v1")
+                  .kind("Secret")
+                  .metadata(
+                      ApiObjectMetadata.builder()
+                          .name(source.name())
+                          .namespace(source.namespace())
+                          .annotations(
+                              manifestAnnotations.packageAnnotations(
+                                  DOMAIN_NAME, PACKAGE_NAME, extra))
+                          .build())
+                  .build());
+
+      // Emitted after the source namespace so the bootstrap multi-doc file lists the Namespace
+      // first — rke2's server-manifests applier creates it before these Secrets land in it.
+      secret.addDependency(sourceNamespace);
+      secret.addJsonPatch(
+          JsonPatch.add("/type", source.type()), JsonPatch.add("/stringData", source.stringData()));
+    }
+  }
+
+  // NODE_BOOTSTRAP: the source namespace rides the bootstrap lane WITH its secrets (a self-
+  // contained set seeded node-side at grow), so the Secrets have a namespace to land in before Flux
+  // — never split across the bootstrap lane and the rendered branch.
+  private ApiObject createSourceNamespace(final Construct scope) {
+    return new ApiObject(
         scope,
         "namespace-rke2lab-replicator-source",
         ApiObjectProps.builder()
@@ -49,7 +104,11 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("rke2lab-replicator-source")
-                    .annotations(manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
+                    .annotations(
+                        manifestAnnotations.packageAnnotations(
+                            DOMAIN_NAME,
+                            PACKAGE_NAME,
+                            Map.of(ManifestAnnotations.NODE_BOOTSTRAP, "true")))
                     .labels(
                         Map.of(
                             "app.kubernetes.io/name",

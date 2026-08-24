@@ -9,6 +9,7 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.ImageState;
 import io.seedmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
+import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ComponentVersions;
 import java.nio.file.Path;
@@ -124,6 +125,10 @@ public final class ManifestSynthesisContext {
 
   public Optional<GithubAppMaterial> githubApp() {
     return request.githubApp();
+  }
+
+  public Optional<ReplicatorSourceSecretsMaterial> replicatorSources() {
+    return request.replicatorSources();
   }
 
   public Optional<SopsAgeMaterial> sopsAgeMaterial() {

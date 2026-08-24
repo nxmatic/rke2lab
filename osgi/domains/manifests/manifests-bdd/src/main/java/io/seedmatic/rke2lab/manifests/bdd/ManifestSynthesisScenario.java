@@ -20,6 +20,7 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
+import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsBundle;
 import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsCoordinate;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
@@ -179,6 +180,22 @@ public class ManifestSynthesisScenario
     return cellar.fetch(parcel.orElseThrow(), GhAppCase.GITHUB_APP, GithubAppMaterial.class);
   }
 
+  /**
+   * The mittwald-replicator SOURCE secrets the {@code replicator-secrets} seal rehydrated from
+   * {@code .secrets} and filed SEALED, revealed from the cellar in-container so {@code
+   * ReplicatorManifestsUnit} renders them onto the node-bootstrap lane. Empty on a bare survey /
+   * before the seal filed (an empty material seals nothing) → the unit renders no source secrets.
+   */
+  private Optional<ReplicatorSourceSecretsMaterial> revealReplicatorSources() {
+    if (cellar == null || parcel.isEmpty()) {
+      return Optional.empty();
+    }
+    return cellar.fetch(
+        parcel.orElseThrow(),
+        ReplicatorSecretsCase.REPLICATOR_SECRETS,
+        ReplicatorSourceSecretsMaterial.class);
+  }
+
   private static final String TAILNET_AUTHORITY = "mammoth-skate";
   private static final String SIGNING_KEY = "github-signing";
   private static final String RENDER_TOOL = "manifests-render";
@@ -308,7 +325,8 @@ public class ManifestSynthesisScenario
     when()
         .the_policy_is_derived_from_the_facet()
         .and()
-        .the_manifests_are_synthesized(revealOperatorPki(), revealGithubApp(), rendered);
+        .the_manifests_are_synthesized(
+            revealOperatorPki(), revealGithubApp(), revealReplicatorSources(), rendered);
     then()
         .every_enabled_domain_produced_its_units()
         .and()
@@ -401,6 +419,7 @@ public class ManifestSynthesisScenario
     public When the_manifests_are_synthesized(
         @Hidden Optional<OperatorPkiMaterial> operatorPki,
         @Hidden Optional<GithubAppMaterial> githubApp,
+        @Hidden Optional<ReplicatorSourceSecretsMaterial> replicatorSources,
         @Hidden Optional<LinkedWorktree> rendered) {
       final ManifestsRunbookInput.DebugFacet debug = facet.facets().debug();
       final FloxDebugPolicy floxDebug =
@@ -443,6 +462,9 @@ public class ManifestSynthesisScenario
       // registration filed): the githubapp Secret unit renders Flux's App-auth Secret from them, or
       // nothing.
       builder.githubApp(githubApp);
+      // The replicator SOURCE secrets revealed from the cellar (empty on a bare survey / before the
+      // seal filed): ReplicatorManifestsUnit renders them onto the node-bootstrap lane, or nothing.
+      builder.replicatorSources(replicatorSources);
       final ManifestSynthesisRequest request = builder.build();
       try {
         this.result = synthesis.orElseThrow().synthesize(request);

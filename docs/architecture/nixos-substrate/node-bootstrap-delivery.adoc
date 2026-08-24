@@ -114,7 +114,25 @@ flowchart LR
 | `manifests-ingress-contract` (`type=dual-realm`)
 | The `@SeedContract("server-manifests")` record carrying the multi-doc YAML across the
   cellar; SEALED at rest.
+
+| `ReplicatorSourceSecretsMaterial`
+| `manifests-contract` (bundle-only)
+| The mittwald-replicator SOURCE secrets (git basic-auth, docker dockerconfigjson, tailscale
+  oauth) the `replicator-secrets` seal rehydrates from `.secrets` and files SEALED; revealed
+  in-container and rendered by `ReplicatorManifestsUnit` onto THIS lane, so the real credentials
+  are seeded node-side and never committed to the branch. A blind manifests-side mirror (the
+  `GithubAppMaterial` treatment).
 |===
+
+The *replicator source secrets* ride the bootstrap lane rather than the branch precisely because
+they carry real credentials: the branch is committed via jgit with no sops filter, so a secret
+rendered there would be plaintext (see the exploder's `.gitattributes` second belt). The seal
+(`ReplicatorSecretsSealScenario`, sown by `the replicator secrets are sealed` before
+incus-provision) reads `.secrets` `kubernetes.secrets` (the source→target mapping) + the
+`tekton.*` / `tailscale.*` credential blocks through the read-only `SecretsGateway`, assembles the
+`ReplicatorSourceSecretsMaterial`, and files it SEALED. The rendered source secrets carry the
+mittwald `replication-allowed` + `replication-allowed-namespaces` annotations so the in-cluster
+replicator fans each out to the target namespaces where the `replicate-from` placeholders live.
 
 == Related
 

@@ -187,6 +187,8 @@ public class ClusterSeedScenario
         .and()
         .the_github_writer_token_is_sealed(hostScenario, hostTree)
         .and()
+        .the_replicator_secrets_are_sealed(hostScenario, hostTree)
+        .and()
         .the_instance_is_provisioned(hostScenario, hostTree)
         .and()
         .the_instance_grows()
@@ -514,6 +516,22 @@ public class ClusterSeedScenario
       sowAndGraft
           .sowing("auth", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the github writer token is sealed");
+      return self();
+    }
+
+    @NestedSteps
+    @As("the replicator secrets are sealed")
+    public When the_replicator_secrets_are_sealed(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // The replicator-secrets seal scion rehydrates the mittwald SOURCE secrets from .secrets
+      // (tekton git/docker, tailscale oauth) via the host SecretsGateway seam and files them SEALED
+      // for the manifests synthesis to reveal + ReplicatorManifestsUnit to render onto the
+      // node-bootstrap lane. Sown BEFORE incus-provision (which sub-sows manifests synthesis, the
+      // consumer). No amendment: the scion reads .secrets in-container, so the sow carries an empty
+      // trigger.
+      sowAndGraft
+          .sowing("replicator-secrets", gardening, hostScenario, hostTree)
+          .the_scion_is_sown_and_grafted("the replicator secrets are sealed");
       return self();
     }
 
