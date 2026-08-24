@@ -73,6 +73,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     // Callers are responsible for clearing stale per-resource files before
     // invoking explode.
     Files.createDirectories(target);
+    writeSopsGuard(target);
 
     final List<Path> written = new ArrayList<>();
     // The node-side bootstrap lane: resources marked NODE_BOOTSTRAP are NOT written into the
@@ -128,6 +129,25 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     }
 
     return new ManifestExplodeResult(target, written);
+  }
+
+  /**
+   * Belt-and-suspenders: bind any Secret rendered into the branch tree to the sops clean filter, so
+   * if one ever carries real data its {@code data}/{@code stringData} commits ENCRYPTED (the age
+   * recipients in the repo's {@code .sops.yaml}), never plaintext. The PRIMARY guarantee stays that
+   * real-data secrets ride the {@link ManifestAnnotations#NODE_BOOTSTRAP} lane and never reach the
+   * branch at all; this {@code .gitattributes} is the second belt, engaged by any filter-aware
+   * committer over the tree (the operator's git CLI, which carries the {@code sops-yaml} filter).
+   */
+  private void writeSopsGuard(final Path target) throws IOException {
+    Files.writeString(
+        target.resolve(".gitattributes"),
+        """
+        # Rendered Secrets are sops-filtered so their data/stringData commits encrypted, never
+        # plaintext. Primary guarantee: real-data secrets ride the node-bootstrap lane (never here).
+        **/*-secret-*.yml filter=sops-yaml
+        **/.secret-*.yml filter=sops-yaml
+        """);
   }
 
   /**
