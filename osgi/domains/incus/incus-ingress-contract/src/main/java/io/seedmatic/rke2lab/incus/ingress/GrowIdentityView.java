@@ -14,5 +14,17 @@ package io.seedmatic.rke2lab.incus.ingress;
  * <cluster>-<node>} (the OS hostname the node sets so mDNS resolves {@code
  * <cluster>-<node>.local}). The host cannot read the blueprint typed, so the scion resolves it and
  * projects these flat values here; the host only poses them.
+ *
+ * <p>The {@code clusterPodCidr}/{@code clusterServiceCidr} are the PER-CLUSTER dual-stack spans
+ * ({@code 10.<44+id>.0.0/16,fd00:<44+id>::/56}) the guest bakes into rke2's {@code cluster-cidr}/
+ * {@code service-cidr} — homogeneous image, so the CIDRs cannot be a static nix literal (they
+ * differ per cluster on the shared host); the node reads them back over devlxd and writes the rke2
+ * config drop-in at boot (see {@code nixos/rke2.nix} {@code rke2lab-dualstack}).
  */
-public record GrowIdentityView(String nodeName, String nodeHostname, String nodeKind, int nodeId) {}
+public record GrowIdentityView(
+    String nodeName,
+    String nodeHostname,
+    String nodeKind,
+    int nodeId,
+    String clusterPodCidr,
+    String clusterServiceCidr) {}

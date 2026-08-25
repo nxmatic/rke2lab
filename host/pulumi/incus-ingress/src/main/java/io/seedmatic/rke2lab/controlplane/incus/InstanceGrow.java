@@ -288,6 +288,11 @@ public final class InstanceGrow {
     instanceConfig.put("user.rke2lab.node-hostname", identity.nodeHostname());
     instanceConfig.put("user.rke2lab.node-kind", identity.nodeKind());
     instanceConfig.put("user.rke2lab.node-id", String.valueOf(identity.nodeId()));
+    // The per-cluster dual-stack pod/service CIDRs — the homogeneous image cannot bake a static
+    // cluster-cidr (it differs per cluster on the shared host), so the guest reads these back over
+    // devlxd and writes rke2's 10-dualstack.yaml at boot (nixos/rke2.nix rke2lab-dualstack).
+    instanceConfig.put("user.rke2lab.cluster-pod-cidr", identity.clusterPodCidr());
+    instanceConfig.put("user.rke2lab.cluster-service-cidr", identity.clusterServiceCidr());
     // The host GROW poses whatever extra devlxd keys the caller resolved — the cluster PKI the seal
     // scion filed (the sops CA bundle + the age identity). Opaque here: the scenario fetched them.
     instanceConfig.putAll(extraDevlxdConfig);

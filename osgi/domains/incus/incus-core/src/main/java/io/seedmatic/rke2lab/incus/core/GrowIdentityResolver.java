@@ -34,6 +34,8 @@ public final class GrowIdentityResolver {
         blueprint.node().name(),
         cluster + "-" + blueprint.node().name(),
         blueprint.node().type().kind(),
-        blueprint.node().id());
+        blueprint.node().id(),
+        blueprint.podCidrDualStack(),
+        blueprint.serviceCidrDualStack());
   }
 }

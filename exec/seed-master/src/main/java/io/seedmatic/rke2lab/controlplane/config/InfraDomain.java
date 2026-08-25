@@ -17,7 +17,6 @@ public enum InfraDomain {
     InfraConfigFragment contribute(ConfigLoader loader) {
       return new Rke2labConfig.IncusConfig(
           loader.optional(domainId(), "project"),
-          loader.optional(domainId(), "defaultRemote"),
           loader.optionalUri(domainId(), "remoteAddress"),
           loader.requirePath(domainId(), "configDir"));
     }

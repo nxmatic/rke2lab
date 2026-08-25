@@ -41,15 +41,20 @@ can escape the lane.
 
 [IMPORTANT]
 ====
-*Cilium native routing is DUAL-STACK, coupled to `nixos/rke2.nix`.* The node's
-`cluster-cidr` is baked dual-stack (`10.42.0.0/16,fd00:42::/56`), so the cilium
-`HelmChartConfig` MUST enable IPv6 and set both native-routing CIDRs — cilium's
-`routingMode: native` template hard-fails the helm install
-(`ipv6NativeRoutingCIDR must be set when routingMode is native`) the moment
-`ipv6.enabled` is true, and a v4-only config leaves the node NotReady. Both CIDRs come
-from one source, `ClusterNetworkBlueprint` (`POD_CIDR` / `POD_CIDR_V6`), which the
-`CiliumConfigManifestsUnit` interpolates — those constants must track the nix
-`cluster-cidr`, since the two live in different languages and cannot import each other.
+*Cilium native routing is DUAL-STACK and PER-CLUSTER.* The node's `cluster-cidr` is
+dual-stack (`10.<44+id>.0.0/16,fd00:<44+id>::/56`) and differs per cluster, so it CANNOT be
+a static `nixos/rke2.nix` literal — the `node-base` image is homogeneous across all clusters.
+Instead the grow projects the CIDRs (from `ClusterNetworkBlueprint.podCidrDualStack(clusterId)`)
+onto the instance's `user.rke2lab.cluster-pod-cidr` / `cluster-service-cidr` devlxd keys;
+`rke2lab-identity` reads them into `/run/rke2lab/node.env`, and the `rke2lab-dualstack` oneshot
+writes rke2's `10-dualstack.yaml` drop-in from there at boot (the same runtime-drop-in pattern as
+`rke2lab-tls-san`). The cilium `HelmChartConfig` MUST enable IPv6 and set both native-routing
+CIDRs — `routingMode: native` hard-fails the helm install (`ipv6NativeRoutingCIDR must be set
+when routingMode is native`) the moment `ipv6.enabled` is true, and a v4-only config leaves the
+node NotReady. `CiliumConfigManifestsUnit` derives those from the SAME blueprint
+(`podCidr()` / `podCidrV6()`), so nix and cilium track one source (the identity-keyed blueprint)
+rather than both hardcoding a literal. See link:../cluster-api/cluster-addressing-plan.adoc[the
+cluster addressing plan] for the per-cluster CIDR formulae.
 ====
 
 == The seam — synth carves, host poses, node writes

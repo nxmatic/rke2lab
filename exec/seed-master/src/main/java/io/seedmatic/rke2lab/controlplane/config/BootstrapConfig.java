@@ -14,6 +14,8 @@ import org.osgi.service.log.LogLevel;
  * Runtime configuration for provider-native Stage A bootstrap, derived from {@link Rke2labConfig}.
  */
 public record BootstrapConfig(
+    String host,
+    String role,
     String clusterName,
     String nodeName,
     String incusProject,
@@ -37,7 +39,8 @@ public record BootstrapConfig(
 
   // Defaults applied here, at the single derivation site — formerly the Builder field initializers
   // and the env/JGit/user.home detection in the deleted Defaults class.
-  private static final String DEFAULT_CLUSTER_NAME = "bioskop";
+  private static final String DEFAULT_HOST = "bioskop";
+  private static final String DEFAULT_ROLE = "mgmt";
   private static final String DEFAULT_NODE_NAME = "master";
   private static final String DEFAULT_INCUS_PROJECT = "rke2lab";
   // The one seed image's incus alias — the host adopts the built image by it. Single source here;
@@ -63,19 +66,24 @@ public record BootstrapConfig(
    * non-null; optional values get their default here.
    */
   public static BootstrapConfig from(Rke2labConfig config) {
-    final String clusterName = config.cluster().name().orElse(DEFAULT_CLUSTER_NAME);
+    // The cluster identity atoms are the single source of truth; the cluster name is DERIVED
+    // <host>-<role> (bioskop-mgmt), never stored. host names the incus substrate the nodes grow on;
+    // role is mgmt/wrkld — so two clusters on one host (bioskop-mgmt / bioskop-wrkld) stay distinct
+    // in every derived name (branch, node fqdn, k8s cluster).
+    final String host = config.cluster().host().orElse(DEFAULT_HOST);
+    final String role = config.cluster().role().orElse(DEFAULT_ROLE);
+    final String clusterName = host + "-" + role;
     final String nodeName = config.node().name().orElse(DEFAULT_NODE_NAME);
-    // The rke2lab host naming convention is derived from the cluster name — the infra is identical
-    // across clusters, only the prefix differs: the NixOS host is <cluster>-nixos. Its RESOLVABLE
-    // address rides the LAN mDNS <host>.local, NOT the tailnet MagicDNS bare name: the incus daemon
-    // binds dual-stack [::]:8443 which the .local name reaches, and this is the SAME channel the
-    // operator's own ~/.config/incus remote already uses. The bare tailnet name is avoided here —
-    // it resolves to a tailnet IP that currently times out from the seed host. Only the incus
-    // remote
-    // LABEL (defaultRemote) stays the bare name (a pure label, never resolved). Deriving here keeps
-    // the cluster name a single source in config.
-    final String nixosHost = clusterName + "-nixos";
-    final String nixosMdnsHost = nixosHost + ".local";
+    // The incus/nixos daemon host — the SINGLE place the "<host>-nixos" convention is spelled.
+    // Explicit rke2lab:cluster:remoteIncus wins (a mgmt cluster grows a workload on ANOTHER host's
+    // remote, so it is config, not decomposed from the cluster name); absent, defaulted here once.
+    // It is the incus remote LABEL, the resolvable daemon address, and the ssh builder host — one
+    // name for all three. Its RESOLVABLE form rides the LAN mDNS <host>-nixos.local (the incus
+    // daemon binds dual-stack [::]:8443 the .local name reaches — the operator's own
+    // ~/.config/incus
+    // channel; the bare tailnet name times out from the seed host).
+    final String remoteIncus = config.cluster().remoteIncus().orElseGet(() -> host + "-nixos");
+    final String nixosMdnsHost = remoteIncus + ".local";
 
     // Flat kubeconfig at .local.d/kubeconfig.yaml — one single-node management cluster.
     final Path kubeconfigRef =
@@ -85,10 +93,12 @@ public record BootstrapConfig(
             .orElseGet(() -> Path.of(BootstrapPaths.STATE_DIR, "kubeconfig.yaml").normalize());
 
     return new BootstrapConfig(
+        host,
+        role,
         clusterName,
         nodeName,
         config.incus().project().orElse(DEFAULT_INCUS_PROJECT),
-        config.incus().defaultRemote().orElseGet(() -> nixosHost),
+        remoteIncus,
         config
             .incus()
             .remoteAddress()
@@ -151,6 +161,6 @@ public record BootstrapConfig(
   }
 
   public String netPrefix() {
-    return "/net/" + clusterName + ".local";
+    return "/net/" + host + ".local";
   }
 }

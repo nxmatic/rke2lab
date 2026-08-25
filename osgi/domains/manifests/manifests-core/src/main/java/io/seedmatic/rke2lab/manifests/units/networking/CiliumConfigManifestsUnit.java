@@ -2,8 +2,10 @@
 package io.seedmatic.rke2lab.manifests.units.networking;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.List;
@@ -54,6 +56,17 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createHelmChartConfig(final Construct scope) {
+    final BootstrapIdentity identity = ManifestSynthesisContext.current().bootstrapIdentity();
+    // The pod/mesh spans are cluster-scoped (a pure function of clusterId, node-independent), so
+    // the
+    // blueprint is derived on the canonical master — the cluster name carries the identity.
+    final ClusterNetworkBlueprint blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster(identity.clusterName())
+            .node("master")
+            .deriveRecipeModel()
+            .build();
+
     ApiObject helmChartConfig =
         new ApiObject(
             scope,
@@ -88,8 +101,8 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
                 bgpControlPlane:
                   enabled: true
                 cluster:
-                  name: sample
-                  id: 7
+                  name: %s
+                  id: %d
                 clustermesh:
                   enabled: true
                   useAPIServer: true
@@ -149,6 +162,9 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
                 socketLB:
                   enabled: true"""
                     .formatted(
-                        ClusterNetworkBlueprint.POD_CIDR, ClusterNetworkBlueprint.POD_CIDR_V6))));
+                        identity.clusterName(),
+                        blueprint.meshClusterId(),
+                        blueprint.podCidr(),
+                        blueprint.podCidrV6()))));
   }
 }

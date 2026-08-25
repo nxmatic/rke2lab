@@ -1,7 +1,13 @@
 encryptionsalt: v1:egSmVjEn+Rc=:v1:tDy9P3PFPKGpSmW7:ohDWaFDPxvO+kWbTRVEh6BJCDHHuag==
 config:
   rke2lab:cluster:
-    name: bioskop
+    # Identity atoms — the cluster name is DERIVED <host>-<role> (bioskop-mgmt), never written here.
+    # host = the incus substrate the nodes grow on; role = mgmt|wrkld. remoteIncus is the ONE place
+    # the <host>-nixos incus remote label is spelled (a mgmt cluster grows a workload on another
+    # host's remote, so it is explicit, not decomposed).
+    host: bioskop
+    role: mgmt
+    remoteIncus: bioskop-nixos
   rke2lab:node:
     name: master
   rke2lab:profile:

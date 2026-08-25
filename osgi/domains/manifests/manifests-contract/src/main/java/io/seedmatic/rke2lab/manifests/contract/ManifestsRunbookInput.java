@@ -180,13 +180,14 @@ public record ManifestsRunbookInput(
   public record Identity(String clusterName, String nodeName) {
 
     /**
-     * The cluster identity {@code <host>-<role>} — {@code clusterName-nodeName}, the SAME identity
-     * the node's mDNS FQDN ({@code <cluster>-<node>.local}) and the seed-node name carry. It is the
-     * rendered branch's name ({@code manifests/<clusterId>}) and its render-worktree leaf, so a
-     * cluster's branch reads {@code manifests/nikopol-mgmt}, not the bare host.
+     * The cluster identity {@code <host>-<role>} — the {@code clusterName} itself (e.g. {@code
+     * bioskop-mgmt}). It is the rendered branch's name ({@code manifests/<clusterId>}) and its
+     * render-worktree leaf — PER-CLUSTER, so a cluster's branch reads {@code
+     * manifests/nikopol-mgmt} (no node suffix; every node of the cluster shares the one GitOps
+     * branch).
      */
     public String clusterId() {
-      return clusterName + "-" + nodeName;
+      return clusterName;
     }
   }
 

@@ -60,8 +60,8 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
   public NetworkTopology networkTopology() {
     return NetworkTopology.builder()
         .clusterCidr(blueprint.host().clusterCidr().toString())
-        .clusterPodCidr(ClusterNetworkBlueprint.POD_CIDR)
-        .clusterServiceCidr(ClusterNetworkBlueprint.SERVICE_CIDR)
+        .clusterPodCidr(blueprint.podCidrDualStack())
+        .clusterServiceCidr(blueprint.serviceCidrDualStack())
         .nodeHostInetAddr(blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress())
         .nodeNetworkCidr(blueprint.nodeNetwork().nodeCidr().toString())
         .nodeNetworkGatewayAddr(blueprint.nodeNetwork().nodeGatewayInetaddr().getHostAddress())

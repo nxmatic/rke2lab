@@ -61,16 +61,16 @@ public record BootstrapIdentity(
   }
 
   /**
-   * The cluster identity slug {@code <host>-<role>} — {@code clusterName-nodeName}, the SINGLE
-   * SOURCE OF TRUTH for the rendered-branch name ({@code manifests/<clusterSlug>}) and its
-   * render-worktree leaf. Mirrors {@code ManifestsRunbookInput.Identity#clusterId()} (the door side
-   * of the same identity, where the field name is free) so a unit rendering the branch reference
-   * (e.g. {@code FluxRootManifestsUnit}) names the EXACT branch the manifests scion pushes — no
-   * {@code <host>-<role>} literal duplicated per call site. (Distinct from the numeric {@link
-   * #clusterId()} record component.)
+   * The cluster identity slug — the {@code clusterName} ({@code <host>-<role>}, e.g. {@code
+   * bioskop-mgmt}), the SINGLE SOURCE OF TRUTH for the rendered-branch name ({@code
+   * manifests/<clusterSlug>}) and its render-worktree leaf. The branch is PER-CLUSTER, not per-node
+   * (every node of a cluster shares one GitOps branch), so it carries no node suffix. Mirrors
+   * {@code ManifestsRunbookInput.Identity#clusterId()} (the door side of the same identity) so a
+   * unit rendering the branch reference (e.g. {@code FluxRootManifestsUnit}) names the EXACT branch
+   * the manifests scion pushes. (Distinct from the numeric {@link #clusterId()} record component.)
    */
   public String clusterSlug() {
-    return clusterName + "-" + nodeName;
+    return clusterName;
   }
 
   public static Builder builder() {

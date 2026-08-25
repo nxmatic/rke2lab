@@ -2,6 +2,7 @@
 package io.seedmatic.rke2lab.manifests.units.networking;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -175,6 +176,15 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createBgpClusterConfig(final Construct scope) {
+    // The BGP localASN is per-cluster (64512 + clusterId); derived on the canonical master since
+    // the
+    // ASN is cluster-scoped (node-independent) — the cluster name carries the identity.
+    final ClusterNetworkBlueprint blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster(ManifestSynthesisContext.current().bootstrapIdentity().clusterName())
+            .node("master")
+            .deriveRecipeModel()
+            .build();
     // BGP Configuration Strategy for Multi-Host Cluster Mesh
     //
     // See docs/cilium-bgp-multi-host-topology.adoc for comprehensive documentation
@@ -215,7 +225,7 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
                 List.of(
                     Map.of(
                         "localASN",
-                        ClusterAsn.RKE2_CLUSTER.number(),
+                        blueprint.bgpLocalAsn(),
                         "name",
                         "control-plane-bgp",
                         "peers",

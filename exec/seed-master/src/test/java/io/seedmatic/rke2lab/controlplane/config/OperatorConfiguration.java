@@ -42,7 +42,8 @@ public final class OperatorConfiguration {
    */
   public static OperatorConfiguration full() {
     return mandatory()
-        .with("cluster", "name", "bioskop")
+        .with("cluster", "host", "bioskop")
+        .with("cluster", "role", "mgmt")
         .with("incus", "project", "rke2lab")
         .with("systemd", "dbusHost", "bioskop-master")
         .with("systemd", "dbusPort", "12434");

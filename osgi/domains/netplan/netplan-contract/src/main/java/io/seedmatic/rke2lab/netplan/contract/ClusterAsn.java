@@ -12,10 +12,12 @@ package io.seedmatic.rke2lab.netplan.contract;
 public enum ClusterAsn {
 
   /**
-   * rke2 cluster local AS — Cilium BGP {@code localASN}; the pod/service/cluster-LAN spans carry
-   * it.
+   * rke2 cluster local-AS FAMILY BASE — Cilium BGP {@code localASN} is {@code
+   * ClusterNetworkBlueprint.bgpLocalAsn(clusterId) = 64512 + clusterId}, per-cluster so clusters
+   * sharing an L2 fabric run unambiguous BGP sessions (see the cluster addressing plan). This
+   * constant is the base {@code 64512} (the family anchor), NOT any one cluster's ASN.
    */
-  RKE2_CLUSTER(65010, "rke2-cluster"),
+  RKE2_CLUSTER(64512, "rke2-cluster"),
 
   /**
    * vmnet gateway peer AS — Cilium BGP {@code peerASN} (the external gateway the cluster peers

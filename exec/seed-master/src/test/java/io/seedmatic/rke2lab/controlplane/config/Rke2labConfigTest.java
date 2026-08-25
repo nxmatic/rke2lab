@@ -14,7 +14,8 @@ class Rke2labConfigTest {
   @Test
   void populates_infra_and_cross_cutting() {
     final Rke2labConfig config = OperatorConfiguration.full().asDto();
-    assertEquals(Optional.of("bioskop"), config.cluster().name());
+    assertEquals(Optional.of("bioskop"), config.cluster().host());
+    assertEquals(Optional.of("mgmt"), config.cluster().role());
     assertEquals(Optional.of("rke2lab"), config.incus().project());
     assertEquals(Path.of("/Users/nxmatic/.config/incus"), config.incus().configDir());
     assertEquals(Optional.of("bioskop-master"), config.systemd().dbusHost());
@@ -24,7 +25,7 @@ class Rke2labConfigTest {
   @Test
   void omitted_optional_is_empty() {
     final Rke2labConfig config = OperatorConfiguration.full().asDto();
-    assertTrue(config.incus().defaultRemote().isEmpty());
+    assertTrue(config.cluster().remoteIncus().isEmpty());
     assertTrue(config.network().lanBridgeParent().isEmpty());
     assertTrue(config.kubeconfig().ref().isEmpty());
   }
@@ -42,6 +43,6 @@ class Rke2labConfigTest {
   void defaults_path_does_not_validate_mandatory() {
     // Offline path: empty config must NOT throw.
     final Rke2labConfig config = Rke2labConfig.defaults();
-    assertTrue(config.cluster().name().isEmpty());
+    assertTrue(config.cluster().host().isEmpty());
   }
 }

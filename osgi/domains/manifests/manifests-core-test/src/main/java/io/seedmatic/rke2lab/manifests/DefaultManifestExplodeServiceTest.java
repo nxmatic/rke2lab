@@ -69,7 +69,7 @@ class DefaultManifestExplodeServiceTest {
                 ManifestAnnotations.LOCAL_CONFIG, "true",
                 ManifestAnnotations.RKE2_CONFIG, "true"));
 
-    assertEquals("runtime/rke2-config/core.yaml", explodeOne(tmp, document));
+    assertEquals("workloads/runtime/rke2-config/core.yaml", explodeOne(tmp, document));
   }
 
   @Test
@@ -85,7 +85,9 @@ class DefaultManifestExplodeServiceTest {
                 ManifestAnnotations.LOCAL_CONFIG, "true",
                 ManifestAnnotations.MANIFEST_GROUP, "true"));
 
-    assertEquals("runtime/rke2-config/.configmap-rke2-config.group.yml", explodeOne(tmp, document));
+    assertEquals(
+        "workloads/runtime/rke2-config/.configmap-rke2-config.group.yml",
+        explodeOne(tmp, document));
   }
 
   @Test
@@ -99,7 +101,8 @@ class DefaultManifestExplodeServiceTest {
             "cloud-config",
             Map.of(ManifestAnnotations.LOCAL_CONFIG, "true"));
 
-    assertEquals("runtime/cloud-config/.configmap-cloud-config.yml", explodeOne(tmp, document));
+    assertEquals(
+        "workloads/runtime/cloud-config/.configmap-cloud-config.yml", explodeOne(tmp, document));
   }
 
   @Test
@@ -107,7 +110,8 @@ class DefaultManifestExplodeServiceTest {
     final Map<String, Object> document =
         resource("ConfigMap", "headscale-config", "mesh-system", "mesh", "headscale", Map.of());
 
-    assertEquals("mesh/headscale/02-configmap-headscale-config.yml", explodeOne(tmp, document));
+    assertEquals(
+        "workloads/mesh/headscale/02-configmap-headscale-config.yml", explodeOne(tmp, document));
   }
 
   @Test
@@ -117,7 +121,7 @@ class DefaultManifestExplodeServiceTest {
             "Namespace", "rke2lab-system", null, "cluster", "runtime-system-namespace", Map.of());
 
     assertEquals(
-        "cluster/runtime-system-namespace/01-namespace-rke2lab-system.yml",
+        "workloads/cluster/runtime-system-namespace/01-namespace-rke2lab-system.yml",
         explodeOne(tmp, document));
   }
 
@@ -133,7 +137,7 @@ class DefaultManifestExplodeServiceTest {
             Map.of());
 
     assertEquals(
-        "cluster-api/operator/00-customresourcedefinition-foos.example.com.yml",
+        "crds/cluster-api/operator/00-customresourcedefinition-foos.example.com.yml",
         explodeOne(tmp, document));
   }
 

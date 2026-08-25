@@ -18,7 +18,9 @@ class BootstrapConfigFromTest {
   @Test
   void omitted_optionals_get_defaults() {
     final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
-    assertEquals("bioskop", boot.clusterName());
+    assertEquals("bioskop", boot.host());
+    assertEquals("mgmt", boot.role());
+    assertEquals("bioskop-mgmt", boot.clusterName());
     assertEquals("master", boot.nodeName());
     assertEquals("rke2lab", boot.incusProject());
     // The remote LABEL stays the bare name (a pure label, never resolved); the resolvable address
@@ -38,7 +40,7 @@ class BootstrapConfigFromTest {
     assertEquals(true, boot.automount());
     // The master container is reached over mDNS (avahi/.local), not the tailnet — so the default
     // dbus host carries the .local FQDN; a bare <cluster>-<node> would not resolve from the host.
-    assertEquals("bioskop-master.local", boot.systemdAdapterDbusHost());
+    assertEquals("bioskop-mgmt-master.local", boot.systemdAdapterDbusHost());
     assertEquals(12434, boot.systemdAdapterDbusPort());
     assertEquals(3, boot.hostAssetRotationRetentionCount());
     // No readiness config ⇒ no overrides; every deadline stays the scenario's @ReadinessDeadlines

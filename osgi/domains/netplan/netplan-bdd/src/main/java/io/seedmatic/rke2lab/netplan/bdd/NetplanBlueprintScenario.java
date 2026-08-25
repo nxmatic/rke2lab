@@ -203,12 +203,9 @@ public class NetplanBlueprintScenario
                 .build();
         segments.add(
             Segment.attribution(
-                bp.lan().nodeCidr().toString(),
-                cluster + "-cluster-lan",
-                ClusterAsn.RKE2_CLUSTER.number()));
+                bp.lan().nodeCidr().toString(), cluster + "-cluster-lan", bp.bgpLocalAsn()));
         segments.add(
-            Segment.attribution(
-                bp.lan().lbCidr().toString(), cluster + "-lb", ClusterAsn.RKE2_CLUSTER.number()));
+            Segment.attribution(bp.lan().lbCidr().toString(), cluster + "-lb", bp.bgpLocalAsn()));
 
         // The per-cluster vmnet /21 (Incus dnsmasq): gateway .1, the WAN DHCP range, and one
         // dhcp-host reservation per canonical node — the SAME tuples GrowNetworkResolver emits into
@@ -231,7 +228,7 @@ public class NetplanBlueprintScenario
             new Segment(
                 bp.host().clusterCidr().toString(),
                 cluster + "-cluster-net",
-                ClusterAsn.RKE2_CLUSTER.number(),
+                bp.bgpLocalAsn(),
                 Optional.of(bp.host().clusterGatewayInetaddr().getHostAddress()),
                 Optional.of(bp.wan().dhcpRange()),
                 Optional.empty(),
@@ -243,27 +240,24 @@ public class NetplanBlueprintScenario
               .node("master")
               .deriveRecipeModel()
               .build();
+      // Shared/attribution spans, labelled with a representative cluster's ASN (anyNode = the mgmt
+      // cluster). NOTE: pod/service are per-cluster now (10.<44+id>/10.<48+id>); this vestigial
+      // netplan narration emits ONE representative span — not fully per-cluster — pending the
+      // netplan-off-NixOS follow-up (the node network is NixOS-declared, so this is off the live
+      // path).
       segments.add(
           Segment.attribution(
-              anyNode.host().superNetworkCidr().toString(),
-              "vmnet",
-              ClusterAsn.RKE2_CLUSTER.number()));
+              anyNode.host().superNetworkCidr().toString(), "vmnet", anyNode.bgpLocalAsn()));
       segments.add(
           Segment.attribution(
               ClusterNetworkBlueprint.GATEWAY_ADDRESS + "/32",
               ClusterAsn.GATEWAY.asName(),
               ClusterAsn.GATEWAY.number()));
+      segments.add(Segment.attribution(anyNode.podCidr(), "pod", anyNode.bgpLocalAsn()));
+      segments.add(Segment.attribution(anyNode.serviceCidr(), "service", anyNode.bgpLocalAsn()));
       segments.add(
           Segment.attribution(
-              ClusterNetworkBlueprint.POD_CIDR, "pod", ClusterAsn.RKE2_CLUSTER.number()));
-      segments.add(
-          Segment.attribution(
-              ClusterNetworkBlueprint.SERVICE_CIDR, "service", ClusterAsn.RKE2_CLUSTER.number()));
-      segments.add(
-          Segment.attribution(
-              ClusterNetworkBlueprint.ULA_PREFIX + "::/48",
-              "ula",
-              ClusterAsn.RKE2_CLUSTER.number()));
+              ClusterNetworkBlueprint.ULA_PREFIX + "::/48", "ula", anyNode.bgpLocalAsn()));
 
       // asn → canonical AS name (the 'asns' dictionary nnh renders), derived from the enum. Home
       // (65000) is ndh's, added by its catalog when it unions the home segments.

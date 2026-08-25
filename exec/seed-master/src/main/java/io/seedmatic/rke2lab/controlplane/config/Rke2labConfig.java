@@ -93,7 +93,10 @@ public record Rke2labConfig(
     final Rke2labConfig dto =
         new Rke2labConfig(
             infra,
-            new ClusterConfig(loader.optional("cluster", "name")),
+            new ClusterConfig(
+                loader.optional("cluster", "host"),
+                loader.optional("cluster", "role"),
+                loader.optional("cluster", "remoteIncus")),
             new NodeConfig(loader.optional("node", "name")),
             new ProfileConfig(loader.optional("profile", "name")),
             new ApiConfig(loader.optionalUri("api", "endpoint")),
@@ -143,11 +146,7 @@ public record Rke2labConfig(
 
   // --- Infra fragments (sealed marker) ---
 
-  public record IncusConfig(
-      Optional<String> project,
-      Optional<String> defaultRemote,
-      Optional<URI> remoteAddress,
-      Path configDir)
+  public record IncusConfig(Optional<String> project, Optional<URI> remoteAddress, Path configDir)
       implements InfraConfigFragment {}
 
   public record ImageConfig(Optional<String> builderHost) implements InfraConfigFragment {}
@@ -167,7 +166,15 @@ public record Rke2labConfig(
 
   // --- Cross-cutting identity (no marker) ---
 
-  public record ClusterConfig(Optional<String> name) {}
+  /**
+   * The cluster identity atoms — the SINGLE SOURCE OF TRUTH the cluster name derives from ({@code
+   * clusterName = <host>-<role>}, never stored). {@code host} names the incus substrate the
+   * cluster's nodes grow on (bioskop/nikopol); {@code role} is mgmt/wrkld. {@code remoteIncus} is
+   * the explicit incus remote LABEL (the {@code <host>-nixos} daemon host) — the one place that
+   * name is written, not decomposed from the cluster name; absent, the derivation defaults it once.
+   */
+  public record ClusterConfig(
+      Optional<String> host, Optional<String> role, Optional<String> remoteIncus) {}
 
   public record NodeConfig(Optional<String> name) {}
 

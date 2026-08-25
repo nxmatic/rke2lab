@@ -44,27 +44,50 @@ public record ClusterNetworkBlueprint(
   public static final String ULA_PREFIX = "fd96:6924:3693";
 
   /**
-   * Pod CIDR — Cilium {@code ipv4NativeRoutingCIDR} and the rke2 node-env {@code clusterPodCidr}.
+   * Pod / Service CIDRs — PER-CLUSTER, a pure function of {@code clusterId} (see the cluster
+   * addressing plan). Under one cluster these were global constants (10.42/10.43); with four
+   * clusters sharing each host's L2 fabric they MUST be globally disjoint or pod routes collide on
+   * the bridge, so every span is {@code f(clusterId)}: pod {@code 10.<44+id>.0.0/16}, service
+   * {@code 10.<48+id>.0.0/16}. The v6 halves mirror the v4 index (digits match: pod {@code 10.44} ↔
+   * {@code fd00:44}). Cilium {@code routingMode: native} REQUIRES the v6 native-routing CIDR
+   * whenever v6 is enabled, and the node bakes the dual-stack {@code cluster-cidr} from {@link
+   * #podCidrDualStack()} — so these track the nix {@code cluster-cidr}, both derived here.
    */
-  public static final String POD_CIDR = "10.42.0.0/16";
+  public String podCidr() {
+    return "10." + (44 + cluster().id()) + ".0.0/16";
+  }
 
-  /**
-   * IPv6 pod CIDR — the v6 half of the dual-stack {@code cluster-cidr} baked in {@code
-   * nixos/rke2.nix} ({@code 10.42.0.0/16,fd00:42::/56}). Cilium {@code routingMode: native}
-   * REQUIRES {@code ipv6NativeRoutingCIDR} whenever {@code ipv6.enabled}, so this must track that
-   * nix value. Distinct from {@link #ULA_PREFIX} (the LAN/WAN underlay) — this is the in-cluster
-   * overlay.
-   */
-  public static final String POD_CIDR_V6 = "fd00:42::/56";
+  public String serviceCidr() {
+    return "10." + (48 + cluster().id()) + ".0.0/16";
+  }
 
-  /** Service CIDR — the rke2 node-env {@code clusterServiceCidr}. */
-  public static final String SERVICE_CIDR = "10.43.0.0/16";
+  public String podCidrV6() {
+    return "fd00:" + (44 + cluster().id()) + "::/56";
+  }
 
-  /**
-   * IPv6 service CIDR — the v6 half of the dual-stack {@code service-cidr} in {@code
-   * nixos/rke2.nix}.
-   */
-  public static final String SERVICE_CIDR_V6 = "fd00:43::/112";
+  public String serviceCidrV6() {
+    return "fd00:" + (48 + cluster().id()) + "::/112";
+  }
+
+  /** The dual-stack {@code cluster-cidr} the node bakes (nix drop-in + rke2 config fragment). */
+  public String podCidrDualStack() {
+    return podCidr() + "," + podCidrV6();
+  }
+
+  /** The dual-stack {@code service-cidr} the node bakes. */
+  public String serviceCidrDualStack() {
+    return serviceCidr() + "," + serviceCidrV6();
+  }
+
+  /** Cilium BGP {@code localASN} — {@code 64512 + clusterId}, anchored on {@link ClusterAsn}. */
+  public int bgpLocalAsn() {
+    return ClusterAsn.RKE2_CLUSTER.number() + cluster().id();
+  }
+
+  /** Cilium clustermesh {@code cluster.id} — {@code clusterId + 1} (globally unique, 1..). */
+  public int meshClusterId() {
+    return cluster().id() + 1;
+  }
 
   /**
    * vmnet gateway address — Cilium BGP {@code peerAddress}; equals cluster 0's {@code
@@ -109,19 +132,19 @@ public record ClusterNetworkBlueprint(
     final int hostThirdOctet = clusterId * 8;
     final int vipThirdOctet = hostThirdOctet + 7;
 
-    final int lanSlice = lanSliceIndex(clusterName);
-    final int lanLbSlice = lanLbSliceIndex(clusterName);
-
-    final int lanSliceBase = lanSlice * 32;
-    final int lanLbSliceBase = lanLbSlice * 32;
-
     final Cidr clusterCidr = Cidr.parse("10.80." + hostThirdOctet + ".0/21");
     final Cidr nodeCidr = Cidr.parse("10.80." + hostThirdOctet + ".0/23");
     final Cidr vipCidr = Cidr.parse("10.80." + vipThirdOctet + ".0/24");
     final Cidr lbCidr = Cidr.parse("10.80." + hostThirdOctet + ".64/26");
 
-    final Cidr lanNodeCidr = Cidr.parse("192.168.1." + lanSliceBase + "/27");
-    final Cidr lanLbCidr = Cidr.parse("192.168.1." + lanLbSliceBase + "/27");
+    // LAN: ONE /27 per cluster at 192.168.1.<clusterId·32>, split internally — node hosts in the
+    // low
+    // /28, LB (headscale/tailscale VIPs) in the high /28. One slice per cluster (not two) keeps
+    // four
+    // of the eight /27s free for a third host (see the cluster addressing plan).
+    final int lanSliceBase = clusterId * 32;
+    final Cidr lanNodeCidr = Cidr.parse("192.168.1." + lanSliceBase + "/28");
+    final Cidr lanLbCidr = Cidr.parse("192.168.1." + (lanSliceBase + 16) + "/28");
 
     // Each host derives from the CIDR we already hold — ask the network for its host, instead of
     // rebuilding and re-parsing an address string that re-encodes the same octets.
@@ -212,7 +235,10 @@ public record ClusterNetworkBlueprint(
         new NamePlan(
             clusterName + "-" + nodeName,
             clusterName + "-" + nodeName + ".local",
-            clusterName + "-nixos"));
+            // The incus/nixos daemon host = <host>-nixos (the bare host, not the <host>-<role>
+            // cluster). The operator-facing authority is config's rke2lab:cluster:remoteIncus; this
+            // is the netplan-domain mirror derived from the same bare host.
+            hostOf(clusterName) + "-nixos"));
   }
 
   /** Stable ref/id for contract exports. */
@@ -243,11 +269,44 @@ public record ClusterNetworkBlueprint(
         + lan.lbCidr();
   }
 
+  /**
+   * The cluster's numeric id, packing the two identity bits host-major: {@code (hostId << 1) |
+   * roleId}. Decomposes the {@code <host>-<role>} name (bioskop-mgmt → 0, bioskop-wrkld → 1,
+   * nikopol-mgmt → 2, nikopol-wrkld → 3), leaving {@code clusterId 0..7} room for a third host on
+   * bit 2. This is the plan's identity encoding — decomposing the name is exactly what it
+   * prescribes (the incus remote, by contrast, is explicit config, never decomposed). A
+   * bare/sentinel name with no {@code -} role (legacy, {@code unknown}) falls to host-only with
+   * role 0.
+   */
   private static int clusterId(String clusterName) {
-    return switch (clusterName) {
+    return (hostId(hostOf(clusterName)) << 1) | roleId(roleOf(clusterName));
+  }
+
+  /** The bare host token — the {@code <host>} of {@code <host>-<role>} (up to the first dash). */
+  private static String hostOf(String clusterName) {
+    final int dash = clusterName.indexOf('-');
+    return dash < 0 ? clusterName : clusterName.substring(0, dash);
+  }
+
+  /** The role token — the {@code <role>} of {@code <host>-<role>} (after the first dash). */
+  private static String roleOf(String clusterName) {
+    final int dash = clusterName.indexOf('-');
+    return dash < 0 ? "" : clusterName.substring(dash + 1);
+  }
+
+  private static int hostId(String host) {
+    return switch (host) {
       case "bioskop" -> 0;
-      case "nikopol" -> 1; // renamed from alcide, keeping same cluster ID
-      default -> 7;
+      case "nikopol" -> 1; // renamed from alcide, keeping same host id
+      default -> 3;
+    };
+  }
+
+  private static int roleId(String role) {
+    return switch (role) {
+      case "mgmt" -> 0;
+      case "wrkld" -> 1;
+      default -> 0;
     };
   }
 
@@ -279,22 +338,6 @@ public record ClusterNetworkBlueprint(
               + "' does not conform to canonical topology "
               + CANONICAL_NODE_NAMES);
     }
-  }
-
-  private static int lanSliceIndex(String clusterName) {
-    return switch (clusterName) {
-      case "bioskop" -> 4;
-      case "nikopol" -> 3; // renamed from alcide
-      default -> 7;
-    };
-  }
-
-  private static int lanLbSliceIndex(String clusterName) {
-    return switch (clusterName) {
-      case "bioskop" -> 6;
-      case "nikopol" -> 5; // renamed from alcide
-      default -> 7;
-    };
   }
 
   public enum NodeType {
