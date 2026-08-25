@@ -72,10 +72,15 @@ public final class ClusterKubeconfigManifestsUnit extends AbstractManifestsUnit 
     final String nodeName = synth.bootstrapIdentity().nodeName();
     final NetworkTopology topology = synth.networkTopology();
 
-    // One namespace per managed cluster (CAPI convention) — the cluster's own name, so the Cluster
-    // CR + its Machines + this kubeconfig Secret co-locate. The Namespace is cluster-scoped, so the
-    // exploder orders it 01- ahead of the 02- Secret and RKE2 applies it first.
-    final String clusterNamespace = clusterName;
+    // One namespace per managed cluster, WE create it (not CAPI) — so it carries the rke2lab prefix
+    // like every other rke2lab-owned namespace (rke2lab-system, rke2lab-replicator-source): {@code
+    // rke2lab-<cluster>}. The Cluster CR + its Machines + this kubeconfig Secret co-locate here,
+    // and
+    // CAPI reads the canonical {@code <cluster>-kubeconfig} Secret WITHIN it (the secret name stays
+    // the bare cluster name — CAPI resolves it by name inside the namespace). The Namespace is
+    // cluster-scoped, so the exploder orders it 01- ahead of the 02- Secret and RKE2 applies it
+    // first.
+    final String clusterNamespace = "rke2lab-" + clusterName;
     createClusterNamespace(scope, clusterNamespace);
 
     renderOperatorKubeconfig(scope, material, clusterName, clusterNamespace, nodeName);
