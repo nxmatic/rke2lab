@@ -130,6 +130,35 @@ class JgitRenderedBranchTest {
   }
 
   @Test
+  void re_preparing_at_a_new_path_reclaims_the_branch_from_its_stale_worktree() throws Exception {
+    try (GitGround ground = new GitGround(tmp)) {
+      // render 1 at the OLD leaf, committed — the branch is now checked out there.
+      final Path oldPath = ground.renderPath(CLUSTER);
+      final LinkedWorktree first = ground.renderedBranch().prepare(oldPath, BRANCH);
+      Files.writeString(first.path().resolve("cluster.yaml"), "kind: Cluster\n");
+      first.stageAll();
+      first.commit("render " + CLUSTER, BOT, Optional.of(ground.signingKey()));
+
+      // The render leaf is renamed out from under us (a branch renamed on the remote leaves the OLD
+      // worktree holding it). Re-preparing at a NEW path must RECLAIM the branch — release the
+      // stale
+      // worktree, re-add here — not fail "already used by worktree at …". The accretion survives.
+      final Path newPath = ground.renderPath("bioskop-mgmt");
+      final LinkedWorktree again = ground.renderedBranch().prepare(newPath, BRANCH);
+
+      assertEquals(
+          newPath.toRealPath(),
+          again.path(),
+          "the branch is re-materialised at the requested path");
+      assertFalse(Files.exists(oldPath), "the stale worktree checkout is released");
+      assertEquals(
+          2,
+          ground.commitCount(again.path()),
+          "the branch history (null base + render 1) survives");
+    }
+  }
+
+  @Test
   void close_removes_the_linked_worktree_but_keeps_the_branch() throws Exception {
     try (GitGround ground = new GitGround(tmp)) {
       final Path worktreePath = ground.renderPath(CLUSTER);

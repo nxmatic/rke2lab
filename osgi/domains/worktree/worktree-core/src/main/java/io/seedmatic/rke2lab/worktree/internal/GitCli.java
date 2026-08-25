@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -37,9 +38,24 @@ final class GitCli {
    * accretion parent). Either way the working tree is then emptied, so the fresh render starts
    * clean and a manifest removed between renders is staged as a deletion. Idempotent: any prior
    * worktree at the path is removed and pruned first.
+   *
+   * <p>A branch can live in only ONE worktree, so before claiming it here we INTROSPECT where it is
+   * currently checked out and release that worktree if it sits elsewhere — a render leaf renamed
+   * out from under us (e.g. the branch renamed on the remote, leaving the old {@code render/<slug>}
+   * holding it) would otherwise make {@code worktree add} fail {@code "already used by worktree at
+   * …"}. The branch itself survives (worktree remove ≠ branch delete), so its accretion history is
+   * reused; only the stale checkout is dropped and the branch re-materialised at the requested SOIL
+   * path where the host expects the render output.
    */
   void worktreeAdd(Path worktreePath, String branch) {
     final String path = worktreePath.toString();
+    worktreeOf(branch)
+        .filter(existing -> !existing.equals(worktreePath))
+        .ifPresent(
+            existing -> {
+              run(false, "worktree", "remove", "--force", existing.toString());
+              run(false, "worktree", "prune");
+            });
     run(false, "worktree", "remove", "--force", path);
     run(false, "worktree", "prune");
     if (branchExists(branch)) {
@@ -105,7 +121,56 @@ final class GitCli {
     return run(false, "show-ref", "--quiet", "--verify", "refs/heads/" + branch) == 0;
   }
 
+  /**
+   * The worktree {@code branch} is currently checked out in, if any — parsed from {@code git
+   * worktree list --porcelain} (blocks of {@code worktree <path>} … {@code branch
+   * refs/heads/<name>}). A branch lives in at most one worktree, so the first match is
+   * authoritative; empty when none holds it (never materialised, or only the bare ref).
+   */
+  private Optional<Path> worktreeOf(String branch) {
+    final String marker = "branch refs/heads/" + branch;
+    Path current = null;
+    for (final String line : capture("worktree", "list", "--porcelain").split("\n")) {
+      final String entry = line.strip();
+      if (entry.startsWith("worktree ")) {
+        current = Path.of(entry.substring("worktree ".length()));
+      } else if (entry.equals(marker) && current != null) {
+        return Optional.of(current.toAbsolutePath().normalize());
+      }
+    }
+    return Optional.empty();
+  }
+
   private int run(boolean check, String... args) {
+    final Result result = exec(args);
+    if (check && result.exit() != 0) {
+      throw new IllegalStateException(
+          "git "
+              + String.join(" ", args)
+              + " failed ("
+              + result.exit()
+              + "): "
+              + result.output().trim());
+    }
+    return result.exit();
+  }
+
+  /** Run git and return its stdout (stderr merged), throwing on a non-zero exit. */
+  private String capture(String... args) {
+    final Result result = exec(args);
+    if (result.exit() != 0) {
+      throw new IllegalStateException(
+          "git "
+              + String.join(" ", args)
+              + " failed ("
+              + result.exit()
+              + "): "
+              + result.output().trim());
+    }
+    return result.output();
+  }
+
+  private Result exec(String... args) {
     final List<String> command = new ArrayList<>();
     command.add("git");
     command.addAll(List.of(args));
@@ -117,16 +182,7 @@ final class GitCli {
         process.destroyForcibly();
         throw new IllegalStateException(String.join(" ", command) + " timed out after " + TIMEOUT);
       }
-      final int exit = process.exitValue();
-      if (check && exit != 0) {
-        throw new IllegalStateException(
-            String.join(" ", command)
-                + " failed ("
-                + exit
-                + "): "
-                + new String(output, StandardCharsets.UTF_8).trim());
-      }
-      return exit;
+      return new Result(process.exitValue(), new String(output, StandardCharsets.UTF_8));
     } catch (IOException ex) {
       throw new UncheckedIOException("cannot run " + String.join(" ", command), ex);
     } catch (InterruptedException ex) {
@@ -134,4 +190,6 @@ final class GitCli {
       throw new IllegalStateException("interrupted while running " + String.join(" ", command), ex);
     }
   }
+
+  private record Result(int exit, String output) {}
 }
