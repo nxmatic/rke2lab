@@ -75,7 +75,13 @@ else
     #     cache.nixos.org during eval, but our flake-built env packages (e.g.
     #     kdns-debug) have no substituter → REALISE them first, on the aarch64-linux
     #     builder, yielding exactly the paths the committed manifest.lock pins.
-    nix_flags="--no-link --print-out-paths --impure --accept-flake-config --system aarch64-linux"
+    #  3. `--system aarch64-linux` also makes nix believe the LOCAL (darwin) machine
+    #     is aarch64-linux, so it would try to build the small derivations LOCALLY
+    #     and fail ("executing bash: Undefined error: 0" — a linux ELF on darwin).
+    #     `--max-jobs 0` forbids local builds → everything offloads to the configured
+    #     aarch64-linux builder (bioskop-nixos), which is native. (Before --system,
+    #     nix knew local=darwin != linux and offloaded on its own.)
+    nix_flags="--no-link --print-out-paths --impure --accept-flake-config --system aarch64-linux --max-jobs 0"
 
     # (1) realise each env's non-substitutable flake packages before the image eval.
     # Extend this list as new flox envs gain a committed manifest.lock.
