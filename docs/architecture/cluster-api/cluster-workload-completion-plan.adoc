@@ -45,13 +45,24 @@ flowchart TD
     p3 --> p4
 ----
 
-== What still blocks progress
+== Management track — DONE (validated live 2026-08-25)
 
-* *CAPN provider not configured* — `rke2lab-cluster-api-install.service` /
-  `rke2lab-capn-provider-install.service` stay `inactive` (a systemd ordering bug: their prerequisite
-  activates after `rke2lab.target` has settled; and `clusterctl.yaml` lacks the `incus` provider). The
-  `seed-mgmt` output shows them as `pendingDependencies`. *This blocks the whole management track* — it
-  is the resume point.
+The management track (Phase 2.A below) is COMPLETE and proven on the running cluster: `bioskop-mgmt`
+comes up single-node Ready, the CAPI operator + all four providers (core, rke2 bootstrap, rke2
+control-plane, incus infrastructure) install as *manifest units* rendered into `manifests/bioskop-mgmt`
+and applied by the cluster's own Flux, and reconcile to Ready. `kubectl get providers -A` shows them
+Ready; `kubectl get clusters` is empty (no workload declared yet — the workload track below).
+
+[NOTE]
+====
+The old blocker — `rke2lab-cluster-api-install.service` / `rke2lab-capn-provider-install.service`
+`inactive`, a `clusterctl.yaml`-lacks-incus + systemd-ordering bug — is *gone*, not fixed:
+the whole `/srv/host` + `clusterctl` + host-systemd install mechanism was DISSOLVED by the NixOS
+substrate refactor. The CAPI operator installs the providers declaratively (`ClusterApiOperatorManifestsUnit`
+renders the operator release YAML + the `CoreProvider`/`InfrastructureProvider incus`/`ControlPlaneProvider
+rke2`/`BootstrapProvider rke2` CRs), delivered by GitOps like every other add-on. §2.A below is kept only
+as the record of that superseded approach.
+====
 
 NOTE: The gitops/add-on surface is *already built* as manifest units — Flux is shipped by
 `FluxOperatorManifestsUnit` (a `helm.cattle.io/v1` HelmChart, `installCRDs: true`) alongside
@@ -71,7 +82,12 @@ Stage B (CAPI + CAPN + CAPRKE2 greenfield-creating the workloads) cannot start u
 cluster has the CAPN infrastructure provider configured. Today `rke2lab-capn-provider-install.service`
 fails because `clusterctl config repositories` does not list `incus` (no `~/.cluster-api/clusterctl.yaml`).
 
-=== 2.A — Foundation: install services + clusterctl.yaml
+=== 2.A — Foundation: install services + clusterctl.yaml [SUPERSEDED]
+
+WARNING: SUPERSEDED — kept only as a record. The `clusterctl.yaml` + host-systemd install described
+here belonged to the `/srv/host` era the NixOS substrate dissolved. The CAPI operator + all four
+providers now install as GitOps manifest units (see the management-track NOTE above) and are Ready on
+the live cluster. Do not implement this section.
 
 Two prerequisite work items before any workload `Machine` reconciles:
 
@@ -89,6 +105,16 @@ Validation: `pulumi up` with these fixes should land the `seed-mgmt` output's `p
 empty (currently shows the two services as `inactive`).
 
 === 2.B — Greenfield the first workload cluster (bioskop-wrkld)
+
+[IMPORTANT]
+====
+UNDER RE-DESIGN (2026-08-25). With the management track live, the workload grow is being
+re-brainstormed from scratch with C4/UML figures (the *how*: how a synthesis run rendering
+`manifests/<host>-mgmt` declares the CR set for a DIFFERENT cluster `<host>-wrkld`; how the CAPN
+per-remote identity is sealed; whether the apply is pure GitOps-in-mgmt vs another driver). The work
+items below capture the INTENDED CR shape (still valid) but NOT the settled mechanism — treat them as
+the target artifacts, not the design. The live design work is on the whiteboard.
+====
 
 Once 2.A lands, the *first* CAPN-managed cluster is `bioskop-wrkld` — a *separate*, greenfield HA
 control plane, *not* peers of the management cluster.

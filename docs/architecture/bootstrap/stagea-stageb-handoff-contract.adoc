@@ -62,10 +62,13 @@ Stage ownership is strict:
   through the Kubernetes controllers running *in the management cluster*. It never scales the
   management cluster itself.
 
-NOTE: In the target model (link:../cluster-api/manifests-rendered-branches.adoc[Manifests Rendered
-Branches]) the imperative "Stage B `kubectl apply` the workload CRs" dissolves into GitOps: the
-workload CRs live in the rendered branch `manifests/<host>-wrkld` and reach CAPI/CAPN through it.
-Near-term `seed-master` applies them; Stage A shrinks to nix-seed + `FluxRoot` bootstrap.
+NOTE: The workload-CR *apply mechanism* (this section's imperative "Stage B `kubectl apply`" vs
+GitOps-in-mgmt vs another driver) is UNDER RE-DESIGN as of 2026-08-25 — see
+link:../cluster-api/cluster-workload-completion-plan.adoc[the completion plan] §2.B and the live
+whiteboard. What is settled and live: the management cluster runs its own Flux against
+`manifests/bioskop-mgmt` (all layers reconciling), and Stage A already shrank to nix-seed + the
+node-bootstrap set (`FluxRoot` + CNI + sops). Where the workload CRs are declared and by whom applies
+them is the open question the re-brainstorm answers.
 
 == Required handoff assets
 
@@ -169,7 +172,7 @@ Optional keys:
 handoff:
   managementClusterName: bioskop-mgmt        # <host>-mgmt, host-indifferent
   apiEndpoint: https://10.66.106.10:6443     # the MANAGEMENT cluster's API
-  kubeconfigRef: /srv/host/rke2lab-kube.d/kubeconfig.yaml
+  kubeconfigRef: .local.d/kubeconfig.yaml     # BootstrapPaths.STATE_DIR — /srv/host is dissolved
   seedNodeId: incus://rke2lab/bioskop-mgmt-master
   incusProject: rke2lab
   imageAlias: control-node
