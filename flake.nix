@@ -43,9 +43,10 @@
     # The flox runtime flake owns the NRI plugin + per-workload package
     # definitions. We re-export its outputs here so the deployable artifacts
     # build through this top-level entry point (and the aarch64-linux NRI plugin
-    # cross-builds via the configured linux-builder). It shares nixpkgs/flake-utils
-    # so there is a single resolved version set across the two flakes.
-    flox-runtime.url = "path:./osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox";
+    # cross-builds via the configured linux-builder). The shim is now its own repo
+    # (a fork), pinned to a released tag; the `follows` below dedup its aggregator +
+    # nixpkgs against ours so there is a single resolved version set across the flakes.
+    flox-runtime.url = "github:seedmatic/flox-nri-plugin?ref=v0.1.0";
     flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
     flox-runtime.inputs.flake-utils.follows = "flake-utils";
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
