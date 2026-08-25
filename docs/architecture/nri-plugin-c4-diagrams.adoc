@@ -2,35 +2,76 @@
 :toc: left
 :toclevels: 3
 
-== 1. System Context - High-Level Architecture
+[IMPORTANT]
+====
+*Two-tier delivery (substrate alignment, 2026-08-25).* The plugin is delivered in
+*two tiers* and these diagrams span both — read the tier tag on each section:
+
+* *FOUNDATION (baked, LIVE)* — the plugin binary is a flake output of
+  `github:seedmatic/flox-nri-plugin` (a fork), baked into the node-base image by
+  `nixos/containerd.nix` (symlinked to `/opt/nri/plugins/10-flox`, NRI enabled via
+  `90-nri.toml`). No DaemonSet, no `/srv/host`, no ConfigMap trampoline. This is
+  Section 1 below.
+* *EXTENSION (retained, post-boot)* — the DaemonSet installer/reconciler + the
+  remote nix builder that contribute *new/unknown* binaries and node configuration
+  at runtime. RETAINED in the codebase for future use, but no longer the primary
+  path; the stale `/srv/host` hostPath is dissolved (→ store-resolved / ConfigMap /
+  rendered-branch source). Sections 2, 3, 6 and the deployment diagram describe this
+  tier — treat their `/srv/host/...` paths as the pre-substrate form.
+
+See link:patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved
+Runtime + Remote Nix Builder] for the full two-tier design and the extraction.
+====
+
+== 1. System Context — FOUNDATION tier (baked, LIVE)
 
 [mermaid]
 ....
 flowchart TB
     User[👤 User<br/>kubectl apply]
 
-    subgraph RKE2["RKE2 Cluster"]
-        K8s[Kubernetes API<br/>Pod Orchestration]
+    subgraph Fork["github:seedmatic/flox-nri-plugin (fork, flake input)"]
+        ForkFlake[flake output<br/>flox-nri-plugin binary]
+    end
+
+    subgraph Image["node-base image · nixos/containerd.nix"]
+        Bake[tmpfiles symlink<br/>/opt/nri/plugins/10-flox → store<br/>90-nri.toml enables NRI]
+    end
+
+    subgraph RKE2["RKE2 Cluster node"]
         Containerd[Containerd<br/>Container Runtime]
         NRI[NRI Plugin<br/>Flox Injector]
     end
 
     Nix[(Nix Store<br/>/nix/store)]
-    FloxHub[(FloxHub<br/>Environments)]
+    Catalog[(Env catalog<br/>rke2lab runtime/flox<br/>kdns, headplane, ...)]
 
-    User -->|Deploy pods with<br/>flox.dev/environment| K8s
-    K8s -->|CRI: CreateContainer| Containerd
+    ForkFlake -->|flake input, nix build| Bake
+    Bake -->|launches| NRI
+    User -->|Deploy pods with<br/>flox.dev/environment| Containerd
     Containerd -->|NRI API: Events| NRI
-    NRI -->|Bind mount| Nix
-    NRI -.->|Resolve envs| FloxHub
+    NRI -->|Resolve envs| Catalog
+    NRI -->|Bind mount / overlay| Nix
 
     style User fill:#326ce5,color:#fff
     style RKE2 fill:#f9f,stroke:#333,stroke-width:2px
     style Nix fill:#7ebae4
-    style FloxHub fill:#7ebae4
+    style Catalog fill:#7ebae4
+    style Image fill:#d5e8d4,stroke:#82b366
+    style Fork fill:#dae8fc,stroke:#6c8ebf
 ....
 
-== 2. Flox Runtime Installer Pod Architecture
+The foundation is a pure bake: the fork flake's binary is symlinked in by
+`nixos/containerd.nix`, containerd launches it, and it resolves envs from the
+local rke2lab catalog + the shared `/nix/store` — no FloxHub round-trip, no runtime
+installer.
+
+== 2. Flox Runtime Installer Pod Architecture — EXTENSION tier (retained)
+
+NOTE: Retained runtime-contribution path, not the primary delivery. The plugin
+binary now arrives via the foundation bake (Section 1); this DaemonSet is kept for
+contributing new/unknown binaries + node config post-boot. `/srv/host/...` is the
+pre-substrate source and is being repointed to a store-resolved / ConfigMap source.
 
 [mermaid]
 ....
@@ -70,7 +111,11 @@ flowchart TB
     style NixStore fill:#ffd700
 ....
 
-== 3. Installation Phase - Bootstrap Flow
+== 3. Installation Phase - Bootstrap Flow — EXTENSION tier (retained)
+
+NOTE: Extension-tier bootstrap. Under the substrate the foundation bake (Section 1)
+handles the common case; this flow applies only when the runtime-contribution path
+is engaged. `/srv/host/...` paths are pre-substrate.
 
 [mermaid]
 ....
@@ -179,7 +224,11 @@ flowchart TB
     style NRI fill:#e8f4f8,stroke:#333,stroke-width:2px
 ....
 
-== 6. Sequence Diagram - Installation Flow
+== 6. Sequence Diagram - Installation Flow — EXTENSION tier (retained)
+
+NOTE: Extension-tier installer sequence (pre-substrate `/srv/host` form). The
+foundation bake replaces this for the default plugin delivery; kept for the
+runtime-contribution path.
 
 [mermaid]
 ....
@@ -279,7 +328,11 @@ sequenceDiagram
     Container->>Container: flox activate (auto-discovers $HOME/.flox)
 ....
 
-== 8. Deployment Diagram
+== 8. Deployment Diagram — EXTENSION tier (retained)
+
+NOTE: Pre-substrate deployment (`/srv/host` host-assets root). The foundation tier
+places the binary via `nixos/containerd.nix` tmpfiles into `/opt/nri/plugins` from
+the store instead; this diagram is the retained runtime-contribution form.
 
 [mermaid]
 ....
@@ -392,5 +445,15 @@ The `flox-runtime-installer` pod has two containers:
 === Environment Path Resolution
 
 * Format: `{category}/{name}` or just `{name}` (defaults to `networking/`)
-* Maps to: `/srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}`
-* Example: `networking/kdns` → `/srv/host/.../networking/kdns`
+* *Foundation (store-resolved, current):* `{category}/{name}` → readlink the
+  GC-root `/nix/var/nix/gcroots/flox-runtime/env/{category}/{name}` → the
+  `/nix/store/...` env path. The env catalog lives in rke2lab's `runtime/flox`
+  flake; the shim (fork) never holds it.
+* *Extension (pre-substrate, legacy):* mapped to
+  `/srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}` by the
+  DaemonSet installer — dissolved by the substrate, repointed to the store path.
+
+== Related Documentation
+
+* link:patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - the two-tier design these diagrams span; the fork-repo extraction and the remote builder
+* link:nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] - the nix-native runtime baked into the base closure (the foundation tier's `nixos/containerd.nix`)

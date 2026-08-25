@@ -3,21 +3,47 @@
 :toclevels: 3
 # :kroki-server-url: https://kroki.io
 
+[IMPORTANT]
+====
+*Substrate alignment (2026-08-25).* This design predates the NixOS node-base
+substrate; it assumed a distrobuilder image plus the `/srv/host` DaemonSet-installer
+as the *only* delivery path. Two things changed and this doc is rewritten around
+them:
+
+. *A two-tier delivery model.* What is *known at image-build time* is baked into
+  the node-base image's `/nix/store` (the *foundation* tier — LIVE today:
+  `nixos/containerd.nix` already resolves `flox-runtime.packages.<system>.flox-nri-plugin`
+  and symlinks it to `/opt/nri/plugins/10-flox`, NRI enabled via `90-nri.toml`).
+  What must be contributed *at runtime, post-boot* — new/unknown binaries AND node
+  configuration — stays a *retained runtime-extension* tier (the DaemonSet installer/
+  reconciler + the Part 2 remote builder). The extension is KEPT in the codebase for
+  future use even though the baked foundation is the primary path now; only the stale
+  `/srv/host` hostPath coupling is pruned (→ a substrate-compatible source).
+. *The shim source moves to its own repo.* The flox NRI shim (a *fork* of flox's
+  containerd plugin) + the `flox-runtime-scripts` are extracted to
+  `github:seedmatic/flox-nri-plugin` and consumed by rke2lab as a flake INPUT, not
+  shipped as Java resources inside the manifests-core jar. This IS Part 1 below,
+  reframed: "sources as flake inputs" now means "sources in the fork repo."
+====
+
 == Overview
 
-This design covers two intertwined changes to the Flox container runtime:
+This design covers two intertwined changes to the Flox container runtime, both
+now positioned inside the two-tier model above:
 
-. *Store-resolved runtime* — move both the loose shell scripts under
-  `manifests/src/main/resources/runtime/flox/bin/` AND the flox envs themselves
-  out of the copy-based delivery model, so the node resolves them from
-  `/nix/store` the same way it already resolves the NRI plugin binary and the
-  workload packages (kdns, headplane, ...). Scripts become nix-built packages;
-  envs are consumed via a fine-grained `.flox` symlink farm (`env/` → store,
+. *Store-resolved runtime* — move both the shell scripts under `runtime/flox/`
+  AND the flox envs themselves out of the copy-based delivery model, so the node
+  resolves them from `/nix/store` the same way it already resolves the NRI plugin
+  binary and the workload packages (kdns, headplane, ...). Scripts become nix-built
+  packages (`flox-runtime-scripts`, an output of the fork repo's flake); envs are
+  consumed via a fine-grained `.flox` symlink farm (`env/` → store,
   `run/cache/log` → local). This removes the `cp` trampoline, the lock-propagation
-  step, and the relative-flake-ref breakage in one stroke.
+  step, and the relative-flake-ref breakage in one stroke — and de-buries the Go +
+  script sources into the fork flake.
 . *Remote nix builder* — let any Flox-injected container build arbitrary,
   unknown-at-provision-time packages by delegating builds to the NixOS host
-  (`{bioskop,nikopol}-nixos`) over `ssh-ng`, while never building locally.
+  (`{bioskop,nikopol}-nixos`) over `ssh-ng`, while never building locally. This is
+  the *runtime-extension* tier's binary-contribution mechanism.
 
 They share one boundary, which is why they are designed together: the line
 between *immutable code* (belongs in `/nix/store`, read-only) and the *mutable
@@ -36,10 +62,19 @@ removes the class of bug where "the file on the node" and "the file in the repo"
 drift, and it is the prerequisite for the builder feature (a builder must hand
 back store paths the container can actually resolve).
 
-== Background: the current delivery model
+== Background: the runtime-extension delivery model
+
+NOTE: This section describes the *runtime-extension* tier (the DaemonSet installer),
+which the substrate RETAINS but demotes from primary. The plugin *binary* itself is
+no longer delivered this way — it is baked into the node-base image
+(`nixos/containerd.nix` → `/opt/nri/plugins/10-flox`, LIVE). What the extension tier
+still owns is contributing new/unknown binaries and node configuration *post-boot*.
+The one substrate change is the source of the materialized assets: the `/srv/host`
+hostPath is dissolved, so a migrated installer reads from a store-resolved package /
+ConfigMap / the rendered branch instead.
 
 The Flox runtime installer DaemonSet materializes assets through three distinct
-delivery contracts. Any migration must preserve all three.
+delivery contracts. Any migration of the *extension tier* must preserve all three.
 
 [cols="1,3,2",options="header"]
 |===
@@ -87,33 +122,44 @@ locks) cannot. The design must keep these separate.
 [mermaid]
 ....
 flowchart TB
-  subgraph synth["Synthesis (operator machine, pulumi up)"]
-    flake["runtime/flox/flake.nix\n(new: runtime-scripts pkg,\nbuilder.conf authoring)"]:::code
-    assets["FloxRuntimeAssets\n(ships store path refs,\nno loose scripts)"]:::code
-    keys[".ndh-ssh.d/keys.yaml\n(nix-store key, decrypted in tree)"]:::secret
+  subgraph fork["github:seedmatic/flox-nri-plugin (flake INPUT, fork)"]
+    forkflake["flake.nix<br/>flox-nri-plugin + flox-runtime-scripts<br/>(externals follow nix-flake-commons)"]:::code
   end
 
-  subgraph node["Cluster node (bioskop-master incus instance)"]
-    store["/nix/store/...-flox-runtime-scripts\n(immutable, read-only)"]:::store
-    workspace["/var/run/.../runtime/flox\n(mutable: flake src, locks, builds)"]:::mut
-    hooks["/usr/local/sbin/flox-nri-*-hook.sh\n(fixed OCI hook path)"]:::store
-    plugin["NRI plugin\n(mounts envs + builder.conf into containers)"]:::code
+  subgraph rke2["rke2lab flake (operator machine, pulumi up)"]
+    envflake["runtime/flox/flake.nix<br/>env catalog (kdns, headplane, ...)"]:::code
+    assets["FloxRuntimeAssets<br/>(store-path refs, no shipped Go source)"]:::code
+    keys[".ndh-ssh.d/keys.yaml<br/>(nix-store key, decrypted in tree)"]:::secret
   end
 
-  subgraph host["NixOS host (bioskop-nixos)"]
-    daemon["nix-daemon\n(native aarch64-linux builder)"]:::builder
-    inbound["nix-store SSH user\n(forced shell: nix-daemon --stdio)"]:::builder
+  subgraph found["FOUNDATION tier — baked node-base image (LIVE)"]
+    image[("nixos/containerd.nix<br/>/opt/nri/plugins/10-flox → store<br/>90-nri.toml enables NRI")]:::store
+    plugin["NRI plugin (baked binary)<br/>mounts envs + builder.conf into containers"]:::code
+  end
+
+  subgraph ext["EXTENSION tier — retained runtime contribution (post-boot)"]
+    store["/nix/store/...-flox-runtime-scripts<br/>(immutable, read-only)"]:::store
+    workspace["mutable workspace (master-only)<br/>flake src, written locks, build staging"]:::mut
+    hooks["OCI hook path (fixed)<br/>flox-nri-*-hook.sh from store libexec"]:::store
+  end
+
+  subgraph nhost["NixOS host (bioskop-nixos)"]
+    daemon["nix-daemon<br/>(native aarch64-linux builder)"]:::builder
+    inbound["nix-store SSH user<br/>(forced shell: nix-daemon --stdio)"]:::builder
   end
 
   subgraph ctr["Flox-injected container"]
-    cnix["/etc/nix/nix.conf.d/builder.conf\nmax-jobs=0, builders=ssh-ng://nix-store.<host>"]:::store
+    cnix["/etc/nix/nix.conf.d/builder.conf<br/>max-jobs=0, builders=ssh-ng://nix-store.<host>"]:::store
     cstore["/nix/store (overlay)"]:::mut
   end
 
-  flake -->|nix build| store
-  flake -->|nix build| hooks
+  forkflake -->|flake input| image
+  forkflake -->|flake input| store
+  forkflake -->|flake input| hooks
+  envflake -->|env store paths| assets
   assets -->|store path ref| workspace
   keys -->|synth-time read| assets
+  image --> plugin
   store -.->|sourced by| workspace
   plugin -->|RO bind-mount| cnix
   cnix -->|ssh-ng remote build| inbound
@@ -130,29 +176,88 @@ flowchart TB
 [cols="1,3",options="header"]
 |===
 | Color | Meaning
-| Blue | Code/synthesis (Java layers, flake, plugin)
-| Green | Immutable, store-resolved (read-only)
+| Blue | Code/synthesis (fork flake, env flake, Java layers, plugin)
+| Green | Immutable, store-resolved (read-only) — foundation bake + extension store paths
 | Orange | Mutable runtime workspace / overlay
 | Red | Secret material (synth-time only)
 | Purple | The NixOS host builder
 |===
 
-== Part 1 — Store-resolved runtime scripts
+The two tiers read left-to-right: the *fork flake* is a shared input; its
+`flox-nri-plugin` output is *baked* into the node-base image (foundation, LIVE),
+while its `flox-runtime-scripts` output feeds the *retained extension* tier that
+contributes post-boot. rke2lab keeps only the env catalog + the synth-time asset/key
+plumbing.
+
+== Part 1 — Store-resolved runtime scripts (the fork-repo extraction)
 
 === Goal
 
-Scripts under `runtime/flox/bin/` stop being source-tracked loose files copied
-through a ConfigMap. They become outputs of a nix package built by the runtime
-flake, resolved from `/nix/store`. The repository keeps the script *sources* as
-flake build inputs, not as runtime-shipped resources.
+The scripts under `runtime/flox/` stop being source-tracked loose files copied
+through a ConfigMap. They become outputs of a nix package built by the *fork
+repo's* flake, resolved from `/nix/store`. "Sources as flake build inputs, not
+runtime-shipped resources" now means: the Go plugin sources + the orchestration/
+hook scripts live in `github:seedmatic/flox-nri-plugin` and are consumed as a
+flake input — never copied into the manifests-core jar.
+
+=== Flake topology after the split
+
+The single in-tree flake (which today builds *both* the plugin and the env
+packages) splits into two, wired through the `nix-flake-commons` aggregator:
+
+[cols="1,2,2",options="header"]
+|===
+| Flake | Outputs | Consumed by
+
+| `github:seedmatic/flox-nri-plugin` (fork)
+| `flox-nri-plugin`, `flox-nri-plugin-debug`, `flox-runtime-scripts`
+| rke2lab flake input `flox-runtime` (URL repointed from `path:./…/runtime/flox`)
+
+| rke2lab `runtime/flox/flake.nix` (retained)
+| the env catalog — `kdns`, `headplane`, `headscale`, `tailscale` (+`-debug`)
+| `FloxRuntimeAssets` / the NRI plugin injects these into opted-in pods
+|===
+
+The shim (fork) is the ONLY thing that leaves; the env packages it *injects* stay
+in rke2lab because they are rke2lab's workload catalog, not the shim.
+
+[NOTE]
+.Flake-input hygiene (the aggregator discipline)
+====
+Both the fork flake and the retained env flake pin their externals to the
+seedmatic aggregator so the whole closure resolves to *one* nixpkgs (no skew, no
+repeat of the lock bloat). This is already the in-tree pattern — the fork repo
+inherits it verbatim.
+
+* In the fork's `flake.nix`:
++
+[source,nix]
+----
+flake-commons.url = "github:seedmatic/nix-flake-commons/develop";
+nixpkgs.follows    = "flake-commons/nixpkgs";
+flake-utils.follows = "flake-commons/flake-utils";
+flox.follows        = "flake-commons/flox";
+----
+* In rke2lab's root `flake.nix` (repointing the existing `flox-runtime` input):
++
+[source,nix]
+----
+flox-runtime.url = "github:seedmatic/flox-nri-plugin";      # was path:./osgi/.../runtime/flox
+flox-runtime.inputs.nixpkgs.follows      = "nixpkgs";
+flox-runtime.inputs.flake-utils.follows  = "flake-utils";
+flox-runtime.inputs.flake-commons.follows = "flake-commons";
+----
+The `follows` lines already exist for the `path:` input; the extraction only
+repoints the `url`.
+====
 
 === Package shape
 
-Add to `runtime/flox/flake.nix` a `flox-runtime-scripts` package built with
+Add to the *fork repo's* `flake.nix` a `flox-runtime-scripts` package built with
 `pkgs.writeShellApplication` per script (or a single `stdenvNoCC.mkDerivation`
 installing the set), with `runtimeInputs` declaring `bash`, `coreutils`,
 `inotify-tools`, etc. so the closure is self-contained. This mirrors how
-`flox-nri-plugin` is already a flake package.
+`flox-nri-plugin` is already a flake package there.
 
 [source,nix]
 ----
@@ -357,7 +462,7 @@ Anything not in-store and not substitutable goes to the remote builder.
   forced-command endpoint). Not the `linux-builder` key (that is host->VM).
 * *Universal, not opt-in*: every Flox container gets `builder.conf` mounted.
 * *Config ownership*: authored by the NRI manifest unit so it is retrievable and
-  patchable from code, not baked into the distrobuilder image.
+  patchable from code, not baked into the node-base image.
 
 === Secret-handling discipline
 
@@ -397,11 +502,19 @@ already present in the real store the overlay lowers from.
 
 == Sequencing
 
-Part 1 (scripts to store) is the foundation: it establishes the immutable-vs-
-mutable split cleanly and removes the loose-file delivery model. Part 2 (builder)
-builds on a store-resolved world and reuses the split. Recommended order:
-Part 1 first, then Part 2 — but the `builder.conf` mount (Part 2) is independent
-enough to land alongside if reachability is confirmed early.
+. *Part 0 — the fork-repo extraction (the concrete first step of Part 1).* The
+  `seedmatic/flox-nri-plugin` repo exists (empty root commit). Move the
+  `runtime/flox` flake's shim half (Go plugin + orchestration/hook scripts +
+  `flake.nix` producing `flox-nri-plugin` + `flox-runtime-scripts`) into it with
+  aggregator-following inputs; repoint rke2lab's `flox-runtime.url` from `path:`
+  to `github:seedmatic/flox-nri-plugin`; stop shipping the Go source as Java
+  resources in manifests-core. The env catalog stays in rke2lab's retained
+  `runtime/flox/flake.nix`.
+. *Part 1 (scripts to store)* is the foundation: it establishes the immutable-vs-
+  mutable split cleanly and removes the loose-file delivery model.
+. *Part 2 (builder)* builds on a store-resolved world and reuses the split — but
+  the `builder.conf` mount is independent enough to land alongside Part 1 if
+  reachability is confirmed early.
 
 == Related Documentation
 
@@ -409,7 +522,9 @@ enough to land alongside if reachability is confirmed early.
   the execution contract and host-asset materialization path these scripts use.
 * link:controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] —
   how host assets are materialized on nodes.
-* link:architecture/nri-plugin-c4-diagrams.adoc[NRI Plugin C4 Diagrams] —
+* link:../nri-plugin-c4-diagrams.adoc[NRI Plugin C4 Diagrams] —
   the plugin that mounts envs (and will mount `builder.conf`) into containers.
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
+* link:../nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] —
+  the foundation-tier bake (`nixos/containerd.nix`) and the dev→prod maturation arc.
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
   the synth-time secret-access pattern the builder key delivery follows.
