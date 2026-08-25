@@ -2,6 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(flox activate *)"
+    ],
+    "additionalDirectories": [
+      "/private/var/lib/git"
     ]
   },
   "model": "claude-opus-4-8[1m]",
