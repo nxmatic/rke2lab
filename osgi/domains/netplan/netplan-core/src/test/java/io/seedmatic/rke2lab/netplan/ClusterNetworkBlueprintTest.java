@@ -64,6 +64,7 @@ class ClusterNetworkBlueprintTest {
         InetAddress.getByName("fd96:6924:3693:220::10.80.16.10"),
         blueprint.nodeNetwork().nodeHostInetaddr6());
     assertEquals(
-        InetAddress.getByName("fd96:6924:3693:250::192.168.1.67"), blueprint.lan().hostInetaddr6());
+        InetAddress.getByName("fd96:6924:3693:250::192.168.1.195"),
+        blueprint.lan().hostInetaddr6());
   }
 }

@@ -83,7 +83,7 @@ The super-blocks the table carves from:
 |Service (IPv4) |`10.48.0.0/14` (48..51) |`10.<48+clusterId>.0.0/16`
 |Pod / Service (IPv6) |`fd00::/16` |Pod `fd00:<44+clusterId>::/56`, Service `fd00:<48+clusterId>::/112` — mirrors the v4 index
 |ULA underlay (IPv6) |`fd96:6924:3693::/48` |`fd96:6924:3693:<clusterId·256>00::/56` — *formula unchanged* (`String.format("%s:%02x00::/56", …)`)
-|LAN (IPv4) |`192.168.1.0/24` (8 × `/27`) |ONE `/27` per cluster at `192.168.1.<clusterId·32>` — node hosts low half, LB IPs high half (see <<lan>>)
+|LAN (IPv4) |`192.168.1.128/25` (HIGH half, 4 × `/27`) |ONE `/27` per cluster at `192.168.1.<128 + clusterId·32>` — node hosts low `/28`, LB IPs high `/28` (see <<lan>>)
 |===
 
 == IPv6 dual-stack
@@ -96,15 +96,19 @@ IMPORTANT). So the pod v6 span is not optional trivia — it is a required ciliu
 track this table.
 
 [[lan]]
-== The LAN `/27` — one slice per cluster, not two
+== The LAN `/27` — one slice per cluster, in the HIGH half
 
-The physical LAN `192.168.1.0/24` is fixed (the home network) and holds exactly eight `/27`
-slices. The prior model gave each cluster *two* `/27`s (a node slice and an LB slice); four
-clusters × two = eight would saturate the `/24` with zero headroom. This plan gives each cluster
-*one* `/27` (`192.168.1.<clusterId·32>/27`), split internally — node hosts in the low half, LB
-addresses (headscale/tailscale VIPs) in the high half. A `/27` is 32 addresses: ample for a
-management cluster (single node) and for a workload (three control-plane + two workers + a few LB
-VIPs). This halves LAN pressure and keeps four slices (`clusterId 4..7`) free for a third host.
+The physical LAN `192.168.1.0/24` is fixed (the home network) and holds eight `/27` slices, but the
+LOW half (`.0-.127`) is NOT the lab's to allocate — it is the home network's own DHCP pool and
+existing devices (the gateway sits at `.254`). A cluster node dropped there collides with the home
+LAN (an early attempt placed a node at `192.168.1.6` and the router refused the reservation). So the
+lab takes the HIGH half only: ONE `/27` per cluster at `192.168.1.<128 + clusterId·32>` — `clusterId
+0 → .128` (the address the single-cluster era already used, so nothing moves for it), then `.160`,
+`.192`, `.224`. Each `/27` is split internally — node hosts in the low `/28`, LB addresses
+(headscale/tailscale VIPs) in the high `/28`. A `/27` is 32 addresses: ample for a management cluster
+(single node) and for a workload (three control-plane + two workers + a few LB VIPs). The four
+`/27`s fill the high half exactly (bioskop/nikopol × mgmt/wrkld); a third bare-metal host would need
+its OWN LAN segment rather than more slices of this `/24`.
 
 == Clustermesh — two role-partitioned meshes
 
@@ -153,7 +157,9 @@ unambiguous when clusters that share the L2 fabric both run BGP on it.
 * *Shared fabric unchanged.* `features.networks=false` and the L2 bridge are untouched; this plan
   changes only *which* L3 spans each cluster claims on it.
 * *Extensible.* `clusterId 0..7` (third host on bit 2); pod/service `/14` supers hold four
-  clusters and widen to `/13` for eight; LAN keeps four free `/27`s.
+  clusters and widen to `/13` for eight. The LAN `/24` is the exception: only its HIGH half is the
+  lab's (the low half is the home network), so it holds exactly the four `<host>-<role>` clusters —
+  a third host brings its own LAN segment rather than more slices here.
 
 == Before → after (the code delta)
 

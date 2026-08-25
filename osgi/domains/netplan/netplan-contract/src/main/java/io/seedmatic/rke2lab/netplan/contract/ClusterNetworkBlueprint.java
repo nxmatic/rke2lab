@@ -137,12 +137,13 @@ public record ClusterNetworkBlueprint(
     final Cidr vipCidr = Cidr.parse("10.80." + vipThirdOctet + ".0/24");
     final Cidr lbCidr = Cidr.parse("10.80." + hostThirdOctet + ".64/26");
 
-    // LAN: ONE /27 per cluster at 192.168.1.<clusterId·32>, split internally — node hosts in the
-    // low
-    // /28, LB (headscale/tailscale VIPs) in the high /28. One slice per cluster (not two) keeps
-    // four
-    // of the eight /27s free for a third host (see the cluster addressing plan).
-    final int lanSliceBase = clusterId * 32;
+    // LAN: ONE /27 per cluster in the HIGH half of 192.168.1.0/24 — the LOW half (.0-.127) is the
+    // home network's (its DHCP pool + existing devices; the gateway is .254), so a cluster's nodes
+    // must NOT land there (a node at .6 collided with the home LAN). Base is 192.168.1.<128 +
+    // clusterId·32>, split internally: node hosts in the low /28, LB (headscale/tailscale VIPs) in
+    // the high /28. clusterId 0 keeps the proven .128 base (peer3 → .134); the four clusters
+    // (bioskop/nikopol × mgmt/wrkld) fill the high half — a third host needs its own LAN segment.
+    final int lanSliceBase = 128 + clusterId * 32;
     final Cidr lanNodeCidr = Cidr.parse("192.168.1." + lanSliceBase + "/28");
     final Cidr lanLbCidr = Cidr.parse("192.168.1." + (lanSliceBase + 16) + "/28");
 
