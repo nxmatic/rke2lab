@@ -75,11 +75,23 @@ let
 
   # The 3 OCI hooks the plugin references at fixed /usr/local/sbin paths
   # (sources recovered from 6e8cd3c28^, kept under nixos/flox/hooks/).
-  floxHooks = pkgs.runCommandLocal "flox-nri-hooks" { } ''
+  #
+  # runc executes OCI hooks with a MINIMAL PATH — NixOS has no /usr/bin/bash and no
+  # coreutils/util-linux on that PATH, so `#!/usr/bin/env bash` fails ("env: bash:
+  # No such file or directory") and the hooks' commands (chown/ln/mkdir/mount/sed/
+  # cat) wouldn't resolve either. Pin the interpreter to the store bash
+  # (patchShebangs) and put the hooks' runtime commands on PATH via a wrapper.
+  floxHooks = pkgs.runCommandLocal "flox-nri-hooks" {
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+  } ''
     mkdir -p $out/sbin
     install -m0755 ${./flox/hooks/flox-nri-overlay-hook.sh}  $out/sbin/flox-nri-overlay-hook.sh
     install -m0755 ${./flox/hooks/flox-nri-env-link-hook.sh} $out/sbin/flox-nri-env-link-hook.sh
     install -m0755 ${./flox/hooks/flox-nri-chown-hook.sh}    $out/sbin/flox-nri-chown-hook.sh
+    patchShebangs $out/sbin
+    for f in $out/sbin/*.sh; do
+      wrapProgram "$f" --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils pkgs.util-linux pkgs.gnused ]}
+    done
   '';
 in
 {
