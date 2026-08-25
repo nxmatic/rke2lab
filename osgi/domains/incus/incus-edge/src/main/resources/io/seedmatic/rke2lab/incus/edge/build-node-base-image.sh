@@ -59,13 +59,30 @@ else
     # realises them into /nix/store (local, content-addressed) — no tmpfs scratch and no root, unlike
     # distrobuilder. Only the two finished files are published below.
     attr="nixosConfigurations.rke2-node-base.config.system.build"
-    # No experimental-features and no --accept-flake-config here: nix-command + flakes are already in
-    # the builder's global nix config, and the flake's only nixConfig (pure-eval=false) is irrelevant
-    # to this PURE node-base eval. (The earlier `--extra-experimental-features nix-command flakes` on
-    # an unquoted, word-split flag string mis-parsed "flakes" as the installable `flake:flakes`.) The
-    # two remaining flags are single tokens, so word-splitting $nix_flags is safe.
-    nix_flags="--no-link --print-out-paths"
 
+    # The image now bakes flox ENVS (nixos/flox-runtime.nix), which import flox's
+    # buildenv.nix — that does `builtins.storePath` on the env lock's realised
+    # outputs. Two consequences for the node-base eval, both handled here:
+    #
+    #  1. It is no longer PURE → we pass `--accept-flake-config` so the flake's
+    #     `nixConfig.pure-eval = false` is honoured (no manual --impure), and
+    #     `--system aarch64-linux` so buildenv.nix's `builtins.currentSystem` keys
+    #     correctly even when this script evals on a darwin host.
+    #  2. storePath requires the outputs PRESENT. Catalog packages substitute from
+    #     cache.nixos.org during eval, but our flake-built env packages (e.g.
+    #     kdns-debug) have no substituter → REALISE them first, on the aarch64-linux
+    #     builder, yielding exactly the paths the committed manifest.lock pins.
+    nix_flags="--no-link --print-out-paths --accept-flake-config --system aarch64-linux"
+
+    # (1) realise each env's non-substitutable flake packages before the image eval.
+    # Extend this list as new flox envs gain a committed manifest.lock.
+    flox_flake="$src_dir/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox"
+    for env_pkg in kdns-debug; do
+        echo "realising flox env package: $env_pkg"
+        $nix_bin build $nix_flags "$flox_flake#$env_pkg" >/dev/null
+    done
+
+    # (2) build the two node-base artifacts.
     metadata_out="$($nix_bin build $nix_flags "$src_dir#$attr.metadata")"
     squashfs_out="$($nix_bin build $nix_flags "$src_dir#$attr.squashfs")"
 

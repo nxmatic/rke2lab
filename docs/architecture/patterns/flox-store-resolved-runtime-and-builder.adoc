@@ -384,6 +384,12 @@ not the plugin.
 
 === Open question: how the node gets the store paths (+ GC-roots)
 
+NOTE: RESOLVED for the flox ENVS — see <<l1-realised>>. The image bakes each env
+(subtree + activation + closure) and writes its GC-root declaratively via
+`nixos/flox-runtime.nix`; option (a) below (prebuild-side-effect) generalised to a
+declarative image-build. The remaining open part is only the Part-2 builder for
+*unknown-at-build* packages.
+
 The store path (scripts package + env subtrees) AND the GC-roots above must exist
 on the node before a container can resolve an env. Two options, to be decided at
 implementation:
@@ -397,6 +403,60 @@ implementation:
 
 This intersects Part 2: realizing a store path (script package or env subtree) on
 a node that lacks it is itself a remote build.
+
+[[l1-realised]]
+== L1 realised — baking flox envs via flox-buildenv (2026-08-25)
+
+The env-provisioning the old boot installer did (`prebuild_runtime_packages` →
+`flox activate` → `gcroot_env_packages`) is now done at IMAGE-BUILD by
+`nixos/flox-runtime.nix`, per "provision in the image, not at runtime". Validated
+end-to-end by spike (lock → closure realise → buildenv → module dry-run green).
+
+=== Two artifacts per env
+
+. *env subtree* — a store path with `env/{manifest.toml,manifest.lock}` (the raw
+  manifest + the committed lock). This is exactly what the NRI plugin's
+  `resolveFloxEnvironment` stats and the `env-link` hook symlinks (`.flox/env →
+  <store>/env`). GC-rooted at `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`.
+  A trivial `runCommandLocal` — NOT buildenv.
+. *activation + closure* — flox's own `buildenv.nix` output (`-dev`/`-run`), built
+  from the committed lock, baked so the container's `flox activate` is a cache-hit;
+  building it realises the package closure (kdns-debug + catalog) into the image.
+
+=== The lock (committed, like a flake.lock)
+
+`flox lock-manifest <manifest.toml>` (once, against the FloxHub catalog) → a
+committed `manifest.lock`. Packages are referenced by *derivation* → buildable:
+catalog packages (go/delve/bash/coreutils) substitute from cache.nixos.org during
+eval; flake packages (kdns-debug) build on the aarch64-linux builder (bioskop-nixos)
+to the lock's exact pinned path.
+
+=== Impurity + the two build flags (controllable)
+
+`buildenv.nix` does `builtins.storePath` on the realised outputs → the node-base
+eval is *impure*, and the outputs must be *present*. Both are controllable and
+handled by `build-node-base-image.sh`:
+
+* the flake declares `nixConfig.pure-eval = false`, activated with
+  `--accept-flake-config` (no manual `--impure`);
+* `--system aarch64-linux` sets buildenv.nix's `builtins.currentSystem` even when
+  the script evals on a darwin host;
+* storePath needs the outputs present → the script REALISES each env's
+  non-substitutable flake packages first (`nix build …#kdns-debug`), then builds
+  the image.
+
+=== Module shape
+
+`nixos/flox-runtime.nix` (imported by `nixos/default.nix`, receives `flox` via
+specialArgs): `mkEnvSubtree` (artifact 1, GC-rooted) + `mkEnvActivation` (artifact
+2, `buildenv.nix`) + the 3 OCI hooks (recovered from `6e8cd3c28^` into
+`nixos/flox/hooks/`, symlinked to `/usr/local/sbin`) + `/etc/flox.toml`
+(`environment.etc`). Adding an env = `flox lock-manifest` → commit the lock → add
+`{ category; name; }` to `envs` + the flake package to the build script's realise list.
+
+The env catalog files (`environment.d/…`) stay as flake SOURCE (read by the build);
+their old jar-resource shipping via `FloxRuntimeAssets` becomes moot (retired with
+the extension-tier rewire).
 
 [[node-config-contribution]]
 == The node-configuration contribution (the other half of the retained mechanism)
