@@ -265,13 +265,9 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
         List.of(
             Map.of("name", "KUBERNETES_SERVICE_HOST", "value", "10.80.0.10"),
             Map.of("name", "KUBERNETES_SERVICE_PORT", "value", "6443"),
-            Map.of(
-                "name",
-                "PATH",
-                "valueFrom",
-                Map.of(
-                    "configMapKeyRef",
-                    Map.of("name", "flox-env", "key", "NIX_DEFAULT_PROFILE_BIN_STORE_PATH"))),
+            // PATH is injected by the flox NRI plugin (it resolves flox's store bin
+            // and prepends it), so `flox activate` finds flox. No flox-env ConfigMap
+            // key needed — the retired DaemonSet installer used to populate it.
             Map.of("name", "HOME", "value", "/root")));
     kdnsContainer.put("livenessProbe", null);
     kdnsContainer.put("readinessProbe", null);
