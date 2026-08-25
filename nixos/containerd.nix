@@ -13,11 +13,17 @@ let
 
   # rke2's embedded containerd auto-imports config-v3.toml.d/*.toml — cleaner than overriding the
   # whole config.toml.tmpl. Two drop-ins: NRI enablement + the zfs snapshotter.
+  #
+  # We only ENABLE NRI here (socket at /var/run/nri/nri.sock); we do NOT set
+  # `plugin_path` — this rke2/containerd build does not reliably launch pre-installed
+  # plugins from it (verified: socket up, binary connects fine manually, but
+  # containerd never launched it). The plugin is instead run as a persistent systemd
+  # service (rke2lab-flox-nri-plugin, below) that connects to the socket — the
+  # baked-model equivalent of the old DaemonSet main-container.
   nriDropin = pkgs.writeText "90-nri.toml" ''
     [plugins."io.containerd.nri.v1.nri"]
       disable = false
       plugin_config_path = "/etc/nri/conf.d"
-      plugin_path = "/opt/nri/plugins"
 
     [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc.options]
       SystemdCgroup = true
@@ -42,6 +48,23 @@ in
     "L+ /var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d/90-nri.toml - - - - ${nriDropin}"
     "L+ /opt/nri/plugins/10-flox - - - - ${floxNriPlugin}/bin/flox-nri-plugin"
   ];
+
+  # Run the flox NRI plugin as a persistent service connecting to containerd's NRI
+  # socket (standalone mode). containerd does not launch it from plugin_path on this
+  # rke2/containerd build, so we own its lifecycle — the baked-model equivalent of
+  # the old DaemonSet main-container. Restart=always reconnects across containerd
+  # restarts and retries until the socket (/var/run/nri/nri.sock) is up.
+  systemd.services.rke2lab-flox-nri-plugin = {
+    description = "rke2lab flox NRI plugin (injects flox envs into workload containers)";
+    after = [ "rke2-server.service" ];
+    wants = [ "rke2-server.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      ExecStart = "${floxNriPlugin}/bin/flox-nri-plugin";
+      Restart = "always";
+      RestartSec = 5;
+    };
+  };
 
   # The zfs snapshotter's backing dataset — a legacy-mountpoint dataset (owned by the incus guest)
   # whose leaf is the NODE NAME (not the hostname): tank/rke2/control-nodes/<node-name>/containerd.
