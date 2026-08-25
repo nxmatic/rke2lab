@@ -64,15 +64,18 @@ else
     # buildenv.nix — that does `builtins.storePath` on the env lock's realised
     # outputs. Two consequences for the node-base eval, both handled here:
     #
-    #  1. It is no longer PURE → we pass `--accept-flake-config` so the flake's
-    #     `nixConfig.pure-eval = false` is honoured (no manual --impure), and
-    #     `--system aarch64-linux` so buildenv.nix's `builtins.currentSystem` keys
-    #     correctly even when this script evals on a darwin host.
+    #  1. It is no longer PURE → we pass `--impure` (buildenv.nix reads
+    #     `builtins.currentSystem` + `builtins.storePath`, both removed in pure
+    #     eval; `--accept-flake-config` alone does NOT lift them here — the flake's
+    #     `nixConfig.pure-eval=false` is not applied for this path-flake eval), plus
+    #     `--system aarch64-linux` so `builtins.currentSystem` keys correctly even
+    #     when this script evals on a darwin host. `--accept-flake-config` stays for
+    #     the flake's substituters/trusted config.
     #  2. storePath requires the outputs PRESENT. Catalog packages substitute from
     #     cache.nixos.org during eval, but our flake-built env packages (e.g.
     #     kdns-debug) have no substituter → REALISE them first, on the aarch64-linux
     #     builder, yielding exactly the paths the committed manifest.lock pins.
-    nix_flags="--no-link --print-out-paths --accept-flake-config --system aarch64-linux"
+    nix_flags="--no-link --print-out-paths --impure --accept-flake-config --system aarch64-linux"
 
     # (1) realise each env's non-substitutable flake packages before the image eval.
     # Extend this list as new flox envs gain a committed manifest.lock.
