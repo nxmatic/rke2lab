@@ -1,5 +1,5 @@
 {
-  description = "Flox runtime: NRI plugin + per-workload packages (kdns, headplane, ...) used by the rke2lab cluster";
+  description = "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).";
 
   inputs = {
     flake-commons.url = "github:seedmatic/nix-flake-commons/develop";
@@ -56,48 +56,12 @@
       };
       lib = pkgs.lib;
 
-      # ---- NRI plugin -------------------------------------------------
-      # `doCheck = false`: this is a lab-only build, the upstream tests add
-      # build time without catching anything we care about for the rke2lab use
-      # case. Same rationale applies to every workload below.
-      nriPluginCommon = {
-        pname = "flox-nri-plugin";
-        src = builtins.path {
-          path = ./nri-plugin;
-          name = "nri-plugin-src";
-        };
-        subPackages = ["cmd/flox-nri-plugin"];
-        vendorHash = "sha256-f2tBtvXqS4XfkKsNQJnwxobVNRFCwEusKC4Et7rySEk="; # lib.fakeHash;
-        env.CGO_ENABLED = "0";
-        tags = ["netgo"];
-        doCheck = false;
-        meta = with lib; {
-          description = "Flox NRI plugin for containerd - injects flox environments into containers";
-          license = licenses.mit;
-          platforms = platforms.unix;
-        };
-      };
-
-      nriPluginVersion = "0.1.7";
-
-      flox-nri-plugin = pkgs.buildGoModule (nriPluginCommon
-        // {
-          version = nriPluginVersion;
-          ldflags = [
-            "-s"
-            "-w"
-            "-X main.pluginVersion=${nriPluginVersion}"
-          ];
-        });
-
-      flox-nri-plugin-debug = pkgs.buildGoModule (nriPluginCommon
-        // {
-          pname = "flox-nri-plugin-debug";
-          version = nriPluginVersion;
-          dontStrip = true;
-          buildFlagsArray = ["-gcflags=all=-N -l"];
-          ldflags = ["-X main.pluginVersion=${nriPluginVersion}-debug"];
-        });
+      # ---- NRI plugin: MOVED OUT ---------------------------------------
+      # The flox-nri-plugin (+debug) is no longer built here — it lives in the
+      # fork repo github:seedmatic/flox-nri-plugin and is consumed as the rke2lab
+      # flake's `flox-runtime` input. This flake is now the env CATALOG only.
+      # `doCheck = false` on the workloads below: lab-only build; upstream tests
+      # add build time without catching anything the rke2lab use case cares about.
 
       # ---- kdns -------------------------------------------------------
       mkKdns = {
@@ -273,7 +237,6 @@
       };
     in {
       packages = {
-        inherit flox-nri-plugin flox-nri-plugin-debug;
         inherit kdns kdns-debug;
         inherit headplane-debug;
 
@@ -294,10 +257,10 @@
         # for `node --inspect`.
         inherit (pkgs) headplane headplane-agent headplane-nixos-docs headplane-ssh-wasm;
 
-        default = flox-nri-plugin;
+        default = kdns;
       };
 
-      defaultPackage = flox-nri-plugin;
+      defaultPackage = kdns;
     })
     // {
       # Cross-system overlay so headplane builds on darwin (pnpm hash override)
