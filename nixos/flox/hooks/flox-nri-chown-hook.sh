@@ -8,13 +8,9 @@
 #
 # Usage: flox-nri-chown-hook.sh <uid> <gid> <home-dir>
 #
-# Logging: stdout/stderr are piped to systemd-journald via logger(1). View with:
-#   journalctl -ft flox-nri-chown-hook
-# stderr (chown errors, xtrace output) is recorded at daemon.err priority.
-
-TAG=flox-nri-chown-hook
-exec > >(logger --id=$$ -t "$TAG" -p daemon.info)
-exec 2> >(logger --id=$$ -t "$TAG" -p daemon.err)
+# Logging: to the hook's own stdout/stderr, captured by the OCI runtime — no
+# logger(1)/journald reroute (keeps the hooks uniform + avoids the process-
+# substitution/`/dev/log` fragility that breaks the CreateContainer hooks).
 
 state="$(cat)"
 bundle="$(printf '%s' "$state" | sed -n 's/.*"bundle"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"

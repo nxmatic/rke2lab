@@ -27,12 +27,9 @@
 #   <target-flox-dir> absolute path inside the container (e.g. /root/.flox) where
 #                     the .flox symlink farm is materialized.
 #
-# Logging: stdout/stderr are piped to systemd-journald via logger(1). View with:
-#   journalctl -ft flox-nri-env-link-hook
-
-TAG=flox-nri-env-link-hook
-exec > >(logger --id=$$ -t "$TAG" -p daemon.info)
-exec 2> >(logger --id=$$ -t "$TAG" -p daemon.err)
+# Logging: to the hook's own stdout/stderr, captured by the OCI runtime — no
+# logger(1)/journald reroute (a CreateContainer hook runs before pivot_root where
+# /dev/log and /dev/fd may be absent, which would fail the hook at exit 127).
 
 env_store_path="$1"
 target_flox_rel="$2"

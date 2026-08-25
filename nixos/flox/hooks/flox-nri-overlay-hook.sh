@@ -1,6 +1,5 @@
 #!/usr/bin/env -S bash -euxo pipefail
 # OCI CreateContainer hook: mount an overlayfs on a path in the container rootfs.
-echo "[flox-overlay-hook] Hot-reload test - version 1.0.1" >&2
 #
 # Runs in the container's mount namespace before pivot_root, so mounts performed
 # here persist into the running container after pivot_root. (CreateRuntime hooks
@@ -27,13 +26,12 @@ echo "[flox-overlay-hook] Hot-reload test - version 1.0.1" >&2
 #   <target>        absolute path inside the container rootfs for the overlay
 #                   mountpoint
 #
-# Logging: stdout/stderr are piped to systemd-journald via logger(1). View with:
-#   journalctl -ft flox-nri-overlay-hook
-# stderr (mount errors, xtrace output) is recorded at daemon.err priority.
-
-TAG=flox-nri-overlay-hook
-exec > >(logger --id=$$ -t "$TAG" -p daemon.info)
-exec 2> >(logger --id=$$ -t "$TAG" -p daemon.err)
+# Logging: the OCI runtime (containerd/runc) captures the hook's stdout/stderr and
+# surfaces it on the pod's events + containerd log, so we log there directly. We do
+# NOT reroute through logger(1)/journald: a CreateContainer hook runs in the
+# container's restricted mount namespace before pivot_root, where /dev/log and the
+# /dev/fd process-substitution plumbing may be absent — `exec > >(logger …)` then
+# fails the hook (exit 127) before it can mount anything.
 
 overlay_name="$1"
 lower_source="$2"
