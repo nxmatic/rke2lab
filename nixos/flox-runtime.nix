@@ -63,6 +63,10 @@ let
   # The env catalog to bake. Each gets a subtree (GC-rooted) + activation (baked).
   envs = [
     { category = "networking"; name = "kdns"; }
+    # kdns-debug: the FloxDebugPolicy (debug.networking) flips kdns's pod to this
+    # env (unstripped kdns + delve/strace). Baked alongside prod so the toggle works
+    # either way without the NRI plugin hitting a missing GC-root.
+    { category = "networking"; name = "kdns-debug"; }
     # add each env here once it has a committed manifest.lock
   ];
 
