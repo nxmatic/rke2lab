@@ -355,23 +355,92 @@ The container *consumption* side no longer needs a writable workspace at all.
 The conflation in the current model — using one `cp`-everything tree for both
 production and consumption — is what this design separates.
 
-=== Open question: how the node gets the store paths
+=== The plugin's runtime deps the substrate does NOT yet bake
 
-The store path (scripts package + env subtrees) must exist on the node before
-the container can resolve it. Two options, to be decided at implementation:
+The plugin *binary* is baked (foundation, LIVE), but injection is a no-op until
+two host-side inputs exist — and neither is currently provisioned by `nixos/`
+(both were casualties of the `/srv/host` dissolution, commit `6e8cd3c28`):
+
+[cols="1,3",options="header"]
+|===
+| Runtime dep | Status / what must provision it
+
+| *flox-env GC-roots* — `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`
+| The plugin's `resolveFloxEnvironment` reads these to map `category/name` → the
+  immutable `/nix/store` env path. Absent from `nixos/` → the plugin resolves
+  *nothing*. Provisioning them is exactly the store-path publishing below.
+
+| *`/etc/flox.toml`* (host file, optional)
+| Projected read-only into every injected container if present (the `floxSystemConfigPath`
+  path in `plugin.go`). Absent from `nixos/` → projection is silently skipped. It
+  can simply be baked as an `environment.etc` entry in a `nixos/` module (it is
+  static host config, foundation-tier — no runtime contribution needed).
+|===
+
+The plugin reads *no* environment variables beyond `NRI_PLUGIN_SOCKET` (set by
+containerd at launch). It is not affected by the dissolved NodeEnv env-var
+mechanism (see <<node-config-contribution>>) — that fed the *RKE2 server / node*,
+not the plugin.
+
+=== Open question: how the node gets the store paths (+ GC-roots)
+
+The store path (scripts package + env subtrees) AND the GC-roots above must exist
+on the node before a container can resolve an env. Two options, to be decided at
+implementation:
 
 * *(a)* the runtime flake's `flox activate` prebuild pass (already runs on the
-  master) realizes the packages and `nix store add-path` the env subtrees into
-  the node store as a side effect, and the synthesis layer passes the resolved
-  store paths in;
+  master) realizes the packages, `nix store add-path`s the env subtrees, and
+  writes the `gcroots/flox-runtime/env/<cat>/<name>` links as a side effect; the
+  synthesis layer passes the resolved store paths in;
 * *(b)* the packages are added to the set the master pre-builds explicitly, and
-  the store paths are published through the image-state/handoff surface.
+  the store paths + GC-roots are published through the image-state/handoff surface.
 
-This intersects Part 2: realizing a store path on a node that lacks it is itself
-a remote build.
+This intersects Part 2: realizing a store path (script package or env subtree) on
+a node that lacks it is itself a remote build.
 
-This intersects Part 2: once the builder exists, realizing a script package on a
-node that lacks it is itself a remote-build.
+[[node-config-contribution]]
+== The node-configuration contribution (the other half of the retained mechanism)
+
+The governing principle keeps the runtime-contribution mechanism for *both*
+binaries AND node configuration. Part 1 + Part 2 cover the binary half. This
+section records the *node-configuration* half — the mechanism that let the seed
+world contribute environment/config to the node's runtime — so it is not lost.
+
+=== What it was (dissolved, recoverable)
+
+Originally the seed world defined a rich, *domain-extensible* set of node
+environment variables that the RKE2 node's runtime consumed. The shape:
+
+* a `NodeEnvContributor` SPI + a registry, with *one contributor per domain* —
+  each domain contributed its own `RKE2LAB_*` variables;
+* the aggregate rendered by `RKE2LabEnvConfigManifestsUnit` (+ `HostPaths`) and
+  delivered to the node, where it was loaded into the RKE2 runtime.
+
+Commit `6e8cd3c28` *dissolved* this along with the `/srv/host` systemd-infra
+synthesis, because the NixOS substrate bakes node config declaratively.
+`NodeEnvContext`/`DefaultNodeEnvContext` survive, but *slimmed* to the identity +
+topology views (synthesis-side only). The SPI, the registry, the per-domain
+contributors, `RKE2LabEnvConfigManifestsUnit` and `HostPaths` are gone from the
+tree — *recoverable at `6e8cd3c28^`* if a re-implementation is ever needed.
+
+=== What the substrate does today
+
+The node's runtime config is a *fixed* six-variable set, not domain-extensible:
+`rke2lab-identity` (`nixos/identity.nix`) resolves them from devlxd
+(`user.rke2lab.node-*`) into `/run/rke2lab/node.env` —
+`RKE2LAB_NODE_{NAME,HOSTNAME,KIND,ID}` + `RKE2LAB_CLUSTER_{POD,SERVICE}_CIDR` —
+consumed as an `EnvironmentFile` by the boot oneshots (`rke2lab-dualstack`,
+`rke2lab-tls-san`, `rke2lab-zfs-containerd`). There is no flox-env carrier and no
+per-domain contribution surface anymore.
+
+=== Decision: document-only (retained as design)
+
+Same treatment as the orchestration scripts: the *mechanism* is retained as this
+documented design, not resurrected in code. If a domain later needs to contribute
+a runtime variable, the re-implementation target is a substrate-native
+`NodeEnvContributor` (domains → vars → `devlxd`/`node.env`, extensible) — restored
+from `6e8cd3c28^` and adapted to write `node.env` rather than the `/srv/host`
+ConfigMap. Until then, add a one-off variable directly in `nixos/identity.nix`.
 
 == Part 2 — Remote nix builder
 
