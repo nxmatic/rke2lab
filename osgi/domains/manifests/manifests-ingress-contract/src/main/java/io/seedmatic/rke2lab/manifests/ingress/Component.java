@@ -35,7 +35,7 @@ public enum Component implements WireEnum {
   KUBERNETES_REPLICATOR("kubernetesReplicator", "v2.12.4", "mittwald/kubernetes-replicator"),
   FLUX_OPERATOR("fluxOperator", "v0.58.1", "controlplaneio-fluxcd/flux-operator"),
   ENVOY_GATEWAY("envoyGateway", "v1.8.3", "envoyproxy/gateway"),
-  TAILSCALE("tailscale", "1.102.2", "tailscale/tailscale"),
+  TAILSCALE("tailscale", "1.102.3", "tailscale/tailscale"),
   CLUSTER_API_OPERATOR(
       "clusterApiOperator",
       "v0.28.0",

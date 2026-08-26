@@ -2,9 +2,11 @@
 package io.seedmatic.rke2lab.manifests.units.mesh;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +48,8 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createHelmChart(final Construct scope) {
+    final String version =
+        ManifestSynthesisContext.current().componentVersions().of(Component.TAILSCALE);
     ApiObject helmChart =
         new ApiObject(
             scope,
@@ -62,8 +66,8 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                         // workloads layer dependsOn operators with wait:true, so the Connector CR
                         // (kept in workloads) only dry-runs once this HelmChart has registered its
                         // CRD — otherwise the whole workloads apply fails "no matches for kind
-                        // Connector". createNamespace:true creates mesh-system in the operators
-                        // layer.
+                        // Connector". mesh-system is created earlier in the foundation layer
+                        // (MeshSystemNamespaceManifestsUnit), so it exists before this HelmChart.
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "helm.cattle.io|HelmChart|${tailscale-namespace}|tailscale-operator",
@@ -91,7 +95,7 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                   debug: true
                 """,
                 "version",
-                "1.102.3")));
+                version)));
 
     return helmChart;
   }
