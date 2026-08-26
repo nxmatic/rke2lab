@@ -26,7 +26,7 @@ import java.util.Optional;
 public enum Component implements WireEnum {
   TEKTON_OPERATOR(
       "tektonOperator",
-      "v0.80.0",
+      "v0.81.1",
       "tektoncd/operator",
       "release.yaml",
       "upstream/cicd/tekton-operator"),
@@ -34,17 +34,17 @@ public enum Component implements WireEnum {
   OPENEBS_ZFS_CHART("openebsZfsChart", "2.8.0"),
   KUBERNETES_REPLICATOR("kubernetesReplicator", "v2.12.4", "mittwald/kubernetes-replicator"),
   FLUX_OPERATOR("fluxOperator", "v0.58.1", "controlplaneio-fluxcd/flux-operator"),
-  ENVOY_GATEWAY("envoyGateway", "v1.8.3", "envoyproxy/gateway"),
+  ENVOY_GATEWAY("envoyGateway", "v1.9.0", "envoyproxy/gateway"),
   TAILSCALE("tailscale", "1.102.3", "tailscale/tailscale"),
   CLUSTER_API_OPERATOR(
       "clusterApiOperator",
-      "v0.28.0",
+      "v0.29.0",
       "kubernetes-sigs/cluster-api-operator",
       "operator-components.yaml",
       "upstream/clusterapi/operator"),
-  CAPI_CORE("capiCore", "v1.13.4", "kubernetes-sigs/cluster-api"),
+  CAPI_CORE("capiCore", "v1.14.0", "kubernetes-sigs/cluster-api"),
   CAPI_INCUS_PROVIDER("capiIncusProvider", "v0.9.0", "lxc/cluster-api-provider-incus"),
-  CAPI_RKE2_PROVIDER("capiRke2Provider", "v0.25.0", "rancher/cluster-api-provider-rke2"),
+  CAPI_RKE2_PROVIDER("capiRke2Provider", "v0.25.2", "rancher/cluster-api-provider-rke2"),
   CERT_MANAGER("certManager", "v1.21.1", "cert-manager/cert-manager");
 
   private final String slug;
