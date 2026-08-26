@@ -527,12 +527,15 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                                 "name",
                                 "sync",
                                 "image",
-                                "alpine:3.20",
+                                ManifestSynthesisContext.current().floxDebugPolicy().prodImage(),
                                 "command",
                                 List.of(
-                                    "/bin/sh",
-                                    "-c",
-                                    "apk add --no-cache yq kubectl && /scripts/agent-sync.sh"),
+                                    "flox",
+                                    "activate",
+                                    "--dir",
+                                    "/root",
+                                    "--",
+                                    "/scripts/agent-sync.sh"),
                                 "envFrom",
                                 List.of(
                                     Map.of(
@@ -690,7 +693,8 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     final LinkedHashMap<String, Object> headplaneContainer = new LinkedHashMap<>();
     headplaneContainer.put("name", "headplane");
     headplaneContainer.put("image", floxImage);
-    headplaneContainer.put("command", List.of("headplane"));
+    headplaneContainer.put(
+        "command", List.of("flox", "activate", "--dir", "/root", "--", "headplane"));
     headplaneContainer.put("args", List.of("serve"));
     headplaneContainer.put(
         "env",
