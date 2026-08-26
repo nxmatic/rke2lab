@@ -893,6 +893,13 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     annotations.put(
         "flox.dev/environment.headscale",
         debugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
+    // The config-init INIT container also runs `flox activate` (it renders the
+    // headscale config), so it must opt into flox injection too — the NRI plugin
+    // only puts flox on PATH for containers named by a flox.dev/environment.<c>
+    // annotation; without this the init container fails "flox not found in $PATH".
+    annotations.put(
+        "flox.dev/environment.config-init",
+        debugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
     annotations.putAll(shellSidecar.sidecarAnnotations());
 
     final LinkedHashMap<String, Object> headscalePodSpec = new LinkedHashMap<>();
@@ -1440,6 +1447,12 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     clientAnnotations.put(
         "flox.dev/environment.tailscale",
         clientDebugPolicy.resolveMeshEnvironment("mesh/tailscale", "mesh/tailscale-debug"));
+    // The wait-for-headscale INIT container runs `flox activate` + `kubectl wait`, so it
+    // needs flox injection AND an env carrying kubectl — the headscale env (same as the
+    // bootstrap script), NOT the tailscale env its main container uses.
+    clientAnnotations.put(
+        "flox.dev/environment.wait-for-headscale",
+        clientDebugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
     clientAnnotations.putAll(clientShellSidecar.sidecarAnnotations());
 
     daemonSet.addJsonPatch(

@@ -20,6 +20,10 @@
       "headscale-debug": {
         "flake": "path:../../..#headscale-debug"
       },
+      "kubectl": {
+        "pkg-path": "kubectl",
+        "outputs": "all"
+      },
       "strace": {
         "pkg-path": "strace"
       }
@@ -167,6 +171,38 @@
       "priority": 5
     },
     {
+      "attr_path": "kubectl",
+      "broken": false,
+      "derivation": "/nix/store/2is96v8lflgsnsz9jiic7r83145cgvs5-kubectl-1.36.3.drv",
+      "description": "Kubernetes CLI",
+      "install_id": "kubectl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=56c02bc00adcf003215cc4bd996d6efaf4cff188",
+      "name": "kubectl-1.36.3",
+      "pname": "kubectl",
+      "rev": "56c02bc00adcf003215cc4bd996d6efaf4cff188",
+      "rev_count": 1060451,
+      "rev_date": "2026-08-23T15:22:48Z",
+      "scrape_date": "2026-08-25T05:27:45.871964Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.36.3",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "convert": "/nix/store/24md48z9majyrscs3ggdqzlgsh43ccbk-kubectl-1.36.3-convert",
+        "man": "/nix/store/lxv9yji4ba7h4al0kvrnyh8nq28gkda0-kubectl-1.36.3-man",
+        "out": "/nix/store/mwrypgbd1idjcnxrfmgif82zv06khnm6-kubectl-1.36.3"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "strace",
       "broken": false,
       "derivation": "/nix/store/x5c6g773g4ghv0l8w2d4fd4vcy9inl04-strace-7.1.drv",
@@ -200,7 +236,7 @@
     },
     {
       "install_id": "headscale-debug",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787717528&narHash=sha256-oRa1qF5ZcojJl3zfMyK7d3rRPqoc4Hq3tKyukTODV6U%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787745300&narHash=sha256-/OnLlznmqbuerEXm6gDb026I0Ms9BtrJvBYxal3hMdg%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headscale-debug",
       "derivation": "/nix/store/b4cq2z5kydrs863l4g4pzwvy36pgp0kr-headscale-debug-97fa117.drv",
