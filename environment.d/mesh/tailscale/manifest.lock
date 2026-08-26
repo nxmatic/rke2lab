@@ -1,0 +1,126 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "schema-version": "1.10.0",
+    "install": {
+      "bash": {
+        "pkg-path": "bash",
+        "outputs": "all"
+      },
+      "coreutils": {
+        "pkg-path": "coreutils",
+        "outputs": "all"
+      },
+      "tailscale": {
+        "flake": "path:../../..#tailscale"
+      }
+    },
+    "options": {
+      "systems": [
+        "aarch64-linux"
+      ]
+    }
+  },
+  "packages": [
+    {
+      "attr_path": "bash",
+      "broken": false,
+      "derivation": "/nix/store/6m17d0hk048xgklqrblndd6hxbx536x9-bash-interactive-5.3p15.drv",
+      "description": "GNU Bourne-Again Shell, the de facto standard shell on Linux (for interactive use)",
+      "install_id": "bash",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=56c02bc00adcf003215cc4bd996d6efaf4cff188",
+      "name": "bash-interactive-5.3p15",
+      "pname": "bash",
+      "rev": "56c02bc00adcf003215cc4bd996d6efaf4cff188",
+      "rev_count": 1060451,
+      "rev_date": "2026-08-23T15:22:48Z",
+      "scrape_date": "2026-08-25T05:27:21.628451Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.3p15",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/0dl2x2hd1chhnl1jnzid2n2pigidvvw3-bash-interactive-5.3p15-debug",
+        "dev": "/nix/store/jllm6fy12lsxnk9af20yjf83livhddzh-bash-interactive-5.3p15-dev",
+        "doc": "/nix/store/p7kxvv6n35nkn2kf7m4gsyh18lpdc174-bash-interactive-5.3p15-doc",
+        "info": "/nix/store/3n2nk4fr1c3lk7dqbvd802svdrhmg7fd-bash-interactive-5.3p15-info",
+        "man": "/nix/store/gdbq6857ydnda2zi8fhdmzpbjh9d946l-bash-interactive-5.3p15-man",
+        "out": "/nix/store/a9kda025a17126f14c01xpwscmjqddwb-bash-interactive-5.3p15"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "coreutils",
+      "broken": false,
+      "derivation": "/nix/store/zywpcpzi0b2d4av1h0lg7x8nnf672mfz-coreutils-9.11.drv",
+      "description": "GNU Core Utilities",
+      "install_id": "coreutils",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=56c02bc00adcf003215cc4bd996d6efaf4cff188",
+      "name": "coreutils-9.11",
+      "pname": "coreutils",
+      "rev": "56c02bc00adcf003215cc4bd996d6efaf4cff188",
+      "rev_count": 1060451,
+      "rev_date": "2026-08-23T15:22:48Z",
+      "scrape_date": "2026-08-25T05:27:22.130238Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.11",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/9s0n8g4m0yy3fkglglir6vfm3g7lncvl-coreutils-9.11-debug",
+        "info": "/nix/store/kk4nsbj48pn6d33rvmxiw6w7r17bqdkn-coreutils-9.11-info",
+        "out": "/nix/store/dqxknsb71lsgzfzcdmn6x7fzssqbdyyx-coreutils-9.11"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "install_id": "tailscale",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787717546&narHash=sha256-B0vZpv27/JfnnK7t/JBLKjET2oyB6Jb219Orf9QcAlw%3D",
+      "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
+      "locked-flake-attr-path": "packages.aarch64-linux.tailscale",
+      "derivation": "/nix/store/zjq9zkxchz1sbcwg6gq32agzxj0zx350-tailscale-1.98.10.drv",
+      "outputs": {
+        "derper": "/nix/store/1pnkg265ifj0dprl23cahw85g2rmpgna-tailscale-1.98.10-derper",
+        "out": "/nix/store/dnz55n561ad8p7yhad0qv97drv1a1hfm-tailscale-1.98.10"
+      },
+      "output-names": [
+        "out",
+        "derper"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "tailscale-1.98.10",
+      "pname": "tailscale",
+      "version": "1.98.10",
+      "description": "Node agent for Tailscale, a mesh VPN built on WireGuard",
+      "licenses": [
+        "BSD-3-Clause"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    }
+  ]
+}
