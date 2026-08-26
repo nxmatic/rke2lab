@@ -13,23 +13,18 @@
       url = "github:lab42/kdns?ref=v0.2.27";
       flake = false;
     };
+    # Upstream headplane flake — its overlay carries the darwin pnpm-deps hash
+    # override that prod (`pkgs.headplane`) needs. The debug re-derivation below
+    # reuses THIS input as its `src` (a flake input is also a source tree), and
+    # reads its `version` from package.json — so the v0.7.0 tag lives in ONE
+    # place (this ref), not duplicated across a second `-src` input + a literal.
     headplane = {
       url = "github:tale/headplane?ref=v0.7.0";
       inputs.flake-utils.follows = "flake-utils";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Headplane source ref kept separately from the upstream flake input so we
-    # can re-derive `headplane` here with debug symbols + sourcemaps preserved
-    # without losing the upstream cross-system overlay (which fixes the darwin
-    # pnpm-deps hash). Prod stays on `pkgs.headplane` via the overlay; this
-    # re-derivation only matters when an operator activates the debug env.
-    headplane-src = {
-      url = "github:tale/headplane?ref=v0.7.0";
-      flake = false;
-    };
-    # Upstream headscale flake, pinned to v0.28.0 which builds with Go 1.25.5
-    # (compatible with nixpkgs 1.25.9). Upstream main bumped to Go 1.26 which
-    # nixpkgs can't satisfy yet — bump this tag once nixpkgs catches up.
+    # Upstream headscale flake, v0.29.3 (v0.28.0 had a startup memory runaway —
+    # ~600Mi/s → OOM; v0.29.3 plateaus ~28MB).
     headscale = {
       url = "github:juanfont/headscale?ref=v0.29.3";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -42,7 +37,6 @@
     flake-utils,
     kdns-src,
     headplane,
-    headplane-src,
     headscale,
     ...
   }:
@@ -185,13 +179,15 @@
       # Prod headplane stays on `pkgs.headplane` via the cross-system overlay
       # below — that overlay carries the darwin pnpm-deps hash override the
       # operator runs into when `flox lock` evaluates the env on darwin. For
-      # debug we re-derive from `headplane-src` with sourcemaps preserved so
+      # debug we re-derive from the `headplane` input with sourcemaps preserved so
       # `node --inspect` resolves to TS lines, accepting that we manage the
       # pnpm-deps hash ourselves for this single derivation.
       headplane-debug = pkgs.stdenv.mkDerivation rec {
         pname = "headplane-debug";
-        version = "0.7.0";
-        src = headplane-src;
+        # Single-sourced from the headplane input: its ref pins the tag, its
+        # package.json carries the version, and the input tree IS the src.
+        version = (builtins.fromJSON (builtins.readFile "${headplane}/package.json")).version;
+        src = headplane;
 
         nativeBuildInputs = [pkgs.nodejs_22 pkgs.pnpm_10 pkgs.pnpm_10.configHook];
         buildInputs = [pkgs.nodejs_22];
@@ -200,7 +196,7 @@
         # run `nix build .#headplane-debug` and copy the printed SRI hash here.
         pnpmDeps = pkgs.pnpm_10.fetchDeps {
           inherit pname version src;
-          hash = "sha256-Xtooqpibv4fuJczUfJDlGt2+5KuoKq/TUUhLKE+ierA="; # lib.fakeHash;
+          hash = "sha256-QjfnE3rvk1NNON9JJfVIDuVf/zU7bveyTYYNc34SPMA="; # headplane v0.7.0 pnpm deps
           fetcherVersion = 1;
         };
 
@@ -253,7 +249,7 @@
         # Prod headplane outputs flow through the overlay defined below so the
         # darwin pnpm-deps override is in scope. The overlay is shared with
         # any consumer that imports the runtime flake's overlays.default. Debug
-        # is re-derived above from `headplane-src` so we can preserve sourcemaps
+        # is re-derived above from the `headplane` input so we can preserve sourcemaps
         # for `node --inspect`.
         inherit (pkgs) headplane headplane-agent headplane-nixos-docs headplane-ssh-wasm;
 
