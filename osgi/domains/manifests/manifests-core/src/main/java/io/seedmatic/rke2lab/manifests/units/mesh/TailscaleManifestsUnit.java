@@ -33,30 +33,18 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    ApiObject namespace = createNamespace(scope);
-    createSecret(scope, namespace);
-    ApiObject helmChart = createHelmChart(scope, namespace);
+    // mesh-system is owned by MeshSystemNamespaceManifestsUnit (declared as this
+    // unit's dependency). Do NOT re-render the Namespace here: the layered
+    // kustomize build aggregates every unit's package dir and rejects a duplicate
+    // Namespace/mesh-system resource ("may not add resource with an already
+    // registered id"). The HelmChart's own createNamespace=true is a runtime no-op
+    // once the namespace exists.
+    createSecret(scope);
+    ApiObject helmChart = createHelmChart(scope);
     createConnector(scope, helmChart, context.nodeEnvContext().bootstrapIdentity().clusterName());
   }
 
-  private ApiObject createNamespace(final Construct scope) {
-    return new ApiObject(
-        scope,
-        "namespace-" + TAILSCALE_NAMESPACE,
-        ApiObjectProps.builder()
-            .apiVersion("v1")
-            .kind("Namespace")
-            .metadata(
-                ApiObjectMetadata.builder()
-                    .name(TAILSCALE_NAMESPACE)
-                    .annotations(
-                        packageProfile.packageAnnotations(
-                            "|Namespace|default|${tailscale-namespace}"))
-                    .build())
-            .build());
-  }
-
-  private ApiObject createHelmChart(final Construct scope, final ApiObject namespace) {
+  private ApiObject createHelmChart(final Construct scope) {
     ApiObject helmChart =
         new ApiObject(
             scope,
@@ -73,8 +61,6 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                                 "helm.cattle.io|HelmChart|${tailscale-namespace}|tailscale-operator"))
                         .build())
                 .build());
-
-    helmChart.addDependency(namespace);
 
     helmChart.addJsonPatch(
         JsonPatch.add(
@@ -132,7 +118,7 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                 Map.of("advertiseRoutes", List.of("10.80.7.10/32", "10.80.0.64/26")))));
   }
 
-  private void createSecret(final Construct scope, final ApiObject namespace) {
+  private void createSecret(final Construct scope) {
     ApiObject secret =
         new ApiObject(
             scope,
@@ -153,7 +139,6 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                                     "rke2lab-replicator-source/operator-oauth")))
                         .build())
                 .build());
-    secret.addDependency(namespace);
 
     secret.addJsonPatch(
         JsonPatch.add("/type", "Opaque"),
