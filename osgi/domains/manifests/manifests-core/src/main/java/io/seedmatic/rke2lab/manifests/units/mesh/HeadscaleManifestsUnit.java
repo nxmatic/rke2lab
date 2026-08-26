@@ -861,12 +861,15 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             Map.of(
                 "cpu", "500m",
                 "ephemeral-storage", "512Mi",
-                "memory", "512Mi"),
+                // headscale OOMKilled (137) right after "listening and serving" at 512Mi —
+                // its startup footprint (server + flox-activate wrapper + store overlay) needs
+                // more headroom on this carrier. Bump to 1Gi.
+                "memory", "1Gi"),
             "requests",
             Map.of(
                 "cpu", "100m",
                 "ephemeral-storage", "256Mi",
-                "memory", "128Mi")));
+                "memory", "256Mi")));
     headscaleContainer.put("volumeMounts", List.copyOf(headscaleMounts));
 
     final List<Object> containers = new ArrayList<>();
