@@ -66,15 +66,25 @@ let
       varsOrder = builtins.toJSON [ ];
     };
 
-  # The env catalog to bake. Each gets a subtree (GC-rooted) + activation (baked).
-  envs = [
-    { category = "networking"; name = "kdns"; }
-    # kdns-debug: the FloxDebugPolicy (debug.networking) flips kdns's pod to this
-    # env (unstripped kdns + delve/strace). Baked alongside prod so the toggle works
-    # either way without the NRI plugin hitting a missing GC-root.
-    { category = "networking"; name = "kdns-debug"; }
-    # add each env here once it has a committed manifest.lock
-  ];
+  # The env catalog to bake, DERIVED from the filesystem: every
+  # environment.d/<category>/<name>/ carrying a committed manifest.lock is baked
+  # (subtree GC-root + activation prod + debug). Same single source of truth as the
+  # build script's realise loop — drop an env dir + pin it with `lock-envs.sh` and
+  # it bakes with no code edit here. An unlocked manifest.toml is skipped (it can't
+  # be built reproducibly until `lock-envs.sh` pins it).
+  envs =
+    let
+      dirsIn = p:
+        builtins.attrNames (lib.filterAttrs (_: t: t == "directory") (builtins.readDir p));
+    in
+    lib.concatMap
+      (category:
+        let catDir = envCatalog + "/${category}";
+        in map (name: { inherit category name; })
+          (builtins.filter
+            (name: builtins.pathExists (catDir + "/${name}/manifest.lock"))
+            (dirsIn catDir)))
+      (dirsIn envCatalog);
 
   subtreeOf = e: mkEnvSubtree e.category e.name;
 

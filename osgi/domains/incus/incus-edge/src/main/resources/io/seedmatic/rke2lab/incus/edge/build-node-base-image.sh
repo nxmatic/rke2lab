@@ -83,10 +83,23 @@ else
     #     nix knew local=darwin != linux and offloaded on its own.)
     nix_flags="--no-link --print-out-paths --impure --accept-flake-config --system aarch64-linux --max-jobs 0"
 
-    # (1) realise each env's non-substitutable flake packages before the image eval.
-    # Extend this list as new flox envs gain a committed manifest.lock.
+    # (1) realise each env's non-substitutable flake packages before the image eval:
+    # buildenv.nix does `builtins.storePath` on them, which needs them present.
+    # DERIVED from every LOCKED env's manifest (its `flake = "path:..#<pkg>"` refs)
+    # so the set never drifts from the catalog — add an env (manifest.toml + a
+    # committed manifest.lock via lock-envs.sh) and its flake packages are realised
+    # automatically. Catalog packages (bash/kubectl/...) are substitutable and need
+    # no pre-realise; only the local flake packages do — which is exactly what the
+    # `flake = "path:..#pkg"` refs select (e.g. kdns prod, sourced via the overlay,
+    # is correctly NOT realised; kdns-debug, a flake ref, is).
     flox_flake="$src_dir/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox"
-    for env_pkg in kdns-debug; do
+    env_pkgs="$(
+        for lock in "$flox_flake"/environment.d/*/*/manifest.lock; do
+            [ -f "$lock" ] || continue
+            grep -hoE 'flake = "path:[^"#]*#[A-Za-z0-9_-]+"' "$(dirname "$lock")/manifest.toml" || true
+        done | sed -E 's/.*#([A-Za-z0-9_-]+)".*/\1/' | sort -u
+    )"
+    for env_pkg in $env_pkgs; do
         echo "realising flox env package: $env_pkg"
         $nix_bin build $nix_flags "$flox_flake#$env_pkg" >/dev/null
     done
