@@ -196,6 +196,14 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
       final ApiObject configMap,
       final ApiObject clusterRoleBinding,
       final String envoyGatewayVersion) {
+    // A Job's spec.template is IMMUTABLE, so bumping ENVOY_GATEWAY_VERSION cannot patch the
+    // existing installer Job — Flux apply fails "field is immutable" and stalls the whole
+    // operators layer (and workloads, which depends on it). Name the Job per version so a
+    // bump renders a NEW Job (Flux prunes the old one), making the installer an idempotent
+    // per-version run instead of an in-place mutation.
+    final String jobName =
+        "envoy-gateway-installer-"
+            + envoyGatewayVersion.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
     ApiObject job =
         new ApiObject(
             scope,
@@ -205,11 +213,11 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
                 .kind("Job")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("envoy-gateway-installer")
+                        .name(jobName)
                         .namespace("envoy-gateway-system")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "batch|Job|${envoy-gateway-namespace}|envoy-gateway-installer"))
+                                "batch|Job|${envoy-gateway-namespace}|" + jobName))
                         .build())
                 .build());
 
