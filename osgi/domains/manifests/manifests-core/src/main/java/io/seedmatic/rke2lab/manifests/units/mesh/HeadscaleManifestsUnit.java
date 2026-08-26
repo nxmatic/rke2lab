@@ -439,7 +439,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-config-init-script",
             Map.of(
                 "config-init.sh",
-                "#!/usr/bin/env -S bash -exuo pipefail\n"
+                "#!/usr/bin/env bash\n"
+                    + "set -exuo pipefail\n"
                     + "mkdir -p /config\n"
                     + "cp /config-source/config.yaml /config/config.yaml\n"
                     + "mkdir -p /var/lib/headscale\n"
@@ -487,7 +488,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-bootstrap-script",
             Map.of(
                 "bootstrap.sh",
-                "#!/usr/bin/env -S bash -exuo pipefail\n\n"
+                "#!/usr/bin/env bash\n"
+                    + "set -exuo pipefail\n\n"
                     + ": \"Waiting for headscale deployment to be available...\"\n"
                     + "kubectl wait --for=condition=available deployment/headscale \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
@@ -684,7 +686,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-gateway-script",
             Map.of(
                 "gateway.sh",
-                "#!/usr/bin/env -S bash -exuo pipefail\n\n"
+                "#!/usr/bin/env bash\n"
+                    + "set -exuo pipefail\n\n"
                     + ": \"[i] Enabling IP forwarding...\"\n"
                     + "sysctl -w net.ipv4.ip_forward=1\n"
                     + "sysctl -w net.ipv6.conf.all.forwarding=1 || true\n\n"
