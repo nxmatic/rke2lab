@@ -236,12 +236,12 @@
     },
     {
       "install_id": "headscale-debug",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787745300&narHash=sha256-/OnLlznmqbuerEXm6gDb026I0Ms9BtrJvBYxal3hMdg%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787768776&narHash=sha256-yE3MJfDXcAwq%2BHA0E8kqUU9cndd8Ois1efaFMsGKIl8%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headscale-debug",
-      "derivation": "/nix/store/b4cq2z5kydrs863l4g4pzwvy36pgp0kr-headscale-debug-97fa117.drv",
+      "derivation": "/nix/store/8m7x2jhhmjj5brq4s5wgq2v5cys5hlbq-headscale-debug-5aff68b.drv",
       "outputs": {
-        "out": "/nix/store/mzlmaf1fqr24115803nka92pxga519nl-headscale-debug-97fa117"
+        "out": "/nix/store/xrfcalj4g92f00wbc8zq638sj8s0782c-headscale-debug-5aff68b"
       },
       "output-names": [
         "out"
@@ -252,9 +252,9 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-linux",
       "system": "aarch64-linux",
-      "name": "headscale-debug-97fa117",
+      "name": "headscale-debug-5aff68b",
       "pname": "headscale-debug",
-      "version": "97fa117",
+      "version": "5aff68b",
       "broken": false,
       "unfree": false,
       "priority": 5

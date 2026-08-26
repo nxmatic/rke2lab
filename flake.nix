@@ -10,11 +10,11 @@
     # input + a new entry in `packages` below; the per-env manifest.toml then
     # references it via `flake = path:.../runtime/flox#<output>`.
     kdns-src = {
-      url = "github:lab42/kdns?ref=v0.2.15";
+      url = "github:lab42/kdns?ref=v0.2.27";
       flake = false;
     };
     headplane = {
-      url = "github:tale/headplane?ref=v0.6.3";
+      url = "github:tale/headplane?ref=v0.7.0";
       inputs.flake-utils.follows = "flake-utils";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -24,14 +24,14 @@
     # pnpm-deps hash). Prod stays on `pkgs.headplane` via the overlay; this
     # re-derivation only matters when an operator activates the debug env.
     headplane-src = {
-      url = "github:tale/headplane?ref=v0.6.3";
+      url = "github:tale/headplane?ref=v0.7.0";
       flake = false;
     };
     # Upstream headscale flake, pinned to v0.28.0 which builds with Go 1.25.5
     # (compatible with nixpkgs 1.25.9). Upstream main bumped to Go 1.26 which
     # nixpkgs can't satisfy yet — bump this tag once nixpkgs catches up.
     headscale = {
-      url = "github:juanfont/headscale?ref=v0.28.0";
+      url = "github:juanfont/headscale?ref=v0.29.3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -70,11 +70,11 @@
       }:
         pkgs.buildGoModule rec {
           pname = packageName;
-          version = "0.2.15";
+          version = "0.2.27";
 
           src = kdns-src;
 
-          vendorHash = "sha256-pPGuBNI/qcGr3EgVQMa6Xw0PRA4iUGMLDnw4nCWqJ3U=";
+          vendorHash = "sha256-2zPV+hatBEll8uMVaQ7WYGI1gBfugW8eJNwI04z2s7A=";
 
           env.CGO_ENABLED = "0";
 
@@ -190,7 +190,7 @@
       # pnpm-deps hash ourselves for this single derivation.
       headplane-debug = pkgs.stdenv.mkDerivation rec {
         pname = "headplane-debug";
-        version = "0.6.3";
+        version = "0.7.0";
         src = headplane-src;
 
         nativeBuildInputs = [pkgs.nodejs_22 pkgs.pnpm_10 pkgs.pnpm_10.configHook];
