@@ -52,11 +52,17 @@ let
     '';
 
   # Artifact 2 — flox's activation package (+ closure), baked for the container's
-  # `flox activate` cache-hit. buildenv.nix reads the committed lock.
+  # `flox activate` cache-hit. buildenv.nix content-addresses the lock (`builtins.path`
+  # + `readFile`), so the SOURCE path of manifestLock is irrelevant to the resulting
+  # environment.drv — only its content is (catalog and subtree copies are identical).
+  # What DID matter: we must NOT pass a custom `name`. buildenv defaults `name` to
+  # "environment"; a custom name yields a DIFFERENT environment.drv than the one
+  # `flox activate` recomputes at runtime (it passes no name), so flox misses the
+  # cache and rebuilds it — which needs a nixbld build group the container lacks.
+  # Dropping `name` makes the baked drv identical to flox's → cache-hit, no build.
   mkEnvActivation = category: name:
     import buildenvNix {
       manifestLock = "${envCatalog}/${category}/${name}/manifest.lock";
-      name = "flox-env-${category}-${name}";
       varsOrder = builtins.toJSON [ ];
     };
 
@@ -71,7 +77,6 @@ let
   ];
 
   subtreeOf = e: mkEnvSubtree e.category e.name;
-  activationOf = e: mkEnvActivation e.category e.name;
 
   # The 3 OCI hooks the plugin references at fixed /usr/local/sbin paths
   # (sources recovered from 6e8cd3c28^, kept under nixos/flox/hooks/).
@@ -90,7 +95,9 @@ let
     install -m0755 ${./flox/hooks/flox-nri-chown-hook.sh}    $out/sbin/flox-nri-chown-hook.sh
     patchShebangs $out/sbin
     for f in $out/sbin/*.sh; do
-      wrapProgram "$f" --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils pkgs.util-linux pkgs.gnused ]}
+      wrapProgram "$f" \
+        --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils pkgs.util-linux pkgs.gnused ]} \
+        --set FLOX_NRI_MOUNT_BIN ${pkgs.pkgsStatic.util-linux}/bin/mount
     done
   '';
 in
@@ -102,8 +109,17 @@ in
     (map
       (e: "L+ /nix/var/nix/gcroots/flox-runtime/env/${e.category}/${e.name} - - - - ${subtreeOf e}")
       envs)
-    ++ (map
-      (e: "L+ /nix/var/nix/gcroots/flox-runtime/activation/${e.category}/${e.name} - - - - ${activationOf e}")
+    # The activation derivation has TWO outputs (`run` + `dev`); `flox activate`
+    # runs in dev mode by default and realises the `dev` output. Root EVERY output
+    # (not just the default `run`), or flox misses the cache on `dev` and rebuilds
+    # the env at runtime (which the container can't do). One GC-root per output
+    # keeps them all in the image closure.
+    ++ (lib.concatMap
+      (e:
+        let act = mkEnvActivation e.category e.name;
+        in map
+          (out: "L+ /nix/var/nix/gcroots/flox-runtime/activation/${e.category}/${e.name}/${out} - - - - ${act.${out}}")
+          act.outputs)
       envs)
     ++ [
       "L+ /usr/local/sbin/flox-nri-overlay-hook.sh  - - - - ${floxHooks}/sbin/flox-nri-overlay-hook.sh"

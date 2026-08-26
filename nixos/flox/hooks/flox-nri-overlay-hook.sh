@@ -71,16 +71,40 @@ mount -o remount,bind,ro "$lower"
 mount -t tmpfs -o mode=0755,size=2g tmpfs "$rw"
 mkdir -p "$upper" "$work"
 
-# Use container-relative paths (from the perspective of the future root after pivot_root).
-# The hook runs before pivot_root, so we must chroot into ${rootfs} first to make paths
-# relative to the container's future root. Otherwise overlayfs records absolute host paths
-# like /run/k3s/containerd/.../rootfs/.overlays.d/... which are invalid after pivot_root.
+# We MUST chroot into ${rootfs} to create the overlay: overlayfs records
+# upperdir/workdir by the PATH given, and reaches workdir by that recorded path
+# later during copy-up. A host-absolute path (/run/.../rootfs/.overlays.d/...) is
+# gone after pivot_root → copy-up fails with EACCES (regression fixed in db4b06412).
+# Chrooting makes overlayfs record CONTAINER-relative paths (/.overlays.d/...),
+# valid once the rootfs becomes /.
+#
+# The chroot severs the host PATH, and the workload image (busybox/alpine/distroless)
+# ships no usable `mount` — requiring one would be an unenforceable contract on every
+# flox-annotated image. So we bring our OWN `mount` from the nix store. It MUST be
+# STATICALLY linked (FLOX_NRI_MOUNT_BIN, set by the hook wrapper): a dynamic store
+# binary resolves its interpreter + libs at absolute /nix/store paths, and /nix/store
+# does not exist in the container yet — THIS hook is what overlays it (chicken-and-egg).
+# A static binary is self-contained, so a plain copy into a scratch dir execs cleanly.
+install -Dm0755 "$FLOX_NRI_MOUNT_BIN" "${rootfs}/.flox-nri/sbin/mount"
+
 container_lower="/.overlays.d/${overlay_name}/lower"
 container_upper="/.overlays.d/${overlay_name}/rw/upper"
 container_work="/.overlays.d/${overlay_name}/rw/work"
 
-chroot "$rootfs" mount -t overlay overlay \
+chroot "$rootfs" /.flox-nri/sbin/mount -t overlay overlay \
     -o "lowerdir=${container_lower},upperdir=${container_upper},workdir=${container_work}" \
     "${target_rel}"
+
+# A daemonless container must not expose the host's Nix daemon socket. Overlaying
+# /nix brings the host socket with it; a stale socket makes nix's `auto` store pick
+# daemon mode and hit a dead socket ("cannot connect … Connection refused"). Drop it
+# (whiteout in the writable upper) so nix stays on the local store — the same
+# socket-absent condition under which it already resolves locally. No-op for any
+# overlay that doesn't carry one.
+rm -f "${rootfs}/nix/var/nix/daemon-socket/socket" 2>/dev/null || true
+
+# The overlay is now held by the kernel via its backing dentries; the injected
+# binary has done its job — drop it so the container rootfs stays clean.
+rm -rf "${rootfs}/.flox-nri"
 
 exit 0
