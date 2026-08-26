@@ -46,7 +46,7 @@
     # cross-builds via the configured linux-builder). The shim is now its own repo
     # (a fork), pinned to a released tag; the `follows` below dedup its aggregator +
     # nixpkgs against ours so there is a single resolved version set across the flakes.
-    flox-runtime.url = "github:seedmatic/flox-nri-plugin?ref=v0.1.2";
+    flox-runtime.url = "github:seedmatic/flox-nri-plugin?ref=v0.1.3";
     flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
     flox-runtime.inputs.flake-utils.follows = "flake-utils";
     flox-runtime.inputs.flake-commons.follows = "flake-commons";

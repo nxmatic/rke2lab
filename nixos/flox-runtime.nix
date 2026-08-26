@@ -30,6 +30,7 @@
 {
   pkgs,
   flox,
+  flox-runtime,
   lib,
   ...
 }:
@@ -88,28 +89,13 @@ let
 
   subtreeOf = e: mkEnvSubtree e.category e.name;
 
-  # The 3 OCI hooks the plugin references at fixed /usr/local/sbin paths
-  # (sources recovered from 6e8cd3c28^, kept under nixos/flox/hooks/).
-  #
-  # runc executes OCI hooks with a MINIMAL PATH — NixOS has no /usr/bin/bash and no
-  # coreutils/util-linux on that PATH, so `#!/usr/bin/env bash` fails ("env: bash:
-  # No such file or directory") and the hooks' commands (chown/ln/mkdir/mount/sed/
-  # cat) wouldn't resolve either. Pin the interpreter to the store bash
-  # (patchShebangs) and put the hooks' runtime commands on PATH via a wrapper.
-  floxHooks = pkgs.runCommandLocal "flox-nri-hooks" {
-    nativeBuildInputs = [ pkgs.makeWrapper ];
-  } ''
-    mkdir -p $out/sbin
-    install -m0755 ${./flox/hooks/flox-nri-overlay-hook.sh}  $out/sbin/flox-nri-overlay-hook.sh
-    install -m0755 ${./flox/hooks/flox-nri-env-link-hook.sh} $out/sbin/flox-nri-env-link-hook.sh
-    install -m0755 ${./flox/hooks/flox-nri-chown-hook.sh}    $out/sbin/flox-nri-chown-hook.sh
-    patchShebangs $out/sbin
-    for f in $out/sbin/*.sh; do
-      wrapProgram "$f" \
-        --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils pkgs.util-linux pkgs.gnused ]} \
-        --set FLOX_NRI_MOUNT_BIN ${pkgs.pkgsStatic.util-linux}/bin/mount
-    done
-  '';
+  # The 3 OCI hooks the plugin references at fixed /usr/local/sbin paths now ship
+  # from the flox-nri-plugin fork (the shim owns its binary + hooks + their
+  # contract as one unit) as the `flox-nri-hooks` package — patchShebangs'd,
+  # PATH-wrapped, with a static `mount` for the overlay hook's pre-pivot chroot.
+  # Here we only PLACE it on the node (tmpfiles below). See
+  # github:seedmatic/flox-nri-plugin.
+  floxHooks = flox-runtime.packages.${system}.flox-nri-hooks;
 in
 {
   # GC-root each env SUBTREE at the plugin's well-known path (declarative twin of
