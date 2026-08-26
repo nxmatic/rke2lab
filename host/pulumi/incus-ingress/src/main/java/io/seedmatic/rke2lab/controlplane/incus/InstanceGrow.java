@@ -297,6 +297,20 @@ public final class InstanceGrow {
     // scion filed (the sops CA bundle + the age identity). Opaque here: the scenario fetched them.
     instanceConfig.putAll(extraDevlxdConfig);
 
+    // The image FINGERPRINT is the artifact's content hash (sha of metadata ++ rootfs). Fold it
+    // into config so replaceOnChanges("config.*") recreates the instance EXACTLY when the built
+    // image content changes — the source-digest buildChecksum above is a proxy that can miss a
+    // rebuild, and `image` drift is deliberately ignored (adopt-by-omission), so without this the
+    // instance stays on a stale image after a node-base rebuild. The fingerprint is an Output, so
+    // fold the map through it.
+    final Output<Map<String, String>> configWithFingerprint =
+        imageFingerprint.applyValue(
+            fingerprint -> {
+              final Map<String, String> merged = new LinkedHashMap<>(instanceConfig);
+              merged.put("user.rke2lab.imageFingerprint", fingerprint);
+              return merged;
+            });
+
     new Instance(
         "seed-instance",
         InstanceArgs.builder()
@@ -304,7 +318,7 @@ public final class InstanceGrow {
             .project(config.incusProject())
             .image(imageFingerprint)
             .profiles(profileName.applyValue(List::of))
-            .config(instanceConfig)
+            .config(configWithFingerprint)
             .running(true)
             .devices(seedInstanceDevices(plan))
             .build(),
