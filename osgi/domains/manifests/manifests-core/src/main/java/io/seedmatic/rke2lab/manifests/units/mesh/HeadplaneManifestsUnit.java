@@ -546,6 +546,8 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                                         Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
+                                    // `flox activate` alone costs ~127Mi RSS; 128Mi OOMs it on
+                                    // startup (same trap as the *-shell sidecars). 256Mi clears it.
                                     "limits",
                                     Map.of(
                                         "cpu",
@@ -553,7 +555,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                                         "ephemeral-storage",
                                         "256Mi",
                                         "memory",
-                                        "128Mi"),
+                                        "256Mi"),
                                     "requests",
                                     Map.of(
                                         "cpu",
