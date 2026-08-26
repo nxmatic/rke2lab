@@ -627,7 +627,17 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     + "    {\n"
                     + "      \"action\": \"accept\",\n"
                     + "      \"src\": [\"group:admin\", \"tag:darwin\", \"tag:nixos\"],\n"
-                    + "      \"dst\": [\"*\"],\n"
+                    // headscale v2 rejects a wildcard SSH dst AND forbids a TAG src from
+                    // targeting autogroup:member (user-owned devices) — only USER sources may.
+                    // Split into two rules: any source (admin users + tagged nodes) reaches the
+                    // tagged fleet; admin USERS additionally reach user-owned devices.
+                    + "      \"dst\": [\"autogroup:tagged\"],\n"
+                    + "      \"users\": [\"autogroup:nonroot\", \"root\"]\n"
+                    + "    },\n"
+                    + "    {\n"
+                    + "      \"action\": \"accept\",\n"
+                    + "      \"src\": [\"group:admin\"],\n"
+                    + "      \"dst\": [\"autogroup:member\"],\n"
                     + "      \"users\": [\"autogroup:nonroot\", \"root\"]\n"
                     + "    }\n"
                     + "  ]\n"
