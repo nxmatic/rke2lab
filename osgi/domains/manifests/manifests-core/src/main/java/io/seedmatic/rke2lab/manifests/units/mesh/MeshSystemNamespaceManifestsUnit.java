@@ -2,6 +2,7 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
@@ -15,8 +16,14 @@ public final class MeshSystemNamespaceManifestsUnit extends AbstractManifestsUni
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.MESH + "/system-namespace";
 
+  // The shared mesh-system namespace must land in the foundation layer, NOT the default workloads
+  // layer: the tailscale-operator HelmChart lives in the `operators` layer (CRD-before-CR), and
+  // operators applies before workloads — so a workloads-layer namespace would not yet exist when
+  // the operators layer tries to create the HelmChart *in* mesh-system ("namespaces mesh-system not
+  // found"). foundation applies before operators, so the namespace is Ready for both.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("mesh", "system-namespace");
+      new PackageMetadataProfile(
+          "mesh", "system-namespace", false, ManifestAnnotations.LAYER_FOUNDATION);
 
   public MeshSystemNamespaceManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
