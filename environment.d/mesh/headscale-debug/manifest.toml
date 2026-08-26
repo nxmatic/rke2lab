@@ -18,6 +18,12 @@ schema-version = "1.10.0"
   pkg-path = "coreutils"
   outputs = "all"
 
+  # kubectl: the headscale bootstrap/wait scripts drive the cluster via kubectl
+  # (same as the prod headscale env) — keep the debug env a superset.
+  [install.kubectl]
+  pkg-path = "kubectl"
+  outputs = "all"
+
   [install.delve]
   pkg-path = "delve"
 

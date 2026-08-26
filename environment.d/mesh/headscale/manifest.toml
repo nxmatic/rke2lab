@@ -14,6 +14,13 @@ schema-version = "1.10.0"
   pkg-path = "coreutils"
   outputs = "all"
 
+  # The headscale-domain init/bootstrap scripts (bootstrap.sh, wait-for-headscale.sh)
+  # drive the cluster via `kubectl wait/exec/create/patch`, so the env must carry kubectl
+  # (same as mesh/headplane). Without it those flox-activated containers fail on `kubectl`.
+  [install.kubectl]
+  pkg-path = "kubectl"
+  outputs = "all"
+
   [install.headscale]
   # Workload package lives in the parent runtime flake (runtime/flox/flake.nix).
   # Path is relative to this env dir to avoid the `/var/run -> /run` symlink
