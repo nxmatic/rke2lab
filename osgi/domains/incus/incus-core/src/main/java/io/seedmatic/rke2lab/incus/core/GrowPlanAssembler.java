@@ -92,25 +92,40 @@ public final class GrowPlanAssembler {
 
   /**
    * SHA-256 of the nix sources that determine the built image — {@code flake.lock} (the pinned
-   * inputs: nixpkgs, flox, flox-runtime), {@code flake.nix} (the nixosConfiguration wiring), and
-   * every file under {@code nixos/} (the modules) — folded over the sorted set with path + NUL +
-   * bytes, so two identical trees hash identically. A missing file/dir contributes nothing but the
-   * digest stays stable. Read-only: no shelling, so it is identical whether the run cultivates or
-   * surveys.
+   * inputs: nixpkgs, flox, flox-runtime), {@code flake.nix} (the nixosConfiguration wiring), every
+   * file under {@code nixos/} (the modules), AND the flox env catalog under {@code
+   * runtime/flox/environment.d}. That last tree is NOT under {@code nixos/} yet {@code
+   * nixos/flox-runtime.nix} bakes it into the image by relative path — each env's {@code
+   * manifest.lock} pins the store closures (headscale/kdns/… versions), so a workload bump (flake
+   * edit + re-lock) changes a baked {@code manifest.lock} and hence the image; without folding it
+   * here the checksum stays put and the GROW adopts the STALE image. Folded over the sorted set
+   * with path + NUL + bytes, so two identical trees hash identically. A missing file/dir
+   * contributes nothing but the digest stays stable. Read-only: no shelling, so it is identical
+   * whether the run cultivates or surveys.
    */
   private String imageSourceDigest() {
     final MessageDigest digest = sha256();
     foldFile(digest, imageSourceRoot.resolve("flake.lock"));
     foldFile(digest, imageSourceRoot.resolve("flake.nix"));
-    final Path nixosDir = imageSourceRoot.resolve("nixos");
-    if (Files.isDirectory(nixosDir)) {
-      try (Stream<Path> files = Files.walk(nixosDir)) {
-        files.filter(Files::isRegularFile).sorted().forEach(file -> foldFile(digest, file));
-      } catch (IOException ex) {
-        throw new UncheckedIOException("cannot walk the nix sources under " + nixosDir, ex);
-      }
-    }
+    foldTree(digest, imageSourceRoot.resolve("nixos"));
+    // Coupled to the envCatalog path in nixos/flox-runtime.nix — move both together (its comment
+    // flags a planned de-burial out of src/main/resources).
+    foldTree(
+        digest,
+        imageSourceRoot.resolve(
+            "osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox/environment.d"));
     return HexFormat.of().formatHex(digest.digest());
+  }
+
+  private void foldTree(MessageDigest digest, Path dir) {
+    if (!Files.isDirectory(dir)) {
+      return;
+    }
+    try (Stream<Path> files = Files.walk(dir)) {
+      files.filter(Files::isRegularFile).sorted().forEach(file -> foldFile(digest, file));
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot walk the nix sources under " + dir, ex);
+    }
   }
 
   private void foldFile(MessageDigest digest, Path file) {
