@@ -86,11 +86,12 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                 "targetNamespace",
                 TAILSCALE_NAMESPACE,
                 "valuesContent",
-                "operatorConfig:\n"
-                    + "  hostname: name-tailscale-operator # kpt-set: name-tailscale-operator\n"
-                    + "  debug: true",
+                """
+                operatorConfig:
+                  debug: true
+                """,
                 "version",
-                "1.82.0")));
+                "1.102.3")));
 
     return helmChart;
   }
