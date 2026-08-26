@@ -137136,33 +137136,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1778776843,
-        "narHash": "sha256-zvJUTKRIlHyPMq80teVXBSb7K9Zz44Kuuj2PPi6qIOw=",
+        "lastModified": 1783177857,
+        "narHash": "sha256-UMAGsrG2xfpgWlsDhf4aWJKoOrUbruucDNOhCJcYmQQ=",
         "owner": "tale",
         "repo": "headplane",
-        "rev": "623e7c03f12f6e46bd956feb48b154d380a21a7e",
+        "rev": "17e7b3547838a45101266e80f46722542a65e9b0",
         "type": "github"
       },
       "original": {
         "owner": "tale",
-        "ref": "v0.6.3",
-        "repo": "headplane",
-        "type": "github"
-      }
-    },
-    "headplane-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1778776843,
-        "narHash": "sha256-zvJUTKRIlHyPMq80teVXBSb7K9Zz44Kuuj2PPi6qIOw=",
-        "owner": "tale",
-        "repo": "headplane",
-        "rev": "623e7c03f12f6e46bd956feb48b154d380a21a7e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "tale",
-        "ref": "v0.6.3",
+        "ref": "v0.7.0",
         "repo": "headplane",
         "type": "github"
       }
@@ -137175,16 +137158,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1770236782,
-        "narHash": "sha256-gR5kOFv4/+87mOhMYjejBMhZlrwYhABZpG0zjIL5vtI=",
+        "lastModified": 1785328531,
+        "narHash": "sha256-ddJHSEqZd++JeG3UjUwzw7i45FlZYggUwhEG/tDkq0s=",
         "owner": "juanfont",
         "repo": "headscale",
-        "rev": "97fa117c48a58bee3941e5e8b4393873501afe14",
+        "rev": "5aff68b5b9921db5ccb88013bb1740077ab872fb",
         "type": "github"
       },
       "original": {
         "owner": "juanfont",
-        "ref": "v0.28.0",
+        "ref": "v0.29.3",
         "repo": "headscale",
         "type": "github"
       }
@@ -143036,16 +143019,16 @@
     "kdns-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1773105092,
-        "narHash": "sha256-ZS5kR5eixIX/5NH7gU7Afr5/jyT4febtW3Q4uetWvjM=",
+        "lastModified": 1787702957,
+        "narHash": "sha256-ReMrBZx8jcE9R/DWUbWNYNiStTg+0LZbQMaeydxLS04=",
         "owner": "lab42",
         "repo": "kdns",
-        "rev": "b1af1f5cf942ca80a8f721e91e4c12a1d388c9b8",
+        "rev": "5cc8b847575fd8613862dcc78b040c3f9499fd2d",
         "type": "github"
       },
       "original": {
         "owner": "lab42",
-        "ref": "v0.2.15",
+        "ref": "v0.2.27",
         "repo": "kdns",
         "type": "github"
       }
@@ -282211,7 +282194,6 @@
           "flake-utils"
         ],
         "headplane": "headplane",
-        "headplane-src": "headplane-src",
         "headscale": "headscale",
         "kdns-src": "kdns-src",
         "nixpkgs": [

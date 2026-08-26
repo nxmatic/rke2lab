@@ -170,12 +170,12 @@
     },
     {
       "install_id": "headplane",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787717506&narHash=sha256-P8CIlsDqwN6L26lfh5mB1YJDyIbBX9MNA1wilx4mSNg%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773136&narHash=sha256-1jVv8Ehrag0swFbzM8f90NFc6APmSVDKKgoh%2BZndB/Y%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headplane",
-      "derivation": "/nix/store/lma89qbkzpssswaaf7ygafyyhhpkr7sn-headplane-0.6.3.drv",
+      "derivation": "/nix/store/9l6xyd0dl9i480cxfiqzl40wddnbayjy-headplane-0.7.0.drv",
       "outputs": {
-        "out": "/nix/store/d4ib6pcyznpjqk04dg4ixvawsi673rsg-headplane-0.6.3"
+        "out": "/nix/store/0n09rp7c0yldx7rf47m5q33d0i41mqaf-headplane-0.7.0"
       },
       "output-names": [
         "out"
@@ -186,21 +186,21 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-linux",
       "system": "aarch64-linux",
-      "name": "headplane-0.6.3",
+      "name": "headplane-0.7.0",
       "pname": "headplane",
-      "version": "0.6.3",
+      "version": "0.7.0",
       "broken": false,
       "unfree": false,
       "priority": 5
     },
     {
       "install_id": "headplane-agent",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787717506&narHash=sha256-P8CIlsDqwN6L26lfh5mB1YJDyIbBX9MNA1wilx4mSNg%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773136&narHash=sha256-1jVv8Ehrag0swFbzM8f90NFc6APmSVDKKgoh%2BZndB/Y%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headplane-agent",
-      "derivation": "/nix/store/3948xgxjhw0l1g77wsacz2nl9h15z903-hp_agent-0.6.3.drv",
+      "derivation": "/nix/store/wq07zx4d0jnq27wwliv1v488lna2c3qx-hp_agent-0.7.0.drv",
       "outputs": {
-        "out": "/nix/store/rvwzhlvblxjli9ry8ydhyqnsn1a3rppc-hp_agent-0.6.3"
+        "out": "/nix/store/bg9g3x4qwz0981kr0vs21hbr6iv0ggr7-hp_agent-0.7.0"
       },
       "output-names": [
         "out"
@@ -211,21 +211,21 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-linux",
       "system": "aarch64-linux",
-      "name": "hp_agent-0.6.3",
+      "name": "hp_agent-0.7.0",
       "pname": "hp_agent",
-      "version": "0.6.3",
+      "version": "0.7.0",
       "broken": false,
       "unfree": false,
       "priority": 5
     },
     {
       "install_id": "headplane-ssh-wasm",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787717506&narHash=sha256-P8CIlsDqwN6L26lfh5mB1YJDyIbBX9MNA1wilx4mSNg%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773136&narHash=sha256-1jVv8Ehrag0swFbzM8f90NFc6APmSVDKKgoh%2BZndB/Y%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headplane-ssh-wasm",
-      "derivation": "/nix/store/pw3g07k7jyb70599d9g8rwlc5ri7p32c-headplane-ssh-wasm-0.6.3.drv",
+      "derivation": "/nix/store/m25rhwpqp583nngr2mkl9m1853x6aln8-headplane-ssh-wasm-0.7.0.drv",
       "outputs": {
-        "out": "/nix/store/l1m2fl3saa4xhh21d00z6n1dzndkpa1c-headplane-ssh-wasm-0.6.3"
+        "out": "/nix/store/68xxhny71rydm12b1y62y83p5yg17s9m-headplane-ssh-wasm-0.7.0"
       },
       "output-names": [
         "out"
@@ -236,21 +236,21 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-linux",
       "system": "aarch64-linux",
-      "name": "headplane-ssh-wasm-0.6.3",
+      "name": "headplane-ssh-wasm-0.7.0",
       "pname": "headplane-ssh-wasm",
-      "version": "0.6.3",
+      "version": "0.7.0",
       "broken": false,
       "unfree": false,
       "priority": 5
     },
     {
       "install_id": "headscale",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787717506&narHash=sha256-P8CIlsDqwN6L26lfh5mB1YJDyIbBX9MNA1wilx4mSNg%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773136&narHash=sha256-1jVv8Ehrag0swFbzM8f90NFc6APmSVDKKgoh%2BZndB/Y%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headscale",
-      "derivation": "/nix/store/w0pc36b7qxnww23y66yd1q012pp91qw4-headscale-97fa117.drv",
+      "derivation": "/nix/store/4f2dbr2c6bdm57c0y90cbf2w47x7lzzw-headscale-5aff68b.drv",
       "outputs": {
-        "out": "/nix/store/ypiml1wgz1v28l163lk5xj0qi8z96wx4-headscale-97fa117"
+        "out": "/nix/store/nlx1arkh6avli5hr510891gjg27471pj-headscale-5aff68b"
       },
       "output-names": [
         "out"
@@ -261,9 +261,9 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-linux",
       "system": "aarch64-linux",
-      "name": "headscale-97fa117",
+      "name": "headscale-5aff68b",
       "pname": "headscale",
-      "version": "97fa117",
+      "version": "5aff68b",
       "broken": false,
       "unfree": false,
       "priority": 5
