@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
@@ -56,9 +57,19 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                     ApiObjectMetadata.builder()
                         .name("tailscale-operator")
                         .namespace(TAILSCALE_NAMESPACE)
+                        // The operator registers the tailscale.com CRDs at runtime, so it must land
+                        // in the `operators` layer (like ClusterApiOperator/EnvoyGateway). The
+                        // workloads layer dependsOn operators with wait:true, so the Connector CR
+                        // (kept in workloads) only dry-runs once this HelmChart has registered its
+                        // CRD — otherwise the whole workloads apply fails "no matches for kind
+                        // Connector". createNamespace:true creates mesh-system in the operators
+                        // layer.
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "helm.cattle.io|HelmChart|${tailscale-namespace}|tailscale-operator"))
+                                "helm.cattle.io|HelmChart|${tailscale-namespace}|tailscale-operator",
+                                Map.of(
+                                    ManifestAnnotations.MANIFEST_LAYER,
+                                    ManifestAnnotations.LAYER_OPERATORS)))
                         .build())
                 .build());
 
