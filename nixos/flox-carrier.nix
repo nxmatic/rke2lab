@@ -30,18 +30,31 @@ let
       pkgs.dockerTools.binSh # /bin/sh → shell for `flox activate`
       pkgs.bashInteractive # /bin/bash
       pkgs.coreutils # env, sleep, … (the debug sidecar's default Cmd)
-      # /etc/passwd + /etc/group + /etc/nsswitch.conf. `flox activate` does a
-      # getpwuid(0) at startup to resolve the user's home; with no /etc/passwd it
-      # fails "ENOENT: No such file or directory" before doing anything (proven by
-      # strace). busybox shipped these; a minimal nix image must add them.
-      pkgs.dockerTools.fakeNss
-      # /etc/ssl/certs CA bundle — not needed by `flox activate` (offline
-      # cache-hit), but workloads on this carrier make external HTTPS calls
-      # (e.g. tailscale-client's `tailscale up` → controlplane.tailscale.com),
-      # which fail "SSL CA cert" without a trust store.
-      pkgs.dockerTools.caCertificates
     ];
-    config.Cmd = [ "/bin/sh" ];
+    config = {
+      Cmd = [ "/bin/sh" ];
+      # nix-built tools find the CA bundle via SSL_CERT_FILE (real file below).
+      Env = [
+        "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+        "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+      ];
+    };
+    # /etc as REAL files, NOT store symlinks. `flox activate` does a getpwuid(0) at
+    # startup → needs /etc/passwd, or it dies "ENOENT" before doing anything (proven
+    # by strace). dockerTools.fakeNss / caCertificates would supply these — but as
+    # SYMLINKS into /nix/store, and the flox NRI plugin overlays /nix/store with the
+    # HOST store, which SHADOWS the image's own store paths → those symlinks DANGLE
+    # in the container (cat /etc/passwd → ENOENT under the overlay). busybox shipped
+    # these as real files; write them the same way so they survive the overlay. The
+    # CA bundle is copied (content), not symlinked, for workloads' external HTTPS
+    # (e.g. tailscale-client `tailscale up`).
+    extraCommands = ''
+      mkdir -p etc etc/ssl/certs
+      printf 'root:x:0:0:root:/root:/bin/sh\nnobody:x:65534:65534:nobody:/nonexistent:/bin/sh\n' > etc/passwd
+      printf 'root:x:0:\nnogroup:x:65534:\n' > etc/group
+      printf 'passwd: files\ngroup: files\nhosts: files dns\n' > etc/nsswitch.conf
+      cp ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt etc/ssl/certs/ca-bundle.crt
+    '';
   };
 in
 {
