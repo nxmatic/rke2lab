@@ -30,6 +30,16 @@ let
       pkgs.dockerTools.binSh # /bin/sh → shell for `flox activate`
       pkgs.bashInteractive # /bin/bash
       pkgs.coreutils # env, sleep, … (the debug sidecar's default Cmd)
+      # /etc/passwd + /etc/group + /etc/nsswitch.conf. `flox activate` does a
+      # getpwuid(0) at startup to resolve the user's home; with no /etc/passwd it
+      # fails "ENOENT: No such file or directory" before doing anything (proven by
+      # strace). busybox shipped these; a minimal nix image must add them.
+      pkgs.dockerTools.fakeNss
+      # /etc/ssl/certs CA bundle — not needed by `flox activate` (offline
+      # cache-hit), but workloads on this carrier make external HTTPS calls
+      # (e.g. tailscale-client's `tailscale up` → controlplane.tailscale.com),
+      # which fail "SSL CA cert" without a trust store.
+      pkgs.dockerTools.caCertificates
     ];
     config.Cmd = [ "/bin/sh" ];
   };
