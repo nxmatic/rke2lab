@@ -14,6 +14,7 @@
     ./sops.nix # sops-nix: PKI secret declaration + runtime devlxd delivery
     ./bootstrap-manifests.nix # devlxd → rke2 server/manifests: the node-side bootstrap lane (Flux + cilium config)
     ./containerd.nix # flox NRI runtime + zfs snapshotter + dataset mount
+    ./zfs.nix # node zfs userland + FHS-compat symlinks (openebs-zfs CSI chroot wrapper)
     ./flox-runtime.nix # flox envs (store-resolved, baked) + GC-roots + OCI hooks + /etc/flox.toml
     ./flox-carrier.nix # the minimal nix OCI base image every flox-injected pod runs (baked → rke2 air-gap import)
     ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node
