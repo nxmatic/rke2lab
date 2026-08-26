@@ -50,6 +50,17 @@
       };
       lib = pkgs.lib;
 
+      # A workload's version is NOT a second literal: a github input's `?ref=vX`
+      # is the ONE place the tag lives (a flake input's ref can't interpolate a
+      # variable, so the ref itself is irreducible), and flake.lock mirrors it as
+      # `nodes.<input>.original.ref`. Read it back here — strip the leading `v` —
+      # so a bump touches only the input ref (the lock refresh follows). Used for
+      # source-only inputs (kdns); upstream-flake inputs (headscale) carry their
+      # own version, and headplane derives it from package.json.
+      lockedVersion = input:
+        lib.removePrefix "v"
+        (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.${input}.original.ref;
+
       # ---- NRI plugin: MOVED OUT ---------------------------------------
       # The flox-nri-plugin (+debug) is no longer built here — it lives in the
       # fork repo github:seedmatic/flox-nri-plugin and is consumed as the rke2lab
@@ -64,7 +75,7 @@
       }:
         pkgs.buildGoModule rec {
           pname = packageName;
-          version = "0.2.27";
+          version = lockedVersion "kdns-src";
 
           src = kdns-src;
 
@@ -196,7 +207,7 @@
         # run `nix build .#headplane-debug` and copy the printed SRI hash here.
         pnpmDeps = pkgs.pnpm_10.fetchDeps {
           inherit pname version src;
-          hash = "sha256-QjfnE3rvk1NNON9JJfVIDuVf/zU7bveyTYYNc34SPMA="; # headplane v0.7.0 pnpm deps
+          hash = "sha256-QjfnE3rvk1NNON9JJfVIDuVf/zU7bveyTYYNc34SPMA="; # re-run nix build .#headplane-debug on bump to refresh
           fetcherVersion = 1;
         };
 
