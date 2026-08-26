@@ -15,6 +15,7 @@
     ./bootstrap-manifests.nix # devlxd → rke2 server/manifests: the node-side bootstrap lane (Flux + cilium config)
     ./containerd.nix # flox NRI runtime + zfs snapshotter + dataset mount
     ./flox-runtime.nix # flox envs (store-resolved, baked) + GC-roots + OCI hooks + /etc/flox.toml
+    ./flox-carrier.nix # the minimal nix OCI base image every flox-injected pod runs (baked → rke2 air-gap import)
     ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node
     ./nix-env.nix # nix.settings + the node toolbox on PATH
   ];

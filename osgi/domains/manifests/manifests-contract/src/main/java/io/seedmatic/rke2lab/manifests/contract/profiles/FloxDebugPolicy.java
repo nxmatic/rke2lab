@@ -31,12 +31,16 @@ public record FloxDebugPolicy(
     boolean meshEnabled, boolean networkingEnabled, boolean floxNriPluginEnabled) {
 
   /**
-   * Single source of truth for the live carrier image. Workload binaries come from the flox env
-   * overlay; the carrier just needs a {@code /bin/sh} for {@code flox activate} to bootstrap from.
+   * Single source of truth for the live carrier image — the minimal nix-built OCI base every
+   * flox-injected pod runs (nixos/flox-carrier.nix, baked into the node image and auto-imported by
+   * rke2's air-gap path, so {@code imagePullPolicy: IfNotPresent} never pulls). Workload binaries
+   * come from the flox env overlay; the carrier just provides {@code /usr/bin/env} + a shell for
+   * {@code flox activate} to bootstrap from. The prod/debug distinction now lives in the flox ENV
+   * (unstripped binary + delve), not the base image, so prod and debug share this one carrier. The
+   * string MUST match the RepoTag the nix image is tagged with.
    */
-  private static final String PROD_IMAGE = "busybox:stable";
+  private static final String CARRIER_IMAGE = "rke2lab/flox-carrier:0.1.0";
 
-  private static final String DEBUG_IMAGE = "alpine:latest";
   private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false, false, false);
 
   /** Live-shape policy: every primitive falls through unchanged. */
@@ -45,12 +49,12 @@ public record FloxDebugPolicy(
   }
 
   public String debugImage() {
-    return DEBUG_IMAGE;
+    return CARRIER_IMAGE;
   }
 
   /** The single prod-image identifier shared by every flox-injected workload carrier. */
   public String prodImage() {
-    return PROD_IMAGE;
+    return CARRIER_IMAGE;
   }
 
   /** True if any per-domain debug toggle is on (used by the shell sidecar profile). */
@@ -59,11 +63,12 @@ public record FloxDebugPolicy(
   }
 
   /**
-   * Returns {@link #prodImage()} unless any domain debug is enabled, in which case {@link
-   * #debugImage()}. The one consumer is {@link DelveSidecarProfile}.
+   * The carrier image. Prod and debug now share the single nix carrier — the debug affordance
+   * (unstripped binary + delve) lives in the flox env, not the base image — so this no longer
+   * branches on {@link #anyDomainEnabled()}. The one consumer is {@link DelveSidecarProfile}.
    */
   public String image() {
-    return anyDomainEnabled() ? DEBUG_IMAGE : PROD_IMAGE;
+    return CARRIER_IMAGE;
   }
 
   /**
