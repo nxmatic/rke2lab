@@ -433,99 +433,33 @@ a node that lacks it is itself a remote build.
 
 [[runtime-env-delivery]]
 [[l1-realised]]
-== Runtime env delivery — FloxEnv CRD + flox controller (target)
+== Runtime env delivery — FloxEnv CRD + flox controller (integration)
 
 The flox envs are delivered at RUNTIME as first-class k8s resources, decoupled from
-the node-base image. A package bump therefore NEVER cold-starts the control node —
-the image (and its `imageBuildChecksum`) does not change when an env version moves.
+the node-base image — so a package bump never cold-starts the control node (the image
+and its `imageBuildChecksum` don't change when an env version moves).
 
-=== The flox env IS a k8s resource (`FloxEnv` CR)
+The COMPONENT contract — the `FloxEnv` CRD (spec: `manifest` + `lock` + `folder` +
+`includes` + `consumption: overlay|image`; status: per-node realisation), the
+node-agent controller's reconcile model, carriers as `image`-consumption envs
+(containerize on-node, specialisation via `[include]`, the carrier-contract invariant),
+and the annotation⇄CR⇄store seam — is **authoritative in its own repo**:
+`github:seedmatic/flox-controller` → `docs/design.md`. It is pure-k8s and
+rke2lab-agnostic; this section covers only how rke2lab INTEGRATES it.
 
-Each env becomes a `FloxEnv` custom resource — a *manifest*, synthesised like every
-other (a `FloxEnvManifestsUnit` renders one CR per env from the committed, locked
-`environment.d/`), applied by Flux. The CR carries the intent and its realisation:
+=== rke2lab integration
 
-* `spec` — the flox `manifest.toml` + `manifest.lock` inline (the CR is
-  self-describing; the controller realises from the lock); `folder` (the relative
-  path to materialise the env in, on the host layout — DISSOCIATED from the k8s
-  namespace; defaults to `metadata.namespace` when unset); and `includes`
-  (references to other `FloxEnv` CRs — composition as relations between resources,
-  the flox `[include]` mechanism made first-class; the controller resolves each
-  target's `folder` to compute the relative include path);
-* `status` — per-node realisation (which nodes hold the closures + GC-roots,
-  ready / failed).
-
-The CR is the k8s-accessible env: `kubectl get floxenv` / `kubectl describe floxenv`
-replace any out-of-band inspection surface — no PVC needed, the resource *is* the
-representation.
-
-[NOTE]
-====
-The `FloxEnv` CRD, the controller, and the NRI plugin are pure-k8s and
-rke2lab-agnostic — they live in their own repos, reusable, and know only
-`(namespace, name)`, NEVER rke2lab's *domain* concept. rke2lab's synthesis maps its
-domain → the CR's k8s namespace (domain `networking` → namespace `networking`, so the
-legacy `networking/kdns` reinterprets cleanly as `namespace/name`). If a domain must
-stay visible as metadata it rides as a k8s label (`rke2lab.io/domain`) the generic
-controller ignores — never as component logic. On host, the materialised layout is
-`<envroot>/<folder>/<name>/`, where `<folder>` is `spec.folder` (a relative path,
-DISSOCIATED from the k8s namespace) defaulting to `metadata.namespace` when unset;
-cross-folder `[include]`s the controller renders as relative `../../<folder>/<name>`
-(the author declares logical `{namespace, name}` refs; the controller resolves each
-target's `folder` and owns the paths).
-====
-
-=== The flox controller (node-agent, sole writer)
-
-A node-agent DaemonSet (Go, shipped from its OWN repo `github:seedmatic/flox-controller`
-— which also owns the `FloxEnv` CRD API, like the plugin owns its shim) watches the
-`FloxEnv` CRs and reconciles each node's local store in ONE pass. It is the sole
-writer of the `gcroots/flox-runtime/` subtree (the same single-writer discipline the
-baked `systemd.tmpfiles` held):
-
-[source]
-----
-desired = FloxEnv CRs (watched)
-actual  = scan gcroots/flox-runtime/env (+ activation)
-for env in desired:  daemon realises the closure onto the HOST /nix/store ; write the GC-root
-for link in actual - desired:  rm the symlink                              # prune — SAME component
-patch FloxEnv/<name>.status: realized@<node>
-----
-
-Closures land on the node's own host `/nix/store` (the daemon substitutes from the
-`bioskop-nixos` builder — cheap on the shared ZFS pool), NOT in a PVC. No `nsenter`,
-no `/srv/host`. Disk reclaim of pruned closures is a separate `nix.gc.automatic`
-cadence.
-
-=== The invariant seam (annotation ⇄ CR ⇄ store)
-
-The plugin's per-container injection (overlay of the host `/nix` + `.flox` farm +
-`flox` on PATH) is unchanged — only the *populator* of the store + GC-roots moves
-from `nixos/flox-runtime.nix` (interim bake) to the controller. And because the
-plugin is OURS, a pod's `flox.seedmatic.io/environment` annotation *references the FloxEnv CR*:
-the plugin resolves that typed reference (validatable against `status`) to the
-realised store path, instead of blindly `readlink`-ing a magic-string GC-root. The
-force-register/OOM pathology cannot recur — the closure is realised + registered on
-the host store before the plugin resolves it.
-
-=== Determinism — the CR carries committed intent
-
-The `manifest.lock` per env stays COMMITTED in the repo (like a `flake.lock`); the
-operator triggers bumps via an *env-bumper* CLI — a scenario in the shape of the
-existing manifests `VersionBumper` (bump `runtime/flox/flake.nix` pins + re-lock
-`environment.d/*/manifest.lock` → commit). Synthesis folds the committed lock into
-the `FloxEnv` CR; the controller NEVER re-locks — it only realises what the CR
-carries. Inspection is `kubectl`, not hand-editing; the controller is the sole
-writer of node state.
-
-=== Ordering — no gate, fail-closed + retry
-
-Flux is the first service in every cluster, so the `FloxEnv` CRs (and the controller)
-land early — before the workload pods that consume the envs. No explicit gate is
-needed: the plugin is *fail-closed* — if the referenced env is not yet realised on
-the node it returns an error, `CreateContainer` propagates it → `CreateContainerError`
-→ k8s retries with back-off. Realisation is substitute-only (seconds), so the window
-self-heals. (Reserve: confirm containerd's NRI fail-closed knob at implementation.)
+* *Synthesis* — a `FloxEnvManifestsUnit` (CDK8s) renders one `FloxEnv` CR per env from
+  the committed, locked `environment.d/`, mapping the rke2lab *domain* → the CR's k8s
+  namespace (domain `networking` → namespace `networking`; the legacy `networking/kdns`
+  reinterprets as `namespace/name`). Flux applies them in an early layer.
+* *Delivery* — rke2lab consumes `flox-controller` (and `flox-nri-plugin`) as flake
+  inputs (`…/develop`, green-gated) and bakes their images into the node-base image
+  (foundation); the controller then reconciles the CRs onto each node.
+* *Bumps* — the operator bumps env versions via an *env-bumper* CLI (a scenario in the
+  shape of the manifests `VersionBumper`: bump `runtime/flox/flake.nix` pins + re-lock
+  `environment.d/*/manifest.lock` → commit). Synthesis folds the committed lock into
+  the CR; the controller never re-locks.
 
 [NOTE]
 .Interim: the LIVE baked model, being migrated
@@ -739,6 +673,8 @@ already present in the real store the overlay lowers from.
   the foundation-tier bake (`nixos/containerd.nix`) and the dev→prod maturation arc.
 * link:../atlas/nixos-substrate.adoc[Atlas — NixOS substrate] —
   the codebase↔vision before/after, incl. the baked-envs → FloxEnv-CRD shift.
+* `github:seedmatic/flox-controller` → `docs/design.md` — the AUTHORITATIVE component
+  contract (the `FloxEnv` CRD, the controller, carriers); this doc only integrates it.
 * link:../cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] —
   the design-only flox webhook (pod-level annotation injection), conceptually adjacent to the flox controller + FloxEnv CRD.
 * link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
