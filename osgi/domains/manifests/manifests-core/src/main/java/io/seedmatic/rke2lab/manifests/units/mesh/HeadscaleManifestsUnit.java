@@ -439,15 +439,17 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-config-init-script",
             Map.of(
                 "config-init.sh",
-                "#!/usr/bin/env bash\n"
-                    + "set -exuo pipefail\n"
-                    + "mkdir -p /config\n"
-                    + "cp /config-source/config.yaml /config/config.yaml\n"
-                    + "mkdir -p /var/lib/headscale\n"
-                    + "if [ ! -f /var/lib/headscale/extra_records.json ]; then \n"
-                    + "  echo \"[]\" > /var/lib/headscale/extra_records.json; \n"
-                    + "fi\n"
-                    + "cp /extra-records-source/extra_records.json /var/lib/headscale/extra_records.json"));
+                """
+                #!/usr/bin/env bash
+                set -exuo pipefail
+                mkdir -p /config
+                cp /config-source/config.yaml /config/config.yaml
+                mkdir -p /var/lib/headscale
+                if [ ! -f /var/lib/headscale/extra_records.json ]; then\s
+                  echo "[]" > /var/lib/headscale/extra_records.json;\s
+                fi
+                cp /extra-records-source/extra_records.json /var/lib/headscale/extra_records.json\
+                """));
     configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/metadata/labels", Map.of("app", "headscale")));
     return configMap;
@@ -488,62 +490,69 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-bootstrap-script",
             Map.of(
                 "bootstrap.sh",
-                "#!/usr/bin/env bash\n"
-                    + "set -exuo pipefail\n\n"
-                    + "# headscale runs behind flox injection: `kubectl exec` starts a fresh process\n"
-                    + "# that bypasses the container's `flox activate` entrypoint, so the headscale\n"
-                    + "# binary is NOT on PATH. Re-activate inside the exec — with the flox background\n"
-                    + "# check-for-upgrades disabled so it can't spike memory and OOM the live server.\n"
-                    + "hs() {\n"
-                    + "  kubectl exec -n \"$HEADSCALE_NAMESPACE\" -c headscale deployment/headscale -- \\\n"
-                    + "    env _FLOX_TESTING_DISABLE_BG_SIDE_EFFECTS=true \\\n"
-                    + "    flox activate --dir /root -- headscale \"$@\"\n"
-                    + "}\n\n"
-                    + ": \"Waiting for headscale deployment to be available...\"\n"
-                    + "kubectl wait --for=condition=available deployment/headscale \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
-                    + ": \"Waiting for headscale pod to be Ready...\"\n"
-                    + "kubectl wait --for=condition=Ready pod -l app=headscale \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
-                    + ": \"Creating admin user...\"\n"
-                    + "hs users create admin 2>/dev/null || echo \"User admin already exists\"\n\n"
-                    + ": \"Getting admin user ID...\"\n"
-                    + "USER_ID=$( hs users list -o yaml |\n"
-                    + "             yq -r '.[] | select( .name == \"admin\" ) | .id' - )\n"
-                    + "if [ -z \"$USER_ID\" ]; then\n"
-                    + "  echo \"ERROR: Failed to get admin user ID\"\n"
-                    + "  exit 1\n"
-                    + "fi\n\n"
-                    + ": \"Creating reusable preauth key... (10 years expiration)\"\n"
-                    + "PREAUTH_KEY=$( hs preauthkeys --user \"$USER_ID\" \\\n"
-                    + "    create --reusable --expiration 87600h -o yaml |\n"
-                    + "  yq -r '.key' - )\n"
-                    + "if [ -z \"$PREAUTH_KEY\" ]; then\n"
-                    + "  echo \"ERROR: Failed to extract preauth key\"\n"
-                    + "  exit 1\n"
-                    + "fi\n\n"
-                    + ": \"Storing preauth key in Secret...\"\n"
-                    + "kubectl create secret generic "
-                    + MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()
-                    + " \\\n"
-                    + "  --from-literal=authkey=\"$PREAUTH_KEY\" \\\n"
-                    + "  --dry-run=client -o yaml | kubectl apply -f -\n\n"
-                    + ": \"Creating Headplane API key...\"\n"
-                    + "HEADPLANE_API_KEY=$( hs apikeys create )\n"
-                    + "if [ -z \"$HEADPLANE_API_KEY\" ]; then\n"
-                    + "  echo \"ERROR: Failed to create Headplane API key\"\n"
-                    + "  exit 1\n"
-                    + "fi\n\n"
-                    + ": \"Updating headplane-secrets with API key...\"\n"
-                    + "kubectl patch secret "
-                    + MeshRefs.HEADPLANE_SECRETS_SECRET.name()
-                    + " \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" \\\n"
-                    + "  --type merge \\\n"
-                    + "  -p \"{\\\"stringData\\\":{\\\"api_key\\\":\\\"$HEADPLANE_API_KEY\\\"}}\" 2>/dev/null || \\\n"
-                    + "  echo \"Note: "
-                    + MeshRefs.HEADPLANE_SECRETS_SECRET.name()
-                    + " not yet created, will be updated when available\""));
+                """
+                #!/usr/bin/env bash
+                set -exuo pipefail
+
+                # headscale runs behind flox injection: `kubectl exec` starts a fresh process
+                # that bypasses the container's `flox activate` entrypoint, so the headscale
+                # binary is NOT on PATH. Re-activate inside the exec — with the flox background
+                # check-for-upgrades disabled so it can't spike memory and OOM the live server.
+                hs() {
+                  kubectl exec -n "$HEADSCALE_NAMESPACE" -c headscale deployment/headscale -- \\
+                    env _FLOX_TESTING_DISABLE_BG_SIDE_EFFECTS=true \\
+                    flox activate --dir /root -- headscale "$@"
+                }
+
+                : "Waiting for headscale deployment to be available..."
+                kubectl wait --for=condition=available deployment/headscale \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+                : "Waiting for headscale pod to be Ready..."
+                kubectl wait --for=condition=Ready pod -l app=headscale \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+                : "Creating admin user..."
+                hs users create admin 2>/dev/null || echo "User admin already exists"
+
+                : "Getting admin user ID..."
+                USER_ID=$( hs users list -o yaml |
+                             yq -r '.[] | select( .name == "admin" ) | .id' - )
+                if [ -z "$USER_ID" ]; then
+                  echo "ERROR: Failed to get admin user ID"
+                  exit 1
+                fi
+
+                : "Creating reusable preauth key... (10 years expiration)"
+                PREAUTH_KEY=$( hs preauthkeys --user "$USER_ID" \\
+                    create --reusable --expiration 87600h -o yaml |
+                  yq -r '.key' - )
+                if [ -z "$PREAUTH_KEY" ]; then
+                  echo "ERROR: Failed to extract preauth key"
+                  exit 1
+                fi
+
+                : "Storing preauth key in Secret..."
+                kubectl create secret generic @CLIENT_AUTH_SECRET@ \\
+                  --from-literal=authkey="$PREAUTH_KEY" \\
+                  --dry-run=client -o yaml | kubectl apply -f -
+
+                : "Creating Headplane API key..."
+                HEADPLANE_API_KEY=$( hs apikeys create )
+                if [ -z "$HEADPLANE_API_KEY" ]; then
+                  echo "ERROR: Failed to create Headplane API key"
+                  exit 1
+                fi
+
+                : "Updating headplane-secrets with API key..."
+                kubectl patch secret @HEADPLANE_SECRETS@ \\
+                  -n "$HEADSCALE_NAMESPACE" \\
+                  --type merge \\
+                  -p "{\\"stringData\\":{\\"api_key\\":\\"$HEADPLANE_API_KEY\\"}}" 2>/dev/null || \\
+                  echo "Note: @HEADPLANE_SECRETS@ not yet created, will be updated when available"\
+                """
+                    .replace("@CLIENT_AUTH_SECRET@", MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())
+                    .replace("@HEADPLANE_SECRETS@", MeshRefs.HEADPLANE_SECRETS_SECRET.name())));
     configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/metadata/labels", Map.of("app", "headscale")));
     return configMap;
@@ -557,48 +566,57 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-client-scripts",
             Map.of(
                 "tailscale-client.sh",
-                "#!/bin/sh\n"
-                    + "set -exuo pipefail\n\n"
-                    + ": \"[i] Starting tailscaled...\"\n"
-                    + "tailscaled \\\n"
-                    + "  --tun=userspace-networking \\\n"
-                    + "  --state=/var/lib/tailscale/tailscaled.state \\\n"
-                    + "  --socket=/var/run/tailscale/tailscaled.sock --verbose=1 &\n"
-                    + "TAILSCALED_PID=$$!\n\n"
-                    + ": \"[i] Waiting for tailscaled socket...\"\n"
-                    + "until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done\n\n"
-                    + ": \"[i] Connecting to Headscale at $HEADSCALE_URL...\"\n"
-                    + "tailscale up \\\n"
-                    + "  --login-server=$HEADSCALE_URL \\\n"
-                    + "  --authkey=file:/var/secrets/authkey \\\n"
-                    + "  --hostname=${DARWIN_HOST}-${RKE2_NODENAME} \\\n"
-                    + "  --advertise-tags=tag:rke2,tag:nikopol \\\n"
-                    + "  --accept-routes \\\n"
-                    + "  --ssh \\\n"
-                    + "  --reset\n\n"
-                    + "wait $TAILSCALED_PID",
+                """
+                #!/bin/sh
+                set -exuo pipefail
+
+                : "[i] Starting tailscaled..."
+                tailscaled \\
+                  --tun=userspace-networking \\
+                  --state=/var/lib/tailscale/tailscaled.state \\
+                  --socket=/var/run/tailscale/tailscaled.sock --verbose=1 &
+                TAILSCALED_PID=$$!
+
+                : "[i] Waiting for tailscaled socket..."
+                until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
+
+                : "[i] Connecting to Headscale at $HEADSCALE_URL..."
+                tailscale up \\
+                  --login-server=$HEADSCALE_URL \\
+                  --authkey=file:/var/secrets/authkey \\
+                  --hostname=${DARWIN_HOST}-${RKE2_NODENAME} \\
+                  --advertise-tags=tag:rke2,tag:nikopol \\
+                  --accept-routes \\
+                  --ssh \\
+                  --reset
+
+                wait $TAILSCALED_PID\
+                """,
                 "wait-for-headscale.sh",
-                "#!/bin/sh\n"
-                    + "set -exuo pipefail\n\n"
-                    + ": \"[i] Waiting for headscale deployment to be available...\"\n"
-                    + "kubectl wait --for=condition=available deployment/headscale \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
-                    + ": \"[i] Waiting for required ConfigMaps...\"\n"
-                    + "kubectl wait --for=create configmap/headscale-client-scripts \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n"
-                    + "kubectl wait --for=create configmap/"
-                    + MeshRefs.HEADSCALE_ENV_CONFIGMAP.name()
-                    + " \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n"
-                    + "kubectl wait --for=create configmap/"
-                    + RuntimeRefs.FLOX_ENV_CONFIGMAP.name()
-                    + " \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
-                    + ": \"[i] Waiting for required secrets...\"\n"
-                    + "kubectl wait --for=create secret/"
-                    + MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()
-                    + " \\\n"
-                    + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s"));
+                """
+                #!/bin/sh
+                set -exuo pipefail
+
+                : "[i] Waiting for headscale deployment to be available..."
+                kubectl wait --for=condition=available deployment/headscale \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+                : "[i] Waiting for required ConfigMaps..."
+                kubectl wait --for=create configmap/headscale-client-scripts \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
+                kubectl wait --for=create configmap/@HEADSCALE_ENV_CONFIGMAP@ \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
+                kubectl wait --for=create configmap/@FLOX_ENV_CONFIGMAP@ \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+                : "[i] Waiting for required secrets..."
+                kubectl wait --for=create secret/@CLIENT_AUTH_SECRET@ \\
+                  -n "$HEADSCALE_NAMESPACE" --timeout=300s\
+                """
+                    .replace("@HEADSCALE_ENV_CONFIGMAP@", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name())
+                    .replace("@FLOX_ENV_CONFIGMAP@", RuntimeRefs.FLOX_ENV_CONFIGMAP.name())
+                    .replace(
+                        "@CLIENT_AUTH_SECRET@", MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())));
     configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/metadata/labels", Map.of("app", "headscale-client")));
     return configMap;
@@ -701,25 +719,33 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             "|ConfigMap|${headscale-namespace}|headscale-gateway-script",
             Map.of(
                 "gateway.sh",
-                "#!/usr/bin/env bash\n"
-                    + "set -exuo pipefail\n\n"
-                    + ": \"[i] Enabling IP forwarding...\"\n"
-                    + "sysctl -w net.ipv4.ip_forward=1\n"
-                    + "sysctl -w net.ipv6.conf.all.forwarding=1 || true\n\n"
-                    + ": \"[i] Starting tailscaled router...\"\n"
-                    + "tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &\n"
-                    + "TAILSCALED_PID=$$!\n\n"
-                    + "until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done\n\n"
-                    + "tailscale up \\\n"
-                    + "  --login-server=$HEADSCALE_URL \\\n"
-                    + "  --authkey=file:/var/secrets/authkey \\\n"
-                    + "  --hostname=${DARWIN_HOST}-gateway \\\n"
-                    + "  --advertise-routes=${VIP_NETWORK_CIDR} \\\n"
-                    + "  --accept-dns=false \\\n"
-                    + "  --ssh \\\n"
-                    + "  --reset\n\n"
-                    + "tailscale set --advertise-routes=${VIP_NETWORK_CIDR}\n\n"
-                    + "wait $TAILSCALED_PID"));
+                """
+                #!/usr/bin/env bash
+                set -exuo pipefail
+
+                : "[i] Enabling IP forwarding..."
+                sysctl -w net.ipv4.ip_forward=1
+                sysctl -w net.ipv6.conf.all.forwarding=1 || true
+
+                : "[i] Starting tailscaled router..."
+                tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+                TAILSCALED_PID=$$!
+
+                until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
+
+                tailscale up \\
+                  --login-server=$HEADSCALE_URL \\
+                  --authkey=file:/var/secrets/authkey \\
+                  --hostname=${DARWIN_HOST}-gateway \\
+                  --advertise-routes=${VIP_NETWORK_CIDR} \\
+                  --accept-dns=false \\
+                  --ssh \\
+                  --reset
+
+                tailscale set --advertise-routes=${VIP_NETWORK_CIDR}
+
+                wait $TAILSCALED_PID\
+                """));
     configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/metadata/labels", Map.of("app", "headscale-gateway")));
     return configMap;

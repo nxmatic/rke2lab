@@ -157,22 +157,26 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
             "/data",
             Map.of(
                 "agent-sync.sh",
-                "#!/bin/sh\n"
-                    + "set -exuo pipefail\n\n"
-                    + "# Read authkey from mounted secret volume (base64 encoded)\n"
-                    + "AUTHKEY=$(cat /secrets/headscale/authkey | base64 -d)\n"
-                    + "kubectl create secret generic headplane-agent-auth \\\n"
-                    + "  -n \"${HEADPLANE_NAMESPACE}\" \\\n"
-                    + "  --from-literal=preauthkey=\"${AUTHKEY}\" \\\n"
-                    + "  --dry-run=client -o yaml | kubectl apply -f -\n\n"
-                    + "yq eval '.server.base_url = strenv(HEADPLANE_BASE_URL) |\n"
-                    + "  .server.cookie_secure = (strenv(HEADPLANE_COOKIE_SECURE) | downcase == \"true\") |\n"
-                    + "  .headscale.url = strenv(HEADSCALE_SERVICE_URL)' \\\n"
-                    + "  /etc/headplane-template/config.yaml > /tmp/config.$$.yaml\n"
-                    + "kubectl create secret generic headplane-config \\\n"
-                    + "  -n \"${HEADPLANE_NAMESPACE}\" \\\n"
-                    + "  --from-file=config.yaml=/tmp/config.$$.yaml \\\n"
-                    + "  --dry-run=client -o yaml | kubectl apply -f -")));
+                """
+                #!/bin/sh
+                set -exuo pipefail
+
+                # Read authkey from mounted secret volume (base64 encoded)
+                AUTHKEY=$(cat /secrets/headscale/authkey | base64 -d)
+                kubectl create secret generic headplane-agent-auth \\
+                  -n "${HEADPLANE_NAMESPACE}" \\
+                  --from-literal=preauthkey="${AUTHKEY}" \\
+                  --dry-run=client -o yaml | kubectl apply -f -
+
+                yq eval '.server.base_url = strenv(HEADPLANE_BASE_URL) |
+                  .server.cookie_secure = (strenv(HEADPLANE_COOKIE_SECURE) | downcase == "true") |
+                  .headscale.url = strenv(HEADSCALE_SERVICE_URL)' \\
+                  /etc/headplane-template/config.yaml > /tmp/config.$$.yaml
+                kubectl create secret generic headplane-config \\
+                  -n "${HEADPLANE_NAMESPACE}" \\
+                  --from-file=config.yaml=/tmp/config.$$.yaml \\
+                  --dry-run=client -o yaml | kubectl apply -f -\
+                """)));
 
     return configMap;
   }

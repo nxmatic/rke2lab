@@ -154,17 +154,21 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
             "/data",
             Map.of(
                 "install.sh",
-                "#!/usr/bin/env -S bash -exuo pipefail\n\n"
-                    + ": \"[i] Installing Envoy Gateway ${ENVOY_GATEWAY_VERSION}...\"\n"
-                    + "kubectl apply \\\n"
-                    + "  --server-side \\\n"
-                    + "  --force-conflicts \\\n"
-                    + "  -f \"https://github.com/envoyproxy/gateway/releases/download/${ENVOY_GATEWAY_VERSION}/install.yaml\"\n\n"
-                    + ": \"[i] Waiting for Envoy Gateway deployment...\"\n"
-                    + "kubectl wait --timeout=300s \\\n"
-                    + "  --namespace \"${ENVOY_GATEWAY_NAMESPACE}\" \\\n"
-                    + "  --for=condition=available \\\n"
-                    + "  deployment/envoy-gateway\n")));
+                """
+                #!/usr/bin/env -S bash -exuo pipefail
+
+                : "[i] Installing Envoy Gateway ${ENVOY_GATEWAY_VERSION}..."
+                kubectl apply \\
+                  --server-side \\
+                  --force-conflicts \\
+                  -f "https://github.com/envoyproxy/gateway/releases/download/${ENVOY_GATEWAY_VERSION}/install.yaml"
+
+                : "[i] Waiting for Envoy Gateway deployment..."
+                kubectl wait --timeout=300s \\
+                  --namespace "${ENVOY_GATEWAY_NAMESPACE}" \\
+                  --for=condition=available \\
+                  deployment/envoy-gateway
+                """)));
     return configMap;
   }
 
