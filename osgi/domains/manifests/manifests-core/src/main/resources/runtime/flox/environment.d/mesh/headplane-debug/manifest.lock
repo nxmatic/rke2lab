@@ -63,6 +63,7 @@
       "outputs_to_install": [
         "man",
         "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -97,6 +98,7 @@
       "unfree": false,
       "version": "9.11",
       "outputs_to_install": [
+        "out",
         "out",
         "out",
         "out"
@@ -242,7 +244,7 @@
     },
     {
       "install_id": "headplane-agent",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773160&narHash=sha256-NSXXzmY66wHowzGwpVhREG9SPcacJZ9rO0HvOWch%2BWA%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787817502&narHash=sha256-grekGmt12m1rZcYODDJsfSXMyqOX7x%2BoXo1ckSX0SFs%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headplane-agent",
       "derivation": "/nix/store/wq07zx4d0jnq27wwliv1v488lna2c3qx-hp_agent-0.7.0.drv",
@@ -267,7 +269,7 @@
     },
     {
       "install_id": "headplane-debug",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773160&narHash=sha256-NSXXzmY66wHowzGwpVhREG9SPcacJZ9rO0HvOWch%2BWA%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787817502&narHash=sha256-grekGmt12m1rZcYODDJsfSXMyqOX7x%2BoXo1ckSX0SFs%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headplane-debug",
       "derivation": "/nix/store/l66hrs4kq33mcy91sxhqz1hva5pzbnx7-headplane-debug-0.7.0.drv",
@@ -296,7 +298,7 @@
     },
     {
       "install_id": "headplane-ssh-wasm",
-      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787773160&narHash=sha256-NSXXzmY66wHowzGwpVhREG9SPcacJZ9rO0HvOWch%2BWA%3D",
+      "locked-url": "path:/private/var/lib/git/seedmatic/rke2lab.d/feature/nixos-node-substrate/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox?lastModified=1787817502&narHash=sha256-grekGmt12m1rZcYODDJsfSXMyqOX7x%2BoXo1ckSX0SFs%3D",
       "flake-description": "Flox runtime env catalog: per-workload packages (kdns, headplane, headscale, tailscale) the flox-nri-plugin injects. The plugin itself now lives in github:seedmatic/flox-nri-plugin (consumed as the flox-runtime input of the rke2lab flake).",
       "locked-flake-attr-path": "packages.aarch64-linux.headplane-ssh-wasm",
       "derivation": "/nix/store/m25rhwpqp583nngr2mkl9m1853x6aln8-headplane-ssh-wasm-0.7.0.drv",

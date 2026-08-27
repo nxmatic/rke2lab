@@ -54,6 +54,11 @@ let
       printf 'root:x:0:\nnogroup:x:65534:\n' > etc/group
       printf 'passwd: files\ngroup: files\nhosts: files dns\n' > etc/nsswitch.conf
       cp ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt etc/ssl/certs/ca-bundle.crt
+      # A world-writable /tmp: dockerTools images ship none, but injected scripts
+      # (e.g. headplane agent-sync's `yq … > /tmp/config.$$.yaml`) expect it, and
+      # the NRI overlay only covers /nix/store so it won't provide one either.
+      mkdir -p tmp
+      chmod 1777 tmp
     '';
   };
 in
