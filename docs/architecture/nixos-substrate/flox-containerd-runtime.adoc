@@ -21,6 +21,13 @@ host build:
 * the containerd wiring (NRI plugin, ZFS snapshotter, SystemdCgroup, registries) is declarative in
   `nixos/containerd.nix`; the flox runtime is the derivation those settings point at.
 
+NOTE: "Base closure" scopes to the runtime *shim* — the plugin + OCI hooks + `/etc/flox.toml` +
+NRI containerd config. The flox *envs* the shim injects are NOT in the base closure: they are
+delivered at runtime from a ZFS-PVC nix store written by a reconciler DaemonSet
+(link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime] §Runtime
+env delivery). Baking the *envs* is the LIVE interim, being migrated — a package bump must not
+cold-start the control node.
+
 == Dev vs prod — runtime now, harden later
 
 During active shim development the runtime build (a DaemonSet from the projected worktree) keeps a

@@ -38,7 +38,7 @@ flowchart TB
   subgraph AFTER[After — build once, reference, split by realm]
     a1["rke2lab flake<br/>nixos-generators, into Incus image store"]
     a2["management node seeded by Pulumi thin<br/>all workload nodes grown greenfield by CAPN, same images"]
-    a3["Flux in each cluster · controller for host mutation<br/>flox runtime baked in the image"]
+    a3["Flux in each cluster · controller for host mutation<br/>flox shim baked · envs at runtime (ZFS-PVC)"]
     a1 --> a2 --> a3
   end
   BEFORE -.the layer underneath is removed.-> AFTER
@@ -118,6 +118,38 @@ flowchart TB
   style AFTER fill:#e8f5e9,stroke:#2e7d32
 ----
 
+=== Diagram D — Flox env delivery: BEFORE vs AFTER
+
+Reads: the BEFORE bakes each flox env (subtree + activation + closure) into the node-base
+`/nix/store` via `nixos/flox-runtime.nix` and folds `environment.d` into the image digest — so a
+package bump changes the image and COLD-STARTS the control node. The AFTER keeps only the *shim*
+baked (foundation) and delivers the *envs* at runtime in the k8s plane: a reconciler DaemonSet
+`nix copy`s the locked closures into a persistent ZFS-PVC self-contained nix store and the NRI plugin
+overlays it — the image is unchanged on a bump, so no cold-start. The dashed edge `envs leave the
+image` names the shift.
+
+[mermaid]
+----
+flowchart TB
+  subgraph BEFORE[Before — envs baked into the image]
+    b1["nixos/flox-runtime.nix bakes each env<br/>subtree + activation + closure + tmpfiles GC-roots"]
+    b2["environment.d folded into imageSourceDigest<br/>+ shell TWIN GATE"]
+    b3["package bump → new image → COLD-START of the control node"]
+    b1 --> b2 --> b3
+  end
+  subgraph AFTER[After — envs delivered at runtime, k8s plane]
+    a1["FOUNDATION baked: plugin + hooks + /etc/flox.toml + NRI config only"]
+    a2["reconciler DaemonSet (sole writer)<br/>nix copy → persistent ZFS-PVC self-contained store"]
+    a3["NRI plugin overlays the PVC store (single lowerdir)<br/>image unchanged on bump → NO cold-start"]
+    a1 --> a3
+    a2 --> a3
+  end
+  BEFORE -.envs leave the image.-> AFTER
+
+  style BEFORE fill:#fdeaea,stroke:#c0392b
+  style AFTER fill:#e8f5e9,stroke:#2e7d32
+----
+
 === What the transition deletes
 
 The simplification, stated as removals — each is a red box above with no successor:
@@ -146,6 +178,9 @@ The simplification, stated as removals — each is a red box above with no succe
 
 | the runtime `nix flake build` of the flox shim on the host (DaemonSet trampoline)
 | the shim baked into the base image at build time
+
+| flox *envs* baked into the node-base `/nix/store` (`environment.d` folded into the image digest → cold-start on every package bump)
+| envs delivered at runtime from a persistent ZFS-PVC store by a reconciler DaemonSet; the image is unchanged on a bump
 |===
 
 What *survives*, unchanged in role: the Pulumi Incus graph for the management node (thin, host-side),
@@ -169,11 +204,15 @@ Shipped, on the codebase today (the green blocks are not all vision):
 Still vision (the red block has not fully collapsed): CAPN growing peers/workers from the published
 images (the management cluster is not yet wired to grow the fleet), and the Go controller for
 post-join host mutation (still the DaemonSet stage). The e2e LIVE proof — grow a real node to Ready —
-is the open gate.
+is the open gate. Flox-*env* delivery is also still vision: today the envs are BAKED
+(`nixos/flox-runtime.nix`, LIVE); Diagram D's AFTER (reconciler DaemonSet + persistent ZFS-PVC store)
+is the target — see link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved
+Runtime] §Runtime env delivery.
 
 == Related documentation
 
 * link:../nixos-substrate/substrate-model.adoc[The substrate model] — the vision this delta renders.
 * link:../nixos-substrate/concern-ownership.adoc[Concern ownership] — the old→new redistribution table.
 * link:../nixos-substrate/node-bootstrap-delivery.adoc[Node-side bootstrap delivery] — the shipped CNI/Flux seam.
+* link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] — Diagram D's target: runtime env delivery via the reconciler + ZFS-PVC store.
 * link:seed.adoc[Seed orchestration L1] — the host pipeline that seeds master and runs the GROW.

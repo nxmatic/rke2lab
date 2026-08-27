@@ -19,6 +19,13 @@
   rendered-branch source). Sections 2, 3, 6 and the deployment diagram describe this
   tier — treat their `/srv/host/...` paths as the pre-substrate form.
 
+* *ENV delivery moved to runtime (2026-08-27).* The plugin stays BAKED (foundation),
+  but the flox *envs* it injects no longer live in the node's baked `/nix/store` —
+  they live in a runtime ZFS-PVC nix store written by a *reconciler DaemonSet*, and
+  the plugin overlays THAT store. Where a diagram or the resolution section shows the
+  env GC-root/store on the baked host store, read it as the LIVE interim; the target
+  populator is the reconciler (design doc §Runtime env delivery).
+
 See link:patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved
 Runtime + Remote Nix Builder] for the full two-tier design and the extraction.
 ====
@@ -43,7 +50,7 @@ flowchart TB
         NRI[NRI Plugin<br/>Flox Injector]
     end
 
-    Nix[(Nix Store<br/>/nix/store)]
+    Nix[(env store — plugin overlays this<br/>TARGET: runtime PVC store<br/>INTERIM: baked /nix/store)]
     Catalog[(Env catalog<br/>rke2lab runtime/flox<br/>kdns, headplane, ...)]
 
     ForkFlake -->|flake input, nix build| Bake
@@ -62,9 +69,10 @@ flowchart TB
 ....
 
 The foundation is a pure bake: the fork flake's binary is symlinked in by
-`nixos/containerd.nix`, containerd launches it, and it resolves envs from the
-local rke2lab catalog + the shared `/nix/store` — no FloxHub round-trip, no runtime
-installer.
+`nixos/containerd.nix`, containerd launches it, and it injects envs — no FloxHub
+round-trip, no runtime installer. The env *store* it overlays is, in the target, the
+runtime ZFS-PVC store written by the reconciler DaemonSet (design doc §Runtime env
+delivery); the baked `/nix/store` env is the LIVE interim.
 
 == 2. Flox Runtime Installer Pod Architecture — EXTENSION tier (retained)
 
@@ -445,10 +453,12 @@ The `flox-runtime-installer` pod has two containers:
 === Environment Path Resolution
 
 * Format: `{category}/{name}` or just `{name}` (defaults to `networking/`)
-* *Foundation (store-resolved, current):* `{category}/{name}` → readlink the
-  GC-root `/nix/var/nix/gcroots/flox-runtime/env/{category}/{name}` → the
-  `/nix/store/...` env path. The env catalog lives in rke2lab's `runtime/flox`
-  flake; the shim (fork) never holds it.
+* *Store-resolved (the contract, stable):* `{category}/{name}` → readlink the
+  GC-root `/nix/var/nix/gcroots/flox-runtime/env/{category}/{name}` → the env store
+  path. The GC-root contract is INVARIANT; only its populator + backing store move —
+  TARGET = the runtime ZFS-PVC store written by the reconciler DaemonSet; INTERIM
+  (LIVE) = baked into the node `/nix/store` by `nixos/flox-runtime.nix`. The env
+  catalog lives in rke2lab's `runtime/flox` flake; the shim (fork) never holds it.
 * *Extension (pre-substrate, legacy):* mapped to
   `/srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}` by the
   DaemonSet installer — dissolved by the substrate, repointed to the store path.
@@ -457,3 +467,4 @@ The `flox-runtime-installer` pod has two containers:
 
 * link:patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - the two-tier design these diagrams span; the fork-repo extraction and the remote builder
 * link:nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] - the nix-native runtime baked into the base closure (the foundation tier's `nixos/containerd.nix`)
+* link:atlas/nixos-substrate.adoc[Atlas — NixOS substrate] - the before/after figure for the baked-envs → runtime-PVC env-delivery shift
