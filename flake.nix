@@ -176,13 +176,17 @@
         ldflags = lib.filter (f: f != "-s" && f != "-w") (old.ldflags or []);
         gcflags = (old.gcflags or []) ++ ["all=-N -l"];
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [pkgs.makeWrapper];
+        # `tailscale` is a MULTI-CALL binary: $out/bin/tailscale is a SYMLINK to
+        # tailscaled, dispatched by argv[0] basename. wrapProgram-ing BOTH breaks the
+        # dispatch (the tailscale wrapper's exec chain reaches the daemon → `tailscale
+        # up` fails "tailscaled does not take non-flag arguments"). Wrap ONLY tailscaled:
+        # the tailscale symlink then resolves THROUGH that wrapper with argv[0]=tailscale
+        # (CLI mode intact) and still inherits delve on PATH from the shared wrapper.
         postFixup =
           (old.postFixup or "")
           + ''
-            for bin in tailscale tailscaled; do
-              wrapProgram "$out/bin/$bin" \
-                --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
-            done
+            wrapProgram "$out/bin/tailscaled" \
+              --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
           '';
       });
 
