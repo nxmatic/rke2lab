@@ -583,7 +583,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                   --tun=userspace-networking \\
                   --state=/var/lib/tailscale/tailscaled.state \\
                   --socket=/var/run/tailscale/tailscaled.sock --verbose=1 &
-                TAILSCALED_PID=$$!
+                TAILSCALED_PID=$!
 
                 : "[i] Waiting for tailscaled socket..."
                 until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
@@ -732,12 +732,12 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                 set -exuo pipefail
 
                 : "[i] Enabling IP forwarding..."
-                sysctl -w net.ipv4.ip_forward=1
-                sysctl -w net.ipv6.conf.all.forwarding=1 || true
+                echo 1 > /proc/sys/net/ipv4/ip_forward
+                echo 1 > /proc/sys/net/ipv6/conf/all/forwarding || true
 
                 : "[i] Starting tailscaled router..."
                 tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
-                TAILSCALED_PID=$$!
+                TAILSCALED_PID=$!
 
                 until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
 
