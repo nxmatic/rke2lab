@@ -472,12 +472,42 @@
           '';
         };
 
+        # flux9s: K9s-style TUI for Flux. nixpkgs pins 0.7.2, which chokes on our
+        # RKE2/headscale serving chain; the upstream v1.0.3 release is built from
+        # source so the flox dev env tracks latest. kube-rs links OpenSSL, so the
+        # same pkg-config + openssl inputs as the nixpkgs derivation. cargoHash
+        # pins the vendored crate closure.
+        flux9sPkg = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+          pname = "flux9s";
+          version = "1.0.3";
+
+          src = pkgs.fetchFromGitHub {
+            owner = "dgunzy";
+            repo = "flux9s";
+            rev = "v${finalAttrs.version}";
+            hash = "sha256-9xk46wwQUegUJJWOLG3EkeTgHQ4qfhGISqcDUcsdBos=";
+          };
+
+          cargoHash = "sha256-VXWg6NrKNFRPwK6A3ttrwUSzLx3BjMDthtRwLX9Zrsg=";
+
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.openssl ];
+
+          meta = {
+            description = "K9s-inspired terminal UI for monitoring Flux GitOps resources";
+            mainProgram = "flux9s";
+            homepage = "https://flux9s.ca/";
+            license = pkgs.lib.licenses.asl20;
+          };
+        });
+
       in {
         packages = {
           inherit netplanJar networkBlueprintYaml networkBlueprintJson seedMasterJar;
           seed-master = seedMasterJar;
           incus-client = incusClient;
           deploy = deployApp;
+          flux9s = flux9sPkg;
         } // floxNriPluginPackages // toolchainPackages;
 
         apps.deploy = {
