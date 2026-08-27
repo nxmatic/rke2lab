@@ -225,11 +225,16 @@
           runHook preInstall
           mkdir -p $out/share/headplane
           cp -r build node_modules package.json $out/share/headplane/
+          # headplane runs drizzle-orm migrations from a CWD-relative ./drizzle
+          # (app/server/db/client.server.ts). Ship the migrations dir and launch
+          # from the app root, or startup dies "ENOENT scandir './drizzle'".
+          [ -d drizzle ] && cp -r drizzle $out/share/headplane/ || true
           mkdir -p $out/bin
           cat > $out/bin/headplane <<EOF
           #!${pkgs.runtimeShell}
+          cd $out/share/headplane
           exec ${pkgs.nodejs_22}/bin/node --enable-source-maps --inspect=0.0.0.0:9229 \
-            $out/share/headplane/build/server/index.js "\$@"
+            build/server/index.js "\$@"
           EOF
           chmod +x $out/bin/headplane
           runHook postInstall
