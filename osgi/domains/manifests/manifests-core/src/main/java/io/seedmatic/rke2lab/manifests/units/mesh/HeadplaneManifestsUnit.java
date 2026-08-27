@@ -161,8 +161,8 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                 #!/bin/sh
                 set -exuo pipefail
 
-                # Read authkey from mounted secret volume (base64 encoded)
-                AUTHKEY=$(cat /secrets/headscale/authkey | base64 -d)
+                # Read the authkey from the mounted secret volume (k8s already decoded it).
+                AUTHKEY=$(cat /secrets/headscale/authkey)
                 kubectl create secret generic headplane-agent-auth \\
                   -n "${HEADPLANE_NAMESPACE}" \\
                   --from-literal=preauthkey="${AUTHKEY}" \\

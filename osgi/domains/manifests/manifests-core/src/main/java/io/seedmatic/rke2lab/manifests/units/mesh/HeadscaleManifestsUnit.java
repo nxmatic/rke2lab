@@ -211,6 +211,14 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     "resources",
                     List.of("deployments"),
                     "verbs",
+                    List.of("get", "list", "watch")),
+                // wait-for-headscale.sh does `kubectl wait --for=create configmap/...`.
+                Map.of(
+                    "apiGroups",
+                    List.of(""),
+                    "resources",
+                    List.of("configmaps"),
+                    "verbs",
                     List.of("get", "list", "watch")))));
     return role;
   }
