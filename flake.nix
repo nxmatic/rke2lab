@@ -176,16 +176,22 @@
         ldflags = lib.filter (f: f != "-s" && f != "-w") (old.ldflags or []);
         gcflags = (old.gcflags or []) ++ ["all=-N -l"];
         nativeBuildInputs = (old.nativeBuildInputs or []) ++ [pkgs.makeWrapper];
-        # `tailscale` is a MULTI-CALL binary: $out/bin/tailscale is a SYMLINK to
-        # tailscaled, dispatched by argv[0] basename. wrapProgram-ing BOTH breaks the
-        # dispatch (the tailscale wrapper's exec chain reaches the daemon → `tailscale
-        # up` fails "tailscaled does not take non-flag arguments"). Wrap ONLY tailscaled:
-        # the tailscale symlink then resolves THROUGH that wrapper with argv[0]=tailscale
-        # (CLI mode intact) and still inherits delve on PATH from the shared wrapper.
+        # `tailscale` is a MULTI-CALL binary dispatched by argv[0] basename, and upstream
+        # ships $out/bin/tailscale as a SYMLINK to tailscaled. Every wrapper in the chain
+        # already does `exec -a "$0"` (argv0 IS propagated), so --inherit-argv0 changes
+        # nothing — the culprit is the symlink: invoked through it, $0 resolves to
+        # "tailscaled" and the binary dispatches as the DAEMON, rejecting `tailscale up`.
+        # Fix by FORCING argv0: wrap tailscaled (daemon keeps argv0=tailscaled from its own
+        # wrapper), then replace the symlink with an explicit wrapper pinning argv0=tailscale
+        # so the CLI dispatch is unambiguous. Both keep delve on PATH.
         postFixup =
           (old.postFixup or "")
           + ''
             wrapProgram "$out/bin/tailscaled" \
+              --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
+            rm -f "$out/bin/tailscale"
+            makeWrapper "$out/bin/tailscaled" "$out/bin/tailscale" \
+              --argv0 tailscale \
               --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
           '';
       });
