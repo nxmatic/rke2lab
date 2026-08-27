@@ -2,6 +2,10 @@
 
 Project memory for rke2lab. Cross-cutting facts (profile, conventions, principles) + cross-repo chantiers live in the **hub** ([[hub:MEMORY]] at `/private/var/lib/git/nxmatic/claude-hub.d/main`), auto-loaded as session root. One line per entry (~200 chars max); detail lives in the file. Links: `[[name]]` = rke2lab-local, `[[hub:name]]` = hub.
 
+## Current chantier — flox envs → runtime delivery (NixOS substrate)
+
+- [★ flox envs → RUNTIME via une FloxEnv CRD + contrôleur (design CONVERGÉ 2026-08-27, specs `ec76cd6ae`, code PAS commencé)](flox-envs-runtime-crd-delivery.md) — **sortir les flox envs de l'image bakée → chaque env = un `FloxEnv` CR (repo `github:seedmatic/flox-envs-controller`) réconcilié par un contrôleur node-agent sur le `/nix` HÔTE + gcroots ; le plugin (nôtre) résout l'annotation `[<ns>/]<name>` comme réf de CR ; PAS de PVC (spike : closures grosses + déjà sur le store hôte, le CR = inspectable).** Pur-k8s domain-agnostic (domain→namespace) ; `spec.folder` (défaut=namespace) pilote le layout host + les `[include]`. Foundation (plugin+hooks+config) reste bakée. See [[flox-carrier-nix]] [[node-image-cold-start-digest-gap]] [[nixos-node-substrate-state]].
+
 ## Active chantiers — OSGi / unitrepo / pipeline
 
 - [★★ Cellier TRANSACTIONNEL — design CONVERGÉ + gravé, code PAS commencé (RESUME 2026-07-16)](cellar-transactional-design-state.md) — **ScenarioCellar UNIVERSEL (seul écrivain de tag) + SeedRunLedger (fabrique + open/commit/rollback) + SeedRunLedgerExtension (pont JUnit, injection champ patron SessionSeed, PAS ParameterResolver — jGiven narre les params).** Framework OSGi PARTAGÉ → pas de compteur distribué (sow synchrone, graft=bracket), l'identité voyage par un txId frappé-racine propagé dans le trigger du sow, clé LDAP côté scion. (A) atomique tout-ou-rien, tag pas attachment. Timing jGiven LEVÉ par construction (begin/end ne touchent pas le modèle; verdict via getExecutionException). Spec §cellar-transactional réécrite (ancienne forme superséée), figures dans `.claude/claude-preview.adoc`. NEXT = coder la fondation 4 étapes. See [[cluster-seed-execution-state]] [[collaborative-design-method]].
