@@ -21,6 +21,12 @@ schema-version = "1.10.0"
   pkg-path = "kubectl"
   outputs = "all"
 
+  # bootstrap.sh parses `headscale ... -o yaml` with `yq` (same as the headplane
+  # env's scripts). Without it the bootstrap Job fails `yq: command not found`.
+  [install.yq-go]
+  pkg-path = "yq-go"
+  outputs = "all"
+
   [install.headscale]
   # Workload package lives in the parent runtime flake (runtime/flox/flake.nix).
   # Path is relative to this env dir to avoid the `/var/run -> /run` symlink
