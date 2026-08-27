@@ -43,7 +43,7 @@ maven.flake = "github:seedmatic/rke2lab#maven"
 shfmt.flake = "github:seedmatic/rke2lab#shfmt"
 shellcheck.flake = "github:seedmatic/rke2lab#shellcheck"
 claude-code.pkg-path = "claude-code"
-flux9s.pkg-path = "flux9s"
+flux9s.flake = "github:seedmatic/rke2lab/feature/nixos-node-substrate#flux9s"
 k9s.pkg-path = "k9s"
 
 
@@ -75,6 +75,7 @@ on-activate = """
   if command -v gh >/dev/null 2>&1 && [ -z "${GH_TOKEN:-}" ]; then
     export GH_TOKEN="$(gh auth token 2>/dev/null)"
   fi
+  export KUBECONFIG="${FLOX_ENV_PROJECT}/.local.d/kubeconfig.yaml"
 """
 
 
