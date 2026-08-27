@@ -21,8 +21,8 @@
 
 * *ENV delivery moved to runtime — as a CRD (2026-08-27).* The plugin stays BAKED
   (foundation), but the flox *envs* it injects are no longer baked: each is a
-  `FloxEnv` CR reconciled by OUR *flox-envs controller* (a node-agent DaemonSet from
-  its own repo `github:seedmatic/flox-envs-controller`) onto the node's host `/nix/store`.
+  `FloxEnv` CR reconciled by OUR *flox controller* (a node-agent DaemonSet from
+  its own repo `github:seedmatic/flox-controller`) onto the node's host `/nix/store`.
   The plugin overlays the host
   `/nix` and resolves a pod's `flox.dev/environment` annotation *as a reference to a
   FloxEnv CR*. No PVC. Where a diagram/section shows the env baked, read it as the LIVE
@@ -52,7 +52,7 @@ flowchart TB
         NRI[NRI Plugin<br/>Flox Injector]
     end
 
-    Nix[(host /nix/store — plugin overlays this<br/>TARGET: realised by the flox-envs controller<br/>INTERIM: baked by nixos/flox-runtime.nix)]
+    Nix[(host /nix/store — plugin overlays this<br/>TARGET: realised by the flox controller<br/>INTERIM: baked by nixos/flox-runtime.nix)]
     Catalog[(FloxEnv CRs<br/>referenced by the pod annotation<br/>ns/name)]
 
     ForkFlake -->|flake input, nix build| Bake
@@ -73,7 +73,7 @@ flowchart TB
 The foundation is a pure bake: the fork flake's binary is symlinked in by
 `nixos/containerd.nix`, containerd launches it, and it injects envs — no FloxHub
 round-trip, no runtime installer. The env *store* it overlays is the node's host
-`/nix/store`; in the target that store is populated by OUR flox-envs controller from
+`/nix/store`; in the target that store is populated by OUR flox controller from
 `FloxEnv` CRs (design doc §Runtime env delivery), and the plugin resolves the pod
 annotation as a reference to a FloxEnv CR; the baked env is the LIVE interim.
 
@@ -461,7 +461,7 @@ The `flox-runtime-installer` pod has two containers:
   superseded.)
 * *CR-resolved (target):* the plugin looks up the `FloxEnv` CR `(namespace, name)`,
   validates it is realised on this node (via `status`), and resolves to the env's
-  host `/nix/store` path — which OUR flox-envs controller has realised + GC-rooted.
+  host `/nix/store` path — which OUR flox controller has realised + GC-rooted.
 * *Interim (LIVE):* the env is baked into the node `/nix/store` by
   `nixos/flox-runtime.nix` and resolved by `readlink`-ing the GC-root
   `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`.

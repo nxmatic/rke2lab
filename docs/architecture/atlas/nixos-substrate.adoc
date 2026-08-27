@@ -123,7 +123,7 @@ flowchart TB
 Reads: the BEFORE bakes each flox env (subtree + activation + closure) into the node-base
 `/nix/store` via `nixos/flox-runtime.nix` and folds `environment.d` into the image digest — so a
 package bump changes the image and COLD-STARTS the control node. The AFTER keeps only the *shim*
-baked (foundation) + the *flox-envs controller*, and makes each env a first-class `FloxEnv` CR: the
+baked (foundation) + the *flox controller*, and makes each env a first-class `FloxEnv` CR: the
 controller (node-agent) realises the closures onto the host `/nix/store` and the NRI plugin overlays
 it, resolving the pod annotation as a FloxEnv reference — no PVC. The image is unchanged on a bump, so
 no cold-start. The dashed edge `envs leave the image` names the shift.
@@ -138,8 +138,8 @@ flowchart TB
     b1 --> b2 --> b3
   end
   subgraph AFTER[After — envs are first-class k8s (FloxEnv CRD)]
-    a1["FOUNDATION baked: plugin + hooks + /etc/flox.toml + NRI config + flox-envs controller"]
-    a2["FloxEnv CR (synth) → flox-envs controller (node-agent)<br/>realises closures onto host /nix + writes GC-roots"]
+    a1["FOUNDATION baked: plugin + hooks + /etc/flox.toml + NRI config + flox controller"]
+    a2["FloxEnv CR (synth) → flox controller (node-agent)<br/>realises closures onto host /nix + writes GC-roots"]
     a3["NRI plugin overlays host /nix ; annotation → FloxEnv CR<br/>image unchanged on bump → NO cold-start"]
     a1 --> a3
     a2 --> a3
@@ -180,7 +180,7 @@ The simplification, stated as removals — each is a red box above with no succe
 | the shim baked into the base image at build time
 
 | flox *envs* baked into the node-base `/nix/store` (`environment.d` folded into the image digest → cold-start on every package bump)
-| envs are first-class `FloxEnv` CRs reconciled by our flox-envs controller onto the host store (no PVC); the image is unchanged on a bump
+| envs are first-class `FloxEnv` CRs reconciled by our flox controller onto the host store (no PVC); the image is unchanged on a bump
 |===
 
 What *survives*, unchanged in role: the Pulumi Incus graph for the management node (thin, host-side),
@@ -205,7 +205,7 @@ Still vision (the red block has not fully collapsed): CAPN growing peers/workers
 images (the management cluster is not yet wired to grow the fleet), and the Go controller for
 post-join host mutation (still the DaemonSet stage). The e2e LIVE proof — grow a real node to Ready —
 is the open gate. Flox-*env* delivery is also still vision: today the envs are BAKED
-(`nixos/flox-runtime.nix`, LIVE); Diagram D's AFTER (FloxEnv CRD + flox-envs controller)
+(`nixos/flox-runtime.nix`, LIVE); Diagram D's AFTER (FloxEnv CRD + flox controller)
 is the target — see link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved
 Runtime] §Runtime env delivery.
 
@@ -214,5 +214,5 @@ Runtime] §Runtime env delivery.
 * link:../nixos-substrate/substrate-model.adoc[The substrate model] — the vision this delta renders.
 * link:../nixos-substrate/concern-ownership.adoc[Concern ownership] — the old→new redistribution table.
 * link:../nixos-substrate/node-bootstrap-delivery.adoc[Node-side bootstrap delivery] — the shipped CNI/Flux seam.
-* link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] — Diagram D's target: runtime env delivery via the FloxEnv CRD + flox-envs controller.
+* link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] — Diagram D's target: runtime env delivery via the FloxEnv CRD + flox controller.
 * link:seed.adoc[Seed orchestration L1] — the host pipeline that seeds master and runs the GROW.

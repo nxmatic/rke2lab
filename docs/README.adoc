@@ -120,7 +120,7 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 
 * link:architecture/patterns/controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] - The former /srv/host host-asset materialisation model (dissolved — superseded by the NixOS node substrate)
 * link:architecture/patterns/daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - DaemonSet-to-host asset trampoline pattern
-* link:architecture/patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - Two-tier delivery: the plugin binary baked into the node-base image (foundation, LIVE) + the retained DaemonSet/remote-builder runtime-contribution tier; the shim (fork) extracted to `github:seedmatic/flox-nri-plugin` as a flake input. The flox *envs* become first-class `FloxEnv` CRs reconciled by our flox-envs controller onto the host store — no PVC, no control-node cold-start on a package bump
+* link:architecture/patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - Two-tier delivery: the plugin binary baked into the node-base image (foundation, LIVE) + the retained DaemonSet/remote-builder runtime-contribution tier; the shim (fork) extracted to `github:seedmatic/flox-nri-plugin` as a flake input. The flox *envs* become first-class `FloxEnv` CRs reconciled by our flox controller onto the host store — no PVC, no control-node cold-start on a package bump
 
 == Networking
 

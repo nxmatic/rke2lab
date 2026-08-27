@@ -28,7 +28,7 @@ them:
   The envs are no longer baked into the node-base `/nix/store` — that model forced
   a control-node cold-start on every package bump. Each env becomes a first-class
   k8s resource, a `FloxEnv` CR (a *manifest*, synthesised like every other), and OUR
-  *flox-envs controller* (a node-agent DaemonSet) reconciles it onto each node's own
+  *flox controller* (a node-agent DaemonSet) reconciles it onto each node's own
   host `/nix/store` (realising the closures via the node's nix daemon) + writes the
   GC-roots the baked NRI plugin reads. The plugin overlays the host `/nix` into
   containers — UNCHANGED; only the POPULATOR moves (image tmpfiles → the controller).
@@ -46,7 +46,7 @@ now positioned inside the two-tier model above:
   envs are resolved from a nix store, never copied. Scripts become nix-built
   packages (`flox-runtime-scripts`, an output of the fork repo's flake). The envs
   are resolved from the node's own host `/nix/store` — NOT the baked image (see the
-  banner and <<runtime-env-delivery>>): our flox-envs controller realises each
+  banner and <<runtime-env-delivery>>): our flox controller realises each
   `FloxEnv` CR's closures there and writes the GC-roots; the container consumes them
   via the plugin's overlay + a fine-grained `.flox` symlink farm (`env/` → store,
   `run/cache/log` → local). This removes the `cp` trampoline, the lock-propagation
@@ -86,7 +86,7 @@ hostPath is dissolved, so a migrated installer reads from a store-resolved packa
 ConfigMap / the rendered branch instead.
 
 For the flox ENVS specifically, that migrated form is now designed — a `FloxEnv` CRD
-reconciled by our *flox-envs controller* (see <<runtime-env-delivery>>). The
+reconciled by our *flox controller* (see <<runtime-env-delivery>>). The
 three-contract copy model below is the superseded historical shape; the controller is
 its clean reborn form (realises onto the host store, no `/srv/host`, no `nsenter`).
 
@@ -143,8 +143,8 @@ flowchart TB
     forkflake["flake.nix<br/>flox-nri-plugin + flox-nri-hooks"]:::code
   end
 
-  subgraph ctlrepo["github:seedmatic/flox-envs-controller (flake INPUT — OURS)"]
-    ctlflake["flake.nix<br/>FloxEnv CRD (API) + flox-envs controller"]:::code
+  subgraph ctlrepo["github:seedmatic/flox-controller (flake INPUT — OURS)"]
+    ctlflake["flake.nix<br/>FloxEnv CRD (API) + flox controller"]:::code
   end
 
   subgraph rke2["rke2lab synth (operator machine)"]
@@ -201,7 +201,7 @@ flowchart TB
 |===
 
 The three planes read top-to-bottom. Two fork flakes (OURS) are shared inputs — the
-`flox-nri-plugin` (plugin + hooks) and the `flox-envs-controller` (the `FloxEnv` CRD
+`flox-nri-plugin` (plugin + hooks) and the `flox-controller` (the `FloxEnv` CRD
 + the controller); both outputs are *baked* into the node-base image (FOUNDATION,
 LIVE — the controller ships as a node-agent DaemonSet). The *envs* leave the image
 entirely and become first-class k8s: the
@@ -392,7 +392,7 @@ two host-side inputs exist — and neither is currently provisioned by `nixos/`
 | *flox-env GC-roots* — `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`
 | The plugin's `resolveFloxEnvironment` reads these to map `category/name` → the
   immutable env store path. In the target model they are written on the host store by
-  the *flox-envs controller* (sole writer), NOT baked. The GC-root contract path is
+  the *flox controller* (sole writer), NOT baked. The GC-root contract path is
   unchanged — only its populator moves from `nixos/flox-runtime.nix` (interim bake) to
   the controller (see <<runtime-env-delivery>>).
 
@@ -410,7 +410,7 @@ not the plugin.
 
 === Open question: how the node gets the store paths (+ GC-roots)
 
-NOTE: RESOLVED for the flox ENVS by the *flox-envs controller* — see
+NOTE: RESOLVED for the flox ENVS by the *flox controller* — see
 <<runtime-env-delivery>>. The controller realises each env's closure onto the host
 `/nix/store` and writes its GC-root there (sole writer); the plugin overlays the host
 `/nix`. The interim LIVE model bakes them instead
@@ -433,7 +433,7 @@ a node that lacks it is itself a remote build.
 
 [[runtime-env-delivery]]
 [[l1-realised]]
-== Runtime env delivery — FloxEnv CRD + flox-envs controller (target)
+== Runtime env delivery — FloxEnv CRD + flox controller (target)
 
 The flox envs are delivered at RUNTIME as first-class k8s resources, decoupled from
 the node-base image. A package bump therefore NEVER cold-starts the control node —
@@ -475,9 +475,9 @@ cross-folder `[include]`s the controller renders as relative `../../<folder>/<na
 target's `folder` and owns the paths).
 ====
 
-=== The flox-envs controller (node-agent, sole writer)
+=== The flox controller (node-agent, sole writer)
 
-A node-agent DaemonSet (Go, shipped from its OWN repo `github:seedmatic/flox-envs-controller`
+A node-agent DaemonSet (Go, shipped from its OWN repo `github:seedmatic/flox-controller`
 — which also owns the `FloxEnv` CRD API, like the plugin owns its shim) watches the
 `FloxEnv` CRs and reconciles each node's local store in ONE pass. It is the sole
 writer of the `gcroots/flox-runtime/` subtree (the same single-writer discipline the
@@ -740,6 +740,6 @@ already present in the real store the overlay lowers from.
 * link:../atlas/nixos-substrate.adoc[Atlas — NixOS substrate] —
   the codebase↔vision before/after, incl. the baked-envs → FloxEnv-CRD shift.
 * link:../cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] —
-  the design-only flox webhook (pod-level annotation injection), conceptually adjacent to the flox-envs controller + FloxEnv CRD.
+  the design-only flox webhook (pod-level annotation injection), conceptually adjacent to the flox controller + FloxEnv CRD.
 * link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
   the synth-time secret-access pattern the builder key delivery follows.
