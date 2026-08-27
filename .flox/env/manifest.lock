@@ -38,6 +38,9 @@
         "version": "^3.3.27",
         "outputs": "all"
       },
+      "flux9s": {
+        "pkg-path": "flux9s"
+      },
       "fluxcd": {
         "pkg-path": "fluxcd",
         "pkg-group": "k8s-kubectl-tools",
@@ -78,6 +81,9 @@
       "jdk25": {
         "flake": "github:seedmatic/rke2lab#jdk25",
         "priority": 1
+      },
+      "k9s": {
+        "pkg-path": "k9s"
       },
       "keychain": {
         "pkg-path": "keychain",
@@ -2513,6 +2519,64 @@
       "priority": 5
     },
     {
+      "attr_path": "flux9s",
+      "broken": false,
+      "derivation": "/nix/store/k3nahalvfm0k7ciz2m2ah9pga8yizvvc-flux9s-0.7.2.drv",
+      "description": "K9s-inspired terminal UI for monitoring Flux GitOps resources in real-time",
+      "install_id": "flux9s",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "flux9s-0.7.2",
+      "pname": "flux9s",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:04.303703Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/nv2f3spj12f09aj2c2flffsm90fwi00x-flux9s-0.7.2"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "flux9s",
+      "broken": false,
+      "derivation": "/nix/store/swyrzxjx012b0q26vj9grvzrh8c5b5ql-flux9s-0.7.2.drv",
+      "description": "K9s-inspired terminal UI for monitoring Flux GitOps resources in real-time",
+      "install_id": "flux9s",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "flux9s-0.7.2",
+      "pname": "flux9s",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:14:39.722968Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/4ncl66bbn6v9h52zqm2y5i55xyv41j2b-flux9s-0.7.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "graphviz",
       "broken": false,
       "derivation": "/nix/store/rspy0sf84b4d7lw1kswihbm7nyvvlx9m-graphviz-12.2.1.drv",
@@ -2566,6 +2630,64 @@
       ],
       "outputs": {
         "out": "/nix/store/241vgqijh7v53h5r7ilf1hfiriplqlvi-graphviz-12.2.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "k9s",
+      "broken": false,
+      "derivation": "/nix/store/j9pnib49hrjgklqh1wkm9f04wfqsbkvs-k9s-0.50.18.drv",
+      "description": "Kubernetes CLI To Manage Your Clusters In Style",
+      "install_id": "k9s",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "k9s-0.50.18",
+      "pname": "k9s",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:20.298161Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.50.18",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/srwy9nk8jmv9197czb3xaj3aqjzvdzag-k9s-0.50.18"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "k9s",
+      "broken": false,
+      "derivation": "/nix/store/ip365rir7ds7xf4whv5dpz5xd5bij73j-k9s-0.50.18.drv",
+      "description": "Kubernetes CLI To Manage Your Clusters In Style",
+      "install_id": "k9s",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "k9s-0.50.18",
+      "pname": "k9s",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:15:01.144243Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.50.18",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/6a6dig68k1q9n9rfay8cf3a0m7v1aqln-k9s-0.50.18"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -3477,6 +3599,9 @@
           "pkg-path": "dasel",
           "version": "3.3.0"
         },
+        "flux9s": {
+          "pkg-path": "flux9s"
+        },
         "graphviz": {
           "pkg-path": "graphviz"
         },
@@ -3486,6 +3611,9 @@
         "jdk25": {
           "flake": "github:seedmatic/rke2lab#jdk25",
           "priority": 1
+        },
+        "k9s": {
+          "pkg-path": "k9s"
         },
         "maven": {
           "flake": "github:seedmatic/rke2lab#maven"

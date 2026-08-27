@@ -43,6 +43,8 @@ maven.flake = "github:seedmatic/rke2lab#maven"
 shfmt.flake = "github:seedmatic/rke2lab#shfmt"
 shellcheck.flake = "github:seedmatic/rke2lab#shellcheck"
 claude-code.pkg-path = "claude-code"
+flux9s.pkg-path = "flux9s"
+k9s.pkg-path = "k9s"
 
 
 ## Environment Variables ---------------------------------------------
