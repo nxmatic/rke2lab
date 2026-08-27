@@ -4,7 +4,7 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 
 ## Current chantier — flox envs → runtime delivery (NixOS substrate)
 
-- [★ flox envs → RUNTIME via une FloxEnv CRD + contrôleur (design CONVERGÉ 2026-08-27, specs `ec76cd6ae`, code PAS commencé)](flox-envs-runtime-crd-delivery.md) — **sortir les flox envs de l'image bakée → chaque env = un `FloxEnv` CR (repo `github:seedmatic/flox-envs-controller`) réconcilié par un contrôleur node-agent sur le `/nix` HÔTE + gcroots ; le plugin (nôtre) résout l'annotation `[<ns>/]<name>` comme réf de CR ; PAS de PVC (spike : closures grosses + déjà sur le store hôte, le CR = inspectable).** Pur-k8s domain-agnostic (domain→namespace) ; `spec.folder` (défaut=namespace) pilote le layout host + les `[include]`. Foundation (plugin+hooks+config) reste bakée. See [[flox-carrier-nix]] [[node-image-cold-start-digest-gap]] [[nixos-node-substrate-state]].
+- [★ flox envs → RUNTIME via une FloxEnv CRD + contrôleur (design CONVERGÉ 2026-08-27, specs `ec76cd6ae`, code PAS commencé)](flox-envs-runtime-crd-delivery.md) — **sortir les flox envs de l'image bakée → chaque env = un `FloxEnv` CR (repo `github:seedmatic/flox-controller`) réconcilié par un contrôleur node-agent sur le `/nix` HÔTE + gcroots ; le plugin (nôtre) résout l'annotation `[<ns>/]<name>` comme réf de CR ; PAS de PVC (spike : closures grosses + déjà sur le store hôte, le CR = inspectable).** Pur-k8s domain-agnostic (domain→namespace) ; `spec.folder` (défaut=namespace) pilote le layout host + les `[include]`. Foundation (plugin+hooks+config) reste bakée. See [[flox-carrier-nix]] [[node-image-cold-start-digest-gap]] [[nixos-node-substrate-state]].
 
 ## Active chantiers — OSGi / unitrepo / pipeline
 
