@@ -170,30 +170,20 @@
         doCheck = false;
       });
 
+      # No delve-WRAPPING here — deliberately. In our nixpkgs, tailscale/tailscaled is ONE
+      # combined binary dispatched by argv[0] basename, with $out/bin/tailscale a symlink to it
+      # (verified on-node: `exec -a tailscale <bin> version` → CLI, `-a tailscaled` → daemon).
+      # makeWrapper can't wrap that: its wrapper is a #! script, and for a script target the
+      # kernel IGNORES exec -a's argv[0] and sets $0 to the script's own path → the binary sees
+      # argv[0]="tailscaled" and `tailscale up` runs as the DAEMON ("does not take non-flag
+      # arguments"). Wrapping added nothing anyway: the mesh/tailscale-debug flox env already
+      # ships delve on PATH (manifest.toml [install.delve]) for `dlv attach $(pgrep tailscaled)`.
+      # So keep the binaries PRISTINE — the debug value is the unstripped + `-N -l` build below.
       tailscale-debug = tailscale-prod.overrideAttrs (old: {
         pname = "tailscale-debug";
         dontStrip = true;
         ldflags = lib.filter (f: f != "-s" && f != "-w") (old.ldflags or []);
         gcflags = (old.gcflags or []) ++ ["all=-N -l"];
-        nativeBuildInputs = (old.nativeBuildInputs or []) ++ [pkgs.makeWrapper];
-        # `tailscale` is a MULTI-CALL binary dispatched by argv[0] basename, and upstream
-        # ships $out/bin/tailscale as a SYMLINK to tailscaled. Every wrapper in the chain
-        # already does `exec -a "$0"` (argv0 IS propagated), so --inherit-argv0 changes
-        # nothing — the culprit is the symlink: invoked through it, $0 resolves to
-        # "tailscaled" and the binary dispatches as the DAEMON, rejecting `tailscale up`.
-        # Fix by FORCING argv0: wrap tailscaled (daemon keeps argv0=tailscaled from its own
-        # wrapper), then replace the symlink with an explicit wrapper pinning argv0=tailscale
-        # so the CLI dispatch is unambiguous. Both keep delve on PATH.
-        postFixup =
-          (old.postFixup or "")
-          + ''
-            wrapProgram "$out/bin/tailscaled" \
-              --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
-            rm -f "$out/bin/tailscale"
-            makeWrapper "$out/bin/tailscaled" "$out/bin/tailscale" \
-              --argv0 tailscale \
-              --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
-          '';
       });
 
       # ---- headplane (debug only) -------------------------------------
