@@ -94,12 +94,8 @@ public final class FloxShellSidecarProfile {
     container.put(
         "resources",
         Map.of(
-            // `flox activate` itself costs ~127Mi RSS, so a 128Mi limit OOMs the moment the
-            // operator runs it — the sidecar's whole purpose. 256Mi clears activation + a shell +
-            // a workload CLI; the request stays low since the sidecar idles in `sleep infinity`
-            // and only spikes during an interactive activation.
             "limits",
-            Map.of("cpu", "100m", "ephemeral-storage", "128Mi", "memory", "256Mi"),
+            Map.of("cpu", "100m", "ephemeral-storage", "128Mi", "memory", "128Mi"),
             "requests",
             Map.of("cpu", "10m", "ephemeral-storage", "64Mi", "memory", "64Mi")));
     container.put(
