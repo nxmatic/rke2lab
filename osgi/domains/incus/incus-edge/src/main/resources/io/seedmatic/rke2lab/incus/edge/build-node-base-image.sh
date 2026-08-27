@@ -96,6 +96,23 @@ else
     # `flake = "path:..#pkg"` refs select (e.g. kdns prod, sourced via the overlay,
     # is correctly NOT realised; kdns-debug, a flake ref, is).
     flox_flake="$src_dir/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox"
+
+    # (0) Self-heal env locks in the EXPORTED tree before baking. Each env's
+    # manifest.lock pins its workload package outputs; a flake/nixpkgs move rebuilds
+    # them, and an un-re-locked env then points at a path the fresh bake never
+    # produced (the tailscale-debug drift). Re-locking here — deterministic, since
+    # flake.lock pins the inputs — keeps every env consistent with the flake the
+    # image is built from, so a stale committed lock can never bake a broken closure.
+    # Ephemeral: only the tmpfs copy is touched. Needs flox on PATH (the seed runs
+    # under `flox activate`, so it's inherited); if absent, fall back to the committed
+    # locks as-is rather than failing the build.
+    if command -v flox >/dev/null 2>&1; then
+        echo "self-healing flox env locks before bake"
+        (cd "$flox_flake" && bash lock-envs.sh)
+    else
+        echo "WARNING: flox not on PATH — skipping env-lock self-heal; using committed locks as-is" >&2
+    fi
+
     env_pkgs="$(
         for lock in "$flox_flake"/environment.d/*/*/manifest.lock; do
             [ -f "$lock" ] || continue
@@ -103,8 +120,12 @@ else
         done | sed -E 's/.*#([A-Za-z0-9_-]+)".*/\1/' | sort -u
     )"
     for env_pkg in $env_pkgs; do
-        echo "realising flox env package: $env_pkg"
-        $nix_bin build $nix_flags "$flox_flake#$env_pkg" >/dev/null
+        # `^*` = ALL outputs, not just the default `out`. A multi-output package
+        # (e.g. tailscale-debug ships out + derper) otherwise leaves the non-default
+        # outputs unrealised, and buildenv's storePath on them at activation fails
+        # → the container re-realises from the (absent) source flake and dies.
+        echo "realising flox env package (all outputs): $env_pkg"
+        $nix_bin build $nix_flags "$flox_flake#$env_pkg^*" >/dev/null
     done
 
     # (2) build the two node-base artifacts.
