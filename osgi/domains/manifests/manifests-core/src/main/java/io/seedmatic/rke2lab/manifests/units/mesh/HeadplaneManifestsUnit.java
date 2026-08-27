@@ -817,6 +817,12 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
             Map.of(
                 "replicas",
                 1,
+                // Single replica on a ReadWriteOnce PVC (headplane-data): a RollingUpdate starts
+                // the new pod before terminating the old, and the new pod cannot attach the RWO
+                // volume the old one still holds (multi-attach → ContainerCreating →
+                // ProgressDeadlineExceeded). Recreate terminates the old pod first.
+                "strategy",
+                Map.of("type", "Recreate"),
                 "selector",
                 Map.of("matchLabels", Map.of("app", "headplane")),
                 "template",
