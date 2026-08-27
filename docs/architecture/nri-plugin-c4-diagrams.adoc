@@ -19,12 +19,14 @@
   rendered-branch source). Sections 2, 3, 6 and the deployment diagram describe this
   tier — treat their `/srv/host/...` paths as the pre-substrate form.
 
-* *ENV delivery moved to runtime (2026-08-27).* The plugin stays BAKED (foundation),
-  but the flox *envs* it injects no longer live in the node's baked `/nix/store` —
-  they live in a runtime ZFS-PVC nix store written by a *reconciler DaemonSet*, and
-  the plugin overlays THAT store. Where a diagram or the resolution section shows the
-  env GC-root/store on the baked host store, read it as the LIVE interim; the target
-  populator is the reconciler (design doc §Runtime env delivery).
+* *ENV delivery moved to runtime — as a CRD (2026-08-27).* The plugin stays BAKED
+  (foundation), but the flox *envs* it injects are no longer baked: each is a
+  `FloxEnv` CR reconciled by OUR *flox-envs controller* (a node-agent DaemonSet from
+  its own repo `github:seedmatic/flox-envs-controller`) onto the node's host `/nix/store`.
+  The plugin overlays the host
+  `/nix` and resolves a pod's `flox.dev/environment` annotation *as a reference to a
+  FloxEnv CR*. No PVC. Where a diagram/section shows the env baked, read it as the LIVE
+  interim; the target populator is the controller (design doc §Runtime env delivery).
 
 See link:patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved
 Runtime + Remote Nix Builder] for the full two-tier design and the extraction.
@@ -50,15 +52,15 @@ flowchart TB
         NRI[NRI Plugin<br/>Flox Injector]
     end
 
-    Nix[(env store — plugin overlays this<br/>TARGET: runtime PVC store<br/>INTERIM: baked /nix/store)]
-    Catalog[(Env catalog<br/>rke2lab runtime/flox<br/>kdns, headplane, ...)]
+    Nix[(host /nix/store — plugin overlays this<br/>TARGET: realised by the flox-envs controller<br/>INTERIM: baked by nixos/flox-runtime.nix)]
+    Catalog[(FloxEnv CRs<br/>referenced by the pod annotation<br/>ns/name)]
 
     ForkFlake -->|flake input, nix build| Bake
     Bake -->|launches| NRI
-    User -->|Deploy pods with<br/>flox.dev/environment| Containerd
+    User -->|Deploy pods with<br/>flox.dev/environment=ns/name| Containerd
     Containerd -->|NRI API: Events| NRI
-    NRI -->|Resolve envs| Catalog
-    NRI -->|Bind mount / overlay| Nix
+    NRI -->|resolve annotation → FloxEnv CR| Catalog
+    NRI -->|overlay host /nix| Nix
 
     style User fill:#326ce5,color:#fff
     style RKE2 fill:#f9f,stroke:#333,stroke-width:2px
@@ -70,9 +72,10 @@ flowchart TB
 
 The foundation is a pure bake: the fork flake's binary is symlinked in by
 `nixos/containerd.nix`, containerd launches it, and it injects envs — no FloxHub
-round-trip, no runtime installer. The env *store* it overlays is, in the target, the
-runtime ZFS-PVC store written by the reconciler DaemonSet (design doc §Runtime env
-delivery); the baked `/nix/store` env is the LIVE interim.
+round-trip, no runtime installer. The env *store* it overlays is the node's host
+`/nix/store`; in the target that store is populated by OUR flox-envs controller from
+`FloxEnv` CRs (design doc §Runtime env delivery), and the plugin resolves the pod
+annotation as a reference to a FloxEnv CR; the baked env is the LIVE interim.
 
 == 2. Flox Runtime Installer Pod Architecture — EXTENSION tier (retained)
 
@@ -442,7 +445,7 @@ The `flox-runtime-installer` pod has two containers:
 [cols="1,1,1,1",options="header"]
 |===
 | Annotation | Required | Description | Example
-| `flox.dev/environment` | Yes | Flox environment name | `networking/kdns`
+| `flox.dev/environment.<container>` | Yes | Reference to a `FloxEnv` CR: `[<namespace>/]<name>` (bare name = the pod's namespace; shared envs explicit, e.g. `flox-system/kdns`) | `flox-system/kdns`
 | `flox.dev/home` | No | Override HOME directory | `/home/app`
 | `flox.dev/uid` | No | Container UID (for chown) | `1000`
 | `flox.dev/gid` | No | Container GID (for chown) | `1000`
@@ -452,19 +455,22 @@ The `flox-runtime-installer` pod has two containers:
 
 === Environment Path Resolution
 
-* Format: `{category}/{name}` or just `{name}` (defaults to `networking/`)
-* *Store-resolved (the contract, stable):* `{category}/{name}` → readlink the
-  GC-root `/nix/var/nix/gcroots/flox-runtime/env/{category}/{name}` → the env store
-  path. The GC-root contract is INVARIANT; only its populator + backing store move —
-  TARGET = the runtime ZFS-PVC store written by the reconciler DaemonSet; INTERIM
-  (LIVE) = baked into the node `/nix/store` by `nixos/flox-runtime.nix`. The env
-  catalog lives in rke2lab's `runtime/flox` flake; the shim (fork) never holds it.
-* *Extension (pre-substrate, legacy):* mapped to
-  `/srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}` by the
-  DaemonSet installer — dissolved by the substrate, repointed to the store path.
+* Format: `[<namespace>/]<name>` — a reference to a `FloxEnv` CR. Bare `<name>`
+  defaults to the pod's namespace (k8s-conventional); shared envs are referenced
+  explicitly, e.g. `flox-system/kdns`. (The legacy flat `category/name` string is
+  superseded.)
+* *CR-resolved (target):* the plugin looks up the `FloxEnv` CR `(namespace, name)`,
+  validates it is realised on this node (via `status`), and resolves to the env's
+  host `/nix/store` path — which OUR flox-envs controller has realised + GC-rooted.
+* *Interim (LIVE):* the env is baked into the node `/nix/store` by
+  `nixos/flox-runtime.nix` and resolved by `readlink`-ing the GC-root
+  `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`.
+* *Legacy (pre-substrate):* mapped to
+  `/srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}` by the DaemonSet
+  installer — dissolved by the substrate.
 
 == Related Documentation
 
 * link:patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - the two-tier design these diagrams span; the fork-repo extraction and the remote builder
 * link:nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] - the nix-native runtime baked into the base closure (the foundation tier's `nixos/containerd.nix`)
-* link:atlas/nixos-substrate.adoc[Atlas — NixOS substrate] - the before/after figure for the baked-envs → runtime-PVC env-delivery shift
+* link:atlas/nixos-substrate.adoc[Atlas — NixOS substrate] - the before/after figure for the baked-envs → FloxEnv-CRD env-delivery shift

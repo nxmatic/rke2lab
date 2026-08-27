@@ -24,15 +24,17 @@ them:
   `github:seedmatic/flox-nri-plugin` and consumed by rke2lab as a flake INPUT, not
   shipped as Java resources inside the manifests-core jar. This IS Part 1 below,
   reframed: "sources as flake inputs" now means "sources in the fork repo."
-. *The flox ENVS move out of the baked image to a runtime store (2026-08-27).*
+. *The flox ENVS move out of the baked image to a runtime CRD (2026-08-27).*
   The envs are no longer baked into the node-base `/nix/store` — that model forced
-  a control-node cold-start on every package bump. They are delivered at RUNTIME in
-  the k8s plane: a ZFS-backed PVC (`zfs-localpv`) holds a *self-contained* nix store
-  (flox + closures + a valid Nix DB), populated by a *reconciler DaemonSet* that
-  `nix copy`s the locked closures from the builder; the NRI plugin overlays that PVC
-  store into containers as its single lowerdir. This is now THE design (see
-  <<runtime-env-delivery>>); the earlier "bake envs in the image" model is retained
-  only as a short migration note — it is the LIVE interim, being migrated away.
+  a control-node cold-start on every package bump. Each env becomes a first-class
+  k8s resource, a `FloxEnv` CR (a *manifest*, synthesised like every other), and OUR
+  *flox-envs controller* (a node-agent DaemonSet) reconciles it onto each node's own
+  host `/nix/store` (realising the closures via the node's nix daemon) + writes the
+  GC-roots the baked NRI plugin reads. The plugin overlays the host `/nix` into
+  containers — UNCHANGED; only the POPULATOR moves (image tmpfiles → the controller).
+  No PVC: the CR itself is the k8s-accessible env (`kubectl get/describe floxenv`).
+  This is now THE design (see <<runtime-env-delivery>>); the baked model is retained
+  only as a short migration note — the LIVE interim.
 ====
 
 == Overview
@@ -43,9 +45,10 @@ now positioned inside the two-tier model above:
 . *Store-resolved runtime* — the shell scripts under `runtime/flox/` and the flox
   envs are resolved from a nix store, never copied. Scripts become nix-built
   packages (`flox-runtime-scripts`, an output of the fork repo's flake). The envs
-  live in a *runtime ZFS-PVC nix store* — NOT the baked image (see the banner and
-  <<runtime-env-delivery>>): the reconciler realises them there and the container
-  consumes them via a fine-grained `.flox` symlink farm (`env/` → store,
+  are resolved from the node's own host `/nix/store` — NOT the baked image (see the
+  banner and <<runtime-env-delivery>>): our flox-envs controller realises each
+  `FloxEnv` CR's closures there and writes the GC-roots; the container consumes them
+  via the plugin's overlay + a fine-grained `.flox` symlink farm (`env/` → store,
   `run/cache/log` → local). This removes the `cp` trampoline, the lock-propagation
   step, and the relative-flake-ref breakage in one stroke — and de-buries the Go +
   script sources into the fork flake.
@@ -82,10 +85,10 @@ The one substrate change is the source of the materialized assets: the `/srv/hos
 hostPath is dissolved, so a migrated installer reads from a store-resolved package /
 ConfigMap / the rendered branch instead.
 
-For the flox ENVS specifically, that migrated form is now designed — a *reconciler
-DaemonSet* writing a ZFS-PVC store (see <<runtime-env-delivery>>). The three-contract
-copy model below is the superseded historical shape; the reconciler is its clean
-reborn form (writes its own PVC volume, no `/srv/host`, no `nsenter`).
+For the flox ENVS specifically, that migrated form is now designed — a `FloxEnv` CRD
+reconciled by our *flox-envs controller* (see <<runtime-env-delivery>>). The
+three-contract copy model below is the superseded historical shape; the controller is
+its clean reborn form (realises onto the host store, no `/srv/host`, no `nsenter`).
 
 The Flox runtime installer DaemonSet materializes assets through three distinct
 delivery contracts. Any migration of the *extension tier* must preserve all three.
@@ -136,43 +139,49 @@ locks) cannot. The design must keep these separate.
 [mermaid]
 ....
 flowchart TB
-  subgraph fork["github:seedmatic/flox-nri-plugin (flake INPUT, fork)"]
-    forkflake["flake.nix<br/>flox-nri-plugin + flox-nri-hooks + reconciler<br/>(externals follow nix-flake-commons)"]:::code
+  subgraph fork["github:seedmatic/flox-nri-plugin (flake INPUT — OURS)"]
+    forkflake["flake.nix<br/>flox-nri-plugin + flox-nri-hooks"]:::code
   end
 
-  subgraph rke2["rke2lab flake + manifests synth (operator machine)"]
-    envflake["runtime/flox/flake.nix<br/>env catalog (kdns, mesh, ...)"]:::code
-    bumper["env-bumper CLI<br/>bump flake pins + re-lock (committed)"]:::code
+  subgraph ctlrepo["github:seedmatic/flox-envs-controller (flake INPUT — OURS)"]
+    ctlflake["flake.nix<br/>FloxEnv CRD (API) + flox-envs controller"]:::code
+  end
+
+  subgraph rke2["rke2lab synth (operator machine)"]
+    envd["runtime/flox/environment.d (locked)<br/>env catalog (kdns, mesh, ...)"]:::code
+    unit["FloxEnvManifestsUnit (CDK8s)<br/>renders one FloxEnv CR per env"]:::code
+    bumper["env-bumper CLI<br/>bump pins + re-lock (committed)"]:::code
+    bumper --> envd --> unit
   end
 
   subgraph found["FOUNDATION tier — baked node-base image (LIVE)"]
-    image[("nixos/containerd.nix<br/>/opt/nri/plugins/10-flox → store<br/>90-nri.toml + /etc/flox.toml + OCI hooks")]:::store
-    plugin["NRI plugin (baked binary, systemd)<br/>overlays the PVC store into containers"]:::code
+    image[("nixos/containerd.nix<br/>10-flox + 90-nri.toml + /etc/flox.toml + hooks")]:::store
+    plugin["NRI plugin (baked, systemd — OURS)<br/>resolves the annotation → FloxEnv CR<br/>overlays host /nix into the pod"]:::code
   end
 
-  subgraph k8s["ENVS tier — runtime, k8s plane (Flux-delivered)"]
-    cm["ConfigMap<br/>desired set = store-paths (pointers, small)"]:::code
-    ds["reconciler DaemonSet<br/>SOLE WRITER: nix copy + GC-root + prune"]:::mut
-    pvc[("PVC (zfs-localpv) — self-contained nix store<br/>flox + closures + valid Nix DB<br/>PERSISTANT (hypervisor pool, survives replace)")]:::store
-    cm --> ds
-    ds -->|"nix copy --to 'local?root=pvc'"| pvc
+  subgraph k8s["ENVS tier — first-class k8s, Flux-delivered"]
+    cr["FloxEnv CR (a manifest)<br/>spec: manifest+lock (+includes)<br/>status: realized@node · kubectl get/describe"]:::code
+    ctl["flox-envs CONTROLLER<br/>node-agent DaemonSet (fork), watches FloxEnv"]:::mut
+    cr -->|"Flux applies · watch"| ctl
   end
 
-  subgraph nhost["NixOS host (bioskop-nixos)"]
-    daemon["nix-daemon<br/>(native aarch64-linux builder + substituter)"]:::builder
+  subgraph nhost["node host (bioskop-nixos nix daemon)"]
+    hoststore[("host /nix/store + gcroots/flox-runtime<br/>closures realised by the daemon")]:::store
   end
 
-  subgraph ctr["Flox-injected container"]
-    cstore["/nix overlay = the PVC store (lowerdir UNIQUE)<br/>flox activate = cache-hit"]:::mut
+  subgraph nctr["Flox-injected pod (consumer)"]
+    pod["annotation flox.dev/environment=&lt;FloxEnv ref&gt;<br/>/nix overlay = host store → flox activate cache-hit"]:::mut
   end
 
   forkflake -->|flake input| image
-  bumper -->|commit locks| envflake
-  envflake -->|locked env store-paths| cm
-  daemon -->|substitute closures| ds
+  ctlflake -->|flake input| image
+  ctlflake -->|flake input| ctl
+  unit -->|synthesised manifest| cr
+  ctl -->|"realise closures (daemon) + write gcroots"| hoststore
   image --> plugin
-  pvc -->|overlay source| plugin
-  plugin -->|overlay /nix + flox on PATH| cstore
+  hoststore -->|overlay source| plugin
+  pod -.->|"annotation references"| cr
+  plugin -->|overlay /nix + flox on PATH| pod
 
   classDef code fill:#dae8fc,stroke:#6c8ebf
   classDef store fill:#d5e8d4,stroke:#82b366
@@ -191,16 +200,18 @@ flowchart TB
 | Purple | The NixOS host builder
 |===
 
-The three planes read top-to-bottom. The *fork flake* is a shared input; its
-`flox-nri-plugin` output (+ hooks) is *baked* into the node-base image (FOUNDATION,
-LIVE). The *envs* leave the image entirely: the manifests synth renders the locked
-env store-paths into a *ConfigMap* (pointers only — the heavy bytes travel by nix
-substitution, so the 1 MiB ConfigMap limit never binds); Flux delivers it in an
-early layer; the *reconciler DaemonSet* is the sole writer of the *ZFS-PVC store*,
-`nix copy`ing the closures from the `bioskop-nixos` builder/substituter and
-GC-rooting them. The NRI plugin overlays that self-contained PVC store into
-containers as a single lowerdir, so `flox activate` is a pure cache-hit. rke2lab
-keeps the env catalog + the operator-run `env-bumper`.
+The three planes read top-to-bottom. Two fork flakes (OURS) are shared inputs — the
+`flox-nri-plugin` (plugin + hooks) and the `flox-envs-controller` (the `FloxEnv` CRD
++ the controller); both outputs are *baked* into the node-base image (FOUNDATION,
+LIVE — the controller ships as a node-agent DaemonSet). The *envs* leave the image
+entirely and become first-class k8s: the
+synth renders one `FloxEnv` CR per env; Flux applies it; the controller watches the
+CRs and, on each node, tells the nix daemon to realise the env closures onto the
+host `/nix/store` and writes the `flox-runtime` GC-roots. Because the plugin is OURS,
+a pod's `flox.dev/environment` annotation *references the FloxEnv CR* — the plugin
+resolves that reference (typed, validatable against status) and overlays the host
+`/nix` into the pod. No PVC: the CR is the k8s-accessible env
+(`kubectl get/describe floxenv`). rke2lab keeps the env catalog + the operator `env-bumper`.
 
 == Part 1 — Store-resolved runtime scripts (the fork-repo extraction)
 
@@ -380,10 +391,10 @@ two host-side inputs exist — and neither is currently provisioned by `nixos/`
 
 | *flox-env GC-roots* — `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`
 | The plugin's `resolveFloxEnvironment` reads these to map `category/name` → the
-  immutable env store path. In the target model they live on the *runtime PVC store*
-  and are written by the reconciler (sole writer), NOT baked. The GC-root contract
-  path is unchanged — only its populator moves from `nixos/flox-runtime.nix` (interim
-  bake) to the reconciler DaemonSet (see <<runtime-env-delivery>>).
+  immutable env store path. In the target model they are written on the host store by
+  the *flox-envs controller* (sole writer), NOT baked. The GC-root contract path is
+  unchanged — only its populator moves from `nixos/flox-runtime.nix` (interim bake) to
+  the controller (see <<runtime-env-delivery>>).
 
 | *`/etc/flox.toml`* (host file, optional)
 | Projected read-only into every injected container if present (the `floxSystemConfigPath`
@@ -399,10 +410,10 @@ not the plugin.
 
 === Open question: how the node gets the store paths (+ GC-roots)
 
-NOTE: RESOLVED for the flox ENVS by the *runtime reconciler* — see
-<<runtime-env-delivery>>. The reconciler DaemonSet `nix copy`s each env's closure
-into the ZFS-PVC store and writes its GC-root there (sole writer); the container
-overlays that store. The interim LIVE model bakes them instead
+NOTE: RESOLVED for the flox ENVS by the *flox-envs controller* — see
+<<runtime-env-delivery>>. The controller realises each env's closure onto the host
+`/nix/store` and writes its GC-root there (sole writer); the plugin overlays the host
+`/nix`. The interim LIVE model bakes them instead
 (`nixos/flox-runtime.nix`) and is being migrated. The remaining open part is only
 the Part-2 builder for *unknown-at-build* packages.
 
@@ -422,77 +433,99 @@ a node that lacks it is itself a remote build.
 
 [[runtime-env-delivery]]
 [[l1-realised]]
-== Runtime env delivery — reconciler DaemonSet + ZFS-PVC store (target)
+== Runtime env delivery — FloxEnv CRD + flox-envs controller (target)
 
-The flox envs are delivered at RUNTIME, in the k8s plane, decoupled from the
-node-base image. A package bump therefore NEVER cold-starts the control node — the
-image (and its `imageBuildChecksum`) does not change when an env version moves.
+The flox envs are delivered at RUNTIME as first-class k8s resources, decoupled from
+the node-base image. A package bump therefore NEVER cold-starts the control node —
+the image (and its `imageBuildChecksum`) does not change when an env version moves.
 
-=== The invariant seam
+=== The flox env IS a k8s resource (`FloxEnv` CR)
 
-Both the baked interim and this target write the SAME contract the plugin reads: a
-GC-root at `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>` → `readlink` →
-the immutable env store path. The plugin's per-container injection (overlay +
-`.flox` farm + `flox` on PATH) is unchanged. Only the *populator* of that GC-root
-moves — from `nixos/flox-runtime.nix` (interim bake) to the reconciler.
+Each env becomes a `FloxEnv` custom resource — a *manifest*, synthesised like every
+other (a `FloxEnvManifestsUnit` renders one CR per env from the committed, locked
+`environment.d/`), applied by Flux. The CR carries the intent and its realisation:
 
-=== The reconciler DaemonSet (sole writer)
+* `spec` — the flox `manifest.toml` + `manifest.lock` inline (the CR is
+  self-describing; the controller realises from the lock); `folder` (the relative
+  path to materialise the env in, on the host layout — DISSOCIATED from the k8s
+  namespace; defaults to `metadata.namespace` when unset); and `includes`
+  (references to other `FloxEnv` CRs — composition as relations between resources,
+  the flox `[include]` mechanism made first-class; the controller resolves each
+  target's `folder` to compute the relative include path);
+* `status` — per-node realisation (which nodes hold the closures + GC-roots,
+  ready / failed).
 
-A DaemonSet mounts the PVC and reconciles the node's flox store to the desired set
-in ONE pass — it is the sole writer of both the store and the `gcroots/flox-runtime/`
-subtree (the same single-writer discipline the baked `systemd.tmpfiles` held):
+The CR is the k8s-accessible env: `kubectl get floxenv` / `kubectl describe floxenv`
+replace any out-of-band inspection surface — no PVC needed, the resource *is* the
+representation.
+
+[NOTE]
+====
+The `FloxEnv` CRD, the controller, and the NRI plugin are pure-k8s and
+rke2lab-agnostic — they live in their own repos, reusable, and know only
+`(namespace, name)`, NEVER rke2lab's *domain* concept. rke2lab's synthesis maps its
+domain → the CR's k8s namespace (domain `networking` → namespace `networking`, so the
+legacy `networking/kdns` reinterprets cleanly as `namespace/name`). If a domain must
+stay visible as metadata it rides as a k8s label (`rke2lab.io/domain`) the generic
+controller ignores — never as component logic. On host, the materialised layout is
+`<envroot>/<folder>/<name>/`, where `<folder>` is `spec.folder` (a relative path,
+DISSOCIATED from the k8s namespace) defaulting to `metadata.namespace` when unset;
+cross-folder `[include]`s the controller renders as relative `../../<folder>/<name>`
+(the author declares logical `{namespace, name}` refs; the controller resolves each
+target's `folder` and owns the paths).
+====
+
+=== The flox-envs controller (node-agent, sole writer)
+
+A node-agent DaemonSet (Go, shipped from its OWN repo `github:seedmatic/flox-envs-controller`
+— which also owns the `FloxEnv` CRD API, like the plugin owns its shim) watches the
+`FloxEnv` CRs and reconciles each node's local store in ONE pass. It is the sole
+writer of the `gcroots/flox-runtime/` subtree (the same single-writer discipline the
+baked `systemd.tmpfiles` held):
 
 [source]
 ----
-desired = ConfigMap → { (cat/name) → store-paths }
+desired = FloxEnv CRs (watched)
 actual  = scan gcroots/flox-runtime/env (+ activation)
-for env in desired:        nix copy --to 'local?root=<pvc>' <closure> ; symlink the GC-root
-for link in actual - desired:   rm the symlink                        # prune — SAME component
+for env in desired:  daemon realises the closure onto the HOST /nix/store ; write the GC-root
+for link in actual - desired:  rm the symlink                              # prune — SAME component
+patch FloxEnv/<name>.status: realized@<node>
 ----
 
-It does NOT `nsenter` the host or write `/srv/host`; it writes its OWN PVC volume —
-which is why the DaemonSet form is clean here (the taint that retired the old
-installer was the host mutation, not the DaemonSet). Disk reclaim of pruned closures
-is left to a separate `nix.gc.automatic` cadence.
+Closures land on the node's own host `/nix/store` (the daemon substitutes from the
+`bioskop-nixos` builder — cheap on the shared ZFS pool), NOT in a PVC. No `nsenter`,
+no `/srv/host`. Disk reclaim of pruned closures is a separate `nix.gc.automatic`
+cadence.
 
-=== The PVC is a self-contained nix store
+=== The invariant seam (annotation ⇄ CR ⇄ store)
 
-The PVC (default ZFS storage class, `zfs-localpv`) holds a COMPLETE store — `flox`
-itself + every env closure + a valid `/nix/var/nix/db` (populated by the
-`nix copy`). The plugin overlays THIS store as its single lowerdir, so:
+The plugin's per-container injection (overlay of the host `/nix` + `.flox` farm +
+`flox` on PATH) is unchanged — only the *populator* of the store + GC-roots moves
+from `nixos/flox-runtime.nix` (interim bake) to the controller. And because the
+plugin is OURS, a pod's `flox.dev/environment` annotation *references the FloxEnv CR*:
+the plugin resolves that typed reference (validatable against `status`) to the
+realised store path, instead of blindly `readlink`-ing a magic-string GC-root. The
+force-register/OOM pathology cannot recur — the closure is realised + registered on
+the host store before the plugin resolves it.
 
-* no multi-store union — the container sees one store that has flox AND the env;
-* the DB is valid by construction → the force-register/OOM pathology (a container
-  seeing store files with no DB registration) CANNOT recur;
-* `flox` on PATH resolves from the PVC store, not the node's `/run/current-system`.
-
-Persistence: the ZFS datasets are provided by the NixOS hypervisor (bioskop-nixos),
-not the node's ephemeral instance rootfs, so the store SURVIVES a node replace — a
-cold-start (rare now, foundation-only) does not re-substitute the envs.
-
-=== Determinism — the store is reconciled, never hand-edited
+=== Determinism — the CR carries committed intent
 
 The `manifest.lock` per env stays COMMITTED in the repo (like a `flake.lock`); the
 operator triggers bumps via an *env-bumper* CLI — a scenario in the shape of the
 existing manifests `VersionBumper` (bump `runtime/flox/flake.nix` pins + re-lock
-`environment.d/*/manifest.lock` → commit). The reconciler NEVER re-locks; it only
-realises the committed, resolved store-paths carried by the ConfigMap. "Visible in
-k8s" means inspect / VolumeSnapshot / observe — the reconciler stays the sole
-writer; no out-of-band mutation (determinism preserved).
-
-The ConfigMap carries store-path POINTERS only (tens of bytes each) — the heavy
-lock/closure bytes travel by nix substitution, so the etcd 1 MiB ConfigMap limit
-never binds (no chunking, no hostPath archive).
+`environment.d/*/manifest.lock` → commit). Synthesis folds the committed lock into
+the `FloxEnv` CR; the controller NEVER re-locks — it only realises what the CR
+carries. Inspection is `kubectl`, not hand-editing; the controller is the sole
+writer of node state.
 
 === Ordering — no gate, fail-closed + retry
 
-Flux is the first service in every cluster, so the env-set ConfigMap lands early
-(foundation/operators layer) — before the workload pods that consume the envs. No
-explicit gate is needed: the plugin is *fail-closed* — if a GC-root is absent
-`resolveFloxEnvironment` returns an error, `CreateContainer` propagates it →
-`CreateContainerError` → k8s retries with back-off. Realisation is substitute-only
-(seconds), so the window self-heals. (Reserve: confirm containerd's NRI fail-closed
-knob at implementation.)
+Flux is the first service in every cluster, so the `FloxEnv` CRs (and the controller)
+land early — before the workload pods that consume the envs. No explicit gate is
+needed: the plugin is *fail-closed* — if the referenced env is not yet realised on
+the node it returns an error, `CreateContainer` propagates it → `CreateContainerError`
+→ k8s retries with back-off. Realisation is substitute-only (seconds), so the window
+self-heals. (Reserve: confirm containerd's NRI fail-closed knob at implementation.)
 
 [NOTE]
 .Interim: the LIVE baked model, being migrated
@@ -705,8 +738,8 @@ already present in the real store the overlay lowers from.
 * link:../nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] —
   the foundation-tier bake (`nixos/containerd.nix`) and the dev→prod maturation arc.
 * link:../atlas/nixos-substrate.adoc[Atlas — NixOS substrate] —
-  the codebase↔vision before/after, incl. the baked-envs → runtime-PVC shift.
+  the codebase↔vision before/after, incl. the baked-envs → FloxEnv-CRD shift.
 * link:../cluster-api/cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] —
-  the design-only flox webhook (pod-level annotation injection), conceptually adjacent to the reconciler + PVC store.
+  the design-only flox webhook (pod-level annotation injection), conceptually adjacent to the flox-envs controller + FloxEnv CRD.
 * link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
   the synth-time secret-access pattern the builder key delivery follows.
