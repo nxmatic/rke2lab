@@ -213,6 +213,88 @@ path, and what the cellar stores) is not yet wired. It waits on resolving the `.
 tension in this document (the durable home; § "The one idea" retires `.local.d`, yet the mDNS-endpoint
 bullet above still named it). That is a cluster-readiness integration, tracked separately.
 
+== Rotating the root — breaking "stable across re-grows" on purpose
+
+Everything above makes the CA *stable across re-grows*. Rotating the root — changing
+the CA itself, not just re-growing a node — must therefore defeat that stability on
+purpose. The seal is **idempotent on a cellar hit**: `ClusterPkiSealScenario` fetches
+`ClusterPkiCoordinate.CLUSTER_CA_BUNDLE` and, if present, keeps it rather than
+re-minting. So a plain `pulumi up` after changing the root re-grows the node onto the
+*old, still-cellared* CA. Rotation is a deliberate three-part ceremony: change the
+source, clear the cache, re-grow.
+
+The trigger to date: `mammoth-skate-tls` was minted with step's `root-ca` profile,
+which stamps `pathLenConstraint: 1` — at most one intermediate below the root. Our
+chain nests two (`rke2-intermediate-ca` -> `server-ca`) before the leaf, so a strict
+verifier (OpenSSL / rustls — any kube-rs client, e.g. flux9s) rejects the served chain
+with `X509_V_ERR_PATH_LENGTH_EXCEEDED`, while client-go anchors early and passes. The
+fix re-mints the root with no `pathLenConstraint`.
+
+. **Re-mint the root in ndh** (the owner of the tree). Same key, so every intermediate
+and leaf signed under it stays valid — only the root cert changes:
++
+[source,bash]
+----
+# from the ndh (nix-darwin-home) repo root
+nix run .#authority-bootstrap-tls-root -- mammoth-skate-tls --force
+----
++
+Commit `keys.yaml`, then **sync the subtree down** into rke2lab so the seal reads the
+new root from `.ndh-ssh.d/keys.yaml` (procedure:
+link:../../../.ndh-ssh.d/README-SUBTREE.md[.ndh-ssh.d/README-SUBTREE.md]). Verify the
+synced copy:
++
+[source,bash]
+----
+yq -r '.authorities."mammoth-skate-tls".ca_crt' .ndh-ssh.d/keys.yaml \
+  | step certificate inspect - | grep -A1 'Basic Constraints'   # expect CA:TRUE, no pathlen
+----
+
+. **Clear the cached PKI** so the next seal re-mints. The three `cluster-pki` cases
+(§ "The one idea") persist as cellar `Entry` resources in the Pulumi state:
++
+[source,bash]
+----
+pulumi state delete 'urn:pulumi:dev::rke2lab::rke2lab:cellar:Entry::cluster-ca-bundle' --stack dev
+pulumi state delete 'urn:pulumi:dev::rke2lab::rke2lab:cellar:Entry::cluster-age-key'   --stack dev
+pulumi state delete 'urn:pulumi:dev::rke2lab::rke2lab:cellar:Entry::admin-credentials' --stack dev
+----
++
+Delete **all three** — they are minted as a set (the CA, the age key that decrypts it
+on the node, and the admin leaf), so a partial delete leaves a mismatched bundle.
+
+. **Re-grow.** A running node reads the bundle only at boot, so delete the master to
+force a fresh devlxd fetch, then re-seed:
++
+[source,bash]
+----
+pulumi destroy --target 'urn:pulumi:dev::rke2lab::incus:index/instance:Instance::seed-instance' --stack dev
+pulumi up --stack dev
+----
++
+The seal mints the new CA, the grow poses it over devlxd, and the run re-publishes the
+operator kubeconfig at the same mDNS endpoint. Finally refresh the root in the host
+trust stores (`nixos-rebuild switch` on the operator hosts) and swap it into any
+standing kubeconfig CA bundle (dropping the old root).
+
+[WARNING]
+====
+Order matters. Sync the new root **before** clearing the cellar and re-seeding. If the
+cellar is empty but `.ndh-ssh.d/keys.yaml` still holds the old root, the seal re-mints
+the *old* CA and the rotation is silently lost.
+====
+
+* ✅ **Same-key re-mint + cellar purge + re-grow** — the root changes, the derived CA
+  set is re-minted from it, the node boots onto the new trust chain.
+* ❌ **`pulumi up` alone after editing `keys.yaml`** — the cellar hit short-circuits the
+  seal; the node re-grows on the old CA and nothing changes.
+* ❌ **Deleting only `cluster-ca-bundle`** — leaves a stale age key + admin leaf that no
+  longer match the freshly minted CA.
+
+No SSH blast radius: SSH host/user certs chain to the separate `mammoth-skate`
+authority (OpenSSH format, no X.509 `pathLen`); rotating `mammoth-skate-tls` touches
+only the TLS side.
+
 == Related documentation
 
 NOTE: Throughout this document `<cluster>` is the full cluster identity `<host>-<role>` (e.g.
