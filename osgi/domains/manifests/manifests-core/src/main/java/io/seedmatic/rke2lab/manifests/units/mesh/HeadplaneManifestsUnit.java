@@ -697,9 +697,22 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     final LinkedHashMap<String, Object> headplaneContainer = new LinkedHashMap<>();
     headplaneContainer.put("name", "headplane");
     headplaneContainer.put("image", floxImage);
+    // headplane's agent integration (integration.agent.enabled) spawns hp_agent from the fixed
+    // path /usr/libexec/headplane/agent. Symlink it to the REAL binary resolved THROUGH the flox
+    // env (`command -v`, once activated) — not a hardcoded /.flox/run/<name> path, which is exactly
+    // what left it dangling (the NRI env activates as "default", not the catalog name). Then exec
+    // headplane. The shell sidecar shares /usr/libexec/headplane (shared-bin), so it sees it too.
     headplaneContainer.put(
-        "command", List.of("flox", "activate", "--dir", "/root", "--", "headplane"));
-    headplaneContainer.put("args", List.of("serve"));
+        "command",
+        List.of(
+            "flox",
+            "activate",
+            "--dir",
+            "/root",
+            "--",
+            "sh",
+            "-c",
+            "ln -sf \"$(command -v hp_agent)\" /usr/libexec/headplane/agent && exec headplane serve"));
     headplaneContainer.put(
         "env",
         List.of(
@@ -714,32 +727,41 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
         List.of(
             Map.of("configMapRef", Map.of("name", MeshRefs.HEADPLANE_ENV_CONFIGMAP.name())),
             Map.of("configMapRef", Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))));
+    // Resolve hp_healthcheck THROUGH the flox env (same as the container command runs
+    // `flox activate --dir /root -- headplane`), not via a hardcoded /.flox/run/<name> path:
+    // the NRI-injected env activates as "default" in the guest's HOME (/root/.flox/run/
+    // aarch64-linux.default-*), NOT the env's catalog name — hardcoding "headplane.run" is
+    // exactly what left the probe binary unresolvable. `flox activate -- hp_healthcheck` finds
+    // it on the env PATH regardless of the run-dir name. Timeouts are generous to absorb the
+    // activation (a baked cache-hit; background side effects are disabled so no OOM).
+    final List<String> healthcheck =
+        List.of("flox", "activate", "--dir", "/root", "--", "hp_healthcheck");
     headplaneContainer.put(
         "livenessProbe",
         Map.of(
             "exec",
-            Map.of("command", List.of("/usr/libexec/headplane/healthcheck")),
+            Map.of("command", healthcheck),
             "failureThreshold",
             3,
             "initialDelaySeconds",
-            30,
+            45,
             "periodSeconds",
-            10,
+            20,
             "timeoutSeconds",
-            5));
+            10));
     headplaneContainer.put(
         "readinessProbe",
         Map.of(
             "exec",
-            Map.of("command", List.of("/usr/libexec/headplane/healthcheck")),
+            Map.of("command", healthcheck),
             "failureThreshold",
-            2,
+            3,
             "initialDelaySeconds",
-            10,
+            15,
             "periodSeconds",
-            5,
+            10,
             "timeoutSeconds",
-            3));
+            10));
     headplaneContainer.put("ports", List.of(Map.of("containerPort", 3000, "name", "http")));
     headplaneContainer.put(
         "resources",
@@ -809,27 +831,6 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                     Map.of(
                         "containers",
                         List.copyOf(containers),
-                        "initContainers",
-                        List.of(
-                            Map.of(
-                                "name",
-                                "setup-agent",
-                                "image",
-                                floxImage,
-                                "command",
-                                List.of(
-                                    "sh",
-                                    "-c",
-                                    "mkdir -p /usr/libexec/headplane\n"
-                                        + "ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_agent /usr/libexec/headplane/agent\n"
-                                        + "ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_healthcheck /usr/libexec/headplane/healthcheck\n"),
-                                "volumeMounts",
-                                List.of(
-                                    Map.of(
-                                        "mountPath",
-                                        "/usr/libexec/headplane",
-                                        "name",
-                                        "shared-bin")))),
                         "serviceAccountName",
                         "headplane",
                         "shareProcessNamespace",
