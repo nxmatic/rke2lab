@@ -10,7 +10,7 @@ package io.seedmatic.rke2lab.manifests.contract.profiles;
  *
  * <ul>
  *   <li>{@code meshEnabled} — gates shell sidecar + debug-env flip on every workload in the {@code
- *       mesh/*} flox env namespace (headscale, headplane, tailscale-gateway, headscale-client).
+ *       mesh/*} flox env namespace (headscale, headplane, tailscale).
  *   <li>{@code networkingEnabled} — gates the same on {@code networking/*} workloads (kdns).
  *   <li>{@code floxNriPluginEnabled} — gates the NRI plugin daemon's *own* debug build (the {@code
  *       flox-nri-plugin-debug} derivation in the runtime flake). The plugin is the carrier, not a

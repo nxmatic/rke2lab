@@ -8,15 +8,15 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Adds a {@code <workload>-shell} sidecar to a flox-injected workload pod for live inspection.
+ * Adds a {@code shell} sidecar to a flox-injected workload pod for live inspection.
  *
  * <p>The sidecar shares the prod container's volume mounts plus a per-pod flox state set ({@code
  * HOME}, {@code ~/.config/flox}, {@code ~/.cache/flox}) so an operator can {@code kubectl exec -it
- * ... -c <workload>-shell -- bash} and run {@code flox activate -- ...} against the same flox view
- * the prod container is using. With {@link #shareProcessNamespace()} = {@code true} on the pod and
- * {@code SYS_PTRACE} added to the sidecar's capabilities, the operator can also {@code dlv attach
- * $(pgrep <workload>)} and step through the live workload — provided the prod build retains debug
- * symbols (the layer-side flox env should drop {@code -s -w} from the workload's go ldflags).
+ * ... -c shell -- bash} and run {@code flox activate -- ...} against the same flox view the prod
+ * container is using. With {@link #shareProcessNamespace()} = {@code true} on the pod and {@code
+ * SYS_PTRACE} added to the sidecar's capabilities, the operator can also {@code dlv attach $(pgrep
+ * <workload>)} and step through the live workload — provided the prod build retains debug symbols
+ * (the layer-side flox env should drop {@code -s -w} from the workload's go ldflags).
  *
  * <p>The sidecar is opted in via the per-domain debug toggle the layer passes in (e.g. {@code
  * floxDebugPolicy.meshEnabled()} for {@code mesh/*} workloads, {@code networkingEnabled()} for
@@ -24,8 +24,8 @@ import java.util.Optional;
  * layer-side wiring stays uniform.
  *
  * <p>The flox env injected into the sidecar is its own per-container annotation ({@code
- * flox.dev/environment.<workload>-shell}); it can match the prod env or point at a debug variant
- * like {@code networking/kdns-debug} that adds {@code delve} on top.
+ * flox.dev/environment.shell}); it can match the prod env or point at a debug variant like {@code
+ * networking/kdns-debug} that adds {@code delve} on top.
  */
 public final class FloxShellSidecarProfile {
 
@@ -160,7 +160,10 @@ public final class FloxShellSidecarProfile {
   }
 
   private String sidecarContainerName() {
-    return workloadName + "-shell";
+    // One shell sidecar per pod, so a bare "shell" is unambiguous and reads far better
+    // in `kubectl`/logs than "<workload>-shell". Its debug-only nature is implied — it
+    // exists only when the debug toggle is on.
+    return "shell";
   }
 
   private String homeVolumeName() {

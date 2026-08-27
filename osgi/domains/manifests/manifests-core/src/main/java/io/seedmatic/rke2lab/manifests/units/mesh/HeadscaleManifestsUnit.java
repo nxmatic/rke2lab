@@ -592,7 +592,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                 tailscale up \\
                   --login-server=$HEADSCALE_URL \\
                   --authkey=file:/var/secrets/authkey \\
-                  --hostname=${DARWIN_HOST}-${RKE2_NODENAME} \\
+                  --hostname=${RKE2_NODENAME} \\
                   --advertise-tags=tag:rke2,tag:nikopol \\
                   --accept-routes \\
                   --ssh \\
@@ -1200,7 +1200,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
         new FloxShellSidecarProfile(
             gatewayDebugPolicy,
             gatewayDebugPolicy.meshEnabled(),
-            "tailscale-gateway",
+            "tailscale",
             "/root",
             "mesh/tailscale-debug",
             "0",
@@ -1223,7 +1223,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     gatewayMounts.addAll(gatewayShellSidecar.extraProdMounts());
 
     final LinkedHashMap<String, Object> gatewayContainer = new LinkedHashMap<>();
-    gatewayContainer.put("name", "tailscale-gateway");
+    gatewayContainer.put("name", "tailscale");
     gatewayContainer.put("image", floxImage);
     gatewayContainer.put(
         "command", List.of("flox", "activate", "--dir", "/root", "--", "/scripts/gateway.sh"));
@@ -1299,7 +1299,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
     final LinkedHashMap<String, String> gatewayAnnotations = new LinkedHashMap<>();
     gatewayAnnotations.put(
-        "flox.dev/environment.tailscale-gateway",
+        "flox.dev/environment.tailscale",
         gatewayDebugPolicy.resolveMeshEnvironment("mesh/tailscale", "mesh/tailscale-debug"));
     gatewayAnnotations.putAll(gatewayShellSidecar.sidecarAnnotations());
 
