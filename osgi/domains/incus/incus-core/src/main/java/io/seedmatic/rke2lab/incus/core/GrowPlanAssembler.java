@@ -108,12 +108,17 @@ public final class GrowPlanAssembler {
     foldFile(digest, imageSourceRoot.resolve("flake.lock"));
     foldFile(digest, imageSourceRoot.resolve("flake.nix"));
     foldTree(digest, imageSourceRoot.resolve("nixos"));
-    // Coupled to the envCatalog path in nixos/flox-runtime.nix — move both together (its comment
-    // flags a planned de-burial out of src/main/resources).
+    // Fold the WHOLE flox runtime tree, not just environment.d: the env manifest.lock files pin
+    // the workload closures, but the flake DEFINITIONS they lock against (runtime/flox/flake.nix +
+    // flake.lock) are image inputs too — editing a package's derivation (e.g. a binary wrapper)
+    // changes what the baked env resolves to. Folding only environment.d left flake.nix edits
+    // INVISIBLE here: the digest stayed put, the grow adopted the stale image, and the build's
+    // auto-relock never fired (it only runs once a rebuild is triggered) → deadlock. Coupled to the
+    // envCatalog path in nixos/flox-runtime.nix.
     foldTree(
         digest,
         imageSourceRoot.resolve(
-            "osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox/environment.d"));
+            "osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox"));
     return HexFormat.of().formatHex(digest.digest());
   }
 
