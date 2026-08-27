@@ -112,6 +112,40 @@ This subtree is the single source of truth for the SSH key definitions
 `keys.yaml` carries metadata for every SSH key: key types and public keys, usage
 annotations, certificate authorities, and profile associations.
 
+## Rotating a TLS root authority (e.g. `mammoth-skate-tls`)
+
+`keys.yaml` also holds X.509 root CAs under `authorities.<name>` (those with
+`tls-authority` in their `usage`). Re-minting one — e.g. to change its
+`basicConstraints` — is a `keys.yaml` content change that must propagate through
+the subtree AND be re-consumed by anything that already derived material from it.
+
+Re-mint reuses the **existing key** (the script reads `.private`, never
+regenerates it), so intermediates and leaves signed under the root stay valid —
+only the root cert itself changes:
+
+```bash
+# nix-darwin-home: re-sign the root (the app's template drops the
+# pathLenConstraint — step's root-ca profile stamps pathlen:1, too tight for a
+# 3-tier chain like RKE2's root -> intermediate-ca -> server-ca -> leaf).
+# Run from the repo root (the app resolves keys.yaml via `git rev-parse`).
+nix run .#authority-bootstrap-tls-root -- mammoth-skate-tls --force
+sops -d modules/home-manager/ssh.d/keys.yaml \
+  | yq -r '.authorities."mammoth-skate-tls".ca_crt' \
+  | step certificate inspect - | grep -A1 'Basic Constraints'   # expect CA:TRUE, no pathlen
+```
+
+Commit `keys.yaml`, then **sync down** (see above) so every consumer copy (e.g.
+`rke2lab`'s `.ndh-ssh.d/keys.yaml`) carries the new root.
+
+**No SSH impact:** SSH host/user certs chain to the separate `mammoth-skate`
+authority and are OpenSSH-format (no X.509 `pathLen`); rotating `mammoth-skate-tls`
+touches only the TLS side.
+
+> Consumers that *derive* material from a rotated root (e.g. rke2lab's cluster
+> seal caches the derived cluster CA) must clear that cache and re-grow after the
+> sync-down — a re-mint alone is not enough. That downstream procedure is
+> consumer-specific and lives in the consumer's own runbook, not here.
+
 ## SOPS encryption
 
 `keys.yaml` is SOPS-encrypted, with 4 age recipients:
