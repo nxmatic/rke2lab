@@ -1,5 +1,3 @@
-# DRAFT (approach (a), NOT yet wired into nixos/default.nix) — for review.
-#
 # Bake the flox ENVS (store-resolved) + their GC-roots + the 3 OCI hooks +
 # /etc/flox.toml into the node-base image, so the foundation NRI plugin
 # (nixos/containerd.nix) resolves envs WITHOUT any boot-time `flox activate`.
@@ -89,6 +87,31 @@ let
 
   subtreeOf = e: mkEnvSubtree e.category e.name;
 
+  # Every output store-path of each FLAKE-install package in an env lock. flox's
+  # buildenv.nix `builtins.storePath`s EVERY output the lock pins, so the
+  # container's `flox activate` cache-hit needs each one present — but the baked
+  # activation drv only makes a package's DEFAULT output a runtime dep, so a
+  # NON-DEFAULT flake output (e.g. tailscale ships `out` + `derper`) is
+  # storePath-checked at build yet never rides into the squashfs. In the
+  # container it is absent, `storePath` fails, and flox falls back to realising
+  # the flake at its (build-host-ephemeral) `path:…` url → crash. Force the full
+  # locked flake closure into the image so activation is a true cache-hit.
+  #
+  # ONLY flake installs (those carrying a `locked-url`) — the build's `#pkg^*`
+  # realise loop guarantees their outputs are present at THIS eval, so
+  # `storePath` is safe. Catalog packages (bash, kubectl, …) are deliberately
+  # NOT forced: their outputs live on the node's own /nix/store via ordinary
+  # substitution, and their non-default outputs aren't pre-realised here (forcing
+  # them would fail this eval).
+  flakeOutputs = category: name:
+    let
+      lock = builtins.fromJSON (builtins.readFile "${envCatalog}/${category}/${name}/manifest.lock");
+      forImage = builtins.filter
+        (p: (p.system or system) == system && (p ? "locked-url"))
+        (lock.packages or [ ]);
+    in
+    builtins.concatLists (map (p: builtins.attrValues (p.outputs or { })) forImage);
+
   # The 3 OCI hooks the plugin references at fixed /usr/local/sbin paths now ship
   # from the flox-nri-plugin fork (the shim owns its binary + hooks + their
   # contract as one unit) as the `flox-nri-hooks` package — patchShebangs'd,
@@ -116,6 +139,15 @@ in
         in map
           (out: "L+ /nix/var/nix/gcroots/flox-runtime/activation/${e.category}/${e.name}/${out} - - - - ${act.${out}}")
           act.outputs)
+      envs)
+    # Force every flake-install output (incl. non-default ones like tailscale's
+    # `derper`) into the image closure — the symlink target IS the store path, so
+    # the squashfs carries it and the container's activation storePath resolves.
+    ++ (lib.concatMap
+      (e:
+        map
+          (sp: "L+ /nix/var/nix/gcroots/flox-runtime/closure/${e.category}/${e.name}/${baseNameOf sp} - - - - ${builtins.storePath sp}")
+          (flakeOutputs e.category e.name))
       envs)
     ++ [
       "L+ /usr/local/sbin/flox-nri-overlay-hook.sh  - - - - ${floxHooks}/sbin/flox-nri-overlay-hook.sh"
