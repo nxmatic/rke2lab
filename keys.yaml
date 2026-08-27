@@ -197,10 +197,25 @@ keys:
       not_after_days: 365
     annotations:
       public_scope: system
+  vz-nudge:
+    type: ssh-ed25519
+    authority: mammoth-skate
+    cert_usage:
+      - ssh-host
+      - ssh-user
+    comment: vz-nudge@mammoth-skate — corp-Mac baremetal-link guest-reconfigure nudge; module-generated rotating key
+    usage:
+      - ssh-host
+      - user-signing
+    profiles:
+      - system
+    principals:
+      rdp-host: rdp-host
+    annotations:
+      public_scope: system
 sops:
   age:
-    - recipient: age10ey0lcup4zpjqcknpxw7enpsagn674nm634f2u75trfr5t62uq5qdjuxzv
-      enc: |
+    - enc: |
         -----BEGIN AGE ENCRYPTED FILE-----
         YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIK2dCTUNPUWlHOWhLWUNW
         VEVXRnFFaGVyYU9NSnVsQTE1djJBZTZCNlRBCjVJUzg4ZDk1VTN0UjlIcDRzMHBQ
@@ -208,8 +223,8 @@ sops:
         NXBUci9IcHYrSGI5MmRiS3M3aUU0RWcKWFTz1ZgOKM10RFLJgD17Z426t2w4wYeP
         6Q9/AQ2A1jIGJVJIa01yqfI6X9whO4wfFU5ABQQ1OEw7c6x35BQgMg==
         -----END AGE ENCRYPTED FILE-----
-    - recipient: age1trxpn8efl5jctwakgpxxjd2h6x5h2m40ggugxl909qsj0h99p9yqkk8tej
-      enc: |
+      recipient: age10ey0lcup4zpjqcknpxw7enpsagn674nm634f2u75trfr5t62uq5qdjuxzv
+    - enc: |
         -----BEGIN AGE ENCRYPTED FILE-----
         YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5M1VYMkRWUGl3Y1ZYd3Bu
         WEppRmw5MEVxZzduVHJVaXdwNjhrcVVyRW0wCmFDQ3o2TGRmWUhpWmFBT2VLSXpl
@@ -217,8 +232,8 @@ sops:
         OFp1eW01bFYvU1lTQ2p1L2trUXRKME0Ky0B0WeW1VC3XkEu1miy501Tr5nl/S8yp
         0hJ4ODCvmHywItSYpOpzTYNaoNJNLGu4IkHoVX7SpXFtfsSRJL2OJg==
         -----END AGE ENCRYPTED FILE-----
-    - recipient: age17q5kw0epcl9ft7ecegr20040vx3g86z0f7vtecn9t8kk27qjspaqp66pp4
-      enc: |
+      recipient: age1trxpn8efl5jctwakgpxxjd2h6x5h2m40ggugxl909qsj0h99p9yqkk8tej
+    - enc: |
         -----BEGIN AGE ENCRYPTED FILE-----
         YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHNUdWZGp5bmIzMTZKNnJL
         dDVhR3lxOWluT3VaMFEzcnVVblFLRVBueUFVCkZYMCtRdGFOTnpiYUhGMldnQVhB
@@ -226,8 +241,8 @@ sops:
         V0VoZlNvNkVqQ2VDWXdHRVZFVnJhbkUK2wSXWsxyqwYFj7Jg9Ze4c9IHjYbEmh8r
         2CdAHg99mmzjZA2lBRCAiboKoif7lJeDG77ucyqESTd2CkXMdTEBzg==
         -----END AGE ENCRYPTED FILE-----
-    - recipient: age1k0tc4gmaqrk5df3ujja34gkqxstu0cye7fl7fktjeuua3yych3aqxfjlak
-      enc: |
+      recipient: age17q5kw0epcl9ft7ecegr20040vx3g86z0f7vtecn9t8kk27qjspaqp66pp4
+    - enc: |
         -----BEGIN AGE ENCRYPTED FILE-----
         YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGRERxUUtYVTM1ekFGQURJ
         aWRUdWJvekxSdFh6U291STVkR2pHaU5mWUdRCk1SWlpBTUw3aXVtYUlodXA1WkJB
@@ -235,7 +250,8 @@ sops:
         NWo5bDhHVEJMY0lsNk5BSDdHbmRyMUEKSmBcSsnlIi6nv1tct7H7geRTrijToecO
         fBmAoizVUBaAHDJaeD5kDmAD65KPgqpyWlWWf8ksaD38yfXNS/hjGA==
         -----END AGE ENCRYPTED FILE-----
-  lastmodified: "2026-05-28T21:40:36Z"
-  mac: ENC[AES256_GCM,data:v8CIsqCQEhWIffN+PmryBLxVJvmKMk2RjytehSNyhF70hd6eXjIwcawxNXcZbjhz1OAnn1vMa8UhAvFjwbszmA6xLRrzW1WVp0fiRrjtuDeF182tiWTqUplouGCvK8+qPp+xJ1QmmE7sBcOoEFxLiPpKWq++VNlzpxcu/+XyQJQ=,iv:+9NGYV2FObJL7JKgX4OuzD1YhDUKOIpLTjYIi5s/rHU=,tag:WbgCopu5BAL3Bo6wpnGx4A==,type:str]
+      recipient: age1k0tc4gmaqrk5df3ujja34gkqxstu0cye7fl7fktjeuua3yych3aqxfjlak
   encrypted_comment_regex: sops:encrypted
+  lastmodified: "2026-08-19T21:16:46Z"
+  mac: ENC[AES256_GCM,data:RTtPgVfFB7tZxxN560o+lDwieoLdHJdfphCPnwQVx5Cp/AN+RLrCmBkEN0MgfSfBT8k9y3NWMKhGak5HGwj1BB59I1jK3/F3mrNhNEJXNduk7A4KaBOIoBKJaOUNsDreZyzMeDnAeys4ufO+8jp/KoOq13XdDCElZ8dWO5qMDaI=,iv:/aFoHwW5eKcMcL49hYuc6xkA3B6XXd3Snh60q2z7xMY=,tag:J6StwGfNvKAPwAuiupjVNA==,type:str]
   version: 3.11.0
