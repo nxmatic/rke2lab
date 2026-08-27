@@ -24,7 +24,7 @@
   `FloxEnv` CR reconciled by OUR *flox controller* (a node-agent DaemonSet from
   its own repo `github:seedmatic/flox-controller`) onto the node's host `/nix/store`.
   The plugin overlays the host
-  `/nix` and resolves a pod's `flox.dev/environment` annotation *as a reference to a
+  `/nix` and resolves a pod's `flox.seedmatic.io/environment` annotation *as a reference to a
   FloxEnv CR*. No PVC. Where a diagram/section shows the env baked, read it as the LIVE
   interim; the target populator is the controller (design doc §Runtime env delivery).
 
@@ -57,7 +57,7 @@ flowchart TB
 
     ForkFlake -->|flake input, nix build| Bake
     Bake -->|launches| NRI
-    User -->|Deploy pods with<br/>flox.dev/environment=ns/name| Containerd
+    User -->|Deploy pods with<br/>flox.seedmatic.io/environment=ns/name| Containerd
     Containerd -->|NRI API: Events| NRI
     NRI -->|resolve annotation → FloxEnv CR| Catalog
     NRI -->|overlay host /nix| Nix
@@ -212,7 +212,7 @@ flowchart TB
 
     subgraph NRI["NRI Plugin Process"]
         Handler[CreateContainer Handler]
-        Parser[Annotation Parser<br/>flox.dev/*]
+        Parser[Annotation Parser<br/>flox.seedmatic.io/*]
         Resolver[Environment Resolver<br/>category/name → path]
         MountBuilder[Mount Builder<br/>bind + overlay]
         HookBuilder[Hook Builder<br/>Prestart chown]
@@ -225,7 +225,7 @@ flowchart TB
 
     Event --> Handler
     Handler --> Parser
-    Parser -->|Extract flox.dev/environment| Resolver
+    Parser -->|Extract flox.seedmatic.io/environment| Resolver
     Resolver -->|Validate| Catalog
     Resolver --> MountBuilder
     MountBuilder -->|Reference| Store
@@ -315,11 +315,11 @@ sequenceDiagram
     participant Container as Container
 
     K8s->>Containerd: CreateContainer(pod, container)
-    Note over Containerd: Parse annotations: flox.dev/environment=networking/kdns
+    Note over Containerd: Parse annotations: flox.seedmatic.io/environment=networking/kdns
 
     Containerd->>NRI: CreateContainer(pod, container)
 
-    Note over NRI: Check flox.dev/environment annotation
+    Note over NRI: Check flox.seedmatic.io/environment annotation
     NRI->>NRI: Parse "networking/kdns"
     NRI->>FS: Resolve /srv/host/.../networking/kdns
     FS-->>NRI: Found .flox/env.json, flake.nix
@@ -423,7 +423,7 @@ The `flox-runtime-installer` pod has two containers:
 
 === Runtime (Container Creation)
 
-. *Annotation Detection*: NRI plugin checks `flox.dev/environment`
+. *Annotation Detection*: NRI plugin checks `flox.seedmatic.io/environment`
 . *Environment Resolution*: Maps `networking/kdns` → `/srv/host/.../networking/kdns`
 . *Mount Construction*: Builds bind mounts for .flox + overlay for /nix
 . *Hook Creation*: Prestart hook to fix ownership (chown)
@@ -445,12 +445,12 @@ The `flox-runtime-installer` pod has two containers:
 [cols="1,1,1,1",options="header"]
 |===
 | Annotation | Required | Description | Example
-| `flox.dev/environment.<container>` | Yes | Reference to a `FloxEnv` CR: `[<namespace>/]<name>` (bare name = the pod's namespace; shared envs explicit, e.g. `flox-system/kdns`) | `flox-system/kdns`
-| `flox.dev/home` | No | Override HOME directory | `/home/app`
-| `flox.dev/uid` | No | Container UID (for chown) | `1000`
-| `flox.dev/gid` | No | Container GID (for chown) | `1000`
-| `flox.dev/debug` | No | Enable debug mode | `true`
-| `flox.dev/debug-port` | No | Delve debugger port | `2345`
+| `flox.seedmatic.io/environment.<container>` | Yes | Reference to a `FloxEnv` CR: `[<namespace>/]<name>` (bare name = the pod's namespace; shared envs explicit, e.g. `flox-system/kdns`) | `flox-system/kdns`
+| `flox.seedmatic.io/home` | No | Override HOME directory | `/home/app`
+| `flox.seedmatic.io/uid` | No | Container UID (for chown) | `1000`
+| `flox.seedmatic.io/gid` | No | Container GID (for chown) | `1000`
+| `flox.seedmatic.io/debug` | No | Enable debug mode | `true`
+| `flox.seedmatic.io/debug-port` | No | Delve debugger port | `2345`
 |===
 
 === Environment Path Resolution

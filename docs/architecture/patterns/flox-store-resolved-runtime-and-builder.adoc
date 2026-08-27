@@ -170,7 +170,7 @@ flowchart TB
   end
 
   subgraph nctr["Flox-injected pod (consumer)"]
-    pod["annotation flox.dev/environment=&lt;FloxEnv ref&gt;<br/>/nix overlay = host store → flox activate cache-hit"]:::mut
+    pod["annotation flox.seedmatic.io/environment=&lt;FloxEnv ref&gt;<br/>/nix overlay = host store → flox activate cache-hit"]:::mut
   end
 
   forkflake -->|flake input| image
@@ -208,7 +208,7 @@ entirely and become first-class k8s: the
 synth renders one `FloxEnv` CR per env; Flux applies it; the controller watches the
 CRs and, on each node, tells the nix daemon to realise the env closures onto the
 host `/nix/store` and writes the `flox-runtime` GC-roots. Because the plugin is OURS,
-a pod's `flox.dev/environment` annotation *references the FloxEnv CR* — the plugin
+a pod's `flox.seedmatic.io/environment` annotation *references the FloxEnv CR* — the plugin
 resolves that reference (typed, validatable against status) and overlays the host
 `/nix` into the pod. No PVC: the CR is the k8s-accessible env
 (`kubectl get/describe floxenv`). rke2lab keeps the env catalog + the operator `env-bumper`.
@@ -502,7 +502,7 @@ cadence.
 The plugin's per-container injection (overlay of the host `/nix` + `.flox` farm +
 `flox` on PATH) is unchanged — only the *populator* of the store + GC-roots moves
 from `nixos/flox-runtime.nix` (interim bake) to the controller. And because the
-plugin is OURS, a pod's `flox.dev/environment` annotation *references the FloxEnv CR*:
+plugin is OURS, a pod's `flox.seedmatic.io/environment` annotation *references the FloxEnv CR*:
 the plugin resolves that typed reference (validatable against `status`) to the
 realised store path, instead of blindly `readlink`-ing a magic-string GC-root. The
 force-register/OOM pathology cannot recur — the closure is realised + registered on
