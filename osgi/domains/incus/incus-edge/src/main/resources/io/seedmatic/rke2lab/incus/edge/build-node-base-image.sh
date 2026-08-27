@@ -35,12 +35,15 @@ rootfs_name="rootfs.squashfs"
 source_tree="$(git -C "$workspace" write-tree)"
 
 # Freshness gate over the EXACT build inputs in that tree. `git ls-tree` lists the blob SHA of every
-# file under flake.lock / flake.nix / nixos/ — a CONTENT digest (not mtimes, not the commit id) of
-# exactly what nix will build from. Unchanged inputs + both artifacts still on disk ⇒ the artifacts
-# are current, so skip nix entirely. (nix would only RE-EVALUATE anyway — realisation is already
-# store-cached — but the git-archive tempdir gives a fresh flake path each run, so nix's own eval
-# cache never hits; this gate is what spares that seconds-long NixOS eval on an unchanged tree.)
-source_digest="$(git -C "$workspace" ls-tree -r "$source_tree" -- flake.lock flake.nix nixos | sha256sum | awk '{print $1}')"
+# file under flake.lock / flake.nix / nixos/ AND the flox env catalog (runtime/flox/environment.d) —
+# a CONTENT digest (not mtimes, not the commit id) of exactly what nix will build from. The env
+# catalog is NOT under nixos/ yet nixos/flox-runtime.nix bakes it into the image by relative path
+# (its manifest.lock files pin the workload closures — headscale/kdns/yq/... versions), so an
+# env-only edit (add a package, bump a workload + re-lock) MUST invalidate this gate or nix is
+# skipped and the stale image is reused. Kept in lock-step with GrowPlanAssembler.imageSourceDigest
+# (the OSGi-side twin) and the envCatalog path in nixos/flox-runtime.nix. Unchanged inputs + both
+# artifacts still on disk ⇒ the artifacts are current, so skip nix entirely.
+source_digest="$(git -C "$workspace" ls-tree -r "$source_tree" -- flake.lock flake.nix nixos osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox/environment.d | sha256sum | awk '{print $1}')"
 checksum_file="$artifact_dir/.image.checksum.sha256"
 
 if [ -f "$checksum_file" ] && [ "$(cat "$checksum_file")" = "$source_digest" ] &&
