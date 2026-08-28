@@ -17,6 +17,7 @@
     ./zfs.nix # node zfs userland + FHS-compat symlinks (openebs-zfs CSI chroot wrapper)
     ./flox-runtime.nix # flox envs (store-resolved, baked) + GC-roots + OCI hooks + /etc/flox.toml
     ./flox-carrier.nix # the minimal nix OCI base image every flox-injected pod runs (baked → rke2 air-gap import)
+    ./flox-controller.nix # the flox-controller node-agent image (baked → rke2 air-gap import; it produces the carriers)
     ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node
     ./nix-env.nix # nix.settings + the node toolbox on PATH
   ];

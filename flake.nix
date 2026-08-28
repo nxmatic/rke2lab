@@ -623,7 +623,7 @@
       # Per-node identity (node-ip, hostname, token) is injected at instance creation, not baked.
       nixosConfigurations.rke2-node-base = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
-        specialArgs = { inherit flox flox-runtime; };
+        specialArgs = { inherit flox flox-runtime flox-controller; };
         modules = [
           "${nixpkgs}/nixos/modules/virtualisation/lxc-container.nix"
           sops-nix.nixosModules.sops
