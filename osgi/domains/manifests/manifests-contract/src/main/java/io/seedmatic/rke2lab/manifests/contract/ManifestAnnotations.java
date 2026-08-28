@@ -86,11 +86,11 @@ public record ManifestAnnotations() {
    * flox.seedmatic.io} domain (shared with the CRD group + the injection annotation), migrated from
    * the upstream {@code flox.dev/enabled}.
    *
-   * <p>This constant is the SINGLE SOURCE of the label. It is POSED on the node at boot by the nixos
-   * oneshot {@code rke2lab-node-labels} (nixos/rke2.nix) — not a manifest, since kubelet applies
-   * {@code --node-labels} only at first registration. The two worlds (Java ↔ nix) can't import each
-   * other, so the {@code node-label-concord} flake check ({@code nix flake check}) guards them
-   * against drift: it fails if nixos/rke2.nix stops carrying this exact value.
+   * <p>This constant is the SINGLE SOURCE of the label. It is POSED on the node at boot by the
+   * nixos oneshot {@code rke2lab-node-labels} (nixos/rke2.nix) — not a manifest, since kubelet
+   * applies {@code --node-labels} only at first registration. The two worlds (Java ↔ nix) can't
+   * import each other, so the {@code node-label-concord} flake check ({@code nix flake check})
+   * guards them against drift: it fails if nixos/rke2.nix stops carrying this exact value.
    */
   public static final String NODE_FLOX_RUNTIME_LABEL = "flox.seedmatic.io/enabled";
 
