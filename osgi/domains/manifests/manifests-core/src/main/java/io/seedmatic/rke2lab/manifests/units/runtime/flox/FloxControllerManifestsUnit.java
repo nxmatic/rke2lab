@@ -117,7 +117,9 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
               Map.of(
                   "apiGroups", new Object[] {"flox.seedmatic.io"},
                   "resources", new Object[] {"floxenvs"},
-                  "verbs", new Object[] {"get", "list", "watch"}),
+                  // create: the controller self-provisions its embedded base carrier (EnsureBase).
+                  "verbs",
+                      new Object[] {"get", "list", "watch", "create", "update", "patch", "delete"}),
               Map.of(
                   "apiGroups", new Object[] {"flox.seedmatic.io"},
                   "resources", new Object[] {"floxenvs/status"},
