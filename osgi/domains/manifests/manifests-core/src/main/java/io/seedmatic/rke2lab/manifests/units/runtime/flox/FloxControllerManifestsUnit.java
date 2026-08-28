@@ -208,6 +208,10 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                     "spec",
                     Map.ofEntries(
                         Map.entry("serviceAccountName", NAME),
+                        // Share the host PID namespace so the controller can nsenter -t 1 into
+                        // the node's namespaces (reach its flox/nix/ctr) and detect it's
+                        // containerized (its mount ns differs from the host init's).
+                        Map.entry("hostPID", true),
                         Map.entry(
                             "nodeSelector",
                             Map.of(ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL, "true")),
