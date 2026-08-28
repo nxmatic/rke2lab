@@ -103032,6 +103032,33 @@
         "type": "github"
       }
     },
+    "flox-controller": {
+      "inputs": {
+        "flake-commons": [
+          "flake-commons"
+        ],
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787896564,
+        "narHash": "sha256-LvJxzJkJ/EgfN7QrLLHzknEgNx+T7SiuwLHzTmzS41w=",
+        "owner": "seedmatic",
+        "repo": "flox-controller",
+        "rev": "c24c336713a60ef8f375344451c2b88487bc63a5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "seedmatic",
+        "ref": "develop",
+        "repo": "flox-controller",
+        "type": "github"
+      }
+    },
     "flox-runtime": {
       "inputs": {
         "flake-commons": [
@@ -103045,16 +103072,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1787811436,
-        "narHash": "sha256-VWTxweG+BBmxWOH2jj+Ed/rwJ6wto9RooBR2JUkasbU=",
+        "lastModified": 1787810789,
+        "narHash": "sha256-J23KdJyvAOSkmrmv9k3LqV3NNNuq9EyaKdMI5jF+ncA=",
         "owner": "seedmatic",
         "repo": "flox-nri-plugin",
-        "rev": "30a7b7fef9f8a0bc63487d0630df8ab1310b7b2c",
+        "rev": "399826155b924da387a67e72f90f2ae8ee49a18f",
         "type": "github"
       },
       "original": {
         "owner": "seedmatic",
-        "ref": "v0.1.4",
+        "ref": "develop",
         "repo": "flox-nri-plugin",
         "type": "github"
       }
@@ -282418,6 +282445,7 @@
           "flake-commons",
           "flox"
         ],
+        "flox-controller": "flox-controller",
         "flox-runtime": "flox-runtime",
         "ndh": "ndh",
         "nixpkgs": [

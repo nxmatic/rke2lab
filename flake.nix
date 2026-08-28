@@ -44,12 +44,25 @@
     # definitions. We re-export its outputs here so the deployable artifacts
     # build through this top-level entry point (and the aarch64-linux NRI plugin
     # cross-builds via the configured linux-builder). The shim is now its own repo
-    # (a fork), pinned to a released tag; the `follows` below dedup its aggregator +
-    # nixpkgs against ours so there is a single resolved version set across the flakes.
-    flox-runtime.url = "github:seedmatic/flox-nri-plugin?ref=v0.1.4";
+    # (a fork), pinned to the `develop` integration branch (seedmatic convention —
+    # releases abandoned for now, co-dev on develop alongside flox-controller); the
+    # `follows` below dedup its aggregator + nixpkgs against ours so there is a
+    # single resolved version set across the flakes.
+    flox-runtime.url = "github:seedmatic/flox-nri-plugin/develop";
     flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
     flox-runtime.inputs.flake-utils.follows = "flake-utils";
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
+
+    # The flox-controller flake owns the FloxEnv CRD + the node-agent controller
+    # (runtime flox-env delivery — the companion to flox-runtime's NRI plugin). We
+    # re-export its outputs so the controller binary + OCI image build through this
+    # entry point (image cross-builds via the linux-builder, like the NRI plugin).
+    # Referenced on the `develop` integration branch (seedmatic convention);
+    # follows dedup its aggregator + nixpkgs against ours.
+    flox-controller.url = "github:seedmatic/flox-controller/develop";
+    flox-controller.inputs.nixpkgs.follows = "nixpkgs";
+    flox-controller.inputs.flake-utils.follows = "flake-utils";
+    flox-controller.inputs.flake-commons.follows = "flake-commons";
 
     # Federation (Direction A): rke2lab consumes ndh's home-LAN facts
     # (catalog.netplan.lan). ndh already imports rke2lab's lib.networkBlueprint,
@@ -64,7 +77,7 @@
     ndh.inputs.flake-commons.follows = "flake-commons";
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox, sops-nix, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, flox-controller, flox, sops-nix, ... }:
     let
       # Enforce the INVARIANT above mechanically, not just by comment: fail eval
       # (any `nix build`/`nix eval` of this flake) with a printed diagnostic if
@@ -361,6 +374,18 @@
                 then { inherit (floxRuntimePackages) flox-nri-plugin-debug; }
                 else { });
 
+        # flox-controller re-exported the same way: the node-agent binary + its OCI
+        # image (the DaemonSet distribution artifact, cross-built via the
+        # linux-builder). Same darwin-eval guard as the NRI plugin.
+        floxControllerPackages =
+          let ctlPkgs = flox-controller.packages.${system} or { };
+          in (if ctlPkgs ? flox-controller
+              then { inherit (ctlPkgs) flox-controller; }
+              else { })
+          // (if ctlPkgs ? flox-controller-image
+                then { inherit (ctlPkgs) flox-controller-image; }
+                else { });
+
         # Maven-build toolchain re-exported as individual packages, so the flox
         # env pins each tool to this flake's version
         # (e.g. `shfmt.flake = "github:seedmatic/rke2lab#shfmt"`) instead of the
@@ -508,7 +533,7 @@
           incus-client = incusClient;
           deploy = deployApp;
           flux9s = flux9sPkg;
-        } // floxNriPluginPackages // toolchainPackages;
+        } // floxNriPluginPackages // floxControllerPackages // toolchainPackages;
 
         apps.deploy = {
           type = "app";
