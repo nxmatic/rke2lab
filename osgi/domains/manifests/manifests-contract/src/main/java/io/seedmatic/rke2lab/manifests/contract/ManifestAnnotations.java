@@ -79,6 +79,15 @@ public record ManifestAnnotations() {
   /** Layer 4 (default) — the CRs that depend on a CRD from an earlier layer. */
   public static final String LAYER_WORKLOADS = "workloads";
 
+  /**
+   * Node label marking a node that runs the flox runtime — the NRI plugin injects there and the
+   * flox-controller node-agent reconciles there. Set as an RKE2 kubelet node-label ({@code
+   * RuntimeRke2ConfigManifestsUnit}) and consumed as the {@code nodeSelector} of the flox
+   * DaemonSets. On the {@code flox.seedmatic.io} domain (shared with the CRD group + the injection
+   * annotation), migrated from the upstream {@code flox.dev/enabled}.
+   */
+  public static final String NODE_FLOX_RUNTIME_LABEL = "flox.seedmatic.io/enabled";
+
   public Map<String, String> packageAnnotations(final String domain, final String packageName) {
     return packageAnnotations(domain, packageName, Map.of());
   }

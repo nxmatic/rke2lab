@@ -134,7 +134,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
             List.of(
                 "node.kubernetes.io/instance-name=master",
                 "node.kubernetes.io/instance-kind=server",
-                "flox.dev/enabled=true")));
+                ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL + "=true")));
     createConfigMap(
         scope,
         "tls-san.yaml",

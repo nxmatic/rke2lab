@@ -681,6 +681,20 @@ Immutable configuration objects the runtime units build their pod specs from.
 | The `AbstractManifestsUnit` synthesising the NRI-plugin flox runtime — ConfigMaps, ServiceAccount,
   DaemonSet — with env config, plugin hot-reload and per-node workspace management.
 
+| `FloxControllerManifestsUnit`
+| The `AbstractManifestsUnit` deploying the flox-controller node-agent (the companion that
+  _provisions_ what the NRI plugin injects — see `github:seedmatic/flox-controller`): the `FloxEnv`
+  CRD plus the controller DaemonSet + cluster RBAC (ServiceAccount / ClusterRole / ClusterRoleBinding).
+  The DaemonSet + RBAC sit on the `operators` layer (the controller serves/reconciles the CRD, so it
+  is healthy before any workload `FloxEnv` CR); the `CustomResourceDefinition` is forced to the
+  `crds` layer by kind. The CRD is single-sourced from the flox-controller flake (its `controller-gen`
+  output, exposed as `flox-controller-crds` and staged onto the synthesis classpath under `/crds/` by
+  `seedMasterJar` / `nix run .#stage-flox-controller-crd`) and emitted verbatim via
+  `UpstreamYamlInclusion` — never re-modelled or vendored. The DaemonSet runs the baked
+  `io.seedmatic.flox-controller` image (`FloxDebugPolicy#floxControllerImage`, `IfNotPresent`) on
+  nodes labelled `flox.seedmatic.io/enabled` (`ManifestAnnotations#NODE_FLOX_RUNTIME_LABEL`), mounting
+  the host `/nix` + containerd socket so it realises closures + GC-roots and imports carrier images.
+
 | `NriPluginArchiveAssets`
 | Builds the TAR archive of NRI plugin sources with SHA-256 checksums, Base64 encoding and a JSON
   integrity manifest.

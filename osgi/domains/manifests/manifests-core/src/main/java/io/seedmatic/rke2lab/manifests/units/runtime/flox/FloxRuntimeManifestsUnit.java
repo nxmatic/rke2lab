@@ -493,7 +493,9 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                                     Map.of("mountPath", "/host-root", "name", "host-root")
                                   })
                             }),
-                        Map.entry("nodeSelector", Map.of("flox.dev/enabled", "true")),
+                        Map.entry(
+                            "nodeSelector",
+                            Map.of(ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL, "true")),
                         Map.entry("restartPolicy", "Always"),
                         Map.entry("serviceAccountName", "flox-runtime-installer"),
                         Map.entry("tolerations", new Object[] {Map.of("operator", "Exists")}),
