@@ -593,7 +593,27 @@
         # (compared canonically via jq -S, so formatting never trips it). Defined ONLY on
         # blueprintSystem — absent elsewhere, so `nix flake check` on an aarch64-linux node
         # never realizes the darwin-pinned jar.
-        checks = pkgs.lib.optionalAttrs (system == blueprintSystem) {
+        checks = {
+          # Anti-drift gate for the cross-world node label (Java ↔ nix, which can't import each
+          # other): extract NODE_FLOX_RUNTIME_LABEL from ManifestAnnotations.java (the single
+          # source, used by the flox DaemonSet nodeSelectors) and fail unless the nixos oneshot
+          # rke2lab-node-labels carries the same "<label>=true". Keeps the boot-time node label the
+          # DaemonSets select on in lock-step with the Java constant.
+          node-label-concord = pkgs.runCommand "node-label-concord" { } ''
+            src=${./osgi/domains/manifests/manifests-contract/src/main/java/io/seedmatic/rke2lab/manifests/contract/ManifestAnnotations.java}
+            label="$(sed -n 's/.*NODE_FLOX_RUNTIME_LABEL = "\([^"]*\)".*/\1/p' "$src")"
+            if [ -z "$label" ]; then
+              echo "could not extract NODE_FLOX_RUNTIME_LABEL from ManifestAnnotations.java" >&2
+              exit 1
+            fi
+            if ! grep -qF "$label=true" ${./nixos/rke2.nix}; then
+              echo "nixos/rke2.nix (rke2lab-node-labels oneshot) must carry '$label=true' —" >&2
+              echo "it drifted from ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL (DaemonSet nodeSelectors)." >&2
+              exit 1
+            fi
+            touch $out
+          '';
+        } // pkgs.lib.optionalAttrs (system == blueprintSystem) {
           blueprint-fresh =
             pkgs.runCommand "blueprint-fresh" { nativeBuildInputs = [ pkgs.jq ]; } ''
               jq -S . ${./network-blueprint.json} > committed.json

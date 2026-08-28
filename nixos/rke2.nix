@@ -89,4 +89,37 @@
       } >"$dropin"
     '';
   };
+
+  # Kubelet node-labels — MUST exist in config.yaml.d before rke2-server starts, because
+  # `--node-labels` is applied only at the node's FIRST registration; a fragment delivered
+  # later (the former RKE2_CONFIG ConfigMap glob'd from the cluster by rke2lab-config-install.sh)
+  # arrives AFTER the join and is silently ignored. Same boot-time drop-in pattern as
+  # rke2lab-dualstack / rke2lab-tls-san, from per-node identity in node.env. This SUPERSEDES the
+  # node-labels fragment RuntimeRke2ConfigManifestsUnit used to emit.
+  systemd.services.rke2lab-node-labels = {
+    description = "rke2lab kubelet node-labels drop-in (per-node identity + flox-runtime)";
+    after = [ "rke2lab-identity.service" ];
+    requires = [ "rke2lab-identity.service" ];
+    before = [ "rke2-server.service" ];
+    requiredBy = [ "rke2-server.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      EnvironmentFile = "/run/rke2lab/node.env";
+    };
+    script = ''
+      set -euo pipefail
+      dropin=/etc/rancher/rke2/config.yaml.d/30-node-labels.yaml
+      install -d -m 0755 "$(dirname "$dropin")"
+      {
+        echo "node-label:"
+        echo "  - node.kubernetes.io/instance-name=''${RKE2LAB_NODE_NAME}"
+        echo "  - node.kubernetes.io/instance-kind=''${RKE2LAB_NODE_KIND}"
+        # flox-runtime: every node runs flox in the current homogeneous lab. Promote to a
+        # devlxd per-node key (user.rke2lab.node-flox-enabled) once node roles diverge.
+        # MUST match ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL (the DaemonSet nodeSelectors).
+        echo "  - flox.seedmatic.io/enabled=true"
+      } >"$dropin"
+    '';
+  };
 }

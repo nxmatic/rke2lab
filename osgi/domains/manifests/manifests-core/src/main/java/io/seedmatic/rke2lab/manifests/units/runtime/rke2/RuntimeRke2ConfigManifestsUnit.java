@@ -124,17 +124,9 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
         "Node IP fragment",
         "|ConfigMap|default|rke2-node-inetaddr",
         Map.of("node-ip", net.nodeHostInetAddr()));
-    createConfigMap(
-        scope,
-        "node-labels.yaml",
-        "Node labels fragment",
-        "|ConfigMap|default|rke2-node-labels",
-        Map.of(
-            "node-label",
-            List.of(
-                "node.kubernetes.io/instance-name=master",
-                "node.kubernetes.io/instance-kind=server",
-                ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL + "=true")));
+    // Node labels are NOT delivered here: kubelet applies --node-labels only at the node's first
+    // registration, so a fragment glob'd from the cluster post-join is ignored. They are written
+    // at boot before rke2-server by the nixos oneshot rke2lab-node-labels (nixos/rke2.nix).
     createConfigMap(
         scope,
         "tls-san.yaml",
