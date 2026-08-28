@@ -27,11 +27,12 @@ import software.constructs.Construct;
  * {@code rke2lab-system}). The env's {@code folder} is the GC-root category the NRI plugin keys on
  * ({@code <base>/networking/kdns}) — a node-side path segment, not a k8s namespace.
  *
- * <p>Flavor is a single logical env switched by the networking debug toggle ({@code
- * FloxDebugPolicy.networkingEnabled}), mirroring {@code resolveNetworkingEnvironment}: prod ships
- * the stripped {@code #kdns}; debug ships {@code #kdns-debug} (delve-wrapped, {@code -N -l}) plus
- * an interactive toolchain. The consuming pod always annotates {@code networking/kdns} — the debug
- * affordance is transparent to it. On the {@code workloads} layer (after the catalog on {@code
+ * <p>Flavor switches the env NAME (and its {@code #output}) by the networking debug toggle ({@code
+ * FloxDebugPolicy.networkingEnabled}), matching {@code KdnsManifestsUnit}'s {@code
+ * resolveNetworkingEnvironment("networking/kdns", "networking/kdns-debug")} pod annotation so the
+ * provisioned GC-root ({@code networking/<name>}) is exactly what the pod waits on: prod is {@code
+ * kdns} (stripped {@code #kdns}); debug is {@code kdns-debug} ({@code #kdns-debug}, delve-wrapped)
+ * plus an interactive toolchain. On the {@code workloads} layer (after the catalog on {@code
  * operators}).
  */
 public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
@@ -73,11 +74,13 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
   private void createKdnsEnv(
       final Construct scope, final Cdk8sApiObjectResolver resolver, final boolean debug) {
     final String namespace = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
-    final String name = "kdns";
+    // Name by flavor so the provisioned GC-root (networking/<name>) matches KdnsManifestsUnit's
+    // resolveNetworkingEnvironment pod annotation: prod=kdns, debug=kdns-debug.
+    final String name = debug ? "kdns-debug" : "kdns";
     final ApiObject env =
         new ApiObject(
             scope,
-            "floxenv-kdns",
+            "floxenv-" + name,
             ApiObjectProps.builder()
                 .apiVersion("flox.seedmatic.io/v1alpha1")
                 .kind("FloxEnv")
