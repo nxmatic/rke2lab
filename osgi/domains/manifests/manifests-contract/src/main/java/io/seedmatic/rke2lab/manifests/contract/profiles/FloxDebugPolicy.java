@@ -47,7 +47,7 @@ public record FloxDebugPolicy(
    * auto-imported by rke2's air-gap path, so {@code imagePullPolicy: IfNotPresent} never pulls. The
    * string MUST match the RepoTag the nix image is tagged with (name:tag = the flake's VERSION).
    */
-  private static final String FLOX_CONTROLLER_IMAGE = "io.seedmatic.flox-controller:0.0.1-develop";
+  private static final String FLOX_CONTROLLER_IMAGE = "io.seedmatic.flox-controller:0.0.0-develop";
 
   private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false, false, false);
 

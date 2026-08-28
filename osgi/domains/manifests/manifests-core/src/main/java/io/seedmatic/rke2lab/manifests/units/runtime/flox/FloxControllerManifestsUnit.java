@@ -232,6 +232,15 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                             "valueFrom",
                                             Map.of(
                                                 "fieldRef", Map.of("fieldPath", "spec.nodeName"))),
+                                        // The controller ensures its embedded base carrier in its
+                                        // OWN namespace (exists), not the flox-system fallback.
+                                        Map.of(
+                                            "name",
+                                            "POD_NAMESPACE",
+                                            "valueFrom",
+                                            Map.of(
+                                                "fieldRef",
+                                                Map.of("fieldPath", "metadata.namespace"))),
                                         // ON-NODE TBD (mirrors the provisioner buildEnv): the
                                         // controller execs the NODE's flox/nix/ctr from the
                                         // mounted host /nix — PATH into the host nix profile and
