@@ -124,7 +124,9 @@ public record ClusterNetworkBlueprint(
   private static ClusterNetworkBlueprint derive(String clusterName, String nodeName) {
     validateNodeName(nodeName);
 
-    final int clusterId = clusterId(clusterName);
+    final int hostId = hostId(hostOf(clusterName));
+    final int roleId = roleId(roleOf(clusterName));
+    final int clusterId = (hostId << 1) | roleId;
 
     final int nodeId = nodeId(nodeName);
     final NodeType nodeType = nodeType(nodeName);
@@ -137,15 +139,19 @@ public record ClusterNetworkBlueprint(
     final Cidr vipCidr = Cidr.parse("10.80." + vipThirdOctet + ".0/24");
     final Cidr lbCidr = Cidr.parse("10.80." + hostThirdOctet + ".64/26");
 
-    // LAN: ONE /27 per cluster in the HIGH half of 192.168.1.0/24 — the LOW half (.0-.127) is the
-    // home network's (its DHCP pool + existing devices; the gateway is .254), so a cluster's nodes
-    // must NOT land there (a node at .6 collided with the home LAN). Base is 192.168.1.<128 +
-    // clusterId·32>, split internally: node hosts in the low /28, LB (headscale/tailscale VIPs) in
-    // the high /28. clusterId 0 keeps the proven .128 base (peer3 → .134); the four clusters
-    // (bioskop/nikopol × mgmt/wrkld) fill the high half — a third host needs its own LAN segment.
-    final int lanSliceBase = 128 + clusterId * 32;
-    final Cidr lanNodeCidr = Cidr.parse("192.168.1." + lanSliceBase + "/28");
-    final Cidr lanLbCidr = Cidr.parse("192.168.1." + (lanSliceBase + 16) + "/28");
+    // LAN: the HIGH half of 192.168.1.0/24 (.128-.255) — the LOW half is the home network's (DHCP +
+    // devices; gateway .254). Carved asymmetrically by role from base = 128 + hostId*48 +
+    // roleId*16:
+    // single-node mgmt takes a /28 (node /29 + lb /29); multi-node wrkld a /27 (node /28 =
+    // host(3)..
+    // host(14) = 4 control + 8 workers, + lb /29). Real clusters fill .128-.223 (bioskop hostId 0,
+    // nikopol hostId 1); the reserved TEST host (hostId 2 -> base .224) gives a blank/unknown
+    // identity its own valid slice instead of overflowing. A genuinely unknown host fails fast in
+    // hostId().
+    final boolean wrkldRole = roleId == 1;
+    final int lanSliceBase = 128 + hostId * 48 + roleId * 16;
+    final Cidr lanNodeCidr = Cidr.parse("192.168.1." + lanSliceBase + (wrkldRole ? "/28" : "/29"));
+    final Cidr lanLbCidr = Cidr.parse("192.168.1." + (lanSliceBase + (wrkldRole ? 16 : 8)) + "/29");
 
     // Each host derives from the CIDR we already hold — ask the network for its host, instead of
     // rebuilding and re-parsing an address string that re-encodes the same octets.
@@ -270,19 +276,6 @@ public record ClusterNetworkBlueprint(
         + lan.lbCidr();
   }
 
-  /**
-   * The cluster's numeric id, packing the two identity bits host-major: {@code (hostId << 1) |
-   * roleId}. Decomposes the {@code <host>-<role>} name (bioskop-mgmt → 0, bioskop-wrkld → 1,
-   * nikopol-mgmt → 2, nikopol-wrkld → 3), leaving {@code clusterId 0..7} room for a third host on
-   * bit 2. This is the plan's identity encoding — decomposing the name is exactly what it
-   * prescribes (the incus remote, by contrast, is explicit config, never decomposed). A
-   * bare/sentinel name with no {@code -} role (legacy, {@code unknown}) falls to host-only with
-   * role 0.
-   */
-  private static int clusterId(String clusterName) {
-    return (hostId(hostOf(clusterName)) << 1) | roleId(roleOf(clusterName));
-  }
-
   /** The bare host token — the {@code <host>} of {@code <host>-<role>} (up to the first dash). */
   private static String hostOf(String clusterName) {
     final int dash = clusterName.indexOf('-');
@@ -299,7 +292,13 @@ public record ClusterNetworkBlueprint(
     return switch (host) {
       case "bioskop" -> 0;
       case "nikopol" -> 1; // renamed from alcide, keeping same host id
-      default -> 3;
+      case "test" -> 2; // reserved LAN slice for the blank/unknown cluster identity (surveys/tests)
+      default ->
+          throw new IllegalArgumentException(
+              "unknown host '"
+                  + host
+                  + "' — no LAN slice allocated; add it to hostId() + the"
+                  + " addressing plan (only bioskop/nikopol/test are carved into 192.168.1.128/25)");
     };
   }
 
@@ -317,8 +316,14 @@ public record ClusterNetworkBlueprint(
       case "peer1" -> 1;
       case "peer2" -> 2;
       case "peer3" -> 3;
-      case "worker1" -> 10;
-      case "worker2" -> 11;
+      case "worker1" -> 4;
+      case "worker2" -> 5;
+      case "worker3" -> 6;
+      case "worker4" -> 7;
+      case "worker5" -> 8;
+      case "worker6" -> 9;
+      case "worker7" -> 10;
+      case "worker8" -> 11;
       default -> throw new IllegalArgumentException("Unsupported node.name: " + nodeName);
     };
   }

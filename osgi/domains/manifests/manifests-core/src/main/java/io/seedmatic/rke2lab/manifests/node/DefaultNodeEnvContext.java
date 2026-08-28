@@ -17,6 +17,16 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
    */
   private static final String DEFAULT_NODE_NAME = "master";
 
+  /**
+   * The reserved test cluster. When the handed-over identity carries no cluster (a bare survey / no
+   * seeded identity), fall back to it so addressing derives a valid, distinct TEST slice
+   * (192.168.1.224) instead of overflowing — never a real cluster's address space. Public because
+   * it is the single source of the reserved default: the cluster-scoped Cilium units that derive a
+   * blueprint from the raw thread-local identity pass THIS constant to {@link
+   * BootstrapIdentity#clusterNameOrDefault(String)}.
+   */
+  public static final String DEFAULT_CLUSTER_NAME = "test-mgmt";
+
   private final ClusterNetworkBlueprint blueprint;
 
   /**
@@ -26,16 +36,11 @@ public final class DefaultNodeEnvContext implements NodeEnvContext {
    * identity is all this context needs to project the whole node environment.
    */
   public DefaultNodeEnvContext(final BootstrapIdentity identity) {
-    final String identityNode = identity.nodeName();
-    final String nodeName =
-        (identityNode == null
-                || identityNode.isBlank()
-                || BootstrapIdentity.UNKNOWN.equals(identityNode))
-            ? DEFAULT_NODE_NAME
-            : identityNode;
+    final String nodeName = identity.nodeNameOrDefault(DEFAULT_NODE_NAME);
+    final String clusterName = identity.clusterNameOrDefault(DEFAULT_CLUSTER_NAME);
     this.blueprint =
         ClusterNetworkBlueprint.builder()
-            .cluster(identity.clusterName())
+            .cluster(clusterName)
             .node(nodeName)
             .deriveRecipeModel()
             .build();

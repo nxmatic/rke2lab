@@ -73,6 +73,21 @@ public record BootstrapIdentity(
     return clusterName;
   }
 
+  /**
+   * Effective cluster name: a null/blank/{@link #UNKNOWN} identity adopts {@code fallback} (the
+   * caller's reserved default, e.g. the test cluster) so a bare survey derives a valid slice, not
+   * an overflow. The domain that knows the default passes it — the identity owns only the guard.
+   */
+  public String clusterNameOrDefault(final String fallback) {
+    final String c = clusterName();
+    return (c == null || c.isBlank() || UNKNOWN.equals(c)) ? fallback : c;
+  }
+
+  public String nodeNameOrDefault(final String fallback) {
+    final String n = nodeName();
+    return (n == null || n.isBlank() || UNKNOWN.equals(n)) ? fallback : n;
+  }
+
   public static Builder builder() {
     return new Builder();
   }

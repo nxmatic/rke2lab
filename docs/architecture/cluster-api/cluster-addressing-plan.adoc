@@ -52,7 +52,8 @@ clusterId = (host << 1) | role
 
 `clusterId ∈ 0..7` leaves room for a third bare-metal host (bit 2) without touching the packing.
 Every span below is `f(clusterId)` — and, for per-node spans, `f(clusterId, nodeId)` with the
-existing `nodeId` map (`master=0, peer1=1, peer2=2, peer3=3, worker1=10, worker2=11`).
+`nodeId` map, packed contiguously (`master=0, peer1=1, peer2=2, peer3=3, worker1..8=4..11`) so the
+twelve nodes fit the workload cluster's LAN node `/28` without overflow.
 
 NOTE: This *re-encodes* today's ids (`bioskop=0`, `nikopol=1`). The existing clusters' addressing
 shifts, which is safe: clusters are re-seeded, never live-migrated
@@ -83,7 +84,7 @@ The super-blocks the table carves from:
 |Service (IPv4) |`10.48.0.0/14` (48..51) |`10.<48+clusterId>.0.0/16`
 |Pod / Service (IPv6) |`fd00::/16` |Pod `fd00:<44+clusterId>::/56`, Service `fd00:<48+clusterId>::/112` — mirrors the v4 index
 |ULA underlay (IPv6) |`fd96:6924:3693::/48` |`fd96:6924:3693:<clusterId·256>00::/56` — *formula unchanged* (`String.format("%s:%02x00::/56", …)`)
-|LAN (IPv4) |`192.168.1.128/25` (HIGH half, 4 × `/27`) |ONE `/27` per cluster at `192.168.1.<128 + clusterId·32>` — node hosts low `/28`, LB IPs high `/28` (see <<lan>>)
+|LAN (IPv4) |`192.168.1.128/25` (HIGH half) |Carved asymmetrically by role from base `192.168.1.<128 + hostId·48 + roleId·16>` — mgmt takes a node `/29` + LB `/29`; wrkld a node `/28` + LB `/29` (see <<lan>>)
 |===
 
 == IPv6 dual-stack
@@ -96,19 +97,43 @@ IMPORTANT). So the pod v6 span is not optional trivia — it is a required ciliu
 track this table.
 
 [[lan]]
-== The LAN `/27` — one slice per cluster, in the HIGH half
+== The LAN — asymmetric per-role slices in the HIGH half
 
-The physical LAN `192.168.1.0/24` is fixed (the home network) and holds eight `/27` slices, but the
-LOW half (`.0-.127`) is NOT the lab's to allocate — it is the home network's own DHCP pool and
-existing devices (the gateway sits at `.254`). A cluster node dropped there collides with the home
-LAN (an early attempt placed a node at `192.168.1.6` and the router refused the reservation). So the
-lab takes the HIGH half only: ONE `/27` per cluster at `192.168.1.<128 + clusterId·32>` — `clusterId
-0 → .128` (the address the single-cluster era already used, so nothing moves for it), then `.160`,
-`.192`, `.224`. Each `/27` is split internally — node hosts in the low `/28`, LB addresses
-(headscale/tailscale VIPs) in the high `/28`. A `/27` is 32 addresses: ample for a management cluster
-(single node) and for a workload (three control-plane + two workers + a few LB VIPs). The four
-`/27`s fill the high half exactly (bioskop/nikopol × mgmt/wrkld); a third bare-metal host would need
-its OWN LAN segment rather than more slices of this `/24`.
+The physical LAN `192.168.1.0/24` is fixed (the home network), but the LOW half (`.0-.127`) is NOT
+the lab's to allocate — it is the home network's own DHCP pool and existing devices (the gateway
+sits at `.254`). A cluster node dropped there collides with the home LAN (an early attempt placed a
+node at `192.168.1.6` and the router refused the reservation). So the lab takes the HIGH half only
+(`192.168.1.128/25`), carved *by role* from
+
+[source]
+----
+base = 192.168.1.<128 + hostId·48 + roleId·16>
+  hostId: bioskop = 0, nikopol = 1, test = 2      roleId: mgmt = 0, wrkld = 1
+----
+
+A *management* cluster is a single node, so it takes a compact `/29` node slice + a `/29` LB slice.
+A *workload* cluster runs four control-plane + up to eight workers, so it takes a `/28` node slice
+(`host(3)..host(14)` — 12 nodes, `host(15)` is broadcast) + a `/29` LB slice. The LB slice holds the
+headscale/tailscale VIPs (`host(1)`/`host(2)`); the node hosts are `host(3 + nodeId)`.
+
+[cols="2,^1,^1,2,2,2",options="header"]
+|===
+|Cluster |`hostId` |`roleId` |base |Node slice |LB slice
+
+|`bioskop-mgmt`  |0 |0 |`.128` |`192.168.1.128/29` |`192.168.1.136/29`
+|`bioskop-wrkld` |0 |1 |`.144` |`192.168.1.144/28` |`192.168.1.160/29`
+|`nikopol-mgmt`  |1 |0 |`.176` |`192.168.1.176/29` |`192.168.1.184/29`
+|`nikopol-wrkld` |1 |1 |`.192` |`192.168.1.192/28` |`192.168.1.208/29`
+|`test-mgmt`     |2 |0 |`.224` |`192.168.1.224/29` |`192.168.1.232/29`
+|===
+
+`test-mgmt` (hostId 2) is a *reserved* slice: it is the fallback the manifests node-env context
+derives when the handed-over identity carries no cluster (a bare survey / no seeded identity), so
+that path lands on a valid, distinct slice at `.224` instead of overflowing the octet — never a real
+cluster's address space. A genuinely unknown host is NOT silently mapped: `hostId()` throws (fail
+fast, "add it to the addressing plan") rather than fabricating an out-of-range base. Real clusters
+fill `.128-.223`; a fourth bare-metal host would need its OWN LAN segment rather than more slices of
+this `/24`.
 
 == Clustermesh — two role-partitioned meshes
 
@@ -158,8 +183,9 @@ unambiguous when clusters that share the L2 fabric both run BGP on it.
   changes only *which* L3 spans each cluster claims on it.
 * *Extensible.* `clusterId 0..7` (third host on bit 2); pod/service `/14` supers hold four
   clusters and widen to `/13` for eight. The LAN `/24` is the exception: only its HIGH half is the
-  lab's (the low half is the home network), so it holds exactly the four `<host>-<role>` clusters —
-  a third host brings its own LAN segment rather than more slices here.
+  lab's (the low half is the home network). It holds the four real `<host>-<role>` clusters
+  (`.128-.223`) plus the reserved `test` slice (`.224`); an unknown host fails fast in `hostId()`
+  and a fourth bare-metal host brings its own LAN segment rather than more slices here.
 
 == Before → after (the code delta)
 
@@ -171,7 +197,7 @@ unambiguous when clusters that share the L2 fabric both run BGP on it.
 |Pod / Service CIDR |global constants `POD_CIDR=10.42.0.0/16`, `SERVICE_CIDR=10.43.0.0/16` (+v6) |`10.<44+id>.0.0/16` / `10.<48+id>.0.0/16` (+v6 `fd00:<44+id>`/`fd00:<48+id>`)
 |BGP ASN |`ClusterAsn.RKE2_CLUSTER=65010` (constant) |`64512 + clusterId`
 |clustermesh `cluster.id`/`name` |hardcoded `id: 7`, `name: sample` in the cilium HelmChartConfig |`clusterId+1` / `<host>-<role>`
-|LAN slices |two `/27` per cluster (node + LB), hand-mapped |one `/27` per cluster, split node/LB
+|LAN slices |two `/27` per cluster (node + LB), hand-mapped |asymmetric per role from `128 + hostId·48 + roleId·16`: mgmt node `/29` + LB `/29`, wrkld node `/28` + LB `/29`; reserved `test` slice at `.224`
 |Node/VIP/LB, ULA |per-cluster already, keyed on the host-only `clusterId` |same formulae, keyed on the new `clusterId`
 |===
 

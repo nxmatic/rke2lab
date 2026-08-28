@@ -5,6 +5,7 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.seedmatic.rke2lab.netplan.contract.ClusterAsn;
 import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
@@ -181,7 +182,10 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
     // ASN is cluster-scoped (node-independent) — the cluster name carries the identity.
     final ClusterNetworkBlueprint blueprint =
         ClusterNetworkBlueprint.builder()
-            .cluster(ManifestSynthesisContext.current().bootstrapIdentity().clusterName())
+            .cluster(
+                ManifestSynthesisContext.current()
+                    .bootstrapIdentity()
+                    .clusterNameOrDefault(DefaultNodeEnvContext.DEFAULT_CLUSTER_NAME))
             .node("master")
             .deriveRecipeModel()
             .build();

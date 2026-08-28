@@ -6,6 +6,7 @@ import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.seedmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.seedmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
 import java.util.List;
@@ -62,7 +63,7 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
     // blueprint is derived on the canonical master — the cluster name carries the identity.
     final ClusterNetworkBlueprint blueprint =
         ClusterNetworkBlueprint.builder()
-            .cluster(identity.clusterName())
+            .cluster(identity.clusterNameOrDefault(DefaultNodeEnvContext.DEFAULT_CLUSTER_NAME))
             .node("master")
             .deriveRecipeModel()
             .build();

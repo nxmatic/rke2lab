@@ -64,7 +64,43 @@ class ClusterNetworkBlueprintTest {
         InetAddress.getByName("fd96:6924:3693:220::10.80.16.10"),
         blueprint.nodeNetwork().nodeHostInetaddr6());
     assertEquals(
-        InetAddress.getByName("fd96:6924:3693:250::192.168.1.195"),
+        InetAddress.getByName("fd96:6924:3693:250::192.168.1.179"),
         blueprint.lan().hostInetaddr6());
+  }
+
+  @Test
+  void deriveRecipeModel_forNikopolMgmtMaster_carvesTheMgmtLanSlice() {
+    ClusterNetworkBlueprint blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster("nikopol-mgmt")
+            .node("master")
+            .deriveRecipeModel()
+            .build();
+
+    // nikopol hostId 1, mgmt roleId 0 -> LAN base 128 + 1*48 + 0*16 = 176; mgmt takes node /29 + lb
+    // /29. master nodeId 0 -> host(3) = .179; headscale/tailscale VIPs from the lb /29 at .184.
+    assertEquals("192.168.1.176/29", blueprint.lan().nodeCidr().toString());
+    assertEquals("192.168.1.184/29", blueprint.lan().lbCidr().toString());
+    assertEquals("192.168.1.179", blueprint.lan().hostInetaddr().getHostAddress());
+    assertEquals("192.168.1.185", blueprint.lan().headscaleInetaddr().getHostAddress());
+    assertEquals("192.168.1.186", blueprint.lan().tailscaleInetaddr().getHostAddress());
+  }
+
+  @Test
+  void deriveRecipeModel_forTheReservedTestCluster_carvesTheDot224Slice() {
+    // The blank/unknown cluster identity falls back to the reserved "test-mgmt" cluster
+    // (DefaultNodeEnvContext), which must derive a valid, distinct slice — NOT overflow the octet.
+    // test hostId 2, mgmt roleId 0 -> LAN base 128 + 2*48 = 224; clusterId (2<<1)|0 = 4.
+    ClusterNetworkBlueprint blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster("test-mgmt")
+            .node("master")
+            .deriveRecipeModel()
+            .build();
+
+    assertEquals(4, blueprint.cluster().id());
+    assertEquals("192.168.1.224/29", blueprint.lan().nodeCidr().toString());
+    assertEquals("192.168.1.232/29", blueprint.lan().lbCidr().toString());
+    assertEquals("192.168.1.227", blueprint.lan().hostInetaddr().getHostAddress());
   }
 }
