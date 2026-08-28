@@ -22,9 +22,11 @@ import software.constructs.Construct;
  * Deploys the flox-controller node-agent + its {@code FloxEnv} CRD (the companion that provisions
  * what the NRI plugin injects). Sibling of {@link FloxRuntimeManifestsUnit} in the runtime domain.
  *
- * <p>Layering: the DaemonSet + RBAC are on the {@code operators} layer (the controller
- * serves/reconciles the CRD → up before workload CRs); the {@code CustomResourceDefinition} is
- * forced to the {@code crds} layer by kind, so it applies before any {@code FloxEnv}.
+ * <p>Layering: the DaemonSet + RBAC are on the {@code operators} layer (the controller is healthy
+ * before workload {@code FloxEnv} CRs); the {@code CustomResourceDefinition} is forced to the
+ * {@code crds} layer by kind. Its namespace ({@code rke2lab-system}) is created in the {@code
+ * foundation} layer (ClusterRuntimeNamespaceManifestsUnit) so it exists by the time this
+ * operators-layer SA/DaemonSet apply.
  *
  * <p>The CRD is single-sourced from the flox-controller flake (its controller-gen output, staged
  * onto the classpath at {@code /crds/} by seedMasterJar / {@code nix run

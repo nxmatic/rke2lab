@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests.units.cluster;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
@@ -19,8 +20,13 @@ public final class ClusterRuntimeNamespaceManifestsUnit extends AbstractManifest
 
   public static final String OUTPUT_DIR = "runtime-system-namespace";
 
+  // Foundation layer, not the default workloads: this shared namespace is depended on by
+  // operators-layer resources (the flox-controller SA/DaemonSet live here), which apply before
+  // workloads. Creating it in foundation breaks the deadlock (operators needs the namespace ↔
+  // workloads holds it) — namespaces the later layers rely on belong early.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile(ManifestDomainCatalog.CLUSTER, OUTPUT_DIR);
+      new PackageMetadataProfile(
+          ManifestDomainCatalog.CLUSTER, OUTPUT_DIR, false, ManifestAnnotations.LAYER_FOUNDATION);
 
   public ClusterRuntimeNamespaceManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
