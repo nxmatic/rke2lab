@@ -103045,11 +103045,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787896564,
-        "narHash": "sha256-LvJxzJkJ/EgfN7QrLLHzknEgNx+T7SiuwLHzTmzS41w=",
+        "lastModified": 1787897553,
+        "narHash": "sha256-qeHHe8EZyhbQZkjnj2BarZECwjsJE8qjUY7uermNfAk=",
         "owner": "seedmatic",
         "repo": "flox-controller",
-        "rev": "c24c336713a60ef8f375344451c2b88487bc63a5",
+        "rev": "db9634793aedbb576ab1d9a2d0f7e75ad73fcd8c",
         "type": "github"
       },
       "original": {
@@ -103072,11 +103072,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787810789,
-        "narHash": "sha256-J23KdJyvAOSkmrmv9k3LqV3NNNuq9EyaKdMI5jF+ncA=",
+        "lastModified": 1787897565,
+        "narHash": "sha256-nI9sinqH9aitQWfjuY3POrE2MSfGzS501993kZlFHzc=",
         "owner": "seedmatic",
         "repo": "flox-nri-plugin",
-        "rev": "399826155b924da387a67e72f90f2ae8ee49a18f",
+        "rev": "162d471b1cbb342337ef2aa5e1b448993be4ffad",
         "type": "github"
       },
       "original": {
