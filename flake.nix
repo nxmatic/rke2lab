@@ -321,6 +321,14 @@
           buildPhase = ''
             ${mavenHostPrelude}
 
+            # Stage the flox-controller CRD (single-sourced from the flake, never
+            # vendored) onto the manifest-synthesis classpath so
+            # FloxControllerManifestsUnit emits it into the cluster's crds layer.
+            ${nixpkgs.lib.optionalString (floxControllerCrds != null) ''
+              mkdir -p ${floxControllerCrdResourceDir}
+              cp ${floxControllerCrds}/*.yaml ${floxControllerCrdResourceDir}/
+            ''}
+
             # Pin spotless's shfmt to the flake binary so its version-check
             # matches the binary on PATH.
             mvnHost -Dshfmt.version=${pkgs.shfmt.version} -DskipTests clean package
@@ -384,7 +392,18 @@
               else { })
           // (if ctlPkgs ? flox-controller-image
                 then { inherit (ctlPkgs) flox-controller-image; }
+                else { })
+          // (if ctlPkgs ? flox-controller-crds
+                then { inherit (ctlPkgs) flox-controller-crds; }
                 else { });
+
+        # The flox-controller CRD as a store path (single-sourced from the flake —
+        # controller-gen output, never vendored). Staged onto the manifest-synthesis
+        # classpath (crds/ resource) by seedMasterJar for release and by
+        # `nix run .#stage-flox-controller-crd` for the dev loop.
+        floxControllerCrds = (flox-controller.packages.${system} or { }).flox-controller-crds or null;
+        floxControllerCrdResourceDir =
+          "osgi/domains/manifests/manifests-core/src/main/resources/crds";
 
         # Maven-build toolchain re-exported as individual packages, so the flox
         # env pins each tool to this flake's version
@@ -553,6 +572,21 @@
             echo "regenerated network-blueprint.json from ${networkBlueprintJson}"
           '');
           meta.description = "Regenerate the committed network-blueprint.json from the netplan jar";
+        };
+
+        # Stage the flox-controller CRD (single-sourced from the flox-controller flake)
+        # onto the manifest-synthesis classpath for the DEV loop (`./mvnw -pl :manifests`).
+        # Release builds stage it inside seedMasterJar. The staged crds/ dir is
+        # gitignored — controller-gen stays the single source, never a committed copy.
+        apps.stage-flox-controller-crd = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "stage-flox-controller-crd" ''
+            set -euo pipefail
+            mkdir -p ${floxControllerCrdResourceDir}
+            cp ${floxControllerCrds}/*.yaml ${floxControllerCrdResourceDir}/
+            echo "staged flox-controller CRD into ${floxControllerCrdResourceDir}/ from ${floxControllerCrds}"
+          '');
+          meta.description = "Stage the flox-controller CRD (from the flake) onto the manifest-synthesis classpath";
         };
 
         # Anti-drift gate: fail if the committed JSON diverges from the jar output
