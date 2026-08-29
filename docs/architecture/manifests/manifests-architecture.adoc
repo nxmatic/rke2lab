@@ -565,7 +565,7 @@ graph TB
     subgraph flox["flox runtime unit"]
       FRMU["FloxRuntimeManifestsUnit"]
       FCMU["FloxControllerManifestsUnit"]
-      FFCU["FloxFlakeCatalogueManifestsUnit"]
+      FFCU["FloxCatalogManifestsUnit"]
       FEMU["FloxEnvManifestsUnit"]
       NRI["NriPluginArchiveAssets"]
     end
@@ -700,21 +700,21 @@ Immutable configuration objects the runtime units build their pod specs from.
   nodes labelled `flox.seedmatic.io/enabled` (`ManifestAnnotations#NODE_FLOX_RUNTIME_LABEL`), mounting
   the host `/nix` + containerd socket so it realises closures + GC-roots and imports carrier images.
 
-| `FloxFlakeCatalogueManifestsUnit`
+| `FloxCatalogManifestsUnit`
 | The `AbstractManifestsUnit` binding the flox-controller's nix-flake catalog to a Flux source. The
   workload flox packages (kdns, headscale, …) live in the `runtime/flox` flake, published to a
   dedicated `flox-catalogue` branch (a `git subtree split` of the `runtime/flox` tree — NOT the
   per-cluster rendered `manifests/<slug>` branch). It emits a `GitRepository` tracking that branch
   (same repo + GitHub App auth) so Flux exposes the flake as an in-cluster tarball artifact, and a
-  `FloxFlake` (`catalogue`) whose `sourceRef` points at it — the controller resolves
-  `floxflake:rke2lab-system/catalogue#<output>` install refs against it. On the `operators` layer
+  `FloxCatalog` (`catalogue`) whose `sourceRef` points at it — the controller resolves
+  `floxcatalog:rke2lab-system/catalogue#<output>` install refs against it. On the `operators` layer
   (Ready before workload `FloxEnv`s resolve their flake refs).
 
 | `FloxEnvManifestsUnit`
 | The `AbstractManifestsUnit` emitting the workload `FloxEnv` CRs the flox-controller realises on
   each node — the runtime successor to the baked `environment.d` tree (first increment: `kdns`).
-  Each env installs its package from the `FloxFlakeCatalogueManifestsUnit` catalog via a
-  `floxflake:catalogue#<output>` ref (same namespace, `rke2lab-system`); its `folder` is the GC-root
+  Each env installs its package from the `FloxCatalogManifestsUnit` catalog via a
+  `floxcatalog:catalogue#<output>` ref (same namespace, `rke2lab-system`); its `folder` is the GC-root
   category the NRI plugin keys on (`<base>/networking/kdns`). Flavor is a single logical env switched
   by the networking debug toggle (`FloxDebugPolicy.networkingEnabled`): prod ships stripped `#kdns`,
   debug ships delve-wrapped `#kdns-debug`. On the `workloads` layer (after the catalog on

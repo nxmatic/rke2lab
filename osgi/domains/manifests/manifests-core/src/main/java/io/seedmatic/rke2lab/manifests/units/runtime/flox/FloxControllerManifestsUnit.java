@@ -44,7 +44,8 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
   /** The staged CRD classpath resources (single source: the flox-controller flake). */
   private static final String FLOXENV_CRD_RESOURCE = "/crds/flox.seedmatic.io_floxenvs.yaml";
 
-  private static final String FLOXFLAKE_CRD_RESOURCE = "/crds/flox.seedmatic.io_floxflakes.yaml";
+  private static final String FLOXCATALOG_CRD_RESOURCE =
+      "/crds/flox.seedmatic.io_floxcatalogs.yaml";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(
@@ -61,9 +62,10 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    // FloxEnv + FloxFlake CRDs — CustomResourceDefinitions, auto-routed to the crds layer by kind.
+    // FloxEnv + FloxCatalog CRDs — CustomResourceDefinitions, auto-routed to the crds layer by
+    // kind.
     new UpstreamYamlInclusion(scope, FLOXENV_CRD_RESOURCE, packageProfile, context.yaml());
-    new UpstreamYamlInclusion(scope, FLOXFLAKE_CRD_RESOURCE, packageProfile, context.yaml());
+    new UpstreamYamlInclusion(scope, FLOXCATALOG_CRD_RESOURCE, packageProfile, context.yaml());
 
     final String namespace = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
     final ApiObject serviceAccount = createServiceAccount(scope, context.resolver(), namespace);
@@ -97,8 +99,10 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createClusterRole(final Construct scope) {
-    // The controller's kubebuilder RBAC markers: watch FloxEnvs + FloxFlakes cluster-wide and patch
-    // their status, and read the Flux GitRepository a FloxFlake resolves its catalog artifact from.
+    // The controller's kubebuilder RBAC markers: watch FloxEnvs + FloxCatalogs cluster-wide and
+    // patch
+    // their status, and read the Flux GitRepository a FloxCatalog resolves its catalog artifact
+    // from.
     final ApiObject clusterRole =
         new ApiObject(
             scope,
@@ -120,15 +124,15 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
             new Object[] {
               Map.of(
                   "apiGroups", new Object[] {"flox.seedmatic.io"},
-                  "resources", new Object[] {"floxenvs", "floxflakes"},
+                  "resources", new Object[] {"floxenvs", "floxcatalogs"},
                   // create: the controller self-provisions its embedded base carrier (EnsureBase).
                   "verbs",
                       new Object[] {"get", "list", "watch", "create", "update", "patch", "delete"}),
               Map.of(
                   "apiGroups", new Object[] {"flox.seedmatic.io"},
-                  "resources", new Object[] {"floxenvs/status", "floxflakes/status"},
+                  "resources", new Object[] {"floxenvs/status", "floxcatalogs/status"},
                   "verbs", new Object[] {"get", "update", "patch"}),
-              // FloxFlake resolves its nix-flake catalog from a Flux GitRepository's reconciled
+              // FloxCatalog resolves its nix-flake catalog from a Flux GitRepository's reconciled
               // artifact — a generic capability (read the Flux source), not an rke2lab coupling.
               Map.of(
                   "apiGroups", new Object[] {"source.toolkit.fluxcd.io"},

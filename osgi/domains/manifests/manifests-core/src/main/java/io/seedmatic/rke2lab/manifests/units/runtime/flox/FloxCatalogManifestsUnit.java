@@ -26,28 +26,29 @@ import software.constructs.Construct;
  *   <li>a dedicated {@code GitRepository} tracking {@value #CATALOGUE_BRANCH} (same repo + GitHub
  *       App auth as the rendered-branch source), so Flux exposes it as an in-cluster tarball
  *       artifact at the exact reconciled commit — zero github fetch / token on the node side;
- *   <li>a {@code FloxFlake} "{@value #FLOX_FLAKE_NAME}" whose {@code sourceRef} points at that
+ *   <li>a {@code FloxCatalog} "{@value #FLOX_CATALOG_NAME}" whose {@code sourceRef} points at that
  *       {@code GitRepository}. The controller reads the artifact and resolves {@code
- *       floxflake:rke2lab-system/catalogue#<output>} install refs to {@code
+ *       floxcatalog:rke2lab-system/catalogue#<output>} install refs to {@code
  *       tarball+http://…#<output>}.
  * </ul>
  *
  * <p>On the {@code operators} layer: the catalog source must be Ready before workload {@code
  * FloxEnv}s (on {@code workloads}) resolve their flake refs against it.
  */
-public final class FloxFlakeCatalogueManifestsUnit extends AbstractManifestsUnit {
+public final class FloxCatalogManifestsUnit extends AbstractManifestsUnit {
 
-  public static final String MANIFEST_UNIT_ID =
-      ManifestDomainCatalog.RUNTIME + "/flox-flake-catalogue";
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.RUNTIME + "/flox-catalog";
 
   /** Exploded package dir (relative to the runtime domain). */
-  public static final String OUTPUT_DIR = "flox-flake-catalogue";
+  public static final String OUTPUT_DIR = "flox-catalog";
 
   /** Dedicated branch carrying the flake at its root (subtree split of {@code runtime/flox}). */
   public static final String CATALOGUE_BRANCH = "flox-catalogue";
 
-  /** The single catalog FloxFlake, referenced as {@code floxflake:rke2lab-system/catalogue#…}. */
-  public static final String FLOX_FLAKE_NAME = "catalogue";
+  /**
+   * The single catalog FloxCatalog, referenced as {@code floxcatalog:rke2lab-system/catalogue#…}.
+   */
+  public static final String FLOX_CATALOG_NAME = "catalogue";
 
   private static final String GIT_REPOSITORY_NAME = "flox-catalogue";
   private static final String REPO_URL = "https://github.com/seedmatic/rke2lab.git";
@@ -57,7 +58,7 @@ public final class FloxFlakeCatalogueManifestsUnit extends AbstractManifestsUnit
       new PackageMetadataProfile(
           ManifestDomainCatalog.RUNTIME, OUTPUT_DIR, false, ManifestAnnotations.LAYER_OPERATORS);
 
-  public FloxFlakeCatalogueManifestsUnit() {
+  public FloxCatalogManifestsUnit() {
     super(
         MANIFEST_UNIT_ID, java.util.List.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID));
   }
@@ -70,7 +71,7 @@ public final class FloxFlakeCatalogueManifestsUnit extends AbstractManifestsUnit
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final ApiObject gitRepository = createGitRepository(scope);
-    createFloxFlake(scope, context.resolver(), gitRepository);
+    createFloxCatalog(scope, context.resolver(), gitRepository);
   }
 
   private ApiObject createGitRepository(final Construct scope) {
@@ -110,30 +111,33 @@ public final class FloxFlakeCatalogueManifestsUnit extends AbstractManifestsUnit
     return gitRepo;
   }
 
-  private void createFloxFlake(
+  private void createFloxCatalog(
       final Construct scope, final Cdk8sApiObjectResolver resolver, final ApiObject gitRepository) {
     final String namespace = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
-    final ApiObject floxFlake =
+    final ApiObject floxCatalog =
         new ApiObject(
             scope,
-            "floxflake-catalogue",
+            "floxcatalog-catalogue",
             ApiObjectProps.builder()
                 .apiVersion("flox.seedmatic.io/v1alpha1")
-                .kind("FloxFlake")
+                .kind("FloxCatalog")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name(FLOX_FLAKE_NAME)
+                        .name(FLOX_CATALOG_NAME)
                         .namespace(namespace)
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "flox.seedmatic.io|FloxFlake|" + namespace + "|" + FLOX_FLAKE_NAME))
+                                "flox.seedmatic.io|FloxCatalog|"
+                                    + namespace
+                                    + "|"
+                                    + FLOX_CATALOG_NAME))
                         .build())
                 .build());
-    floxFlake.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
-    floxFlake.addDependency(gitRepository);
+    floxCatalog.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
+    floxCatalog.addDependency(gitRepository);
     // dir omitted: the flake sits at the branch root, so the controller derives
     // tarball+http://…/<sha>.tar.gz#<output> with no ?dir= segment.
-    floxFlake.addJsonPatch(
+    floxCatalog.addJsonPatch(
         JsonPatch.add(
             "/spec",
             Map.of(

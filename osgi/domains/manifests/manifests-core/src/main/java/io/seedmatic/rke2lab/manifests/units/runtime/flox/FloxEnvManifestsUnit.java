@@ -22,10 +22,10 @@ import software.constructs.Construct;
  * successor to the baked {@code environment.d} tree. First increment: {@code kdns} (others —
  * headscale/headplane/tailscale — follow the same shape).
  *
- * <p>Each env installs its workload package from the {@link FloxFlakeCatalogueManifestsUnit}
- * catalog via a {@code floxflake:catalogue#<output>} ref (resolved same-namespace, both live in
- * {@code rke2lab-system}). The env's {@code folder} is the GC-root category the NRI plugin keys on
- * ({@code <base>/networking/kdns}) — a node-side path segment, not a k8s namespace.
+ * <p>Each env installs its workload package from the {@link FloxCatalogManifestsUnit} catalog via a
+ * {@code floxcatalog:catalogue#<output>} ref (resolved same-namespace, both live in {@code
+ * rke2lab-system}). The env's {@code folder} is the GC-root category the NRI plugin keys on ({@code
+ * <base>/networking/kdns}) — a node-side path segment, not a k8s namespace.
  *
  * <p>Flavor switches the env NAME (and its {@code #output}) by the networking debug toggle ({@code
  * FloxDebugPolicy.networkingEnabled}), matching {@code KdnsManifestsUnit}'s {@code
@@ -57,7 +57,7 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
         MANIFEST_UNIT_ID,
         List.of(
             ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
-            FloxFlakeCatalogueManifestsUnit.MANIFEST_UNIT_ID));
+            FloxCatalogManifestsUnit.MANIFEST_UNIT_ID));
   }
 
   @Override
@@ -106,7 +106,7 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
   private Map<String, Object> kdnsManifest(final boolean debug) {
     final String flavor = debug ? "kdns-debug" : "kdns";
     final Map<String, Object> install = new LinkedHashMap<>();
-    install.put("kdns", Map.of("flake", "floxflake:catalogue#" + flavor));
+    install.put("kdns", Map.of("flake", "floxcatalog:catalogue#" + flavor));
     if (debug) {
       // Interactive debug shell alongside the delve-wrapped binary: attach a debugger / poke
       // around.
