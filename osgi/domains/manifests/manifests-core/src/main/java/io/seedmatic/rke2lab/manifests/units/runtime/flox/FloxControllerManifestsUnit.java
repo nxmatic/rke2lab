@@ -47,6 +47,11 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
   private static final String FLOXCATALOG_CRD_RESOURCE =
       "/crds/flox.seedmatic.io_floxcatalogs.yaml";
 
+  /** The replicated FloxHub token Secret (name + key match .secrets kubernetes.secrets.flox). */
+  private static final String FLOXHUB_TOKEN_SECRET = "floxhub-token";
+
+  private static final String FLOXHUB_TOKEN_KEY = "token";
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(
           ManifestDomainCatalog.RUNTIME, OUTPUT_DIR, false, ManifestAnnotations.LAYER_OPERATORS);
@@ -215,8 +220,44 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                     "env-root",
                     "hostPath",
                     Map.of("path", "/var/lib/flox-controller/envs", "type", "DirectoryOrCreate"))));
+    final java.util.List<Object> env =
+        new java.util.ArrayList<>(
+            List.of(
+                Map.of(
+                    "name",
+                    "NODE_NAME",
+                    "valueFrom",
+                    Map.of("fieldRef", Map.of("fieldPath", "spec.nodeName"))),
+                // The controller ensures its embedded base carrier in its OWN namespace (exists).
+                Map.of(
+                    "name",
+                    "POD_NAMESPACE",
+                    "valueFrom",
+                    Map.of("fieldRef", Map.of("fieldPath", "metadata.namespace"))),
+                // flox lives on the NixOS SYSTEM profile (/run/current-system/sw/bin/flox), NOT the
+                // default nix profile — so that MUST lead the PATH nsenter resolves against, else
+                // `nsenter … flox` fails 127.
+                Map.of(
+                    "name", "PATH",
+                    "value",
+                        "/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin"),
+                Map.of(
+                    "name", "CONTAINERD_ADDRESS",
+                    "value", "/run/k3s/containerd/containerd.sock")));
     if (webhookEnabled) {
       args.add("--enable-webhook");
+      // Tell the webhook injector which (replicated) Secret carries the FloxHub token.
+      args.add("--token-secret-name=" + FLOXHUB_TOKEN_SECRET);
+      args.add("--token-secret-key=" + FLOXHUB_TOKEN_KEY);
+      // The controller's OWN flox subprocesses (realise via nsenter) authenticate with the same
+      // token — the Secret is replicated into this namespace alongside the webhook enablement.
+      env.add(
+          Map.of(
+              "name",
+              "FLOX_FLOXHUB_TOKEN",
+              "valueFrom",
+              Map.of(
+                  "secretKeyRef", Map.of("name", FLOXHUB_TOKEN_SECRET, "key", FLOXHUB_TOKEN_KEY))));
       volumeMounts.add(
           Map.of(
               "name", "webhook-certs",
@@ -296,43 +337,7 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                             "containerPort", 9443,
                                             "protocol", "TCP")
                                       }),
-                                  Map.entry(
-                                      "env",
-                                      new Object[] {
-                                        Map.of(
-                                            "name",
-                                            "NODE_NAME",
-                                            "valueFrom",
-                                            Map.of(
-                                                "fieldRef", Map.of("fieldPath", "spec.nodeName"))),
-                                        // The controller ensures its embedded base carrier in its
-                                        // OWN namespace (exists), not the flox-system fallback.
-                                        Map.of(
-                                            "name",
-                                            "POD_NAMESPACE",
-                                            "valueFrom",
-                                            Map.of(
-                                                "fieldRef",
-                                                Map.of("fieldPath", "metadata.namespace"))),
-                                        // The controller nsenters into the node to exec
-                                        // flox/nix/ctr
-                                        // from the mounted host /nix. flox lives on the NixOS
-                                        // SYSTEM
-                                        // profile (/run/current-system/sw/bin/flox → /nix/store/…),
-                                        // NOT the default nix profile — so that MUST lead the PATH
-                                        // nsenter resolves against, else `nsenter … flox` fails
-                                        // 127.
-                                        Map.of(
-                                            "name",
-                                            "PATH",
-                                            "value",
-                                            "/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin"),
-                                        Map.of(
-                                            "name",
-                                            "CONTAINERD_ADDRESS",
-                                            "value",
-                                            "/run/k3s/containerd/containerd.sock")
-                                      }),
+                                  Map.entry("env", env.toArray()),
                                   Map.entry(
                                       "securityContext",
                                       Map.of("privileged", true, "runAsUser", 0, "runAsGroup", 0)),

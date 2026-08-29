@@ -107,11 +107,11 @@ public class ReplicatorSecretsSealScenario
     @As("the replicator source secrets are resolved")
     public When the_replicator_source_secrets_are_resolved(
         @Hidden Optional<SecretsGateway> secrets) {
-      this.material = secrets.map(When::assemble).orElse(this.material);
+      this.material = secrets.map(this::assemble).orElse(this.material);
       return self();
     }
 
-    private static ReplicatorSourceSecretsMaterial assemble(final SecretsGateway gateway) {
+    private ReplicatorSourceSecretsMaterial assemble(final SecretsGateway gateway) {
       final Optional<JsonNode> kubernetes = read(gateway, "kubernetes");
       if (kubernetes.isEmpty()) {
         return new ReplicatorSourceSecretsMaterial(List.of());
@@ -121,8 +121,11 @@ public class ReplicatorSecretsSealScenario
       final JsonNode secretsMap = k.path("secrets");
       final Optional<JsonNode> tekton = read(gateway, "tekton");
       final Optional<JsonNode> tailscale = read(gateway, "tailscale");
+      final Optional<JsonNode> flox = read(gateway, "flox");
 
       final List<SourceSecret> sources = new ArrayList<>();
+      flox.ifPresent(
+          fx -> floxSecret(secretsMap.path("flox"), sourceNamespace, fx).ifPresent(sources::add));
       tekton.ifPresent(
           t -> {
             final JsonNode git = t.path("git");
@@ -139,7 +142,7 @@ public class ReplicatorSecretsSealScenario
       return new ReplicatorSourceSecretsMaterial(List.copyOf(sources));
     }
 
-    private static Optional<SourceSecret> gitSecret(
+    private Optional<SourceSecret> gitSecret(
         final JsonNode mapping, final String namespace, final JsonNode git) {
       if (mapping.path("name").isMissingNode() || git.isMissingNode()) {
         return Optional.empty();
@@ -155,7 +158,7 @@ public class ReplicatorSecretsSealScenario
               namespaces(mapping.path("replicateTo"))));
     }
 
-    private static Optional<SourceSecret> dockerSecret(
+    private Optional<SourceSecret> dockerSecret(
         final JsonNode mapping, final String namespace, final JsonNode docker) {
       if (mapping.path("name").isMissingNode() || docker.isMissingNode()) {
         return Optional.empty();
@@ -169,7 +172,21 @@ public class ReplicatorSecretsSealScenario
               namespaces(mapping.path("replicateTo"))));
     }
 
-    private static Optional<SourceSecret> oauthSecret(
+    private Optional<SourceSecret> floxSecret(
+        final JsonNode mapping, final String namespace, final JsonNode flox) {
+      if (mapping.path("name").isMissingNode() || flox.path("token").isMissingNode()) {
+        return Optional.empty();
+      }
+      return Optional.of(
+          new SourceSecret(
+              mapping.path("name").asText(),
+              namespace,
+              "Opaque",
+              Map.of("token", flox.path("token").asText()),
+              namespaces(mapping.path("replicateTo"))));
+    }
+
+    private Optional<SourceSecret> oauthSecret(
         final JsonNode mapping, final String namespace, final JsonNode oauth) {
       if (mapping.path("name").isMissingNode() || oauth.isMissingNode()) {
         return Optional.empty();
