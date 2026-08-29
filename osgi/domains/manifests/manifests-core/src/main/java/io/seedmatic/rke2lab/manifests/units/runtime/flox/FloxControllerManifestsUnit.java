@@ -259,16 +259,19 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                             Map.of(
                                                 "fieldRef",
                                                 Map.of("fieldPath", "metadata.namespace"))),
-                                        // ON-NODE TBD (mirrors the provisioner buildEnv): the
-                                        // controller execs the NODE's flox/nix/ctr from the
-                                        // mounted host /nix — PATH into the host nix profile and
-                                        // the exact containerd address are pinned against a live
-                                        // node. containerd on rke2 = /run/k3s/containerd/….
+                                        // The controller nsenters into the node to exec
+                                        // flox/nix/ctr
+                                        // from the mounted host /nix. flox lives on the NixOS
+                                        // SYSTEM
+                                        // profile (/run/current-system/sw/bin/flox → /nix/store/…),
+                                        // NOT the default nix profile — so that MUST lead the PATH
+                                        // nsenter resolves against, else `nsenter … flox` fails
+                                        // 127.
                                         Map.of(
                                             "name",
                                             "PATH",
                                             "value",
-                                            "/nix/var/nix/profiles/default/bin:/usr/bin:/bin"),
+                                            "/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin"),
                                         Map.of(
                                             "name",
                                             "CONTAINERD_ADDRESS",
