@@ -296,11 +296,15 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                             "mountPath",
                                             "/var/lib/flox-controller/envs")
                                       }),
+                                  // memory limit is generous: realising a FloxEnv runs nix on
+                                  // the node (via nsenter) — flake eval of a large lock + a
+                                  // from-scratch build of the workload closure — in THIS
+                                  // container's cgroup; 256Mi OOM-kills it (exit 137).
                                   Map.entry(
                                       "resources",
                                       Map.of(
-                                          "requests", Map.of("cpu", "20m", "memory", "64Mi"),
-                                          "limits", Map.of("cpu", "200m", "memory", "256Mi"))))
+                                          "requests", Map.of("cpu", "20m", "memory", "256Mi"),
+                                          "limits", Map.of("cpu", "1", "memory", "2Gi"))))
                             }),
                         Map.entry("restartPolicy", "Always"),
                         Map.entry(
