@@ -182,6 +182,54 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
     final Map<String, String> podLabels =
         Map.of("app.kubernetes.io/name", NAME, "app.kubernetes.io/component", "node-agent");
 
+    // The pod-mutating webhook is served from every DaemonSet pod (behind
+    // FloxWebhookManifestsUnit's
+    // Service) — but only when the serving cert exists (a real seal). No cert ⇒ no --enable-webhook
+    // and no cert mount, matching FloxWebhookManifestsUnit's own guard so the two never diverge.
+    final boolean webhookEnabled = ManifestSynthesisContext.current().webhookServing().isPresent();
+
+    final java.util.List<Object> args =
+        new java.util.ArrayList<>(
+            List.of(
+                "--gcroot-base=/nix/var/nix/gcroots/flox-runtime/env",
+                "--env-root=/var/lib/flox-controller/envs"));
+    final java.util.List<Object> volumeMounts =
+        new java.util.ArrayList<>(
+            List.of(
+                Map.of("name", "host-nix", "mountPath", "/nix"),
+                Map.of(
+                    "name", "containerd-sock",
+                    "mountPath", "/run/k3s/containerd/containerd.sock"),
+                Map.of("name", "env-root", "mountPath", "/var/lib/flox-controller/envs")));
+    final java.util.List<Object> volumes =
+        new java.util.ArrayList<>(
+            List.of(
+                Map.of("name", "host-nix", "hostPath", Map.of("path", "/nix", "type", "Directory")),
+                Map.of(
+                    "name",
+                    "containerd-sock",
+                    "hostPath",
+                    Map.of("path", "/run/k3s/containerd/containerd.sock", "type", "Socket")),
+                Map.of(
+                    "name",
+                    "env-root",
+                    "hostPath",
+                    Map.of("path", "/var/lib/flox-controller/envs", "type", "DirectoryOrCreate"))));
+    if (webhookEnabled) {
+      args.add("--enable-webhook");
+      volumeMounts.add(
+          Map.of(
+              "name", "webhook-certs",
+              "mountPath", "/tmp/k8s-webhook-server/serving-certs",
+              "readOnly", true));
+      volumes.add(
+          Map.of(
+              "name",
+              "webhook-certs",
+              "secret",
+              Map.of("secretName", FloxWebhookManifestsUnit.TLS_SECRET_NAME)));
+    }
+
     final ApiObject daemonSet =
         new ApiObject(
             scope,
@@ -239,11 +287,14 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                   Map.entry("imagePullPolicy", "IfNotPresent"),
                                   // Defaults from cmd/flox-controller: --gcroot-base matches the
                                   // path the NRI plugin reads; --env-root is the .flox source root.
+                                  Map.entry("args", args.toArray()),
                                   Map.entry(
-                                      "args",
+                                      "ports",
                                       new Object[] {
-                                        "--gcroot-base=/nix/var/nix/gcroots/flox-runtime/env",
-                                        "--env-root=/var/lib/flox-controller/envs"
+                                        Map.of(
+                                            "name", "webhook",
+                                            "containerPort", 9443,
+                                            "protocol", "TCP")
                                       }),
                                   Map.entry(
                                       "env",
@@ -285,21 +336,7 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                   Map.entry(
                                       "securityContext",
                                       Map.of("privileged", true, "runAsUser", 0, "runAsGroup", 0)),
-                                  Map.entry(
-                                      "volumeMounts",
-                                      new Object[] {
-                                        Map.of("name", "host-nix", "mountPath", "/nix"),
-                                        Map.of(
-                                            "name",
-                                            "containerd-sock",
-                                            "mountPath",
-                                            "/run/k3s/containerd/containerd.sock"),
-                                        Map.of(
-                                            "name",
-                                            "env-root",
-                                            "mountPath",
-                                            "/var/lib/flox-controller/envs")
-                                      }),
+                                  Map.entry("volumeMounts", volumeMounts.toArray()),
                                   // memory limit is generous: realising a FloxEnv runs nix on
                                   // the node (via nsenter) — flake eval of a large lock + a
                                   // from-scratch build of the workload closure — in THIS
@@ -311,28 +348,6 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                                           "limits", Map.of("cpu", "1", "memory", "2Gi"))))
                             }),
                         Map.entry("restartPolicy", "Always"),
-                        Map.entry(
-                            "volumes",
-                            new Object[] {
-                              Map.of(
-                                  "name",
-                                  "host-nix",
-                                  "hostPath",
-                                  Map.of("path", "/nix", "type", "Directory")),
-                              Map.of(
-                                  "name",
-                                  "containerd-sock",
-                                  "hostPath",
-                                  Map.of(
-                                      "path", "/run/k3s/containerd/containerd.sock",
-                                      "type", "Socket")),
-                              Map.of(
-                                  "name",
-                                  "env-root",
-                                  "hostPath",
-                                  Map.of(
-                                      "path", "/var/lib/flox-controller/envs",
-                                      "type", "DirectoryOrCreate"))
-                            }))))));
+                        Map.entry("volumes", volumes.toArray()))))));
   }
 }

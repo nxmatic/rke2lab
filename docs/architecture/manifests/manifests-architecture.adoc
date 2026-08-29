@@ -567,6 +567,7 @@ graph TB
       FCMU["FloxControllerManifestsUnit"]
       FFCU["FloxCatalogManifestsUnit"]
       FEMU["FloxEnvManifestsUnit"]
+      FWMU["FloxWebhookManifestsUnit"]
       NRI["NriPluginArchiveAssets"]
     end
     style svc fill:#e1ffe1,stroke:#00cc00
@@ -719,6 +720,18 @@ Immutable configuration objects the runtime units build their pod specs from.
   by the networking debug toggle (`FloxDebugPolicy.networkingEnabled`): prod ships stripped `#kdns`,
   debug ships delve-wrapped `#kdns-debug`. On the `workloads` layer (after the catalog on
   `operators`).
+
+| `FloxWebhookManifestsUnit`
+| The `AbstractManifestsUnit` serving the flox-controller's pod-mutating webhook: a
+  `kubernetes.io/tls` Secret (`flox-controller-webhook-tls`), the `flox-controller-webhook` Service
+  fronting the DaemonSet pods (the mutation is stateless → any pod serves, so no separate
+  Deployment), and the `MutatingWebhookConfiguration` routing pod `CREATE` to it. The serving cert is
+  minted by the cluster-pki `server-ca` and revealed onto the synthesis as `WebhookServingMaterial`
+  (see xref:../cluster-api/deterministic-cluster-access.adoc[deterministic cluster access]); the
+  Service name/namespace must match the cert's SAN. `failurePolicy: Ignore` + system-namespace
+  exclusion bound the blast radius; the unit renders only when the serving material is present (a
+  real seal), matching `FloxControllerManifestsUnit`'s `--enable-webhook` guard. On the `operators`
+  layer.
 
 | `NriPluginArchiveAssets`
 | Builds the TAR archive of NRI plugin sources with SHA-256 checksums, Base64 encoding and a JSON

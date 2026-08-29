@@ -203,6 +203,15 @@ domain's mirror record (contract `profiles`, alongside `SopsAgeMaterial` / `Incu
 carrying the render as `OperatorPkiMaterial.kubeconfig(cluster, server)`. No `cluster-pki` type
 enters `manifests-core`.
 
+The same seal→reveal thread now also carries a *serving* leaf for the flox-controller webhook. The
+seal mints it from the `server-ca` (a `serverAuth` EKU + SAN DNS names for the
+`flox-controller-webhook.rke2lab-system.svc` Service) and files it SEALED as `WebhookServingCredentials`
+(cert + key + the `server-ca` bundle) at the `WEBHOOK_SERVING` cellar case. `ManifestSynthesisScenario`
+reveals it into the manifests-side mirror `WebhookServingMaterial` (contract `profiles`, twin of
+`OperatorPkiMaterial`) on the synthesis context, and `FloxWebhookManifestsUnit` renders it as the
+webhook's `kubernetes.io/tls` Secret with the `server-ca` chain as the `MutatingWebhookConfiguration`
+`caBundle`. Same gate discipline: no `cluster-pki` type crosses into `manifests-core`.
+
 The kubeconfig user name is `<cluster>-admin`, unique per cluster: `users`/`clusters`/`contexts` are
 global lists merged BY NAME, so a shared user name would collapse across clusters and both contexts
 would point at one (wrong) user cert. The cluster + context names are already the cluster name; the

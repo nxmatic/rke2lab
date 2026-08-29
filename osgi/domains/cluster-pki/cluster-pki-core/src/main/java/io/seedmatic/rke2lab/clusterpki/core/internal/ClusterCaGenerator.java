@@ -16,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.sec.ECPrivateKey;
@@ -23,6 +24,8 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -142,7 +145,12 @@ public final class ClusterCaGenerator {
       final KeyPair adminKey = ec();
       final X509Certificate adminCert =
           signLeaf(
-              clientCa, clientCaKey, "CN=rke2lab-admin,O=system:masters", adminKey.getPublic());
+              clientCa,
+              clientCaKey,
+              "CN=rke2lab-admin,O=system:masters",
+              adminKey.getPublic(),
+              KeyPurposeId.id_kp_clientAuth,
+              Optional.empty());
       return new AdminLeaf(chainPem(adminCert), keyPem(adminKey.getPrivate()));
     } catch (RuntimeException ex) {
       throw ex;
@@ -155,13 +163,57 @@ public final class ClusterCaGenerator {
   public record AdminLeaf(String certPem, String keyPem) {}
 
   /**
-   * The end-entity clientAuth profile for the admin leaf: NOT a CA (BasicConstraints CA:false),
-   * KeyUsage critical {@code digitalSignature|keyEncipherment}, EKU {@code clientAuth}, SKI + AKI
-   * (issuer keyid), sha256, {@link #VALIDITY_DAYS} validity. notBefore is {@code now} — the node
-   * clock is disciplined at the source (chrony on the VZ host), so no skew backdate is needed.
+   * Mint a serverAuth serving leaf, signed by the cluster {@code server-ca} (the FIRST cert of
+   * {@code serverCaChainPem} — the server-CA itself, ahead of the intermediate + root). Unlike the
+   * admin leaf this carries a {@code subjectAlternativeName} (the supplied DNS names) and the
+   * {@code serverAuth} EKU, so kube's webhook client accepts it for TLS server verification.
+   * Subject {@code CN=<first dnsName>}, EC prime256v1 key, SEC1 PEM; the cert PEM is the leaf
+   * alone.
+   */
+  public ServingLeaf mintServing(
+      String serverCaChainPem, String serverCaKeyPem, List<String> dnsNames) {
+    try {
+      final X509Certificate serverCa = readCert(serverCaChainPem);
+      final PrivateKey serverCaKey = readKey(serverCaKeyPem);
+      final KeyPair servingKey = ec();
+      final GeneralName[] names =
+          dnsNames.stream()
+              .map(dns -> new GeneralName(GeneralName.dNSName, dns))
+              .toArray(GeneralName[]::new);
+      final X509Certificate servingCert =
+          signLeaf(
+              serverCa,
+              serverCaKey,
+              "CN=" + dnsNames.getFirst(),
+              servingKey.getPublic(),
+              KeyPurposeId.id_kp_serverAuth,
+              Optional.of(new GeneralNames(names)));
+      return new ServingLeaf(chainPem(servingCert), keyPem(servingKey.getPrivate()));
+    } catch (RuntimeException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new IllegalStateException("serving certificate minting failed", ex);
+    }
+  }
+
+  /** A serverAuth serving leaf: its certificate PEM + private-key PEM. */
+  public record ServingLeaf(String certPem, String keyPem) {}
+
+  /**
+   * The end-entity leaf profile: NOT a CA (BasicConstraints CA:false), KeyUsage critical {@code
+   * digitalSignature|keyEncipherment}, the supplied EKU ({@code clientAuth} for the admin leaf,
+   * {@code serverAuth} for a serving leaf), an optional {@code subjectAlternativeName} (DNS names,
+   * non-critical — present only for serving leaves), SKI + AKI (issuer keyid), sha256, {@link
+   * #VALIDITY_DAYS} validity. notBefore is {@code now} — the node clock is disciplined at the
+   * source (chrony on the VZ host), so no skew backdate is needed.
    */
   private static X509Certificate signLeaf(
-      X509Certificate issuer, PrivateKey issuerKey, String subjectDn, PublicKey subjectPub)
+      X509Certificate issuer,
+      PrivateKey issuerKey,
+      String subjectDn,
+      PublicKey subjectPub,
+      KeyPurposeId eku,
+      Optional<GeneralNames> subjectAltNames)
       throws Exception {
     final Instant notBefore = Instant.now();
     final X500Name issuerDn = new JcaX509CertificateHolder(issuer).getSubject();
@@ -186,8 +238,10 @@ public final class ClusterCaGenerator {
         Extension.keyUsage,
         true,
         new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
-    b.addExtension(
-        Extension.extendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeId.id_kp_clientAuth));
+    b.addExtension(Extension.extendedKeyUsage, false, new ExtendedKeyUsage(eku));
+    if (subjectAltNames.isPresent()) {
+      b.addExtension(Extension.subjectAlternativeName, false, subjectAltNames.orElseThrow());
+    }
     final String sigAlg =
         issuerKey.getAlgorithm().startsWith("EC") ? "SHA256withECDSA" : "SHA256withRSA";
     final X509CertificateHolder holder =

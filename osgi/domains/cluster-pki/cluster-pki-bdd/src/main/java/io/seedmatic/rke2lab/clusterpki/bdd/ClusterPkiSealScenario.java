@@ -155,6 +155,11 @@ public class ClusterPkiSealScenario
                 ClusterPkiCoordinate.ADMIN_CREDENTIALS,
                 pki.adminCredentials(),
                 Sensitivity.SEALED);
+            cellar.store(
+                parcel,
+                ClusterPkiCoordinate.WEBHOOK_SERVING,
+                pki.webhookServing(),
+                Sensitivity.SEALED);
           });
       return self();
     }

@@ -7,6 +7,7 @@ import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxCatalogManifestsUni
 import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxControllerManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxEnvManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeManifestsUnit;
+import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxWebhookManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.runtime.rke2.RuntimeRke2ConfigManifestsUnit;
 import java.util.List;
 import org.osgi.service.component.annotations.Component;
@@ -24,6 +25,7 @@ public final class RuntimeDomainRegistrar implements ManifestsDomainRegistrar {
             new FloxRuntimeManifestsUnit(),
             new FloxControllerManifestsUnit(),
             new FloxCatalogManifestsUnit(),
-            new FloxEnvManifestsUnit()));
+            new FloxEnvManifestsUnit(),
+            new FloxWebhookManifestsUnit()));
   }
 }

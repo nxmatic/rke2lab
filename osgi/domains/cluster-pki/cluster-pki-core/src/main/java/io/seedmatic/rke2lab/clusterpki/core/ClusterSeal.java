@@ -6,6 +6,7 @@ import io.seedmatic.rke2lab.clusterpki.contract.AdminCredentials;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterAgeKey;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
 import io.seedmatic.rke2lab.clusterpki.contract.SopsEncryptor;
+import io.seedmatic.rke2lab.clusterpki.contract.WebhookServingCredentials;
 import io.seedmatic.rke2lab.clusterpki.core.internal.ClusterCaGenerator;
 import io.seedmatic.rke2lab.clusterpki.core.internal.SopsRecipients;
 import io.seedmatic.rke2lab.manifests.contract.SshToAgeConverter;
@@ -47,6 +48,16 @@ public final class ClusterSeal {
 
   private static final String CLUSTER_SSH_KEY = "rke2-cluster";
 
+  /**
+   * The DNS names the webhook serving cert carries in its SAN. MUST match the flox-controller
+   * webhook Service {@code <name>.<namespace>} — single-source concord with
+   * FloxWebhookManifestsUnit.
+   */
+  private static final List<String> WEBHOOK_SERVING_DNS =
+      List.of(
+          "flox-controller-webhook.rke2lab-system.svc",
+          "flox-controller-webhook.rke2lab-system.svc.cluster.local");
+
   private final NdhKeystoreReader keystore;
   private final SshToAgeConverter sshToAge;
   private final SopsEncryptor sops;
@@ -80,8 +91,22 @@ public final class ClusterSeal {
     final AdminCredentials adminCredentials =
         new AdminCredentials(admin.certPem(), admin.keyPem(), bundle.get("server-ca.crt"));
 
+    // The webhook serving cert: a serverAuth leaf minted from the server-ca just generated,
+    // carrying
+    // the flox-controller webhook Service DNS names in its SAN, paired with the server-ca chain the
+    // apiserver's webhook client trusts.
+    final ClusterCaGenerator.ServingLeaf serving =
+        generator.mintServing(
+            bundle.get("server-ca.crt"), bundle.get("server-ca.key"), WEBHOOK_SERVING_DNS);
+    final WebhookServingCredentials webhookServing =
+        new WebhookServingCredentials(
+            serving.certPem(), serving.keyPem(), bundle.get("server-ca.crt"));
+
     return new SealedClusterPki(
-        new ClusterCaBundle(sealed), new ClusterAgeKey(ageIdentity), adminCredentials);
+        new ClusterCaBundle(sealed),
+        new ClusterAgeKey(ageIdentity),
+        adminCredentials,
+        webhookServing);
   }
 
   /**
