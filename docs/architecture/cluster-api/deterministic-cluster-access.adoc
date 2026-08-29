@@ -212,6 +212,18 @@ reveals it into the manifests-side mirror `WebhookServingMaterial` (contract `pr
 webhook's `kubernetes.io/tls` Secret with the `server-ca` chain as the `MutatingWebhookConfiguration`
 `caBundle`. Same gate discipline: no `cluster-pki` type crosses into `manifests-core`.
 
+**Additive seal (adding a case to a cluster already sealed).** The seal scion is idempotent on a
+cellar hit — an existing `CLUSTER_CA_BUNDLE` means the CA is KEPT, never re-minted (keygen is random;
+a re-seal would rotate every cluster cert). But a NEW sealed case introduced later — the webhook
+serving leaf is the first — must still land on clusters sealed before it existed, WITHOUT touching the
+CA. The seal does this additively: on a cellar hit it mints only the cases the cellar LACKS, from the
+CA it already possesses. The CA key is not lost — the sealed `ClusterCaBundle` is encrypted for the
+cluster age recipient whose identity the seal itself re-derives (ssh-to-age on the `rke2-cluster`
+key), so the seal re-opens the bundle with `SopsDecryptor` (the twin of `SopsEncryptor`, realised by
+`sops-edge`), recovers the existing `server-ca`, mints the missing leaf, and files it. No wipe, no
+re-seal — the next grow of an existing cluster simply fills `WEBHOOK_SERVING` and the webhook
+activates. This is the general mechanism for adding any future sealed case to a live cluster.
+
 The kubeconfig user name is `<cluster>-admin`, unique per cluster: `users`/`clusters`/`contexts` are
 global lists merged BY NAME, so a shared user name would collapse across clusters and both contexts
 would point at one (wrong) user cert. The cluster + context names are already the cluster name; the

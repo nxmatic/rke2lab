@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import io.seedmatic.rke2lab.clusterpki.contract.AdminCredentials;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterAgeKey;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
+import io.seedmatic.rke2lab.clusterpki.contract.SopsDecryptor;
 import io.seedmatic.rke2lab.clusterpki.contract.SopsEncryptor;
 import io.seedmatic.rke2lab.clusterpki.contract.WebhookServingCredentials;
 import io.seedmatic.rke2lab.clusterpki.core.internal.ClusterCaGenerator;
@@ -60,12 +61,18 @@ public final class ClusterSeal {
 
   private final NdhKeystoreReader keystore;
   private final SshToAgeConverter sshToAge;
-  private final SopsEncryptor sops;
+  private final SopsEncryptor encryptor;
+  private final SopsDecryptor decryptor;
 
-  public ClusterSeal(NdhKeystoreReader keystore, SshToAgeConverter sshToAge, SopsEncryptor sops) {
+  public ClusterSeal(
+      NdhKeystoreReader keystore,
+      SshToAgeConverter sshToAge,
+      SopsEncryptor encryptor,
+      SopsDecryptor decryptor) {
     this.keystore = keystore;
     this.sshToAge = sshToAge;
-    this.sops = sops;
+    this.encryptor = encryptor;
+    this.decryptor = decryptor;
   }
 
   public SealedClusterPki seal() {
@@ -78,7 +85,7 @@ public final class ClusterSeal {
             keystore.authorityCert(TLS_AUTHORITY),
             keystore.authorityPrivate(TLS_AUTHORITY),
             timestamp);
-    final String sealed = sops.encryptYaml(renderYaml(bundle), recipients);
+    final String sealed = encryptor.encryptYaml(renderYaml(bundle), recipients);
     final String ageIdentity = sshToAge.toAgeKey(keystore.sshPrivate(CLUSTER_SSH_KEY));
 
     // The operator's admin creds: an admin clientAuth leaf minted from the client-ca just
@@ -110,6 +117,27 @@ public final class ClusterSeal {
   }
 
   /**
+   * ADDITIVE re-seal: mint the webhook serving cert for an EXISTING cluster WITHOUT regenerating
+   * the CAs. The CA material is not lost — it is the {@link ClusterCaBundle} we already filed,
+   * sealed for (among others) the cluster age recipient whose identity this seal re-derives. So we
+   * re-open the bundle with that identity, recover the existing {@code server-ca}, and mint only
+   * the missing leaf. The scion calls this on a cellar hit when {@code WEBHOOK_SERVING} is absent;
+   * a fresh cluster gets it from {@link #seal()} instead. See
+   * docs/architecture/cluster-api/deterministic-cluster-access.adoc.
+   */
+  public WebhookServingCredentials mintWebhookServing(ClusterCaBundle existing) {
+    final String ageIdentity = sshToAge.toAgeKey(keystore.sshPrivate(CLUSTER_SSH_KEY));
+    final LinkedHashMap<String, String> bundle =
+        parseYaml(decryptor.decryptYaml(existing.sops(), ageIdentity));
+    final ClusterCaGenerator.ServingLeaf serving =
+        new ClusterCaGenerator()
+            .mintServing(
+                bundle.get("server-ca.crt"), bundle.get("server-ca.key"), WEBHOOK_SERVING_DNS);
+    return new WebhookServingCredentials(
+        serving.certPem(), serving.keyPem(), bundle.get("server-ca.crt"));
+  }
+
+  /**
    * Render {@code fileName -> PEM} to the flat YAML the node's {@code sops.nix} declares — literal
    * block scalars so each PEM stays readable and its trailing newline is preserved.
    */
@@ -124,6 +152,18 @@ public final class ClusterSeal {
       return mapper.writeValueAsString(bundle);
     } catch (Exception ex) {
       throw new IllegalStateException("failed to render the cluster CA bundle YAML", ex);
+    }
+  }
+
+  /**
+   * Parse the recovered {@code fileName -> PEM} YAML back into the bundle map (inverse of render).
+   */
+  @SuppressWarnings("unchecked")
+  private static LinkedHashMap<String, String> parseYaml(String plaintextYaml) {
+    try {
+      return new YAMLMapper().readValue(plaintextYaml, LinkedHashMap.class);
+    } catch (Exception ex) {
+      throw new IllegalStateException("failed to parse the recovered cluster CA bundle YAML", ex);
     }
   }
 }

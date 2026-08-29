@@ -5,11 +5,14 @@ import com.tngtech.jgiven.annotation.As;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
+import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
+import io.seedmatic.rke2lab.clusterpki.contract.SopsDecryptor;
 import io.seedmatic.rke2lab.clusterpki.contract.SopsEncryptor;
+import io.seedmatic.rke2lab.clusterpki.contract.WebhookServingCredentials;
 import io.seedmatic.rke2lab.clusterpki.core.ClusterSeal;
 import io.seedmatic.rke2lab.clusterpki.core.SealedClusterPki;
 import io.seedmatic.rke2lab.manifests.contract.SshToAgeConverter;
@@ -64,12 +67,14 @@ public class ClusterPkiSealScenario
   /** The current plot this run cultivates — injected from the bundle registry before the body. */
   @OsgiService private Optional<Parcel> parcel = Optional.empty();
 
-  /** The three collaborators the seal drives — injected from THIS bundle's registry. */
+  /** The collaborators the seal drives — injected from THIS bundle's registry. */
   @OsgiService private Optional<NdhKeystoreReader> keystore = Optional.empty();
 
   @OsgiService private Optional<SshToAgeConverter> sshToAge = Optional.empty();
 
-  @OsgiService private Optional<SopsEncryptor> sops = Optional.empty();
+  @OsgiService private Optional<SopsEncryptor> encryptor = Optional.empty();
+
+  @OsgiService private Optional<SopsDecryptor> decryptor = Optional.empty();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
@@ -95,7 +100,8 @@ public class ClusterPkiSealScenario
             tx,
             keystore.orElseThrow(() -> new IllegalStateException("no NdhKeystoreReader")),
             sshToAge.orElseThrow(() -> new IllegalStateException("no SshToAgeConverter edge")),
-            sops.orElseThrow(() -> new IllegalStateException("no SopsEncryptor edge")));
+            encryptor.orElseThrow(() -> new IllegalStateException("no SopsEncryptor edge")),
+            decryptor.orElseThrow(() -> new IllegalStateException("no SopsDecryptor edge")));
     then().the_cluster_pki_is_filed(plot, tx);
   }
 
@@ -109,10 +115,19 @@ public class ClusterPkiSealScenario
     }
   }
 
-  /** WHEN — the CA is sealed (idempotent on a cellar hit), the fabrication carried to the THEN. */
+  /**
+   * WHEN — the CA is sealed. Fresh cluster: mint everything. Existing cluster (cellar hit): the CA
+   * is KEPT (never re-minted — stable across re-grows), and only the sealed cases ABSENT from the
+   * cellar are minted additively, reusing the CA we already possess. Both fabrications are carried
+   * to the THEN. Two erased {@code Optional}s share the stage, so name-resolve them.
+   */
   public static class When extends Stage<When> {
 
-    @ProvidedScenarioState Optional<SealedClusterPki> sealed = Optional.empty();
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    Optional<SealedClusterPki> sealed = Optional.empty();
+
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    Optional<WebhookServingCredentials> additiveWebhookServing = Optional.empty();
 
     @As("the cluster CA is sealed")
     public When the_cluster_ca_is_sealed(
@@ -120,17 +135,26 @@ public class ClusterPkiSealScenario
         @Hidden Cellar cellar,
         @Hidden NdhKeystoreReader keystore,
         @Hidden SshToAgeConverter sshToAge,
-        @Hidden SopsEncryptor sops) {
-      // Idempotent: a bundle already filed (this run's overlay, else the durable backend a prior
-      // grow drained to) means the CA is minted — keep it, so the CA is stable across re-grows.
-      final boolean alreadySealed =
-          cellar
-              .fetch(parcel, ClusterPkiCoordinate.CLUSTER_CA_BUNDLE, ClusterCaBundle.class)
-              .isPresent();
-      this.sealed =
-          alreadySealed
-              ? Optional.empty()
-              : Optional.of(new ClusterSeal(keystore, sshToAge, sops).seal());
+        @Hidden SopsEncryptor encryptor,
+        @Hidden SopsDecryptor decryptor) {
+      final ClusterSeal seal = new ClusterSeal(keystore, sshToAge, encryptor, decryptor);
+      final Optional<ClusterCaBundle> existing =
+          cellar.fetch(parcel, ClusterPkiCoordinate.CLUSTER_CA_BUNDLE, ClusterCaBundle.class);
+      if (existing.isEmpty()) {
+        this.sealed = Optional.of(seal.seal());
+      } else {
+        // Additive: mint only the cases the cellar lacks (here the webhook serving cert, added
+        // after this cluster was first sealed), from the CA recovered out of the existing bundle.
+        final boolean webhookMissing =
+            cellar
+                .fetch(
+                    parcel, ClusterPkiCoordinate.WEBHOOK_SERVING, WebhookServingCredentials.class)
+                .isEmpty();
+        if (webhookMissing) {
+          this.additiveWebhookServing =
+              Optional.of(seal.mintWebhookServing(existing.orElseThrow()));
+        }
+      }
       return self();
     }
   }
@@ -141,10 +165,15 @@ public class ClusterPkiSealScenario
    */
   public static class Then extends Stage<Then> {
 
-    @ExpectedScenarioState Optional<SealedClusterPki> sealed;
+    @ExpectedScenarioState(resolution = Resolution.NAME)
+    Optional<SealedClusterPki> sealed;
+
+    @ExpectedScenarioState(resolution = Resolution.NAME)
+    Optional<WebhookServingCredentials> additiveWebhookServing;
 
     @As("the cluster PKI is filed")
     public Then the_cluster_pki_is_filed(@Hidden Parcel parcel, @Hidden Cellar cellar) {
+      // Fresh seal: file the whole PKI.
       sealed.ifPresent(
           pki -> {
             cellar.store(parcel, ClusterPkiCoordinate.CLUSTER_CA_BUNDLE, pki.bundle());
@@ -161,6 +190,9 @@ public class ClusterPkiSealScenario
                 pki.webhookServing(),
                 Sensitivity.SEALED);
           });
+      // Additive re-seal (existing cluster): file only the newly-minted case.
+      additiveWebhookServing.ifPresent(
+          ws -> cellar.store(parcel, ClusterPkiCoordinate.WEBHOOK_SERVING, ws, Sensitivity.SEALED));
       return self();
     }
   }
