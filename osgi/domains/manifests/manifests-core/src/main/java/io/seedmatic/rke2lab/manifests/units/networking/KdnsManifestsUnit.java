@@ -334,6 +334,11 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
 
     LinkedHashMap<String, Object> deploymentSpec = new LinkedHashMap<>();
     deploymentSpec.put("replicas", 1);
+    // Recreate, not the default RollingUpdate: kdns binds hostPort 5353, so a surged new pod can
+    // never bind the port while the old one holds it (single-node deadlock — the rollout wedges on
+    // "didn't have free ports"). Recreate tears the old pod down first; the brief DNS gap on a
+    // rollout is the right trade for a host-port singleton.
+    deploymentSpec.put("strategy", Map.of("type", "Recreate"));
     deploymentSpec.put(
         "selector",
         Map.of(
