@@ -248,31 +248,57 @@ atomic, one such resource blocks the entire branch. This is structural, not inci
 mixes CRDs, the operators/installers that register *more* CRDs at runtime, and the CRs that need
 those CRDs — an ordering the flat model cannot express.
 
-So `FluxRoot` seeds not one root `Kustomization` but a **layered stack**, each layer a
-`Kustomization` over its own sub-path, chained by `dependsOn` with `wait: true` (a layer is Ready
-only once its objects are applied AND healthy):
+So `FluxRoot` seeds a single **root `Kustomization` `flux`** over `./flux` — plus one child
+`Kustomization` per **service** `(layer, domain, package)` cell, generated post-explode by
+`FluxServiceKustomizationPlanner` and written under `./flux`. The root applies (owns) the children;
+each child reconciles its own `./<layer>/<domain>/<package>` path. An operator sees per-service
+progress in `flux get kustomizations` (`mesh-headscale`, `runtime-flox-controller-crds`, …), a
+failure stays local to one service, and retries are independent — where the old flat per-layer
+stack lumped every domain's resources into four opaque `Kustomization`s. The reconcile ORDER still
+comes from the layers, now carried by the children's `dependsOn`:
 
 [mermaid,rendered-branches-layers,svg]
 ----
 flowchart TB
-  subgraph BR["manifests/&lt;host&gt;-&lt;role&gt;"]
-    C["./crds"]
-    F["./foundation"]
-    O["./operators"]
-    W["./workloads"]
+  root["Kustomization: flux<br/>path ./flux · prune · wait"]
+  subgraph crds["layer crds"]
+    kc["runtime-flox-controller-crds"]
   end
-  KC["Kustomization: crds<br/>(rendered CustomResourceDefinitions)"]
-  KF["Kustomization: foundation<br/>dependsOn crds · wait<br/>(cert-manager — CRDs + issuer)"]
-  KO["Kustomization: operators<br/>dependsOn foundation · wait<br/>(capi-operator, envoy-gateway installer…)"]
-  KW["Kustomization: workloads<br/>dependsOn operators · wait<br/>(GatewayClass, Cluster CRs, HelmReleases…)"]
-  C --> KC
-  F --> KF
-  O --> KO
-  W --> KW
-  KC -->|"dependsOn"| KF
-  KF -->|"dependsOn"| KO
-  KO -->|"dependsOn"| KW
+  subgraph ops["layer operators"]
+    ko1["runtime-flox-controller-operators"]
+    ko2["mesh-tailscale-operators"]
+  end
+  subgraph wl["layer workloads"]
+    kw1["mesh-headscale"]
+    kw2["mesh-headplane"]
+  end
+  root -->|owns| kc
+  root -->|owns| ko1
+  root -->|owns| ko2
+  root -->|owns| kw1
+  root -->|owns| kw2
+  kc -.->|barrier| ko1
+  kc -.->|barrier| ko2
+  ko1 -.->|barrier| kw1
+  ko2 -.->|barrier| kw1
+  kw1 -.->|"service edge"| kw2
 ----
+
+A child's `dependsOn` combines two sources:
+
+. the **layer barrier** — a cell depends on every cell of the immediately-previous NON-EMPTY layer
+  (crds → foundation → operators → workloads), so a CR's CRD (rendered, or registered by a
+  foundation/operators provider) is applied first *transitively*, without enumerating each CR→CRD
+  edge; and
+. **intra-layer service→service edges** from a unit's `dependsOnManifestsUnitIds`
+  (`mesh-headplane` after `mesh-headscale`, both `workloads`). Only SAME-layer edges are emitted: a
+  cross-layer unit dep is either already covered by the barrier (dep in an earlier layer) or would
+  invert it (dep in a later layer — the layer assignment wins). Barrier edges only ever point to a
+  lower layer and intra-layer edges stay within one layer (the unit graph is a DAG), so the combined
+  `dependsOn` graph is acyclic by construction; the root's `wait: true` makes it Ready only once
+  every child is.
+
+The four layers keep their meaning as the barrier's rungs:
 
 . *crds* — every rendered `CustomResourceDefinition`. Applied first; Flux's own CRD-first ordering
   plus this explicit layer means a CR's *rendered* CRD is always established before the CR.
@@ -295,11 +321,17 @@ flowchart TB
 (link:../nixos-substrate/node-bootstrap-delivery.adoc[node-bootstrap delivery]): the default is
 `workloads`; a `CustomResourceDefinition` is routed to `crds` by kind; a unit that installs an
 operator/CRD-registrar carries a `layer=operators` annotation (`PackageMetadataProfile`). The
-exploder writes each resource under `&lt;layer&gt;/&lt;domain&gt;/&lt;package&gt;/…`, and `FluxRoot`
-emits one `Kustomization` per layer pointing at `./&lt;layer&gt;`.
+exploder writes each resource under `&lt;layer&gt;/&lt;domain&gt;/&lt;package&gt;/…` (unchanged);
+`FluxServiceKustomizationPlanner` then reads those written cells plus the in-memory dependency graph
+(`CoherentManifestsDomainRegistry`) and emits the per-service children. Child names are the bare
+`&lt;domain&gt;-&lt;package&gt;` (a `-&lt;layer&gt;` suffix only for a service whose resources span
+layers, e.g. `runtime-flox-controller-crds`/`-operators`); the cluster slug is dropped — the branch
++ `flux-system` namespace are already per-cluster (a single, self-managing management cluster, not
+hub-and-spoke).
 
-This is the durable answer to the recurring CRD↔CR ordering problem — not a per-resource patch. A
-new operator only needs its `layer=operators` mark; its CRs stay in `workloads` and wait for it.
+This is the durable answer to the recurring CRD↔CR ordering problem — not a per-resource patch, now
+with per-service observability on top. A new operator only needs its `layer=operators` mark; its CRs
+stay in `workloads` and wait for the barrier.
 
 == The management cluster is function-of-git too
 
