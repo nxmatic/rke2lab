@@ -9,7 +9,6 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
-import io.seedmatic.rke2lab.manifests.units.runtime.RuntimeRefs;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,7 +55,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     ApiObject roleBootstrap = createRoleBootstrap(scope, namespace);
     createRoleBindingBootstrap(scope, saBootstrap, roleBootstrap, namespace);
 
-    ApiObject cmFloxEnv = createConfigMapFloxEnv(scope, namespace);
     ApiObject cmHeadscaleConfig = createConfigMapHeadscaleConfig(scope, namespace);
 
     ApiObject cmConfigInitScript = createConfigMapConfigInitScript(scope, namespace);
@@ -84,7 +82,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             scope,
             floxImage,
             namespace,
-            cmFloxEnv,
             cmHeadscaleConfig,
             cmConfigInitScript,
             cmAcl,
@@ -100,25 +97,16 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             namespace,
             saBootstrap,
             cmHeadscaleEnv,
-            cmFloxEnv,
             cmBootstrapScript,
             deploymentHeadscale);
     createDeploymentGateway(
-        scope,
-        floxImage,
-        namespace,
-        saGateway,
-        cmHeadscaleEnv,
-        cmFloxEnv,
-        cmGatewayScript,
-        bootstrapJob);
+        scope, floxImage, namespace, saGateway, cmHeadscaleEnv, cmGatewayScript, bootstrapJob);
     createDaemonsetClient(
         scope,
         floxImage,
         namespace,
         saClient,
         cmHeadscaleEnv,
-        cmFloxEnv,
         cmClientScripts,
         bootstrapJob,
         serviceHeadscale);
@@ -363,22 +351,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     HEADSCALE_NAMESPACE))));
   }
 
-  private ApiObject createConfigMapFloxEnv(final Construct scope, final ApiObject namespace) {
-    ApiObject configMap =
-        configMapWithData(
-            scope,
-            RuntimeRefs.FLOX_ENV_CONFIGMAP.name(),
-            "|ConfigMap|${headscale-namespace}|" + RuntimeRefs.FLOX_ENV_CONFIGMAP.name(),
-            Map.of());
-    configMap.addDependency(namespace);
-    configMap.addJsonPatch(
-        JsonPatch.add("/metadata/labels", Map.of("app.kubernetes.io/replicated", "true")),
-        JsonPatch.add(
-            "/metadata/annotations/replicator.v1.mittwald.de~1replicate-from",
-            RuntimeRefs.FLOX_ENV_CONFIGMAP.qualifiedName()));
-    return configMap;
-  }
-
   private ApiObject createConfigMapHeadscaleConfig(
       final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
@@ -614,15 +586,12 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                   -n "$HEADSCALE_NAMESPACE" --timeout=300s
                 kubectl wait --for=create configmap/@HEADSCALE_ENV_CONFIGMAP@ \\
                   -n "$HEADSCALE_NAMESPACE" --timeout=300s
-                kubectl wait --for=create configmap/@FLOX_ENV_CONFIGMAP@ \\
-                  -n "$HEADSCALE_NAMESPACE" --timeout=300s
 
                 : "[i] Waiting for required secrets..."
                 kubectl wait --for=create secret/@CLIENT_AUTH_SECRET@ \\
                   -n "$HEADSCALE_NAMESPACE" --timeout=300s\
                 """
                     .replace("@HEADSCALE_ENV_CONFIGMAP@", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name())
-                    .replace("@FLOX_ENV_CONFIGMAP@", RuntimeRefs.FLOX_ENV_CONFIGMAP.name())
                     .replace(
                         "@CLIENT_AUTH_SECRET@", MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())));
     configMap.addDependency(namespace);
@@ -798,7 +767,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final Construct scope,
       final String floxImage,
       final ApiObject namespace,
-      final ApiObject cmFloxEnv,
       final ApiObject cmHeadscaleConfig,
       final ApiObject cmConfigInitScript,
       final ApiObject cmAcl,
@@ -823,7 +791,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                         .build())
                 .build());
     deployment.addDependency(namespace);
-    deployment.addDependency(cmFloxEnv);
     deployment.addDependency(cmHeadscaleConfig);
     deployment.addDependency(cmConfigInitScript);
     deployment.addDependency(cmAcl);
@@ -867,9 +834,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     headscaleContainer.put("image", floxImage);
     headscaleContainer.put(
         "command", List.of("flox", "activate", "--dir", "/root", "--", "headscale", "serve"));
-    headscaleContainer.put(
-        "envFrom",
-        List.of(Map.of("configMapRef", Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))));
     headscaleContainer.put(
         "livenessProbe",
         Map.of(
@@ -1057,7 +1021,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject cmHeadscaleEnv,
-      final ApiObject cmFloxEnv,
       final ApiObject cmScript,
       final ApiObject deployment) {
     ApiObject job =
@@ -1079,7 +1042,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     job.addDependency(namespace);
     job.addDependency(serviceAccount);
     job.addDependency(cmHeadscaleEnv);
-    job.addDependency(cmFloxEnv);
     job.addDependency(cmScript);
     job.addDependency(deployment);
     job.addJsonPatch(
@@ -1114,10 +1076,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                                 List.of(
                                     Map.of(
                                         "configMapRef",
-                                        Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name())),
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))),
+                                        Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
                                     "limits",
@@ -1168,7 +1127,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject cmHeadscaleEnv,
-      final ApiObject cmFloxEnv,
       final ApiObject cmScript,
       final ApiObject bootstrapJob) {
     ApiObject deployment =
@@ -1191,7 +1149,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     deployment.addDependency(namespace);
     deployment.addDependency(serviceAccount);
     deployment.addDependency(cmHeadscaleEnv);
-    deployment.addDependency(cmFloxEnv);
     deployment.addDependency(cmScript);
     deployment.addDependency(bootstrapJob);
 
@@ -1240,9 +1197,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                         "key", "authkey", "name", MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())))));
     gatewayContainer.put(
         "envFrom",
-        List.of(
-            Map.of("configMapRef", Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name())),
-            Map.of("configMapRef", Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))));
+        List.of(Map.of("configMapRef", Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name()))));
     gatewayContainer.put(
         "resources",
         Map.of(
@@ -1331,6 +1286,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             Map.of(
                 "replicas",
                 1,
+                // hostNetwork singleton: a surged rolling-update pod can't bind the host ports
+                // (tailscaled) while the old one holds them (single-node deadlock). Recreate tears
+                // the old pod down first.
+                "strategy",
+                Map.of("type", "Recreate"),
                 "selector",
                 Map.of("matchLabels", Map.of("app", "headscale-gateway")),
                 "template",
@@ -1351,7 +1311,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject cmHeadscaleEnv,
-      final ApiObject cmFloxEnv,
       final ApiObject cmScripts,
       final ApiObject bootstrapJob,
       final ApiObject serviceHeadscale) {
@@ -1375,7 +1334,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     daemonSet.addDependency(namespace);
     daemonSet.addDependency(serviceAccount);
     daemonSet.addDependency(cmHeadscaleEnv);
-    daemonSet.addDependency(cmFloxEnv);
     daemonSet.addDependency(cmScripts);
     daemonSet.addDependency(bootstrapJob);
     daemonSet.addDependency(serviceHeadscale);
@@ -1435,9 +1393,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             Map.of("name", "TS_KUBE_SECRET", "value", "")));
     clientContainer.put(
         "envFrom",
-        List.of(
-            Map.of("configMapRef", Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name())),
-            Map.of("configMapRef", Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))));
+        List.of(Map.of("configMapRef", Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name()))));
     clientContainer.put(
         "resources",
         Map.of(
@@ -1547,10 +1503,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                                 List.of(
                                     Map.of(
                                         "configMapRef",
-                                        Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name())),
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))),
+                                        Map.of("name", MeshRefs.HEADSCALE_ENV_CONFIGMAP.name()))),
                                 "volumeMounts",
                                 List.of(
                                     Map.of(

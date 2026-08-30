@@ -19,8 +19,9 @@ import software.constructs.Construct;
 
 /**
  * Emits the workload {@code FloxEnv} CRs the flox-controller realises on each node — the runtime
- * successor to the baked {@code environment.d} tree. First increment: {@code kdns} (others —
- * headscale/headplane/tailscale — follow the same shape).
+ * successor to the baked {@code environment.d} tree. Covers {@code kdns} (networking) and {@code
+ * headscale}/{@code tailscale} (mesh); {@code headplane} follows the same shape in a later
+ * increment.
  *
  * <p>Each env installs its workload package from the {@link FloxCatalogManifestsUnit} catalog via a
  * {@code floxcatalog:catalogue#<output>} ref (resolved same-namespace, both live in {@code
@@ -44,11 +45,6 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
 
   private static final String SCHEMA_VERSION = "1.10.0";
 
-  /**
-   * GC-root category (node-side path segment), matches the pod's {@code flox.dev/environment.<c>}.
-   */
-  private static final String NETWORKING_FOLDER = "networking";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(ManifestDomainCatalog.RUNTIME, OUTPUT_DIR, false);
 
@@ -67,16 +63,37 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    final boolean debug = ManifestSynthesisContext.current().floxDebugPolicy().networkingEnabled();
-    createKdnsEnv(scope, context.resolver(), debug);
+    final var policy = ManifestSynthesisContext.current().floxDebugPolicy();
+    final Cdk8sApiObjectResolver resolver = context.resolver();
+    // Each env is named by its flavor so the provisioned GC-root (<folder>/<name>) matches the
+    // consuming pod's resolve*Environment annotation: prod=<name>, debug=<name>-debug.
+    final boolean net = policy.networkingEnabled();
+    createEnv(
+        scope, resolver, net ? "kdns-debug" : "kdns", FloxEnvFolder.NETWORKING, kdnsManifest(net));
+    // Mesh: headscale control server + tailscale (the gateway Deployment + client DaemonSet share
+    // the tailscale env). Headplane migrates in a later increment.
+    final boolean mesh = policy.meshEnabled();
+    createEnv(
+        scope,
+        resolver,
+        mesh ? "headscale-debug" : "headscale",
+        FloxEnvFolder.MESH,
+        headscaleManifest(mesh));
+    createEnv(
+        scope,
+        resolver,
+        mesh ? "tailscale-debug" : "tailscale",
+        FloxEnvFolder.MESH,
+        tailscaleManifest(mesh));
   }
 
-  private void createKdnsEnv(
-      final Construct scope, final Cdk8sApiObjectResolver resolver, final boolean debug) {
+  private void createEnv(
+      final Construct scope,
+      final Cdk8sApiObjectResolver resolver,
+      final String name,
+      final FloxEnvFolder folder,
+      final Map<String, Object> manifest) {
     final String namespace = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
-    // Name by flavor so the provisioned GC-root (networking/<name>) matches KdnsManifestsUnit's
-    // resolveNetworkingEnvironment pod annotation: prod=kdns, debug=kdns-debug.
-    final String name = debug ? "kdns-debug" : "kdns";
     final ApiObject env =
         new ApiObject(
             scope,
@@ -96,9 +113,9 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     env.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
 
     final Map<String, Object> spec = new LinkedHashMap<>();
-    spec.put("folder", NETWORKING_FOLDER);
+    spec.put("folder", folder.value());
     spec.put("consumption", "overlay");
-    spec.put("manifest", kdnsManifest(debug));
+    spec.put("manifest", manifest);
     env.addJsonPatch(JsonPatch.add("/spec", spec));
   }
 
@@ -111,12 +128,62 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
       // Interactive debug shell alongside the delve-wrapped binary: attach a debugger / poke
       // around.
       install.put("go", Map.of("pkg-path", "go", "version", "^1.25"));
-      install.put("delve", Map.of("pkg-path", "delve"));
-      install.put("bash", Map.of("pkg-path", "bash", "outputs", "all"));
-      install.put("coreutils", Map.of("pkg-path", "coreutils", "outputs", "all"));
-      install.put("strace", Map.of("pkg-path", "strace"));
-      install.put("curl", Map.of("pkg-path", "curl"));
+      install.put("delve", catalog("delve"));
+      install.put("bash", catalogAll("bash"));
+      install.put("coreutils", catalogAll("coreutils"));
+      install.put("strace", catalog("strace"));
+      install.put("curl", catalog("curl"));
     }
+    return manifest(install);
+  }
+
+  /** Mirrors {@code environment.d/mesh/headscale[-debug]/manifest.toml}. */
+  private Map<String, Object> headscaleManifest(final boolean debug) {
+    final String flavor = debug ? "headscale-debug" : "headscale";
+    final Map<String, Object> install = new LinkedHashMap<>();
+    install.put("bash", catalogAll("bash"));
+    install.put("coreutils", catalogAll("coreutils"));
+    // The bootstrap/wait scripts drive the cluster via kubectl (both flavors carry it).
+    install.put("kubectl", catalogAll("kubectl"));
+    if (debug) {
+      install.put("delve", catalog("delve"));
+      install.put("strace", catalog("strace"));
+      install.put("curl", catalog("curl"));
+    } else {
+      // bootstrap.sh parses `headscale ... -o yaml` with yq — prod only (the bootstrap Job always
+      // activates the prod headscale env, never the delve-wrapped debug build).
+      install.put("yq-go", catalogAll("yq-go"));
+    }
+    install.put(flavor, Map.of("flake", "floxcatalog:catalogue#" + flavor));
+    return manifest(install);
+  }
+
+  /** Mirrors {@code environment.d/mesh/tailscale[-debug]/manifest.toml}. */
+  private Map<String, Object> tailscaleManifest(final boolean debug) {
+    final String flavor = debug ? "tailscale-debug" : "tailscale";
+    final Map<String, Object> install = new LinkedHashMap<>();
+    install.put("bash", catalogAll("bash"));
+    install.put("coreutils", catalogAll("coreutils"));
+    if (debug) {
+      install.put("delve", catalog("delve"));
+      install.put("strace", catalog("strace"));
+      install.put("curl", catalog("curl"));
+    }
+    install.put(flavor, Map.of("flake", "floxcatalog:catalogue#" + flavor));
+    return manifest(install);
+  }
+
+  /** A catalog install pulling a package's default output. */
+  private Map<String, Object> catalog(final String pkg) {
+    return Map.of("pkg-path", pkg);
+  }
+
+  /** A catalog install pulling all of a package's outputs (bin split across {@code out}/…). */
+  private Map<String, Object> catalogAll(final String pkg) {
+    return Map.of("pkg-path", pkg, "outputs", "all");
+  }
+
+  private Map<String, Object> manifest(final Map<String, Object> install) {
     final Map<String, Object> manifest = new LinkedHashMap<>();
     manifest.put("schema-version", SCHEMA_VERSION);
     manifest.put("install", install);
