@@ -3,13 +3,11 @@ package io.seedmatic.rke2lab.manifests.units.gitops;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -33,12 +31,15 @@ import software.constructs.Construct;
  * {@code contents:read} pull token. The {@code provider: github} is mandatory — source-controller
  * rejects an App-data secret without it.
  *
- * <p><b>Layered Kustomizations:</b> one per reconcile layer ({@code ./crds} → {@code ./foundation}
- * → {@code ./operators} → {@code ./workloads}), chained by {@code dependsOn} with {@code wait:
- * true}, each pruned and SOPS-decrypting via the {@code sops-age} Secret — so a CR dry-runs only
- * once its CRD (rendered in {@code crds}, or registered at runtime by cert-manager in {@code
- * foundation} / an operator-installer in {@code operators}) exists. The two Secrets (App-auth +
- * age) ride the same local-only bootstrap lane so Flux comes up able to both pull and decrypt.
+ * <p><b>Root Kustomization:</b> a single {@code Kustomization} over {@code ./flux} — the in-branch
+ * dir the {@link io.seedmatic.rke2lab.manifests.FluxServiceKustomizationPlanner} fills post-explode
+ * with one child Kustomization per service {@code (layer, domain, package)} cell. The root applies
+ * those children; each reconciles its own {@code ./<layer>/<domain>/<package>} path and carries the
+ * dependsOn graph (layer barrier + service→service edges) that orders the reconcile — so an
+ * operator sees per-service progress in {@code flux get kustomizations}, and a CR dry-runs only
+ * once its CRD exists. {@code wait: true} makes the root Ready only once every child is. The two
+ * Secrets (App-auth + age) ride the same local-only bootstrap lane so Flux comes up able to pull +
+ * decrypt.
  */
 public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
@@ -46,9 +47,12 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
   private static final String REPO_URL = "https://github.com/seedmatic/rke2lab.git";
   private static final String BRANCH_PREFIX = "manifests/";
-  private static final String GIT_REPOSITORY_NAME = "rke2lab";
+  public static final String GIT_REPOSITORY_NAME = "rke2lab";
   private static final String APP_AUTH_SECRET = "githubapp";
-  private static final String SOPS_AGE_SECRET = "sops-age";
+  public static final String SOPS_AGE_SECRET = "sops-age";
+
+  /** The in-branch dir the root Kustomization reconciles; filled with per-service children. */
+  public static final String FLUX_DIR = "flux";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "flux-root", true);
@@ -61,27 +65,7 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String clusterSlug = ManifestSynthesisContext.current().bootstrapIdentity().clusterSlug();
     createGitRepository(scope, clusterSlug);
-    // The layered stack: crds → foundation → operators → workloads, chained by dependsOn (+wait) so
-    // a CR's CRD — rendered (crds), or registered at runtime by a foundation provider
-    // (cert-manager)
-    // / an operator-installer — exists before the CR is dry-run. See
-    // manifests-rendered-branches.adoc §layers.
-    createLayerKustomization(scope, clusterSlug, ManifestAnnotations.LAYER_CRDS, Optional.empty());
-    createLayerKustomization(
-        scope,
-        clusterSlug,
-        ManifestAnnotations.LAYER_FOUNDATION,
-        Optional.of(ManifestAnnotations.LAYER_CRDS));
-    createLayerKustomization(
-        scope,
-        clusterSlug,
-        ManifestAnnotations.LAYER_OPERATORS,
-        Optional.of(ManifestAnnotations.LAYER_FOUNDATION));
-    createLayerKustomization(
-        scope,
-        clusterSlug,
-        ManifestAnnotations.LAYER_WORKLOADS,
-        Optional.of(ManifestAnnotations.LAYER_OPERATORS));
+    createRootKustomization(scope);
   }
 
   private void createGitRepository(Construct scope, String clusterSlug) {
@@ -123,18 +107,21 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   }
 
   /**
-   * One layer's {@code Kustomization} over {@code ./<layer>} — pruned, waited (Ready only when its
-   * objects are healthy) and SOPS-decrypting. {@code dependsOnLayer} chains it after the prior
-   * layer ({@code Optional.empty()} for the first, {@code crds}), so its CRs dry-run only once the
-   * earlier layer's CRDs — rendered or operator-registered — exist.
+   * The single ROOT {@code Kustomization} over {@code ./flux} — the in-branch dir the {@link
+   * io.seedmatic.rke2lab.manifests.FluxServiceKustomizationPlanner} fills post-explode with one
+   * child Kustomization per service {@code (layer, domain, package)} cell. The root applies those
+   * children (pruned + waited); each child reconciles its own path and carries the dependsOn graph.
+   * No {@code decryption} here — the root applies only child Kustomization objects (no Secrets);
+   * the children carry their own sops decryption for the resources they apply.
    */
-  private void createLayerKustomization(
-      Construct scope, String clusterSlug, String layer, Optional<String> dependsOnLayer) {
-    final String name = clusterSlug + "-" + layer;
+  private void createRootKustomization(Construct scope) {
+    // Un-prefixed: each cluster has its own rendered branch + flux-system namespace, so the
+    // cluster slug in the name is pure redundancy — the children are bare <domain>-<package> too.
+    final String name = "flux";
     final ApiObject kustomization =
         new ApiObject(
             scope,
-            "kustomization-" + layer,
+            "kustomization-flux-root",
             ApiObjectProps.builder()
                 .apiVersion("kustomize.toolkit.fluxcd.io/v1")
                 .kind("Kustomization")
@@ -150,15 +137,10 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 
     final LinkedHashMap<String, Object> spec = new LinkedHashMap<>();
     spec.put("interval", "5m");
-    spec.put("path", "./" + layer);
+    spec.put("path", "./" + FLUX_DIR);
     spec.put("prune", true);
     spec.put("wait", true);
     spec.put("sourceRef", Map.of("kind", "GitRepository", "name", GIT_REPOSITORY_NAME));
-    spec.put(
-        "decryption", Map.of("provider", "sops", "secretRef", Map.of("name", SOPS_AGE_SECRET)));
-    dependsOnLayer.ifPresent(
-        dep -> spec.put("dependsOn", List.of(Map.of("name", clusterSlug + "-" + dep))));
-
     kustomization.addJsonPatch(JsonPatch.add("/spec", spec));
   }
 }

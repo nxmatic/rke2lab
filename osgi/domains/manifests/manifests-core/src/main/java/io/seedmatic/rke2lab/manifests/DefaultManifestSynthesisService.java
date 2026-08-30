@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import io.seedmatic.rke2lab.manifests.cdk8s.Cdk8sApps;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
+import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeService;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
@@ -136,7 +137,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       record Scaffold(App app, Chart chart, Path synthOutdir, Path synthManifestFile) {}
 
       /** Configured domain registry and its unit hit count — produced by the registry stage. */
-      record Registry(ManifestsDomainRegistry domainRegistry, int manifestUnitHitCount) {}
+      record Registry(
+          ManifestsDomainRegistry domainRegistry,
+          CoherentManifestsDomainRegistry coherent,
+          int manifestUnitHitCount) {}
 
       /**
        * Working memory shared across pipeline stages. Each phase produces one immutable record; the
@@ -307,7 +311,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                     DefaultManifestSynthesisService.this.yaml));
           }
 
-          sink.registry(new Registry(domainRegistry, manifestUnitHitCount));
+          sink.registry(new Registry(domainRegistry, coherent, manifestUnitHitCount));
 
           return this;
         }
@@ -375,11 +379,21 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             // auto-deploys them), local-config resources become hidden dotfiles (skipped by apply,
             // read by host consumers — e.g. runtime/cloud-config/.configmap-cloud-config.yml, the
             // NoCloud seed the incus scion unwraps). Into synthOutdir.
-            explodeService.explode(
-                new ManifestExplodeRequest(scaffold.synthManifestFile(), scaffold.synthOutdir()));
+            final ManifestExplodeResult explodeResult =
+                explodeService.explode(
+                    new ManifestExplodeRequest(
+                        scaffold.synthManifestFile(), scaffold.synthOutdir()));
             LOG.info(
                 "Exploded consolidated manifest into the per-resource tree at {}",
                 scaffold.synthOutdir());
+
+            // Post-explode: plan one Flux Kustomization per service (layer,domain,package) cell
+            // into ./flux — the root Kustomization (FluxRootManifestsUnit) reconciles them. The
+            // exploder knows the non-empty cells (writtenFiles); the coherent registry carries the
+            // dependsOn graph. See FluxServiceKustomizationPlanner.
+            new FluxServiceKustomizationPlanner(
+                    state.registry().coherent(), DefaultManifestSynthesisService.this.yaml)
+                .plan(explodeResult);
 
             return this;
           } catch (IOException e) {
