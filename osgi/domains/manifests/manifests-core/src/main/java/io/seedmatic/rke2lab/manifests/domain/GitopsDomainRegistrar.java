@@ -5,6 +5,7 @@ import io.seedmatic.rke2lab.manifests.ManifestsDomainRegistrar;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.units.gitops.FluxInstanceManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.gitops.FluxOperatorManifestsUnit;
+import io.seedmatic.rke2lab.manifests.units.gitops.FluxReceiverManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.gitops.FluxRootManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.gitops.GithubAppSecretManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.gitops.SopsAgeSecretManifestsUnit;
@@ -23,6 +24,7 @@ public final class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
             new FluxOperatorManifestsUnit(),
             new FluxInstanceManifestsUnit(),
             new FluxRootManifestsUnit(),
+            new FluxReceiverManifestsUnit(),
             new SopsAgeSecretManifestsUnit(),
             new GithubAppSecretManifestsUnit()));
   }

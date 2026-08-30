@@ -122,10 +122,15 @@ public class ReplicatorSecretsSealScenario
       final Optional<JsonNode> tekton = read(gateway, "tekton");
       final Optional<JsonNode> tailscale = read(gateway, "tailscale");
       final Optional<JsonNode> flox = read(gateway, "flox");
+      final Optional<JsonNode> github = read(gateway, "github");
 
       final List<SourceSecret> sources = new ArrayList<>();
       flox.ifPresent(
           fx -> floxSecret(secretsMap.path("flox"), sourceNamespace, fx).ifPresent(sources::add));
+      github.ifPresent(
+          gh ->
+              webhookSecret(secretsMap.path("web-hook"), sourceNamespace, gh)
+                  .ifPresent(sources::add));
       tekton.ifPresent(
           t -> {
             final JsonNode git = t.path("git");
@@ -183,6 +188,26 @@ public class ReplicatorSecretsSealScenario
               namespace,
               "Opaque",
               Map.of("token", flox.path("token").asText()),
+              namespaces(mapping.path("replicateTo"))));
+    }
+
+    /**
+     * The Flux Receiver webhook HMAC secret: the operator-chosen shared value at {@code
+     * github.web-hook.token} in {@code .secrets}, keyed {@code token} (what a Flux {@code Receiver}
+     * validates against). The SAME value goes in the GitHub webhook's Secret field.
+     */
+    private Optional<SourceSecret> webhookSecret(
+        final JsonNode mapping, final String namespace, final JsonNode github) {
+      final JsonNode token = github.path("web-hook").path("token");
+      if (mapping.path("name").isMissingNode() || token.isMissingNode()) {
+        return Optional.empty();
+      }
+      return Optional.of(
+          new SourceSecret(
+              mapping.path("name").asText(),
+              namespace,
+              "Opaque",
+              Map.of("token", token.asText()),
               namespaces(mapping.path("replicateTo"))));
     }
 
