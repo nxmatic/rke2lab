@@ -7,12 +7,12 @@
  * <ul>
  *   <li>{@code rke2} — {@code RuntimeRke2ConfigManifestsUnit}, the RKE2 server config (installed
  *       <b>before</b> rke2-server).
- *   <li>{@code flox} — {@code FloxRuntimeManifestsUnit} and the NRI plugin archive assets.
- *   <li>{@code daemonset} — the daemonset script-policy unit that trampolines host assets.
+ *   <li>{@code flox} — the flox-runtime delivery units: {@code FloxControllerManifestsUnit}
+ *       (node-agent + CRDs), {@code FloxCatalogManifestsUnit} (the catalog Flux source), {@code
+ *       FloxEnvManifestsUnit} (workload {@code FloxEnv} CRs), {@code FloxWebhookManifestsUnit}.
  * </ul>
  *
- * <p>{@link io.seedmatic.rke2lab.manifests.units.runtime.RuntimeRefs} holds the shared resource
- * references. Registered by {@link io.seedmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar}.
+ * <p>Registered by {@link io.seedmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar}.
  *
  * <h2>Related documentation</h2>
  *

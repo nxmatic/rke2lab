@@ -8,7 +8,6 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
-import io.seedmatic.rke2lab.manifests.units.runtime.RuntimeRefs;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -544,10 +543,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                                 List.of(
                                     Map.of(
                                         "configMapRef",
-                                        Map.of("name", MeshRefs.HEADPLANE_ENV_CONFIGMAP.name())),
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))),
+                                        Map.of("name", MeshRefs.HEADPLANE_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
                                     "limits",
@@ -724,9 +720,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                 Map.of("fieldRef", Map.of("fieldPath", "metadata.name")))));
     headplaneContainer.put(
         "envFrom",
-        List.of(
-            Map.of("configMapRef", Map.of("name", MeshRefs.HEADPLANE_ENV_CONFIGMAP.name())),
-            Map.of("configMapRef", Map.of("name", RuntimeRefs.FLOX_ENV_CONFIGMAP.name()))));
+        List.of(Map.of("configMapRef", Map.of("name", MeshRefs.HEADPLANE_ENV_CONFIGMAP.name()))));
     // Resolve hp_healthcheck THROUGH the flox env (same as the container command runs
     // `flox activate --dir /root -- headplane`), not via a hardcoded /.flox/run/<name> path:
     // the NRI-injected env activates as "default" in the guest's HOME (/root/.flox/run/

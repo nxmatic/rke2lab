@@ -20,7 +20,7 @@ import software.constructs.Construct;
 
 /**
  * Deploys the flox-controller node-agent + its {@code FloxEnv} CRD (the companion that provisions
- * what the NRI plugin injects). Sibling of {@link FloxRuntimeManifestsUnit} in the runtime domain.
+ * what the NRI plugin injects). Sibling of {@link FloxEnvManifestsUnit} in the runtime domain.
  *
  * <p>Layering: the DaemonSet + RBAC are on the {@code operators} layer (the controller is healthy
  * before workload {@code FloxEnv} CRs); the {@code CustomResourceDefinition} is forced to the

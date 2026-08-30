@@ -20,8 +20,7 @@ import software.constructs.Construct;
 /**
  * Emits the workload {@code FloxEnv} CRs the flox-controller realises on each node — the runtime
  * successor to the baked {@code environment.d} tree. Covers {@code kdns} (networking) and {@code
- * headscale}/{@code tailscale} (mesh); {@code headplane} follows the same shape in a later
- * increment.
+ * headscale}/{@code tailscale}/{@code headplane} (mesh).
  *
  * <p>Each env installs its workload package from the {@link FloxCatalogManifestsUnit} catalog via a
  * {@code floxcatalog:catalogue#<output>} ref (resolved same-namespace, both live in {@code
@@ -85,6 +84,12 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
         mesh ? "tailscale-debug" : "tailscale",
         FloxEnvFolder.MESH,
         tailscaleManifest(mesh));
+    createEnv(
+        scope,
+        resolver,
+        mesh ? "headplane-debug" : "headplane",
+        FloxEnvFolder.MESH,
+        headplaneManifest(mesh));
   }
 
   private void createEnv(
@@ -123,7 +128,7 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
   private Map<String, Object> kdnsManifest(final boolean debug) {
     final String flavor = debug ? "kdns-debug" : "kdns";
     final Map<String, Object> install = new LinkedHashMap<>();
-    install.put("kdns", Map.of("flake", "floxcatalog:catalogue#" + flavor));
+    install.put("kdns", flakeRef(flavor));
     if (debug) {
       // Interactive debug shell alongside the delve-wrapped binary: attach a debugger / poke
       // around.
@@ -154,7 +159,7 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
       // activates the prod headscale env, never the delve-wrapped debug build).
       install.put("yq-go", catalogAll("yq-go"));
     }
-    install.put(flavor, Map.of("flake", "floxcatalog:catalogue#" + flavor));
+    install.put(flavor, flakeRef(flavor));
     return manifest(install);
   }
 
@@ -169,8 +174,39 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
       install.put("strace", catalog("strace"));
       install.put("curl", catalog("curl"));
     }
-    install.put(flavor, Map.of("flake", "floxcatalog:catalogue#" + flavor));
+    install.put(flavor, flakeRef(flavor));
     return manifest(install);
+  }
+
+  /** Mirrors {@code environment.d/mesh/headplane[-debug]/manifest.toml}. */
+  private Map<String, Object> headplaneManifest(final boolean debug) {
+    final Map<String, Object> install = new LinkedHashMap<>();
+    install.put("bash", catalogAll("bash"));
+    install.put("coreutils", catalogAll("coreutils"));
+    // The agent-sync script drives the cluster via kubectl + parses config with yq (both flavors).
+    install.put("kubectl", catalogAll("kubectl"));
+    install.put("yq-go", catalog("yq-go"));
+    if (debug) {
+      install.put("strace", catalog("strace"));
+      install.put("curl", catalog("curl"));
+      install.put("headplane-debug", flakeRef("headplane-debug"));
+    } else {
+      install.put("headplane", flakeRef("headplane"));
+      // headplane reads the headscale config/CLI for its integration — prod env carries it.
+      install.put("headscale", flakeRef("headscale"));
+    }
+    // hp_agent (the tailnet agent) + the ssh WASM helper are separate flake outputs both flavors
+    // need — headplane symlinks /usr/libexec/headplane/agent to `command -v hp_agent`.
+    install.put("headplane-agent", flakeRef("headplane-agent"));
+    install.put("headplane-ssh-wasm", flakeRef("headplane-ssh-wasm"));
+    return manifest(install);
+  }
+
+  /**
+   * A flake install resolved against the FloxCatalog artifact ({@code floxcatalog:catalogue#…}).
+   */
+  private Map<String, Object> flakeRef(final String output) {
+    return Map.of("flake", "floxcatalog:catalogue#" + output);
   }
 
   /** A catalog install pulling a package's default output. */
