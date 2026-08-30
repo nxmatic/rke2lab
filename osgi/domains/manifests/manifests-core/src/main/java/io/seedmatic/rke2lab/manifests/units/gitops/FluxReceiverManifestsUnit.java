@@ -26,8 +26,8 @@ import software.constructs.Construct;
  *       source-controller to reconcile the {@code rke2lab} {@code GitRepository} at once;
  *   <li>the {@code flux-webhook-token} Secret it HMAC-validates against — a replica stub filled by
  *       mittwald from the replicator source (the same pull pattern as {@code floxhub-token}); the
- *       operator seeds the value at {@code github.web-hook.token} in {@code .secrets} and
- *       configures the GitHub webhook's Secret field with the SAME value;
+ *       operator seeds the value at {@code github.webhook.token} in {@code .secrets} and configures
+ *       the GitHub webhook's Secret field with the SAME value;
  *   <li>a Tailscale {@code Ingress} ({@code ingressClassName: tailscale}, {@code
  *       tailscale.com/funnel: "true"}) exposing the notification-controller's {@code
  *       webhook-receiver} Service publicly at {@code https://flux-webhook.<tailnet>.ts.net} with a

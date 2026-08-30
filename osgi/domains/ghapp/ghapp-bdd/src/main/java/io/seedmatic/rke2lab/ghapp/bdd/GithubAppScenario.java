@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
  *       the cellar. This is the steady state once the operator has run {@code ghapp seed}.
  * </ol>
  *
- * <p>Absence — no cellar case and no {@code githubApp} block in {@code .secrets} — seals nothing.
+ * <p>Absence — no cellar case and no {@code github.app} block in {@code .secrets} — seals nothing.
  * That is the honest local skip: a required-credential absence is a HARD fail at the CONSUMPTION
  * site (the writer mint / the Flux-Secret render), never here (see {@code
  * github-credential-model.adoc}). The operator runs the {@code ghapp} CLI first; if they did not,
@@ -60,7 +60,7 @@ public class GithubAppScenario
         GithubAppScenario.Given, GithubAppScenario.When, GithubAppScenario.Then>
     implements CellarReceiver<ScenarioCellar>, ScenarioPlayer.Playable {
 
-  private static final String SECRETS_KEY = "githubApp";
+  private static final String SECRETS_KEY = "github";
 
   private final Scenario<Given, When, Then> scenario = createScenario();
 
@@ -124,19 +124,25 @@ public class GithubAppScenario
           .isPresent()) {
         return self();
       }
-      this.credentials = secrets.flatMap(gateway -> gateway.read(SECRETS_KEY)).map(When::fromJson);
+      this.credentials =
+          secrets.flatMap(gateway -> gateway.read(SECRETS_KEY)).flatMap(When::fromJson);
       return self();
     }
 
-    private static GithubAppCredentials fromJson(String json) {
+    private static Optional<GithubAppCredentials> fromJson(String json) {
       try {
-        final JsonNode node = MAPPER.readTree(json);
-        return new GithubAppCredentials(
-            node.path("appId").asText(),
-            node.path("installationId").asText(),
-            node.path("privateKeyPem").asText());
+        final JsonNode app = MAPPER.readTree(json).path("app");
+        if (app.path("privateKeyPem").isMissingNode()) {
+          return Optional
+              .empty(); // .github present but no .github.app sub-block (survey/ephemeral)
+        }
+        return Optional.of(
+            new GithubAppCredentials(
+                app.path("appId").asText(),
+                app.path("installationId").asText(),
+                app.path("privateKeyPem").asText()));
       } catch (IOException e) {
-        throw new UncheckedIOException("could not parse the githubApp secrets block", e);
+        throw new UncheckedIOException("could not parse the github.app secrets block", e);
       }
     }
   }
