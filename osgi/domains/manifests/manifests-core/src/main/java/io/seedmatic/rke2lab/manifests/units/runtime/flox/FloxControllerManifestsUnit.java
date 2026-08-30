@@ -79,6 +79,44 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
     clusterRoleBinding.addDependency(serviceAccount);
     clusterRoleBinding.addDependency(clusterRole);
     createDaemonSet(scope, context.resolver(), namespace, serviceAccount, clusterRoleBinding);
+
+    // The FloxHub token target stub: mittwald fills it from the replicator source (pull pattern, as
+    // Tailscale/Tekton do). Emitted only when the webhook is enabled — same gate as the DaemonSet's
+    // FLOX_FLOXHUB_TOKEN env + the webhook's injection, which consume it. Without it the source
+    // secret
+    // (authorised to this namespace) is never pulled and the controller wedges on a missing secret.
+    if (ManifestSynthesisContext.current().webhookServing().isPresent()) {
+      createTokenReplicaStub(scope, context.resolver(), namespace);
+    }
+  }
+
+  private void createTokenReplicaStub(
+      final Construct scope, final Cdk8sApiObjectResolver resolver, final String namespace) {
+    final ApiObject secret =
+        new ApiObject(
+            scope,
+            "secret-floxhub-token",
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("Secret")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name(FLOXHUB_TOKEN_SECRET)
+                        .namespace(namespace)
+                        .labels(Map.of("app.kubernetes.io/replicated", "true"))
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "|Secret|" + namespace + "|" + FLOXHUB_TOKEN_SECRET,
+                                Map.of(
+                                    "replicator.v1.mittwald.de/replicate-from",
+                                    "rke2lab-replicator-source/" + FLOXHUB_TOKEN_SECRET)))
+                        .build())
+                .build());
+    secret.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
+    // Empty stub — no placeholder sentinel: mittwald's replicate-from fills the data from the
+    // source. Consumers reference the token as an OPTIONAL secretKeyRef, so the absent key before
+    // replication is a clean "unset", not a wedge.
+    secret.addJsonPatch(JsonPatch.add("/type", "Opaque"));
   }
 
   private ApiObject createServiceAccount(
@@ -250,14 +288,20 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
       args.add("--token-secret-name=" + FLOXHUB_TOKEN_SECRET);
       args.add("--token-secret-key=" + FLOXHUB_TOKEN_KEY);
       // The controller's OWN flox subprocesses (realise via nsenter) authenticate with the same
-      // token — the Secret is replicated into this namespace alongside the webhook enablement.
+      // token. optional: the replicated Secret's key may not have landed yet (mittwald fills the
+      // stub async) — the controller must NOT wedge on it, so an absent key just leaves flox
+      // unauthenticated (warnings only) until a restart picks up the replicated value.
       env.add(
           Map.of(
               "name",
               "FLOX_FLOXHUB_TOKEN",
               "valueFrom",
               Map.of(
-                  "secretKeyRef", Map.of("name", FLOXHUB_TOKEN_SECRET, "key", FLOXHUB_TOKEN_KEY))));
+                  "secretKeyRef",
+                  Map.of(
+                      "name", FLOXHUB_TOKEN_SECRET,
+                      "key", FLOXHUB_TOKEN_KEY,
+                      "optional", true))));
       volumeMounts.add(
           Map.of(
               "name", "webhook-certs",
