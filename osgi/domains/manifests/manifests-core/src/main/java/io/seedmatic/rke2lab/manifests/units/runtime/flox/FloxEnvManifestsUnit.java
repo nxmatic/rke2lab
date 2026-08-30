@@ -27,13 +27,14 @@ import software.constructs.Construct;
  * rke2lab-system}). The env's {@code folder} is the GC-root category the NRI plugin keys on ({@code
  * <base>/networking/kdns}) — a node-side path segment, not a k8s namespace.
  *
- * <p>Flavor switches the env NAME (and its {@code #output}) by the networking debug toggle ({@code
- * FloxDebugPolicy.networkingEnabled}), matching {@code KdnsManifestsUnit}'s {@code
- * resolveNetworkingEnvironment("networking/kdns", "networking/kdns-debug")} pod annotation so the
- * provisioned GC-root ({@code networking/<name>}) is exactly what the pod waits on: prod is {@code
- * kdns} (stripped {@code #kdns}); debug is {@code kdns-debug} ({@code #kdns-debug}, delve-wrapped)
- * plus an interactive toolchain. On the {@code workloads} layer (after the catalog on {@code
- * operators}).
+ * <p>The env NAME is the flavor: prod is {@code <name>} ({@code #<name>}), debug is {@code
+ * <name>-debug} ({@code #<name>-debug}, delve-wrapped + an interactive toolchain), so the
+ * provisioned GC-root ({@code <folder>/<name>}) is exactly what a pod waits on via its {@code
+ * resolve*Environment} annotation. The PROD flavor is emitted ALWAYS; the debug flavor is emitted
+ * ADDITIONALLY when the domain's debug toggle ({@code FloxDebugPolicy.networkingEnabled} / {@code
+ * meshEnabled}) is on — both coexist in debug mode because a debug-flipped prod container
+ * references {@code <name>-debug} while the always-prod bootstrap/sync Jobs still reference {@code
+ * <name>}. On the {@code workloads} layer (after the catalog on {@code operators}).
  */
 public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
 
@@ -64,32 +65,27 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final var policy = ManifestSynthesisContext.current().floxDebugPolicy();
     final Cdk8sApiObjectResolver resolver = context.resolver();
-    // Each env is named by its flavor so the provisioned GC-root (<folder>/<name>) matches the
-    // consuming pod's resolve*Environment annotation: prod=<name>, debug=<name>-debug.
+    // The PROD flavor is emitted ALWAYS; the debug flavor ADDITIONALLY when the domain's debug
+    // toggle is on. Both must coexist in debug mode: a debug-flipped prod CONTAINER references the
+    // <name>-debug env (via resolve*Environment), but the ALWAYS-PROD Jobs keep referencing the
+    // prod env — headscale's bootstrap Job annotates mesh/headscale (it needs yq-go, which the
+    // headscale-debug env deliberately drops) and headplane's agent-sync Job annotates
+    // mesh/headplane. Emitting only the selected flavor left those Jobs' flox-wait blocked forever
+    // on a prod GC-root the controller never provisioned (the mesh-debug bootstrap wedge).
     final boolean net = policy.networkingEnabled();
-    createEnv(
-        scope, resolver, net ? "kdns-debug" : "kdns", FloxEnvFolder.NETWORKING, kdnsManifest(net));
-    // Mesh: headscale control server + tailscale (the gateway Deployment + client DaemonSet share
-    // the tailscale env). Headplane migrates in a later increment.
+    createEnv(scope, resolver, "kdns", FloxEnvFolder.NETWORKING, kdnsManifest(false));
+    if (net) {
+      createEnv(scope, resolver, "kdns-debug", FloxEnvFolder.NETWORKING, kdnsManifest(true));
+    }
     final boolean mesh = policy.meshEnabled();
-    createEnv(
-        scope,
-        resolver,
-        mesh ? "headscale-debug" : "headscale",
-        FloxEnvFolder.MESH,
-        headscaleManifest(mesh));
-    createEnv(
-        scope,
-        resolver,
-        mesh ? "tailscale-debug" : "tailscale",
-        FloxEnvFolder.MESH,
-        tailscaleManifest(mesh));
-    createEnv(
-        scope,
-        resolver,
-        mesh ? "headplane-debug" : "headplane",
-        FloxEnvFolder.MESH,
-        headplaneManifest(mesh));
+    createEnv(scope, resolver, "headscale", FloxEnvFolder.MESH, headscaleManifest(false));
+    createEnv(scope, resolver, "tailscale", FloxEnvFolder.MESH, tailscaleManifest(false));
+    createEnv(scope, resolver, "headplane", FloxEnvFolder.MESH, headplaneManifest(false));
+    if (mesh) {
+      createEnv(scope, resolver, "headscale-debug", FloxEnvFolder.MESH, headscaleManifest(true));
+      createEnv(scope, resolver, "tailscale-debug", FloxEnvFolder.MESH, tailscaleManifest(true));
+      createEnv(scope, resolver, "headplane-debug", FloxEnvFolder.MESH, headplaneManifest(true));
+    }
   }
 
   private void createEnv(
