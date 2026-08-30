@@ -7,8 +7,9 @@
   ...
 }:
 let
-  # The flox containerd runtime, from the runtime/flox sub-flake: an NRI plugin that injects flox
-  # environments into workload containers. containerd launches it from plugin_path.
+  # The flox containerd runtime, from the flox-runtime flake input
+  # (github:seedmatic/flox-nri-plugin): an NRI plugin that injects flox environments into workload
+  # containers. containerd launches it from plugin_path.
   floxNriPlugin = flox-runtime.packages.${pkgs.stdenv.hostPlatform.system}.flox-nri-plugin;
 
   # rke2's embedded containerd auto-imports config-v3.toml.d/*.toml — cleaner than overriding the

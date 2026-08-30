@@ -5,7 +5,7 @@
 #
 # Iteration 1 (path B): stock rke2 server, dual-stack, flox baked. Proven end-to-end by the spike
 # (image builds, boots in Incus, rke2-server + containerd come up). Next iterations add the
-# flox-nri-plugin (containerd NRI, from the runtime/flox sub-flake), cilium, and the zfs snapshotter.
+# flox-nri-plugin (containerd NRI, from the flox-runtime flake input), cilium, and the zfs snapshotter.
 { lib, ... }:
 {
   imports = [
@@ -15,7 +15,7 @@
     ./bootstrap-manifests.nix # devlxd → rke2 server/manifests: the node-side bootstrap lane (Flux + cilium config)
     ./containerd.nix # flox NRI runtime + zfs snapshotter + dataset mount
     ./zfs.nix # node zfs userland + FHS-compat symlinks (openebs-zfs CSI chroot wrapper)
-    ./flox-runtime.nix # flox envs (store-resolved, baked) + GC-roots + OCI hooks + /etc/flox.toml
+    ./flox-runtime.nix # flox NRI plugin OCI hooks + /etc/flox.toml (workload envs = runtime FloxEnv CRs, not baked)
     ./flox-carrier.nix # the minimal nix OCI base image every flox-injected pod runs (baked → rke2 air-gap import)
     ./flox-controller.nix # the flox-controller node-agent image (baked → rke2 air-gap import; it produces the carriers)
     ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node

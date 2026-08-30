@@ -35,17 +35,14 @@ rootfs_name="rootfs.squashfs"
 source_tree="$(git -C "$workspace" write-tree)"
 
 # Freshness gate over the EXACT build inputs in that tree. `git ls-tree` lists the blob SHA of every
-# file under flake.lock / flake.nix / nixos/ AND the WHOLE flox runtime tree (runtime/flox: flake.nix
-# + flake.lock + the env manifest.toml/manifest.lock catalog) — a CONTENT digest (not mtimes, not the
-# commit id) of exactly what nix will build from. That tree is NOT under nixos/ yet
-# nixos/flox-runtime.nix bakes it into the image by relative path (the env locks pin the workload
-# closures — headscale/kdns/... — AND flake.nix defines the derivations they lock against). So an
-# env edit (add a package, bump a workload) OR a flake.nix edit (change a package's derivation, e.g. a
-# binary wrapper) MUST invalidate this gate — folding only environment.d left flake.nix edits
-# invisible, so nix was skipped and the stale image reused until a manual re-lock nudged a lock. Kept
-# in lock-step with GrowPlanAssembler.imageSourceDigest (the OSGi twin) and nixos/flox-runtime.nix's
-# envCatalog path. Unchanged inputs + both artifacts still on disk ⇒ artifacts current, skip nix.
-source_digest="$(git -C "$workspace" ls-tree -r "$source_tree" -- flake.lock flake.nix nixos osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox | sha256sum | awk '{print $1}')"
+# file under flake.lock / flake.nix / nixos/ — a CONTENT digest (not mtimes, not the commit id) of
+# what nix builds from. The flox runtime tree (runtime/flox) is deliberately NOT folded: since the
+# FloxEnv-CR migration the image no longer bakes envs from it (workload closures are realised at
+# runtime by the flox-controller), so it is the catalog SOURCE only and a catalog-only edit must not
+# rebuild the node image. The baked NRI plugin + OCI hooks ride the flox-runtime flake INPUT, pinned
+# in flake.lock (already folded). Kept in lock-step with GrowPlanAssembler.imageSourceDigest (the OSGi
+# twin). Unchanged inputs + both artifacts still on disk ⇒ artifacts current, skip nix.
+source_digest="$(git -C "$workspace" ls-tree -r "$source_tree" -- flake.lock flake.nix nixos | sha256sum | awk '{print $1}')"
 checksum_file="$artifact_dir/.image.checksum.sha256"
 
 if [ -f "$checksum_file" ] && [ "$(cat "$checksum_file")" = "$source_digest" ] &&
@@ -65,85 +62,17 @@ else
     # distrobuilder. Only the two finished files are published below.
     attr="nixosConfigurations.rke2-node-base.config.system.build"
 
-    # The image now bakes flox ENVS (nixos/flox-runtime.nix), which import flox's
-    # buildenv.nix — that does `builtins.storePath` on the env lock's realised
-    # outputs. Two consequences for the node-base eval, both handled here:
-    #
-    #  1. It is no longer PURE → we pass `--impure` (buildenv.nix reads
-    #     `builtins.currentSystem` + `builtins.storePath`, both removed in pure
-    #     eval; `--accept-flake-config` alone does NOT lift them here — the flake's
-    #     `nixConfig.pure-eval=false` is not applied for this path-flake eval), plus
-    #     `--system aarch64-linux` so `builtins.currentSystem` keys correctly even
-    #     when this script evals on a darwin host. `--accept-flake-config` stays for
-    #     the flake's substituters/trusted config.
-    #  2. storePath requires the outputs PRESENT. Catalog packages substitute from
-    #     cache.nixos.org during eval, but our flake-built env packages (e.g.
-    #     kdns-debug) have no substituter → REALISE them first, on the aarch64-linux
-    #     builder, yielding exactly the paths the committed manifest.lock pins.
-    #  3. `--system aarch64-linux` also makes nix believe the LOCAL (darwin) machine
-    #     is aarch64-linux, so it would try to build the small derivations LOCALLY
-    #     and fail ("executing bash: Undefined error: 0" — a linux ELF on darwin).
-    #     `--max-jobs 0` forbids local builds → everything offloads to the configured
-    #     aarch64-linux builder (bioskop-nixos), which is native. (Before --system,
-    #     nix knew local=darwin != linux and offloaded on its own.)
+    # Cross-build the aarch64-linux node-base artifacts from this (possibly darwin)
+    # host: `--system aarch64-linux` + `--max-jobs 0` force every derivation onto the
+    # configured aarch64-linux builder (bioskop-nixos) rather than a doomed local build
+    # (a linux ELF won't run on darwin, e.g. "executing bash: Undefined error: 0");
+    # `--accept-flake-config` honours the flake's substituters/trusted config. `--impure`
+    # is retained defensively for the nixos eval (the flox ENV baking that once required
+    # it — buildenv.nix's storePath/currentSystem — is gone; envs are now runtime FloxEnv
+    # CRs, so there is no per-env pre-realise pass here anymore).
     nix_flags="--no-link --print-out-paths --impure --accept-flake-config --system aarch64-linux --max-jobs 0"
 
-    # (1) realise each env's non-substitutable flake packages before the image eval:
-    # buildenv.nix does `builtins.storePath` on them, which needs them present.
-    # DERIVED from every LOCKED env's manifest (its `flake = "path:..#<pkg>"` refs)
-    # so the set never drifts from the catalog — add an env (manifest.toml + a
-    # committed manifest.lock via lock-envs.sh) and its flake packages are realised
-    # automatically. Catalog packages (bash/kubectl/...) are substitutable and need
-    # no pre-realise; only the local flake packages do — which is exactly what the
-    # `flake = "path:..#pkg"` refs select (e.g. kdns prod, sourced via the overlay,
-    # is correctly NOT realised; kdns-debug, a flake ref, is).
-    flox_flake="$src_dir/osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox"
-
-    # (0) Self-heal env locks in the EXPORTED tree before baking. Each env's
-    # manifest.lock pins its workload package outputs; a flake/nixpkgs move rebuilds
-    # them, and an un-re-locked env then points at a path the fresh bake never
-    # produced (the tailscale-debug drift). Re-locking is deterministic (flake.lock
-    # pins the inputs) but EVAL-heavy — one nixpkgs eval per env — so gate it on a
-    # content hash of everything under runtime/flox EXCEPT the generated manifest.lock
-    # files (i.e. flake.nix / flake.lock / manifest.toml / scripts). Unchanged ⇒ reuse
-    # the locks cached from the last re-lock (zero eval); changed ⇒ re-lock all envs +
-    # refresh the cache. Excluding manifest.lock avoids a fixpoint (the locks are part
-    # of the tree). Cache + hash live in the artifact dir (persist across builds).
-    # Ephemeral: only the tmpfs copy is touched; needs flox on PATH (inherited from the
-    # seed's `flox activate`); absent ⇒ fall back to the committed locks as-is.
-    flox_defs_hash="$(git -C "$workspace" ls-tree -r "$source_tree" -- \
-        osgi/domains/manifests/manifests-core/src/main/resources/runtime/flox |
-        grep -v '/manifest\.lock' | sha256sum | awk '{print $1}')"
-    lock_cache="$artifact_dir/.envlock-cache.tar"
-    lock_hash_file="$artifact_dir/.envlock-defs.sha256"
-    if [ -f "$lock_hash_file" ] && [ "$(cat "$lock_hash_file")" = "$flox_defs_hash" ] && [ -f "$lock_cache" ]; then
-        echo "flox env locks: flake definitions unchanged ($flox_defs_hash) — reusing cached locks"
-        tar -xf "$lock_cache" -C "$flox_flake/environment.d"
-    elif command -v flox >/dev/null 2>&1; then
-        echo "flox env locks: flake definitions changed — re-locking all envs"
-        (cd "$flox_flake" && bash lock-envs.sh)
-        (cd "$flox_flake/environment.d" && tar -cf "$lock_cache" $(find . -name manifest.lock))
-        printf '%s' "$flox_defs_hash" >"$lock_hash_file"
-    else
-        echo "WARNING: flox not on PATH — skipping env-lock self-heal; using committed locks as-is" >&2
-    fi
-
-    env_pkgs="$(
-        for lock in "$flox_flake"/environment.d/*/*/manifest.lock; do
-            [ -f "$lock" ] || continue
-            grep -hoE 'flake = "path:[^"#]*#[A-Za-z0-9_-]+"' "$(dirname "$lock")/manifest.toml" || true
-        done | sed -E 's/.*#([A-Za-z0-9_-]+)".*/\1/' | sort -u
-    )"
-    for env_pkg in $env_pkgs; do
-        # `^*` = ALL outputs, not just the default `out`. A multi-output package
-        # (e.g. tailscale-debug ships out + derper) otherwise leaves the non-default
-        # outputs unrealised, and buildenv's storePath on them at activation fails
-        # → the container re-realises from the (absent) source flake and dies.
-        echo "realising flox env package (all outputs): $env_pkg"
-        $nix_bin build $nix_flags "$flox_flake#$env_pkg^*" >/dev/null
-    done
-
-    # (2) build the two node-base artifacts.
+    # build the two node-base artifacts.
     metadata_out="$($nix_bin build $nix_flags "$src_dir#$attr.metadata")"
     squashfs_out="$($nix_bin build $nix_flags "$src_dir#$attr.squashfs")"
 
