@@ -17,5 +17,4 @@ import io.seedmatic.rke2lab.seed.broker.port.SeedContract;
  * webhook-serving} coordinate for the codec's decode guard. Mirrors {@link AdminCredentials}.
  */
 @SeedContract("webhook-serving")
-public record WebhookServingCredentials(
-    String servingCertPem, String servingKeyPem, String caBundlePem) {}
+public record WebhookServingCredentials(String certPem, String keyPem, String caBundlePem) {}

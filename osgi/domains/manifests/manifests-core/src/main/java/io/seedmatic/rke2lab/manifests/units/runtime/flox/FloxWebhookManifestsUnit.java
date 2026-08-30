@@ -120,8 +120,8 @@ public final class FloxWebhookManifestsUnit extends AbstractManifestsUnit {
         JsonPatch.add(
             "/data",
             Map.of(
-                "tls.crt", base64(material.servingCertPem()),
-                "tls.key", base64(material.servingKeyPem()))));
+                "tls.crt", base64(material.certPem()),
+                "tls.key", base64(material.keyPem()))));
   }
 
   private void createService(

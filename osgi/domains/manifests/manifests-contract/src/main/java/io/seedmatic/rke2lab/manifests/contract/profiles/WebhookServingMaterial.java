@@ -19,13 +19,17 @@ import java.util.Objects;
  * <p>Absence — no cluster PKI sealed yet (unit tests, a bare survey) — is carried as an empty
  * {@code Optional<WebhookServingMaterial>} on the context, never a placeholder: a present material
  * always holds real PEM.
+ *
+ * <p>Field names ({@code certPem}/{@code keyPem}/{@code caBundlePem}) match the cluster-pki {@code
+ * WebhookServingCredentials} 1:1 — the codec decodes the sealed coquille into this mirror BY FIELD
+ * NAME, so the two MUST agree (as {@link OperatorPkiMaterial} agrees with {@code
+ * AdminCredentials}).
  */
-public record WebhookServingMaterial(
-    String servingCertPem, String servingKeyPem, String caBundlePem) {
+public record WebhookServingMaterial(String certPem, String keyPem, String caBundlePem) {
 
   public WebhookServingMaterial {
-    servingCertPem = Objects.requireNonNull(servingCertPem, "servingCertPem");
-    servingKeyPem = Objects.requireNonNull(servingKeyPem, "servingKeyPem");
+    certPem = Objects.requireNonNull(certPem, "certPem");
+    keyPem = Objects.requireNonNull(keyPem, "keyPem");
     caBundlePem = Objects.requireNonNull(caBundlePem, "caBundlePem");
   }
 }
