@@ -213,6 +213,14 @@ resolves that reference (typed, validatable against status) and overlays the hos
 `/nix` into the pod. No PVC: the CR is the k8s-accessible env
 (`kubectl get/describe floxenv`). rke2lab keeps the env catalog + the operator `env-bumper`.
 
+The env's `spec.folder` — the on-node GC-root category the plugin readlinks
+(`<base>/<folder>/<name>`) and, identically, the `flox.dev/environment.<container>`
+pod-annotation prefix the plugin keys on — is a closed, durable vocabulary typed as
+`FloxEnvFolder` (`networking`, `mesh`). It is a genuine single-source-of-truth: the
+`FloxEnvManifestsUnit`-emitted CR folder and the consuming pod's annotation prefix derive
+from the same enum, so they cannot silently diverge and make the plugin readlink a GC-root
+the controller never provisioned.
+
 == Part 1 — Store-resolved runtime scripts (the fork-repo extraction)
 
 === Goal
