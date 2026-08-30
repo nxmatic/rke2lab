@@ -563,7 +563,6 @@ graph TB
       DSTR["DelveSidecarToggleResolver"]
     end
     subgraph flox["flox runtime unit"]
-      FRMU["FloxRuntimeManifestsUnit"]
       FCMU["FloxControllerManifestsUnit"]
       FFCU["FloxCatalogManifestsUnit"]
       FEMU["FloxEnvManifestsUnit"]
@@ -681,10 +680,6 @@ Immutable configuration objects the runtime units build their pod specs from.
 |===
 | Type | Role
 
-| `FloxRuntimeManifestsUnit`
-| The `AbstractManifestsUnit` synthesising the NRI-plugin flox runtime — ConfigMaps, ServiceAccount,
-  DaemonSet — with env config, plugin hot-reload and per-node workspace management.
-
 | `FloxControllerManifestsUnit`
 | The `AbstractManifestsUnit` deploying the flox-controller node-agent (the companion that
   _provisions_ what the NRI plugin injects — see `github:seedmatic/flox-controller`): the `FloxEnv`
@@ -713,7 +708,7 @@ Immutable configuration objects the runtime units build their pod specs from.
 
 | `FloxEnvManifestsUnit`
 | The `AbstractManifestsUnit` emitting the workload `FloxEnv` CRs the flox-controller realises on
-  each node — the runtime successor to the baked `environment.d` tree (first increment: `kdns`).
+  each node (kdns for networking, plus the headscale/tailscale/headplane mesh family).
   Each env installs its package from the `FloxCatalogManifestsUnit` catalog via a
   `floxcatalog:catalogue#<output>` ref (same namespace, `rke2lab-system`); its `folder` is the GC-root
   category the NRI plugin keys on (`<base>/networking/kdns`). Flavor is a single logical env switched

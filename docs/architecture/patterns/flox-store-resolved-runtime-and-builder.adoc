@@ -24,17 +24,15 @@ them:
   `github:seedmatic/flox-nri-plugin` and consumed by rke2lab as a flake INPUT, not
   shipped as Java resources inside the manifests-core jar. This IS Part 1 below,
   reframed: "sources as flake inputs" now means "sources in the fork repo."
-. *The flox ENVS move out of the baked image to a runtime CRD (2026-08-27).*
-  The envs are no longer baked into the node-base `/nix/store` — that model forced
-  a control-node cold-start on every package bump. Each env becomes a first-class
-  k8s resource, a `FloxEnv` CR (a *manifest*, synthesised like every other), and OUR
-  *flox controller* (a node-agent DaemonSet) reconciles it onto each node's own
-  host `/nix/store` (realising the closures via the node's nix daemon) + writes the
-  GC-roots the baked NRI plugin reads. The plugin overlays the host `/nix` into
-  containers — UNCHANGED; only the POPULATOR moves (image tmpfiles → the controller).
-  No PVC: the CR itself is the k8s-accessible env (`kubectl get/describe floxenv`).
-  This is now THE design (see <<runtime-env-delivery>>); the baked model is retained
-  only as a short migration note — the LIVE interim.
+. *The flox ENVS are delivered at runtime as a `FloxEnv` CRD (2026-08-27).*
+  Each env is a first-class k8s resource, a `FloxEnv` CR (a *manifest*, synthesised
+  like every other), and OUR *flox controller* (a node-agent DaemonSet) reconciles it
+  onto each node's own host `/nix/store` (realising the closures via the node's nix
+  daemon) + writes the GC-roots the baked NRI plugin reads. The plugin overlays the
+  host `/nix` into containers; the controller is the populator. No PVC: the CR itself
+  is the k8s-accessible env (`kubectl get/describe floxenv`). See
+  <<runtime-env-delivery>>. `nixos/flox-runtime.nix` bakes only the flox NRI OCI hooks
+  + `/etc/flox.toml`.
 ====
 
 == Overview
@@ -131,8 +129,8 @@ The `cp -af /.sh -> /var/run` step is not incidental. It makes
   source via git's index rather than walking volatile files.
 
 `/nix/store` is read-only. Therefore scripts can move to the store, but the
-*workspace* (the flake source nix builds against, `environment.d/`, the written
-locks) cannot. The design must keep these separate.
+*workspace* (the flake source nix builds against, the written locks) cannot. The
+design must keep these separate.
 
 == C4 context: concerns and data flow
 
@@ -148,7 +146,7 @@ flowchart TB
   end
 
   subgraph rke2["rke2lab synth (operator machine)"]
-    envd["runtime/flox/environment.d (locked)<br/>env catalog (kdns, mesh, ...)"]:::code
+    envd["runtime/flox flake (catalog SOURCE)<br/>env catalog (kdns, mesh, ...)"]:::code
     unit["FloxEnvManifestsUnit (CDK8s)<br/>renders one FloxEnv CR per env"]:::code
     bumper["env-bumper CLI<br/>bump pins + re-lock (committed)"]:::code
     bumper --> envd --> unit
@@ -399,10 +397,8 @@ two host-side inputs exist — and neither is currently provisioned by `nixos/`
 
 | *flox-env GC-roots* — `/nix/var/nix/gcroots/flox-runtime/env/<category>/<name>`
 | The plugin's `resolveFloxEnvironment` reads these to map `category/name` → the
-  immutable env store path. In the target model they are written on the host store by
-  the *flox controller* (sole writer), NOT baked. The GC-root contract path is
-  unchanged — only its populator moves from `nixos/flox-runtime.nix` (interim bake) to
-  the controller (see <<runtime-env-delivery>>).
+  immutable env store path. They are written on the host store by the *flox controller*
+  (sole writer), NOT baked (see <<runtime-env-delivery>>).
 
 | *`/etc/flox.toml`* (host file, optional)
 | Projected read-only into every injected container if present (the `floxSystemConfigPath`
@@ -421,9 +417,8 @@ not the plugin.
 NOTE: RESOLVED for the flox ENVS by the *flox controller* — see
 <<runtime-env-delivery>>. The controller realises each env's closure onto the host
 `/nix/store` and writes its GC-root there (sole writer); the plugin overlays the host
-`/nix`. The interim LIVE model bakes them instead
-(`nixos/flox-runtime.nix`) and is being migrated. The remaining open part is only
-the Part-2 builder for *unknown-at-build* packages.
+`/nix`. The remaining open part is only the Part-2 builder for *unknown-at-build*
+packages.
 
 The store path (scripts package + env subtrees) AND the GC-roots above must exist
 on the node before a container can resolve an env. Two options, to be decided at
@@ -457,30 +452,20 @@ rke2lab-agnostic; this section covers only how rke2lab INTEGRATES it.
 
 === rke2lab integration
 
-* *Synthesis* — a `FloxEnvManifestsUnit` (CDK8s) renders one `FloxEnv` CR per env from
-  the committed, locked `environment.d/`, mapping the rke2lab *domain* → the CR's k8s
-  namespace (domain `networking` → namespace `networking`; the legacy `networking/kdns`
-  reinterprets as `namespace/name`). Flux applies them in an early layer.
+* *Synthesis* — a `FloxEnvManifestsUnit` (CDK8s) emits the workload `FloxEnv` CRs (kdns
+  for networking, plus the headscale/tailscale/headplane mesh family, per debug flavor),
+  each installing its package from the `runtime/flox` flake catalog via a `floxcatalog:`
+  install ref; its `folder` is the GC-root category the plugin keys on. A
+  `FloxCatalogManifestsUnit` publishes that catalog: the `runtime/flox` flake is pushed to
+  a dedicated `flox-catalogue` git branch and exposed to the cluster as a Flux
+  `GitRepository` + a `FloxCatalog` CR the controller resolves. Flux applies them in an
+  early layer.
 * *Delivery* — rke2lab consumes `flox-controller` (and `flox-nri-plugin`) as flake
   inputs (`…/develop`, green-gated) and bakes their images into the node-base image
   (foundation); the controller then reconciles the CRs onto each node.
-* *Bumps* — the operator bumps env versions via an *env-bumper* CLI (a scenario in the
-  shape of the manifests `VersionBumper`: bump `runtime/flox/flake.nix` pins + re-lock
-  `environment.d/*/manifest.lock` → commit). Synthesis folds the committed lock into
-  the CR; the controller never re-locks.
-
-[NOTE]
-.Interim: the LIVE baked model, being migrated
-====
-Today the envs are still BAKED at image-build by `nixos/flox-runtime.nix`
-(`mkEnvSubtree` + `mkEnvActivation` + tmpfiles GC-roots; env catalog under
-`environment.d/…` read as flake SOURCE). That model is LIVE (kdns + the mesh family
-run on it) but forces a control-node cold-start on every package bump — the coupling
-this target removes. The migration also drops the `environment.d` fold in
-`GrowPlanAssembler.imageSourceDigest` and the shell-side TWIN GATE in
-`build-node-base-image.sh` (both added *solely* to force that cold-start). The baked
-implementation stays retrievable in git for reference during the migration.
-====
+* *Bumps* — the operator bumps env versions by bumping the `runtime/flox/flake.nix`
+  pins, re-locking the flake, and republishing the `flox-catalogue` branch; the
+  controller resolves each CR's `floxcatalog:` ref against it and never re-locks.
 
 [[node-config-contribution]]
 == The node-configuration contribution (the other half of the retained mechanism)

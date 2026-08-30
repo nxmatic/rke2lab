@@ -150,8 +150,10 @@ Pods opt into flox-provided executables with a per-container annotation
 `flox.seedmatic.io/environment.<container>: fleet/k8s` (or `fleet/keyhole`). Injection is done by the
 *flox NRI plugin*, not a mutating admission webhook: the plugin intercepts container creation on the
 node, reads that annotation, and mounts the nix store + sets `PATH`/`FLOX_ENV` from the materialised
-environment. See `FloxRuntimeManifestsUnit` (the NRI plugin + DaemonSet) and `FloxShellSidecarProfile`
-(debug/exec injection) in `manifests-core`.
+environment. The plugin is baked as a systemd service (`rke2lab-flox-nri-plugin`) from the
+`flox-runtime` flake input; the workload envs are delivered as `FloxEnv` CRs (`FloxEnvManifestsUnit`)
+that the flox-controller realises onto each node. See `FloxShellSidecarProfile` (debug/exec injection)
+in `manifests-core`.
 
 NOTE: An earlier design proposed a cert-managed mutating webhook in a `flox-system` namespace for this
 tier. It was never built and is superseded by the NRI plugin above — the plugin needs no admission

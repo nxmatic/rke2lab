@@ -204,10 +204,10 @@ Shipped, on the codebase today (the green blocks are not all vision):
 Still vision (the red block has not fully collapsed): CAPN growing peers/workers from the published
 images (the management cluster is not yet wired to grow the fleet), and the Go controller for
 post-join host mutation (still the DaemonSet stage). The e2e LIVE proof — grow a real node to Ready —
-is the open gate. Flox-*env* delivery is also still vision: today the envs are BAKED
-(`nixos/flox-runtime.nix`, LIVE); Diagram D's AFTER (FloxEnv CRD + flox controller)
-is the target — see link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved
-Runtime] §Runtime env delivery.
+is the open gate. Flox-*env* delivery is now runtime `FloxEnv` CRs realised onto the host store by
+the flox controller (Diagram D's AFTER), not baked into the image; its live proof rides that same
+grow-a-node-to-Ready gate — see link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox
+Store-Resolved Runtime] §Runtime env delivery.
 
 == Related documentation
 
