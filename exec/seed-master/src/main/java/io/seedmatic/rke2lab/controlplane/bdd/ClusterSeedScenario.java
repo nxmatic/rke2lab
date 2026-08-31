@@ -21,10 +21,8 @@ import io.seedmatic.rke2lab.clusterpki.contract.ClusterAgeKey;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterCaBundle;
 import io.seedmatic.rke2lab.clusterpki.contract.ClusterPkiCoordinate;
 import io.seedmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.seedmatic.rke2lab.controlplane.config.ChainedSecretsGateway;
-import io.seedmatic.rke2lab.controlplane.config.DotSecretsGateway;
-import io.seedmatic.rke2lab.controlplane.config.TailscaleOauthClientGateway;
 import io.seedmatic.rke2lab.controlplane.incus.InstanceGrow;
+import io.seedmatic.rke2lab.host.runtime.ExecutionEnvironment;
 import io.seedmatic.rke2lab.incus.ingress.GrowOutcome;
 import io.seedmatic.rke2lab.incus.ingress.Growth;
 import io.seedmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
@@ -64,7 +62,6 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -287,21 +284,19 @@ public class ClusterSeedScenario
           .context()
           .registerService(OpaqueCellar.class, cellarRealisation, new Hashtable<>());
       gardening.connection().context().registerService(Parcel.class, parcel, new Hashtable<>());
-      // The .secrets door — the host owns that file (ConfigLoader reads it, DotSecretsGateway
-      // writes
-      // it); published into the framework it grew so the ghapp scion can rehydrate its anchor and
-      // persist a freshly-registered one through the seam, no .secrets logic crossing a realm.
-      // The tailscale block is the ONE exception: its OAuth client is ndh's single source of trust
-      // (rke2lab holds no tailscale creds), so a TailscaleOauthClientGateway reading ndh's
-      // sops-nix-provisioned client is chained AHEAD of the .secrets door — it serves `tailscale`,
-      // everything else falls through to DotSecretsGateway.
+      // The secrets door — published into the framework it grew so the ghapp scion can rehydrate
+      // its anchor and persist a freshly-registered one through the seam, no .secrets logic
+      // crossing
+      // a realm. WHICH source backs the door is the ExecutionEnvironment's call, projected from the
+      // enclosure it detects: this grow runs OPERATOR, so the chain is ndh's OAuth client (serving
+      // `tailscale`, rke2lab's single source of trust for it) ahead of the operator's .secrets
+      // (everything else). An in-cluster process would resolve a different chain.
       gardening
           .connection()
           .context()
           .registerService(
               SecretsGateway.class,
-              new ChainedSecretsGateway(
-                  List.of(new TailscaleOauthClientGateway(), new DotSecretsGateway())),
+              new ExecutionEnvironment(System.getenv()).secretsGateway(),
               new Hashtable<>());
       // The manifests FACET amendment — the operator config subtree the root read from Pulumi,
       // published as an ambient AmendmentContributor (the same generic FacetContributor the incus

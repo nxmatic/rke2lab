@@ -1,4 +1,4 @@
-package io.seedmatic.rke2lab.controlplane.config;
+package io.seedmatic.rke2lab.host.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

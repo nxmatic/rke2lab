@@ -73,6 +73,13 @@
       <artifactId>pulumi-edge-testkit</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- host-runtime: the ExecutionEnclosure FACT + the SecretsGateway realisations the grow
+         registers into the framework (moved out of this module's config package so the Pulumi-free
+         manifests CLI can share the same container-to-source mapping). -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>host-runtime</artifactId>
+    </dependency>
     <!-- Runtime-scope: the host compiles only against the -port types; unitrepo-core is needed at
          run time (and on the test classpath the host-seam test locates it as a bundle). WI-C will
          embed it intact as an OSGi bundle. -->

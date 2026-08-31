@@ -17,6 +17,7 @@
 
   <modules>
     <module>host-parent</module>
+    <module>host-runtime</module>
     <module>pulumi</module>
   </modules>
 </project>

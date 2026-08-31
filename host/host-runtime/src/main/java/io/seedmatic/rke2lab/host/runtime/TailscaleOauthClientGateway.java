@@ -1,4 +1,4 @@
-package io.seedmatic.rke2lab.controlplane.config;
+package io.seedmatic.rke2lab.host.runtime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -93,7 +93,7 @@ public final class TailscaleOauthClientGateway implements SecretsGateway {
   /**
    * The OAuth client id embedded in {@code tskey-client-<id>-<rest>}, empty if the shape differs.
    */
-  private static Optional<String> clientId(final String secret) {
+  private Optional<String> clientId(final String secret) {
     if (!secret.startsWith(CLIENT_PREFIX)) {
       return Optional.empty();
     }

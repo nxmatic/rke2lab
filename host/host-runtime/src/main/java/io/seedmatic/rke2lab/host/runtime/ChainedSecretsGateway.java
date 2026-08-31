@@ -1,4 +1,4 @@
-package io.seedmatic.rke2lab.controlplane.config;
+package io.seedmatic.rke2lab.host.runtime;
 
 import io.seedmatic.rke2lab.seed.broker.port.SecretsGateway;
 import java.util.List;

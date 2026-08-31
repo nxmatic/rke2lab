@@ -1,4 +1,4 @@
-package io.seedmatic.rke2lab.controlplane.config;
+package io.seedmatic.rke2lab.host.runtime;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
