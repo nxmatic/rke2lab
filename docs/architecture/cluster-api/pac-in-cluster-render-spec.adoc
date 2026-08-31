@@ -142,78 +142,53 @@ push token. A `KubeSecretsGateway` mirroring `.secrets` is *unnecessary*. Both l
 App — the identity is uniform, only the token's provenance differs.
 
 [[tekton-in-source]]
-== The `.tekton/` PipelineRun lives in source (a bounded departure)
+== The Tekton resources are rendered manifests; only a minimal PipelineRun stub is source
 
-Everything else in this system is rendered by the synthesis and self-hosted via Flux. PaC's model
-REQUIRES the PipelineRun to be fetchable from the repo (`.tekton/` on the target branch) — so the CI
-definition is a *committed source artifact*, not a rendered one. This is not a wart; it is the RIGHT
-boundary, and there is a chicken-and-egg proof.
+The Tekton objects — the `Pipeline` `render-manifests` + its `Task`(s), the PaC `Repository` CR, the
+`pipelines-as-code-secret`, the funnel `Ingress` — are *ordinary K8S resources*, so they are RENDERED
+by `cicd` `ManifestsUnit`s and reconciled by Flux like everything else, living in `tekton-pipelines`.
+There is no dedicated `tekton/<cluster>` branch, no remote pipeline resolution, no second rendered
+branch — earlier drafts explored those; they were a design detour. The Tekton pipeline is not special;
+it is a manifest.
 
-*Why the pipeline must NOT be rendered.* Suppose we rendered the Pipeline onto `manifests/<cluster>`
-and had PaC resolve it remotely from there (to keep the synthesis ownership). Then the pipeline that
-PRODUCES the branch would live ON the branch it produces: a change to the pipeline def would only
-take effect on the render AFTER this one (which still resolves the OLD def from the branch) — a
-self-reference. A dedicated pipeline branch has the same defect (something must populate it; if the
-synthesis does, the render pipeline renders its own def). *The CI that produces rendered artifacts
-must not itself be a rendered artifact.* That is exactly why the universal convention keeps CI defs
-in source: the push IS both the change and the trigger — zero lag, no chicken-and-egg.
+The ONE thing that must be source is the *trigger*: PaC matches a `PipelineRun` in `.tekton/` on the
+code/default branch (`pipelinerun_provenance` is only `source` or `default_branch`). That stub is
+minimal and stable — it `pipelineRef`s the IN-CLUSTER `render-manifests` Pipeline by name, sets
+`on-event: [push]` + `on-target-branch`, and reads the per-cluster values (the cluster identity) from
+the `Repository` CR's `spec.params`. It is glue (which in-cluster Pipeline to run, on what event), not
+the pipeline logic — the logic is the rendered, Flux-reconciled Pipeline.
 
-So the line: *how the CI is triggered+shaped* is PaC-native in source `.tekton/` (the builder is a
-source input); *what the CI RUNS* (the manifests it renders) is the rendered/reconciled output. Only
-the PaC App secret + the `Repository` CR are rendered by `cicd` units — they are cluster
-configuration, not the builder. The render pipeline is also GENERIC (clone → verify → publish, not a
-per-cluster function), so unlike `manifests/<cluster>` it earns no per-cluster branch namespace — one
-`.tekton/` def, parameterized by the target cluster.
+=== The render self-reference + the `manifests → tekton → manifests` cycle are benign
 
-=== The `manifests → tekton → manifests` cycle is benign (self-management)
+The `render-manifests` Pipeline is a rendered manifest, and the render it runs produces (among
+everything) that same Pipeline — a self-reference. It is benign, and the deep reason is that *the
+trigger is source-scoped*: PaC only runs a PipelineRun whose `on-target-branch` matches the pushed
+branch (the SOURCE branch, e.g. `main`). The render's effects — a push to `manifests/<cluster>` (the
+OUTPUT branch) and Flux reconciling it — never match `on-target-branch`, so they never re-trigger PaC.
+The feedback loop is cut at the trigger; a render, even when it touches the Pipeline, cannot cause
+another render. What remains is the ordinary GitOps self-management loop (Flux-manages-Flux):
 
-The synthesis renders the Tekton config (the PaC App secret + `Repository` CR), and Tekton re-runs
-the synthesis — a cycle. It is the standard GitOps self-management loop (Flux-manages-Flux), NOT the
-fatal chicken-and-egg above, for two reasons:
+* *The grow bootstraps it.* seed-master renders EVERYTHING host-side at bootstrap (the Pipeline, the
+  PaC config, the manifests) and pushes; Flux applies it; PaC + the in-cluster Pipeline exist. The
+  first turn needs no Tekton.
+* *It converges with a one-run lag.* A change to the Pipeline (or the PaC config) is rendered →
+  pushed → Flux applies it in-cluster; the CURRENT run used the previous in-cluster Pipeline, the
+  NEXT run uses the new one. No fatal chicken-and-egg — exactly how any self-managing manifest
+  behaves. (Earlier drafts over-weighted this into a "the pipeline must be source" rule; it is only a
+  one-run lag.)
 
-* *The grow bootstraps it.* seed-master renders EVERYTHING host-side at bootstrap (including the
-  Tekton config) and pushes; Flux applies it; PaC is configured. The first turn needs no Tekton.
-* *The trigger does not depend on the rendered output.* The `.tekton/` def + trigger are in SOURCE —
-  PaC reads them from the push, never from `manifests/<cluster>`. Only the config DATA (PaC secret,
-  `Repository`) cycles, and Flux reconciles it (Tekton reads it from the cluster, not from the render
-  output). The loop converges through Flux.
+The residual fragility is the price of self-management: a render that pushes a BROKEN Pipeline or PaC
+config breaks the next trigger and needs a re-grow to recover — the grow is the escape hatch, as for
+any self-managing GitOps cluster.
 
-The residual fragility is the price of self-management: a render that pushes a BROKEN Tekton config
-(or toolchain FloxEnv) breaks the next trigger and needs a re-grow to recover — the grow is the
-escape hatch, exactly as for any self-managing GitOps cluster.
+=== No dedicated branch, no separate repo
 
-=== Isolation: a dedicated branch in rke2lab, NOT a separate repo
-
-The CI def is a separable CONCERN — authoring it needs Tekton YAML + the build invocation, never
-`osgi/`/`host/`/`docs/` in view. That justifies isolating it. The grain: a *dedicated branch in
-rke2lab*, not a separate repo.
-
-*Why not a separate repo (the flox comparison).* `flox-nri-plugin` and `flox-controller` earned
-their own repos by being INDEPENDENT software — own language (Go), own release lifecycle (consumed by
-rke2lab as flake inputs/images), reusable, own domain (GC-roots, CRD reconciliation). The cluster CI
-has none of that: it is thin glue that invokes *rke2lab's own build* (`mvn`, `manifests publish`) —
-no independent language, domain, or lifecycle. "How to build+publish rke2lab" is intrinsically
-rke2lab knowledge; a separate repo would be substanceless and would INVERT the coupling (chasing
-rke2lab's build interface from outside). So the CI belongs IN rke2lab, isolated on a branch for
-cognitive separation — not extracted.
-
-*Mechanic (confirmed).* PaC's `.spec.settings.pipelinerun_provenance` takes only `source` (the
-event's branch, default) or `default_branch` (e.g. `main`) — no arbitrary-branch provenance, so a
-`.tekton/` PipelineRun must live on the code branch. Real cognitive isolation comes from *remote
-resolution*: the `pipelinesascode.tekton.dev/pipeline` + `/task` annotations accept a full remote
-blob URL pointing at a file on a specific branch (e.g.
-`https://github.com/seedmatic/rke2lab/blob/tekton/render-pipeline.yaml`), and relative tasks resolve
-from that pipeline's base URL. So:
-
-* a *thin PipelineRun stub* `.tekton/render.yaml` on the code/default branch (read via provenance) —
-  `on-event: [push]`, `on-target-branch: [<grow branch>]`, `.../pipeline: <blob URL to the `tekton`
-  branch>` — the ~10 lines that must live on a code branch;
-* the *substantive Pipeline + Tasks* (clone / `mvn … verify` / `manifests publish`) on the dedicated
-  `tekton` branch, remote-resolved from that blob URL.
-
-The `tekton` branch is SOURCE (hand/tool-maintained, like `flox-catalogue`) — never rendered, so no
-chicken-and-egg; editing the pipeline logic happens there, without the codebase in view. This does
-not affect the rendered `cicd` units below.
+Because the Tekton objects are manifests, the isolation question dissolves: they live in
+`manifests/<cluster>` like the rest, reconciled by Flux; the only source footprint is the tiny
+`.tekton/` PipelineRun stub. A separate repo would be doubly wrong — the flox comparison holds
+(`flox-nri-plugin`/`flox-controller` earned repos by being independent software with their own
+language/lifecycle/domain; the render pipeline is thin glue over rke2lab's own build, intrinsically
+rke2lab knowledge), and a rendered K8S resource has no reason to leave the manifests it lives among.
 
 == Build — verify before publish
 
