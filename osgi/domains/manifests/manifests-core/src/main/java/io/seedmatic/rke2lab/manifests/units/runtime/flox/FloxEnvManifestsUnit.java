@@ -19,8 +19,9 @@ import software.constructs.Construct;
 
 /**
  * Emits the workload {@code FloxEnv} CRs the flox-controller realises on each node — the runtime
- * successor to the baked {@code environment.d} tree. Covers {@code kdns} (networking) and {@code
- * headscale}/{@code tailscale}/{@code headplane} (mesh).
+ * successor to the baked {@code environment.d} tree. Covers {@code kdns} (networking), {@code
+ * headscale}/{@code tailscale}/{@code headplane} (mesh), and the {@code maven} CI render toolchain
+ * (cicd).
  *
  * <p>Each env installs its workload package from the {@link FloxCatalogManifestsUnit} catalog via a
  * {@code floxcatalog:catalogue#<output>} ref (resolved same-namespace, both live in {@code
@@ -86,6 +87,9 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
       createEnv(scope, resolver, "tailscale-debug", FloxEnvFolder.MESH, tailscaleManifest(true));
       createEnv(scope, resolver, "headplane-debug", FloxEnvFolder.MESH, headplaneManifest(true));
     }
+    // The CI render toolchain (cicd/maven): the flox NRI plugin injects it into the Tekton
+    // render-publish step (step-render). Always emitted — the toolchain is not debug-flavored.
+    createEnv(scope, resolver, "maven", FloxEnvFolder.CICD, mavenManifest());
   }
 
   private void createEnv(
@@ -195,6 +199,24 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     // need — headplane symlinks /usr/libexec/headplane/agent to `command -v hp_agent`.
     install.put("headplane-agent", flakeRef("headplane-agent"));
     install.put("headplane-ssh-wasm", flakeRef("headplane-ssh-wasm"));
+    return manifest(install);
+  }
+
+  /**
+   * The CI render toolchain, injected by the flox NRI plugin into the Tekton {@code render-publish}
+   * step. {@code jdk25} + {@code maven} come from the catalog as the pinned rke2lab flake outputs
+   * (the SAME toolchain SSOT the dev shell uses — {@code github:seedmatic/rke2lab#jdk25}/{@code
+   * #maven} — re-exported by the flox-catalogue flake), so the in-cluster {@code clean verify} runs
+   * the spotless/shfmt gates at the same versions as dev. {@code git}/{@code bash}/{@code
+   * coreutils} are stock catalog packages for the clone + reactor scripts.
+   */
+  private Map<String, Object> mavenManifest() {
+    final Map<String, Object> install = new LinkedHashMap<>();
+    install.put("jdk25", flakeRef("jdk25"));
+    install.put("maven", flakeRef("maven"));
+    install.put("git", catalogAll("git"));
+    install.put("bash", catalogAll("bash"));
+    install.put("coreutils", catalogAll("coreutils"));
     return manifest(install);
   }
 
