@@ -1,0 +1,96 @@
+package io.seedmatic.rke2lab.manifests.units.cicd;
+
+import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import java.util.List;
+import java.util.Map;
+import org.cdk8s.ApiObject;
+import org.cdk8s.ApiObjectMetadata;
+import org.cdk8s.ApiObjectProps;
+import org.cdk8s.JsonPatch;
+import software.constructs.Construct;
+
+/**
+ * The Pipelines-as-Code {@code Repository} CR — the Tekton TWIN of the Flux {@code GitRepository}
+ * ({@code FluxRootManifestsUnit}). Where the Flux {@code GitRepository} declares the OUTPUT branch
+ * ({@code manifests/<cluster>}) it pulls, this {@code Repository} declares the SOURCE repo
+ * (rke2lab) PaC watches for pushes and binds it to the execution namespace ({@code
+ * tekton-pipelines}, where PaC runs the matched PipelineRuns).
+ *
+ * <p>The per-cluster attachment rides {@code spec.params}: the {@code .tekton/} PipelineRun stub on
+ * the source branch reads {@code {{ cluster }}} / {@code {{ node }}} from here (PaC exposes a
+ * {@code Repository}'s {@code spec.params} as standard PipelineRun params), so the generic stub
+ * renders {@code manifests publish} for THIS cluster ({@code -Dcluster=…} → pushes {@code
+ * manifests/<cluster>}). The identity comes from the synth-time {@link BootstrapIdentity} the
+ * synthesis already holds — the same slice {@code FluxRootManifestsUnit} names the branch from.
+ *
+ * <p>Not a secret, not the bootstrap lane: the {@code Repository} carries no credential (the App is
+ * configured globally in {@code pipelines-as-code-secret}), so it reconciles from the branch like
+ * any other resource. {@code spec.url} matches the {@code GitRepository} source of truth minus the
+ * {@code .git} suffix (PaC canonicalises the GitHub repo URL without it).
+ */
+public final class RepositoryManifestsUnit extends AbstractManifestsUnit {
+
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.CICD + "/repository";
+
+  private static final String NAMESPACE = "tekton-pipelines";
+
+  private static final String REPOSITORY_NAME = "rke2lab";
+
+  private static final String SOURCE_REPO_URL = "https://github.com/seedmatic/rke2lab";
+
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile("cicd", "repository");
+
+  public RepositoryManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final BootstrapIdentity identity = ManifestSynthesisContext.current().bootstrapIdentity();
+
+    final ApiObject repository =
+        new ApiObject(
+            scope,
+            "repository-rke2lab",
+            ApiObjectProps.builder()
+                .apiVersion("pipelinesascode.tekton.dev/v1alpha1")
+                .kind("Repository")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name(REPOSITORY_NAME)
+                        .namespace(NAMESPACE)
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "pipelinesascode.tekton.dev|Repository|"
+                                    + NAMESPACE
+                                    + "|"
+                                    + REPOSITORY_NAME))
+                        .build())
+                .build());
+
+    repository.addJsonPatch(
+        JsonPatch.add(
+            "/spec",
+            Map.of(
+                "url",
+                SOURCE_REPO_URL,
+                // Exposed to the .tekton/ PipelineRun as {{ cluster }} / {{ node }} — the generic
+                // stub renders `manifests publish` for THIS cluster without threading identity
+                // through the source repo.
+                "params",
+                new Object[] {
+                  Map.of("name", "cluster", "value", identity.clusterName()),
+                  Map.of("name", "node", "value", identity.nodeName())
+                },
+                // Read the PipelineRun definition from the branch that was pushed (the grow branch
+                // is the source of truth); PaC's provenance is only `source` or `default_branch`.
+                "settings",
+                Map.of("pipelinerun_provenance", "source"))));
+  }
+}

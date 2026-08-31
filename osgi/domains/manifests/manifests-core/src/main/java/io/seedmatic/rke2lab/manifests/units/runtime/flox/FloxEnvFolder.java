@@ -15,7 +15,8 @@ package io.seedmatic.rke2lab.manifests.units.runtime.flox;
  */
 public enum FloxEnvFolder {
   NETWORKING("networking"),
-  MESH("mesh");
+  MESH("mesh"),
+  CICD("cicd");
 
   private final String value;
 

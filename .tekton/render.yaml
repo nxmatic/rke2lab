@@ -1,0 +1,58 @@
+# Pipelines-as-Code trigger stub — the ONE source footprint of the in-cluster render loop.
+#
+# PaC matches a PipelineRun in `.tekton/` on the pushed (source) branch — `pipelinerun_provenance`
+# is only `source` or `default_branch`, so the pipeline LOGIC cannot be rendered; it lives in-cluster
+# as the Flux-reconciled `render-manifests` Pipeline (RenderPipelineManifestsUnit). This stub is glue:
+# which in-cluster Pipeline to run, on what event, with which workspaces + identity.
+#
+# See docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc.
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: render-manifests
+  annotations:
+    # Fire on a push to the grow branch (the source of truth: feature/nixos-node-substrate today,
+    # main at term). The render's OUTPUT push to manifests/<cluster> never matches this, so the loop
+    # is cut at the trigger — no feedback re-trigger.
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[feature/nixos-node-substrate]"
+    pipelinesascode.tekton.dev/max-keep-runs: "5"
+    # flox NRI injection (dogfooding): the plugin keys per-container on flox.dev/environment.<c> with
+    # NO bare-key fallback, so this names the render task's step container (step-render) explicitly.
+    # It propagates to every task pod; only the render-publish pod owns a step-render container, so
+    # the git-fetch pod ignores it. The CI flox envs are specialised PER TASK under the cicd folder.
+    flox.dev/environment.step-render: "cicd/maven"
+    flox.dev/home.step-render: "/root"
+    flox.dev/uid.step-render: "0"
+    flox.dev/gid.step-render: "0"
+spec:
+  pipelineRef:
+    name: render-manifests
+  params:
+    # PaC dynamic variables (the pushed commit + repo).
+    - name: repo-url
+      value: "{{ repo_url }}"
+    - name: revision
+      value: "{{ revision }}"
+    # From the PaC Repository CR spec.params (RepositoryManifestsUnit) — the per-cluster identity.
+    - name: cluster
+      value: "{{ cluster }}"
+    - name: node
+      value: "{{ node }}"
+  workspaces:
+    # Per-run scratch shared fetch -> render; RWO co-locates the two task pods on the single node.
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 2Gi
+    # The persistent ~/.m2 + build-cache PVC (RenderPipelineManifestsUnit); serialised, RWO.
+    - name: maven-cache
+      persistentVolumeClaim:
+        claimName: manifests-maven-cache
+    # PaC injects the App token here — .git-credentials + .gitconfig for the clone + the ff-push.
+    - name: basic-auth
+      secret:
+        secretName: "{{ git_auth_secret }}"
