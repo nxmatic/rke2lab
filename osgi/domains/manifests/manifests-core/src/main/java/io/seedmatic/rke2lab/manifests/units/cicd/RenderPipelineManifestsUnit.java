@@ -43,10 +43,13 @@ import software.constructs.Construct;
  * serialised (concurrency 1, set on the PaC {@code Repository}/stub) — a Maven local repo + build-
  * cache are not multi-writer safe.
  *
- * <p>Forward references (functional once the flox-catalogue branch lands the toolchain): the render
- * task's {@code cicd/<task-env>} FloxEnv (JDK 25 / maven) does not exist yet, and the exact push-
- * token consumption in the {@code publish} step finalises with the in-cluster {@code git_auth}
- * wiring. The objects render structurally now so the resources materialise and reconcile.
+ * <p>The push token is wired: the {@code render-publish} step extracts PaC's App token from the
+ * mounted {@code git_auth} secret into {@code RKE2LAB_PUSH_TOKEN}, which the in-cluster {@code
+ * publish} reveals for the ff-push (container-aware {@code
+ * ManifestSynthesisScenario.revealGithubToken} — cellar OPERATOR, env IN_CLUSTER). The one forward
+ * reference left is the render task's {@code cicd/<task-env>} FloxEnv (JDK 25 / maven), which the
+ * flox-catalogue branch lands; the objects render structurally now so the resources materialise and
+ * reconcile.
  */
 public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
 
@@ -220,13 +223,18 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           // Reactor discipline: -am builds siblings from target/, verify runs the
                           // tests + staging gates before any push. Never `install`.
                           "./mvnw -Dmaven.repo.local=\"$MAVEN_REPO\" -pl :manifests-cli -am clean verify",
-                          // Adopt PaC's App credentials for the ff-push to manifests/<cluster>. The
-                          // publish delivery's exact token consumption finalises with the
-                          // in-cluster
-                          // git_auth wiring.
-                          "if [ -f \"$(workspaces.basic-auth.path)/.git-credentials\" ]; then",
-                          "  cp \"$(workspaces.basic-auth.path)/.git-credentials\" \"$HOME/.git-credentials\"",
-                          "  cp \"$(workspaces.basic-auth.path)/.gitconfig\" \"$HOME/.gitconfig\"",
+                          // PaC minted an App token into the mounted git_auth secret. Adopt its git
+                          // config AND extract the token into RKE2LAB_PUSH_TOKEN so the in-cluster
+                          // publish reveals it for the ff-push (the scion reads it in-container —
+                          // ManifestSynthesisScenario.revealGithubToken). Backticks, not $(...), so
+                          // Tekton doesn't mistake the shell substitution for one of its own vars.
+                          // The exact git_auth layout finalises at first run.
+                          "GIT_AUTH_DIR=\"$(workspaces.basic-auth.path)\"",
+                          "if [ -f \"$GIT_AUTH_DIR/.git-credentials\" ]; then",
+                          "  cp \"$GIT_AUTH_DIR/.git-credentials\" \"$HOME/.git-credentials\"",
+                          "  cp \"$GIT_AUTH_DIR/.gitconfig\" \"$HOME/.gitconfig\" 2>/dev/null || true",
+                          "  export RKE2LAB_PUSH_TOKEN=`sed -E 's#https://[^:]+:([^@]+)@.*#\\1#'"
+                              + " $HOME/.git-credentials | head -n1`",
                           "fi",
                           "java \\",
                           "  -Drke2lab.manifests.outdir=\"$(workspaces.source.path)/render\" \\",

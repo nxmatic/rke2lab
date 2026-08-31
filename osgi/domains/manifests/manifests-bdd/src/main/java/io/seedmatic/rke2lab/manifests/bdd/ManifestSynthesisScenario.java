@@ -263,18 +263,34 @@ public class ManifestSynthesisScenario
   }
 
   /**
-   * The GitHub token the auth-seal filed SEALED, revealed from the cellar for a force-push. Empty
-   * when no cellar/plot (a survey) or the seal did not run (no gh session) — the push is then
-   * simply skipped. Reads {@link AuthCoordinate#GITHUB_TOKEN} directly (manifests-bdd already
-   * depends on auth-contract for the version bumper).
+   * The GitHub token for the force-push, resolved by CONTAINER (the two lanes the {@code
+   * host/host-runtime} {@code ExecutionEnclosure} FACT names):
+   *
+   * <ul>
+   *   <li>OPERATOR — the {@code auth}-seal minted a token from a {@code gh} session and filed it
+   *       SEALED; revealed here from the cellar ({@link AuthCoordinate#GITHUB_TOKEN}).
+   *   <li>IN_CLUSTER — the renderer runs inside a Tekton PipelineRun; there is no {@code gh}
+   *       session and nothing fills the cellar. Pipelines-as-Code has already minted an App token
+   *       and the {@code render-publish} step extracts it from the mounted {@code git_auth} secret
+   *       into {@code RKE2LAB_PUSH_TOKEN}. Read in-container — the token never crosses the
+   *       host↔OSGi membrane (no seam word), the twin locality of the cellar reveal.
+   * </ul>
+   *
+   * <p>Empty when neither is present (a survey / a render that isn't a push) — the push is then
+   * simply skipped. The cellar wins when both are set (an operator run never sets the env).
    */
   private Optional<String> revealGithubToken() {
-    if (cellar == null || parcel.isEmpty()) {
-      return Optional.empty();
-    }
-    return cellar
-        .fetch(parcel.orElseThrow(), AuthCoordinate.GITHUB_TOKEN, GithubToken.class)
-        .map(GithubToken::token);
+    final Optional<String> sealed =
+        (cellar == null || parcel.isEmpty())
+            ? Optional.empty()
+            : cellar
+                .fetch(parcel.orElseThrow(), AuthCoordinate.GITHUB_TOKEN, GithubToken.class)
+                .map(GithubToken::token);
+    return sealed.or(
+        () ->
+            Optional.ofNullable(System.getenv("RKE2LAB_PUSH_TOKEN"))
+                .map(String::trim)
+                .filter(token -> !token.isEmpty()));
   }
 
   /** The rendered-branch delivery plan carried from the scenario into the THEN. */
