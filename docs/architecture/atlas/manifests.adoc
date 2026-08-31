@@ -260,3 +260,39 @@ node-env and host-asset channels pioneered before they were dissolved: `Manifest
 SCR `@Component` keyed by `domainId`, collected by `DefaultManifestSynthesisService` via
 `@Reference(MULTIPLE)`, and the static chain is erased. The shape outlived the two channels that first
 carried it.
+
+=== Diagram O — additivity: the delivery loop closes (grow → publish → PaC)
+
+Diagrams M/N are what the synthesis produces + how it is fed. This is what carries the OUTPUT to the
+cluster, and how it re-renders itself. The render+push OPERATION is one thing (the OSGi
+`ghapp`→`auth`→`manifests` scion graph); what changes is the HOST that sows it. Monotone: the grow
+lane is the shipped base (blue), the standalone `publish` verb is shipped (blue), the in-cluster PaC
+lane is the target (green). Full detail:
+link:../cluster-api/pac-in-cluster-render-spec.adoc[the PaC in-cluster render spec].
+
+[mermaid]
+....
+flowchart LR
+  Op["the OPERATION<br/>ghapp -> auth -> manifests<br/>(OSGi scions, one thing)"]
+  subgraph hosts ["the HOSTS that sow it"]
+    Grow["grow / seed-master<br/>1st render+push (Pulumi envelope)"]
+    Pub["manifests publish<br/>operator standalone CLI"]
+    PaC["in-cluster PaC PipelineRun<br/>on source push"]
+  end
+  Grow --> Op
+  Pub --> Op
+  PaC --> Op
+  Op -->|push manifests/cluster| Flux["Flux reconcile"]
+  classDef base fill:#dfe7ff,stroke:#37f;
+  classDef tgt fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class Grow,Pub base;
+  class PaC tgt;
+....
+
+*What holds.* The operation is realm-neutral (it never knows its host) — the same coordinates sown
+under a Pulumi grow, a standalone CLI, or a PaC PipelineRun. The push identity is uniform (the baked
+GitHub App) across all three; only the token's provenance is host-specific, resolved by the
+`ExecutionEnvironment` FACT (OPERATOR mints via `.secrets`; IN_CLUSTER consumes PaC's `git_auth`).
+The render output is secret-blind (real-data secrets ride the NODE_BOOTSTRAP lane, off the branch),
+so the in-cluster `EmptySecretsGateway` holds — the loop closes without descending any operator
+secret into the cluster.

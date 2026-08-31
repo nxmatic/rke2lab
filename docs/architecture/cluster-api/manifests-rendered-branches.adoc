@@ -535,6 +535,7 @@ into, rather than co-developing both at once.
 
 == Related Documentation
 
+* link:pac-in-cluster-render-spec.adoc[In-cluster render via Pipelines-as-Code] — the UPSTREAM half of this loop: how the rendered branch is re-produced + pushed in-cluster (Tekton PaC) when the source changes, so this downstream reconcile has fresh content to track
 * link:management-workload-topology.adoc[Management / Workload Topology] — which clusters exist and why
 * link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] — the per-cluster Flux/vCluster (Option D) pattern this generalises
 * link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] — the concrete `FluxRoot` / Kustomization shapes

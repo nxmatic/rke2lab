@@ -1,0 +1,282 @@
+= In-cluster manifests render via Pipelines-as-Code — the upstream GitOps loop
+:toc: left
+:toclevels: 3
+
+== Overview
+
+The GitOps delivery loop has two halves. The *downstream* half is shipped
+(link:manifests-rendered-branches.adoc[the rendered-branch model] + the Flux push webhook):
+a push to the rendered branch `manifests/<cluster>` triggers a Flux reconcile at once. This
+document specifies the *upstream* half: when the manifests **source code** changes, re-render and
+push `manifests/<cluster>` **in-cluster**, without a grow.
+
+Three lanes, one operation:
+
+* *Grow* (seed-master) — the FIRST render+push, host-side. It MUST be host-side: at bootstrap there
+  is no cluster, no Tekton, no webhook, and Flux needs the branch to pull.
+* *Downstream* (Flux webhook) — the rendered branch changes → reconcile.
+* *Upstream* (THIS doc) — the source changes → re-render → push the rendered branch → downstream fires.
+
+The render+push OPERATION is not owned by any executable — it lives in OSGi (the
+`ghapp`→`auth`→`manifests` scion graph, driven through the `seed.broker.port` membrane). seed-master
+and the `manifests publish` CLI are thin HOSTS that sow the SAME coordinates, differing only by
+envelope (Pulumi grow vs standalone CLI). The upstream lane runs `manifests publish` inside a
+Tekton PipelineRun — no standing renderer workload (staleness-free: it builds from the source it
+renders; the first render stays seed-master's, Tekton maintains).
+
+*Why Pipelines-as-Code (PaC), not raw Triggers or a bespoke renderer Deployment:* PaC is Tekton's
+GitHub-App-native CI — it handles the webhook, matches PipelineRuns from the repo's `.tekton/`, and
+authenticates as a GitHub App. We already baked a GitHub App for this automation and PaC is already
+installed (Tekton profile `all`). Reusing it dissolves the webhook plumbing AND the in-cluster push
+credential (see <<auth>>). Don't reinvent the wheel.
+
+== Architecture views
+
+=== System context (C4 L1)
+
+[mermaid]
+....
+flowchart TB
+  Dev["Operator / CI<br/>pushes manifests source"]
+  App["GitHub App<br/>(baked for this automation)"]
+  PaC["Pipelines-as-Code<br/>(in tekton-pipelines)"]
+  Flux["Flux<br/>(reconciles manifests/cluster)"]
+  Dev -->|push source @R| App
+  App -->|App webhook| PaC
+  PaC -->|renders + pushes as the App| Branch["manifests/cluster branch"]
+  Branch -->|repo webhook| Flux
+  Flux -->|apply| Cluster["the cluster"]
+....
+
+The App is the single automation identity across all three lanes (grow, operator publish, in-cluster
+PaC) — the push always authenticates as the App.
+
+=== The loop (flow)
+
+[mermaid]
+....
+flowchart LR
+  Dev["dev push<br/>rke2lab source @R"] -->|App webhook| PW["PaC webhook<br/>(Tailscale funnel)"]
+  PW --> PaC["PaC controller<br/>auth as the App"]
+  PaC -->|match .tekton/ + Repository CR| PLR["PipelineRun<br/>pod flox-annote, NRI toolchain"]
+  subgraph P["PipelineRun (tekton-pipelines)"]
+    F["PaC fetch @R<br/>+ git_auth_secret = App token"] --> B["mvn -pl :manifests-cli -am clean verify<br/>cache: PVC ~/.m2 RWO, concurrency 1"]
+    B --> Pub["manifests publish<br/>push with the PaC token"]
+  end
+  PLR --> P
+  Pub -->|push| Branch["manifests/cluster"]
+  Branch -->|Flux webhook| Flux["Flux reconcile"]
+....
+
+== The pieces
+
+[cols="1,3",options="header"]
+|===
+| Piece | Role + home
+
+| `pipelines-as-code-secret`
+| Configures PaC with OUR baked App (`github-application-id`, `github-private-key`, `webhook.secret`)
+  → PaC acts AS the App (webhook, clone, statuses, `git_auth_secret`). Rendered by a `cicd`
+  `ManifestsUnit` (reads `github.app`, sealed at grow). NODE_BOOTSTRAP lane (a real-data secret,
+  never on the reconciled branch).
+
+| `Repository` CR (`pipelinesascode.tekton.dev`)
+| The Tekton TWIN of the Flux `GitRepository`: where the cluster's branch/identity attachment is
+  declared. The Flux `GitRepository` declares the OUTPUT branch (`manifests/<cluster>`); the PaC
+  `Repository` declares the SOURCE repo (rke2lab) + binds it to the execution namespace, and carries
+  the per-cluster attachment in `spec.params` — the cluster identity (`clusterName`/`nodeName`) the
+  generic `.tekton/` pipeline reads (`{{ params.cluster }}` → `manifests publish -Dcluster=…` →
+  targets `manifests/<cluster>`), and the source-branch attachment (`on-target-branch`). Rendered
+  per-cluster by a `cicd` `RepositoryManifestsUnit` (the synthesis already holds the IDENTITY
+  amendment), self-hosted via Flux. *Open (ties to Q1):* the source grow branch is not yet a
+  synthesis input — declaring it as the cluster's attachment (vs a generic `on-target-branch` in the
+  stub) would make it a first-class IDENTITY/FACET field.
+
+| `.tekton/render-manifests.yaml`
+| The PipelineRun, *committed in the rke2lab SOURCE repo* — NOT rendered by the synthesis. PaC
+  matches it on `on-event: [push]` + `on-target-branch: [<branch>]`. See <<tekton-in-source>>.
+
+| Tailscale funnel Ingress → PaC controller
+| The one public door GitHub's App webhook needs — the twin of the Flux webhook funnel (a
+  Tailscale-provisioned LE cert; the funnel is the Tailscale operator's, not headscale's).
+
+| `manifests-render` ServiceAccount + RBAC
+| The PipelineRun identity: mount the `~/.m2` PVC, consume the `git_auth_secret`.
+|===
+
+== Operator setup — extend the existing App, do not create a new one
+
+There is no Tekton/PaC webhook yet (`pipelines-as-code-secret` is unconfigured). What exists is the
+baked GitHub App + a repo-level Flux webhook (HMAC `github.webhook.token`). Configuring PaC EXTENDS
+the one App (the single automation identity) — a new App would fragment the identity and double the
+rotation. Out-of-band operator ceremony on the GitHub App:
+
+* point the App's webhook URL at the PaC funnel — the App has ONE webhook URL, currently free (Flux
+  uses a SEPARATE repo-level webhook, so the two coexist without collision);
+* add the `push` event;
+* extend permissions with `checks:write` (PaC statuses) + `metadata:read`, on top of the `contents`
+  read (Flux pull) + write (render push) the App already carries.
+
+[[auth]]
+== Auth — the App identity everywhere, the in-cluster token dissolved by PaC
+
+The render OUTPUT is *secret-blind*: the reconciled branch Flux tracks carries ZERO secret bytes —
+every real-data secret rides the `NODE_BOOTSTRAP` lane, which the exploder writes OUTSIDE the git
+worktree (`NodeBootstrapArtifact`, a sibling above the tree; never staged/committed/pushed). Only the
+*push* needs a credential, and it is container-dependent — the `link:../../../host/host-runtime[ExecutionEnvironment]`
+FACT (OPERATOR vs IN_CLUSTER) is the seam that resolves it.
+
+[cols="1,3",options="header"]
+|===
+| Container | Push token
+| OPERATOR (the operator's host)
+| Minted in-container via the `ghapp`→`auth` scions (which read `.secrets` through the
+  `SecretsGateway`) — the `manifests publish` verb's current path.
+| IN_CLUSTER (PaC)
+| *Provided by PaC* — its `git_auth_secret` is a basic-auth token of the App (PaC mints it from the
+  configured App). `publish` consumes it; it sows NO `ghapp`/`auth` and needs NO secrets gateway.
+|===
+
+So in-cluster the `ExecutionEnvironment` stays the secret-blind `EmptySecretsGateway`; PaC hands the
+push token. A `KubeSecretsGateway` mirroring `.secrets` is *unnecessary*. Both lanes push as the SAME
+App — the identity is uniform, only the token's provenance differs.
+
+[[tekton-in-source]]
+== The `.tekton/` PipelineRun lives in source (a bounded departure)
+
+Everything else in this system is rendered by the synthesis and self-hosted via Flux. PaC's model
+REQUIRES the PipelineRun to be fetchable from the repo (`.tekton/` on the target branch) — so the CI
+definition is a *committed source artifact*, not a rendered one. This is not a wart; it is the RIGHT
+boundary, and there is a chicken-and-egg proof.
+
+*Why the pipeline must NOT be rendered.* Suppose we rendered the Pipeline onto `manifests/<cluster>`
+and had PaC resolve it remotely from there (to keep the synthesis ownership). Then the pipeline that
+PRODUCES the branch would live ON the branch it produces: a change to the pipeline def would only
+take effect on the render AFTER this one (which still resolves the OLD def from the branch) — a
+self-reference. A dedicated pipeline branch has the same defect (something must populate it; if the
+synthesis does, the render pipeline renders its own def). *The CI that produces rendered artifacts
+must not itself be a rendered artifact.* That is exactly why the universal convention keeps CI defs
+in source: the push IS both the change and the trigger — zero lag, no chicken-and-egg.
+
+So the line: *how the CI is triggered+shaped* is PaC-native in source `.tekton/` (the builder is a
+source input); *what the CI RUNS* (the manifests it renders) is the rendered/reconciled output. Only
+the PaC App secret + the `Repository` CR are rendered by `cicd` units — they are cluster
+configuration, not the builder. The render pipeline is also GENERIC (clone → verify → publish, not a
+per-cluster function), so unlike `manifests/<cluster>` it earns no per-cluster branch namespace — one
+`.tekton/` def, parameterized by the target cluster.
+
+=== The `manifests → tekton → manifests` cycle is benign (self-management)
+
+The synthesis renders the Tekton config (the PaC App secret + `Repository` CR), and Tekton re-runs
+the synthesis — a cycle. It is the standard GitOps self-management loop (Flux-manages-Flux), NOT the
+fatal chicken-and-egg above, for two reasons:
+
+* *The grow bootstraps it.* seed-master renders EVERYTHING host-side at bootstrap (including the
+  Tekton config) and pushes; Flux applies it; PaC is configured. The first turn needs no Tekton.
+* *The trigger does not depend on the rendered output.* The `.tekton/` def + trigger are in SOURCE —
+  PaC reads them from the push, never from `manifests/<cluster>`. Only the config DATA (PaC secret,
+  `Repository`) cycles, and Flux reconciles it (Tekton reads it from the cluster, not from the render
+  output). The loop converges through Flux.
+
+The residual fragility is the price of self-management: a render that pushes a BROKEN Tekton config
+(or toolchain FloxEnv) breaks the next trigger and needs a re-grow to recover — the grow is the
+escape hatch, exactly as for any self-managing GitOps cluster.
+
+=== Isolation: a dedicated branch in rke2lab, NOT a separate repo
+
+The CI def is a separable CONCERN — authoring it needs Tekton YAML + the build invocation, never
+`osgi/`/`host/`/`docs/` in view. That justifies isolating it. The grain: a *dedicated branch in
+rke2lab*, not a separate repo.
+
+*Why not a separate repo (the flox comparison).* `flox-nri-plugin` and `flox-controller` earned
+their own repos by being INDEPENDENT software — own language (Go), own release lifecycle (consumed by
+rke2lab as flake inputs/images), reusable, own domain (GC-roots, CRD reconciliation). The cluster CI
+has none of that: it is thin glue that invokes *rke2lab's own build* (`mvn`, `manifests publish`) —
+no independent language, domain, or lifecycle. "How to build+publish rke2lab" is intrinsically
+rke2lab knowledge; a separate repo would be substanceless and would INVERT the coupling (chasing
+rke2lab's build interface from outside). So the CI belongs IN rke2lab, isolated on a branch for
+cognitive separation — not extracted.
+
+*Mechanic (confirmed).* PaC's `.spec.settings.pipelinerun_provenance` takes only `source` (the
+event's branch, default) or `default_branch` (e.g. `main`) — no arbitrary-branch provenance, so a
+`.tekton/` PipelineRun must live on the code branch. Real cognitive isolation comes from *remote
+resolution*: the `pipelinesascode.tekton.dev/pipeline` + `/task` annotations accept a full remote
+blob URL pointing at a file on a specific branch (e.g.
+`https://github.com/seedmatic/rke2lab/blob/tekton/render-pipeline.yaml`), and relative tasks resolve
+from that pipeline's base URL. So:
+
+* a *thin PipelineRun stub* `.tekton/render.yaml` on the code/default branch (read via provenance) —
+  `on-event: [push]`, `on-target-branch: [<grow branch>]`, `.../pipeline: <blob URL to the `tekton`
+  branch>` — the ~10 lines that must live on a code branch;
+* the *substantive Pipeline + Tasks* (clone / `mvn … verify` / `manifests publish`) on the dedicated
+  `tekton` branch, remote-resolved from that blob URL.
+
+The `tekton` branch is SOURCE (hand/tool-maintained, like `flox-catalogue`) — never rendered, so no
+chicken-and-egg; editing the pipeline logic happens there, without the codebase in view. This does
+not affect the rendered `cicd` units below.
+
+== Build — verify before publish
+
+The pipeline runs `mvn -pl :manifests-cli -am clean verify` (not `package`): `verify` runs the tests
++ staging gates (realm-wiring-integrity, spec-coverage) so a broken manifests change can NEVER be
+pushed. `verify` sits before `install` in the lifecycle → the reactor discipline holds (siblings
+resolve from `target/`, nothing is installed to `~/.m2`). Speed:
+
+* A *RWO PVC* mounted at `~/.m2` carries the dependency repo + the maven-build-cache. `clean` wipes
+  the module `target/` dirs but NOT the PVC build-cache, so unchanged modules restore from cache.
+* The pipeline is *serialised* (concurrency 1) — a Maven local repo + build-cache are not
+  multi-writer safe, and two renders racing to push the branch is undesirable anyway.
+
+*Runtime = the flox NRI plugin (dogfooding).* The PipelineRun pod is flox-annotated → the NRI plugin
+injects a FloxEnv build-toolchain (JDK 25 / maven). No bespoke toolchain image; its lifecycle is a
+FloxEnv CR. The NRI plugin is baked into the node base (a systemd service) → present before Tekton,
+so no circular bootstrap. Ownership: the toolchain FloxEnv, the `Repository` CR, and the PaC secret
+all belong to the `cicd` domain (where `TektonPipelinesManifestsUnit` owns the Tekton config); the
+FloxEnv flavor is `FloxEnvFolder=cicd`.
+
+== Which revision, which branch
+
+PaC fetches the *pushed commit* (`@R`) and matches `on-target-branch` — the branch the cluster was
+grown from (the source-of-truth branch: `feature/nixos-node-substrate` today, `main` at term). The
+`.tekton/` PipelineRun must exist on that branch. The rendered revision is thus the triggering push's
+commit — determinism + consistency with what an operator would render.
+
+== Anti-patterns
+
+* ❌ *Render the PipelineRun via the synthesis.* PaC only matches `.tekton/` in the repo; a rendered
+  PipelineRun would never fire. ✅ Commit the PipelineRun in source `.tekton/`; render only the PaC
+  App secret + `Repository` CR.
+* ❌ *Mint or mirror a push credential in-cluster* (a `KubeSecretsGateway` over `.secrets`, or an
+  in-cluster `ghapp`→`auth`). ✅ Consume PaC's `git_auth_secret` — it is already an App token.
+* ❌ *A standing renderer Deployment* watching for changes. ✅ Event-driven build-and-run — the
+  renderer is a per-run build artifact, staleness-free (built from the source it renders).
+* ❌ *`mvn install`* to make siblings resolve. ✅ `-am clean verify` (reactor from `target/`).
+
+== Troubleshooting
+
+[cols="1,2",options="header"]
+|===
+| Symptom | Cause / fix
+| PaC never fires on a push
+| The App webhook isn't pointing at the PaC funnel, or the App lacks *webhook events (push)* /
+  *checks* permissions (ours was scoped for Flux contents:read + push contents:write). Extend the
+  App's permissions+events; confirm the App webhook URL = the PaC funnel host.
+| `manifests publish` renders but the push is skipped
+| The `git_auth_secret` wasn't wired into `publish` — in-cluster `ExecutionEnvironment.pushToken()`
+  must read PaC's mounted token, else the delivery reveals an empty token and skips the push (the
+  signed commit still lands locally).
+| The reconciled branch churns with empty commits
+| A structural re-render on an unchanged source is a no-op fast-forward; if it is not, check the
+  render is deterministic (input hashing) — the NODE_BOOTSTRAP secrets must stay off the branch.
+|===
+
+== Related Documentation
+
+* link:manifests-rendered-branches.adoc[Manifests Rendered Branches] — the downstream half (the
+  `manifests/*` branch model + the Flux push webhook) this loop feeds.
+* link:../manifests/manifests-architecture.adoc[Manifests Architecture] — the `ManifestsUnit` model
+  the `cicd` PaC/Repository units join.
+* link:../patterns/cli-scion-and-dual-realm-ingress.adoc[CLIs are scions] — why `manifests publish`
+  sows a scenario through the broker rather than calling a typed service.
+* link:../atlas/manifests.adoc[Atlas L1 — Manifests] — the subsystem map (see the in-cluster render
+  loop figure).
