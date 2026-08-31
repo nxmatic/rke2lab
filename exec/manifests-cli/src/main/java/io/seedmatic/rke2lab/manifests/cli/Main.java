@@ -9,6 +9,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextScenarioWriter;
 import io.seedmatic.rke2lab.manifests.cli.bdd.ManifestsCliRun;
 import io.seedmatic.rke2lab.manifests.cli.bdd.ManifestsCliScenario;
+import io.seedmatic.rke2lab.manifests.cli.bdd.PublishCliScenario;
 import io.seedmatic.rke2lab.manifests.cli.bdd.VersionsCliRun;
 import io.seedmatic.rke2lab.manifests.cli.bdd.VersionsCliScenario;
 import io.seedmatic.rke2lab.manifests.ingress.BumpLevel;
@@ -78,6 +79,9 @@ public final class Main {
       case "synthesize" -> {
         return commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties()));
       }
+      case "publish" -> {
+        return commandOf(new PublishCommand.Builder(this).run(runForPublish()));
+      }
       case "versions" -> {
         final java.util.Map<String, String> options = optionArgs(args);
         return commandOf(
@@ -95,6 +99,7 @@ public final class Main {
   private List<CliCommand> availableCommands() {
     return List.of(
         commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties())),
+        commandOf(new PublishCommand.Builder(this).run(runFromSystemProperties())),
         commandOf(new VersionsCommand.Builder(this)),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
@@ -104,7 +109,7 @@ public final class Main {
    * map, so {@code versions apply=true level=major} works as typed — alongside the {@code
    * -Drke2lab.manifests.versions.<key>} system-property form.
    */
-  private static java.util.Map<String, String> optionArgs(String[] args) {
+  private java.util.Map<String, String> optionArgs(String[] args) {
     final java.util.Map<String, String> options = new java.util.LinkedHashMap<>();
     for (int i = 1; i < args.length; i++) {
       final int eq = args[i].indexOf('=');
@@ -143,7 +148,35 @@ public final class Main {
         manifestsFacet());
   }
 
-  private static Optional<String> sysProperty(String key) {
+  /**
+   * The facts for {@code publish} — {@code synthesize} PLUS an armed delivery. It REQUIRES the plot
+   * ({@code -Drke2lab.manifests.outdir}) and the identity ({@code .cluster}/{@code .node}): without
+   * them the delivery worktree never prepares and the push is a silent no-op, so a missing one is a
+   * hard fail here, not a survey. The FACET carries {@code delivery.push=true}, the git-push gate
+   * {@code ManifestSynthesisScenario} reads.
+   */
+  private ManifestsCliRun runForPublish() {
+    final Optional<String> outdir = sysProperty("rke2lab.manifests.outdir");
+    if (outdir.isEmpty()) {
+      throw new IllegalArgumentException(
+          "publish needs -Drke2lab.manifests.outdir (the plot to render + deliver from)");
+    }
+    final Optional<ManifestsCliRun.Identity> identity =
+        identityFrom(
+            sysProperty("rke2lab.manifests.cluster"), sysProperty("rke2lab.manifests.node"));
+    if (identity.isEmpty()) {
+      throw new IllegalArgumentException(
+          "publish needs -Drke2lab.manifests.cluster and -Drke2lab.manifests.node (the branch"
+              + " manifests/<cluster> the render delivers to)");
+    }
+    // The publish FACET = the operator posture plus delivery.push=true (the git-push gate
+    // ManifestSynthesisScenario reads); armed inline so no separate static helper is minted.
+    final ObjectNode facet = (ObjectNode) manifestsFacet();
+    facet.putObject("delivery").put("push", true);
+    return ManifestsCliRun.of(outdir, identity, facet);
+  }
+
+  private Optional<String> sysProperty(String key) {
     return Optional.ofNullable(System.getProperty(key))
         .map(String::trim)
         .filter(value -> !value.isEmpty());
@@ -158,7 +191,7 @@ public final class Main {
    * client. The shape mirrors {@code ManifestsRunbookInput.Facets} — the membrane carries only
    * JSON.
    */
-  private static JsonNode manifestsFacet() {
+  private JsonNode manifestsFacet() {
     final ObjectNode facet = JsonNodeFactory.instance.objectNode();
     final ObjectNode publish = facet.putObject("publish");
     publish.put("gitops", publishToggle("gitops", true));
@@ -175,13 +208,13 @@ public final class Main {
     return facet;
   }
 
-  private static boolean publishToggle(String layer, boolean fallback) {
+  private boolean publishToggle(String layer, boolean fallback) {
     return sysProperty("rke2lab.manifests.publish." + layer)
         .map(Boolean::parseBoolean)
         .orElse(fallback);
   }
 
-  private static boolean debugToggle(String toggle) {
+  private boolean debugToggle(String toggle) {
     return sysProperty("rke2lab.manifests.debug." + toggle)
         .map(Boolean::parseBoolean)
         .orElse(false);
@@ -193,7 +226,7 @@ public final class Main {
    * neither: a partial identity is a misuse, not a survey, so it fails loud rather than silently
    * rendering the blank {@code unknown} cluster.
    */
-  private static Optional<ManifestsCliRun.Identity> identityFrom(
+  private Optional<ManifestsCliRun.Identity> identityFrom(
       Optional<String> clusterName, Optional<String> nodeName) {
     if (clusterName.isPresent() != nodeName.isPresent()) {
       throw new IllegalArgumentException(
@@ -336,11 +369,11 @@ public final class Main {
     static final class Builder implements CommandBuilder<SynthesizeCommand> {
       private final Main main;
 
-      private ManifestsCliRun run =
-          ManifestsCliRun.of(Optional.empty(), Optional.empty(), manifestsFacet());
+      private ManifestsCliRun run;
 
       Builder(Main main) {
         this.main = main;
+        this.run = ManifestsCliRun.of(Optional.empty(), Optional.empty(), main.manifestsFacet());
       }
 
       Builder run(ManifestsCliRun run) {
@@ -354,6 +387,110 @@ public final class Main {
 
       public Class<SynthesizeCommand> commandClass() {
         return SynthesizeCommand.class;
+      }
+    }
+  }
+
+  private final class PublishCommand implements CliCommand {
+
+    final ManifestsCliRun run;
+
+    @SuppressWarnings("unused")
+    PublishCommand(Builder builder) {
+      this.run = builder.run;
+    }
+
+    @Override
+    public String name() {
+      return "publish";
+    }
+
+    @Override
+    public String description() {
+      return "Render the manifests into the plot AND deliver them — commit (signed) + push the"
+          + " manifests/<cluster> branch, so the Flux webhook reconciles at once";
+    }
+
+    @Override
+    public String usage() {
+      return "publish  (-Drke2lab.manifests.outdir=… -Drke2lab.manifests.cluster=…"
+          + " -Drke2lab.manifests.node=…)";
+    }
+
+    @Override
+    public void run() {
+      // Drive PublishCliScenario on the embedded launcher — synthesize + delivery. It sows ghapp →
+      // auth → manifests through the broker: ghapp rehydrates the App credentials from .secrets,
+      // auth seals the WRITER token, manifests renders into the SOIL and pushes
+      // manifests/<cluster>.
+      // The same in-container operation the grow drives, minus the Pulumi envelope.
+      final String txId = UUID.randomUUID().toString();
+      try {
+        final ReportModel runbook =
+            new JUnitLauncherCore<ReportModel>()
+                .run(
+                    Main.class.getClassLoader(),
+                    JupiterTestEngine.class,
+                    wiring -> List.of(DiscoverySelectors.selectClass(PublishCliScenario.class)),
+                    (launcher, request, sessionStore) -> {
+                      final SummaryGeneratingListener listener = new SummaryGeneratingListener();
+                      launcher.execute(request, listener);
+                      final var summary = listener.getSummary();
+                      if (summary.getTotalFailureCount() > 0) {
+                        final var first = summary.getFailures().get(0);
+                        throw new IllegalStateException(
+                            "the manifests-cli publish scenario failed: "
+                                + first.getTestIdentifier().getDisplayName(),
+                            first.getException());
+                      }
+                      return new ScenarioOutcomeSeed().read(sessionStore).runbook();
+                    },
+                    PublishCliScenario.SEED
+                        .into(run)
+                        .andThen(RunRoleSeed.into(RunRole.ROOT))
+                        .andThen(TxIdSeed.into(txId))
+                        .andThen(LogFileSeed.into(".local.d/manifests-publish.log")));
+        final List<?> broken =
+            runbook.getScenariosWithStatus(ExecutionStatus.FAILED, ExecutionStatus.ABORTED);
+        if (!broken.isEmpty()) {
+          throw new IllegalStateException(
+              "the manifests publish did not complete (" + broken.size() + " failed/aborted)");
+        }
+        run.identity()
+            .ifPresent(
+                id ->
+                    logger.info(
+                        "Manifests rendered into {} and pushed to manifests/{}",
+                        run.materializationRoot().orElse("?"),
+                        id.clusterName()));
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(
+            "the manifests-cli publish run was interrupted", interrupted);
+      }
+    }
+
+    static final class Builder implements CommandBuilder<PublishCommand> {
+      private final Main main;
+
+      private ManifestsCliRun run;
+
+      Builder(Main main) {
+        this.main = main;
+        this.run = ManifestsCliRun.of(Optional.empty(), Optional.empty(), main.manifestsFacet());
+      }
+
+      Builder run(ManifestsCliRun run) {
+        this.run = run;
+        return this;
+      }
+
+      public PublishCommand build() {
+        return main.commandOf(this);
+      }
+
+      public Class<PublishCommand> commandClass() {
+        return PublishCommand.class;
       }
     }
   }

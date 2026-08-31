@@ -142,6 +142,54 @@
       <artifactId>ndh-core</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The publish verb's auth sub-graph (embed type=model/edge), staged INTACT so the `publish`
+         flow's in-container scions resolve bundle-side: ghapp-bdd (the `ghapp` scion — rehydrates the
+         one org App's credentials from .secrets through the SecretsGateway seam) + ghapp-edge (the
+         GithubAppMinter @Component), then auth-bdd (the `auth` scion — mints a WRITER token from
+         those credentials and seals AuthCoordinate.GITHUB_TOKEN, which the manifests delivery reveals
+         to push). synthesize needs none of these; publish grows all three coordinates in order. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-edge</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>auth-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- bouncycastle on the FLAT host classpath so BootPlanner can system-export the packages
+         ghapp-edge's GithubAppMinter imports (JWT signing from the App's RSA private-key PEM):
+         org.bouncycastle.{asn1.pkcs, jce.provider, openssl, openssl.jcajce}. Without them the boot
+         fails deriving system.packages.extra (ghapp-edge unresolved) — the same reason seed-master
+         carries them for cluster-pki-core. runtime scope: the host never compiles against bc. -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcutil-jdk18on</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- host-runtime (COMPILE): the publish scenario registers the SecretsGateway the ghapp scion
+         reads, resolved container-blind through new ExecutionEnvironment(System.getenv()) — OPERATOR
+         here (the operator's .secrets + ndh OAuth client). -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>host-runtime</artifactId>
+    </dependency>
     <!-- jGiven-in-OSGi wrap, dual-realm (staged as a bundle AND kept host-flat): the host root
          scenario is a jGiven ScenarioTest, so jgiven runs FLAT for it and as a BUNDLE for the
          in-container scion. Directly declared = the realm-library signal (StagingClosure). -->
