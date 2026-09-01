@@ -122,28 +122,81 @@ Out-of-band operator ceremony:
   `contents` read (Flux pull) + write (render push) the App already carries.
 
 [[auth]]
-== Auth — the App identity everywhere, the in-cluster token dissolved by PaC
+== Auth — two distinct secret properties, resolved by the execution enclosure
 
-The render OUTPUT is *secret-blind*: the reconciled branch Flux tracks carries ZERO secret bytes —
-every real-data secret rides the `NODE_BOOTSTRAP` lane, which the exploder writes OUTSIDE the git
-worktree (`NodeBootstrapArtifact`, a sibling above the tree; never staged/committed/pushed). Only the
-*push* needs a credential, and it is container-dependent — the `link:../../../host/host-runtime[ExecutionEnvironment]`
-FACT (OPERATOR vs IN_CLUSTER) is the seam that resolves it.
+Draw the line precisely, because an early draft blurred it: the render *OUTPUT* is secret-blind, but
+the render *PROCESS* is not.
 
-[cols="1,3",options="header"]
+* *The output branch is secret-blind.* The reconciled `manifests/<cluster>` branch Flux tracks
+  carries ZERO secret bytes — every real-data secret rides the `NODE_BOOTSTRAP` lane, which the
+  exploder writes OUTSIDE the git worktree (`NodeBootstrapArtifact`, a sibling above the tree; never
+  staged/committed/pushed). This is unchanged and permanent.
+* *The render process handles two secrets.* It ALWAYS signs the rendered commit (as the rke2lab bot),
+  and — when `delivery.push` is armed — it pushes. So the process needs a *signing key* and a *push
+  token*. Neither ever touches the output branch; both are process inputs.
+
+Both are container-dependent, and the seam that resolves them is the *execution enclosure* — TWO
+distinct-but-dependent concepts:
+
+* `link:../../../host/host-runtime[ExecutionEnclosure]` — the runtime FACT (OPERATOR vs IN_CLUSTER).
+  It is the *deterministic gate*: it decides WHICH branch of the missing logic runs (read the ndh
+  keystore, or not; re-emit `sops-age`, or not). It crosses the `seed.broker.port` membrane so OSGi
+  branches on it explicitly — a named gate, never inferred from an empty projection.
+* `link:../../../host/host-runtime[ExecutionEnvironment]` — the RESOLVER instance that owns the
+  process env, derives the enclosure from it, and PROJECTS the enclosure-resolved sources:
+  `secretsGateway()` (already) and `renderSigning()` (the signing key + bot identity). The
+  projections are *derived from* the fact, so fact and sources are always coherent. They cross the
+  membrane as seam services, host-seeded like any other broker coordinate.
+
+[cols="1,2,2",options="header"]
 |===
-| Container | Push token
-| OPERATOR (the operator's host)
+| Concern | OPERATOR (operator's host) | IN_CLUSTER (PaC pod)
+
+| Push token
 | Minted in-container via the `ghapp`→`auth` scions (which read `.secrets` through the
-  `SecretsGateway`) — the `manifests publish` verb's current path.
-| IN_CLUSTER (PaC)
-| *Provided by PaC* — its `git_auth_secret` is a basic-auth token of the App (PaC mints it from the
-  configured App). `publish` consumes it; it sows NO `ghapp`/`auth` and needs NO secrets gateway.
+  `SecretsGateway`).
+| *Provided by PaC* — its `git_auth_secret` is a basic-auth App token; `publish` reveals it in-container
+  (`RKE2LAB_PUSH_TOKEN`), sowing NO `ghapp`/`auth`.
+
+| Signing key + bot identity
+| `renderSigning()` reads the ndh keystore (`sshPrivate("github-signing")` + `authorityDomain`) — the
+  `manifests publish` verb's current path.
+| `renderSigning()` reads a *mounted Secret* — the signing key rides the same NODE_BOOTSTRAP →
+  mittwald-replicator lane as `tekton.git`/`tekton.docker` (the OPERATOR bootstrap emits it from its
+  keystore, exactly as it emits `sops-age`), replicated into `tekton-pipelines`, mounted into
+  `render-publish`. The bot's authority domain is the code constant.
+
+| ndh keystore (`sops-age` age key, cluster-pki)
+| Read from the sops-smudged `.ndh-ssh.d/keys.yaml`.
+| *Not read.* The enclosure gates `SopsAgeMaterialResolver` + the cluster-pki reads OFF in-cluster —
+  `sops-age` is a NODE_BOOTSTRAP bootstrap secret already applied at the operator's first grow, never
+  re-emitted by an in-cluster render.
 |===
 
-So in-cluster the `ExecutionEnvironment` stays the secret-blind `EmptySecretsGateway`; PaC hands the
-push token. A `KubeSecretsGateway` mirroring `.secrets` is *unnecessary*. Both lanes push as the SAME
-App — the identity is uniform, only the token's provenance differs.
+So in-cluster the `SecretsGateway` stays the secret-blind `EmptySecretsGateway` (a `KubeSecretsGateway`
+mirroring `.secrets` is still *unnecessary*), the push token comes from PaC, and the ONE process secret
+that must reach the pod — the signing key — rides the existing replicator lane, NOT the git tree (which
+the Tekton clone lands sops-encrypted at rest, having no smudge filter). Both lanes push and sign as the
+SAME App/bot — the identity is uniform, only each secret's provenance differs by enclosure.
+
+[mermaid]
+....
+flowchart TB
+  Encl["ExecutionEnclosure (FACT)<br/>OPERATOR | IN_CLUSTER"]
+  Env["ExecutionEnvironment (RESOLVER)<br/>derives + projects"]
+  Encl -->|derives| Env
+  Env -->|projects| SG["secretsGateway()"]
+  Env -->|projects| RS["renderSigning()"]
+  subgraph OSGi["OSGi synthesis (across the seam)"]
+    Gate{"enclosure gate"}
+    Gate -->|OPERATOR| KS["read ndh keystore<br/>(sops-age, signing)"]
+    Gate -->|IN_CLUSTER| Skip["skip keystore<br/>signing ← renderSigning mount"]
+  end
+  Encl -.->|crosses as named fact| Gate
+  RS -.->|crosses as seam service| Skip
+  SignSrc["OPERATOR keystore →<br/>NODE_BOOTSTRAP SourceSecret →<br/>replicator → tekton-pipelines →<br/>render-publish mount"]
+  SignSrc -.-> RS
+....
 
 [[tekton-in-source]]
 == The Tekton resources are rendered manifests; only a minimal PipelineRun stub is source
@@ -241,9 +294,14 @@ commit — determinism + consistency with what an operator would render.
   *checks* permissions (ours was scoped for Flux contents:read + push contents:write). Extend the
   App's permissions+events; confirm the App webhook URL = the PaC funnel host.
 | `manifests publish` renders but the push is skipped
-| The `git_auth_secret` wasn't wired into `publish` — in-cluster `ExecutionEnvironment.pushToken()`
-  must read PaC's mounted token, else the delivery reveals an empty token and skips the push (the
-  signed commit still lands locally).
+| The `git_auth_secret` wasn't wired into `publish` — in-cluster the delivery's `revealGithubToken()`
+  reads PaC's mounted token (`RKE2LAB_PUSH_TOKEN`), else it reveals an empty token and skips the push
+  (the signed commit still lands locally).
+| `keys.yaml appears sops-encrypted at rest` during an in-cluster render
+| The render tried to read the ndh keystore in-cluster (the Tekton clone lands it sops-encrypted, no
+  smudge filter). The enclosure gate is missing/misresolved: `SopsAgeMaterialResolver` +
+  `deliveryPlan` must branch on the seeded `ExecutionEnclosure` and, in IN_CLUSTER, skip the keystore
+  and take the signing key from the `renderSigning()` mount instead.
 | The reconciled branch churns with empty commits
 | A structural re-render on an unchanged source is a no-op fast-forward; if it is not, check the
   render is deterministic (input hashing) — the NODE_BOOTSTRAP secrets must stay off the branch.
