@@ -10,6 +10,7 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
+import io.seedmatic.rke2lab.manifests.contract.profiles.SigningKeyMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.WebhookServingMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ComponentVersions;
@@ -59,24 +60,36 @@ public final class ManifestSynthesisContext {
    */
   private final Optional<SopsAgeMaterial> sopsAgeMaterial;
 
+  /**
+   * The commit-signing key, resolved by the same pre-synthesis step (from the ndh key-store, ONLY
+   * as OPERATOR) and bound here — the twin of {@link #sopsAgeMaterial}, {@link Optional#empty()}
+   * when no key-store was present or the render runs in-cluster.
+   */
+  private final Optional<SigningKeyMaterial> signingKeyMaterial;
+
   private ManifestSynthesisContext(ManifestSynthesisRequest request) {
-    this(request, Optional.empty());
+    this(request, Optional.empty(), Optional.empty());
   }
 
   private ManifestSynthesisContext(
-      ManifestSynthesisRequest request, Optional<SopsAgeMaterial> sopsAgeMaterial) {
+      ManifestSynthesisRequest request,
+      Optional<SopsAgeMaterial> sopsAgeMaterial,
+      Optional<SigningKeyMaterial> signingKeyMaterial) {
     this.request = Objects.requireNonNull(request, "request");
     this.sopsAgeMaterial = Objects.requireNonNull(sopsAgeMaterial, "sopsAgeMaterial");
+    this.signingKeyMaterial = Objects.requireNonNull(signingKeyMaterial, "signingKeyMaterial");
   }
 
   public static ManifestSynthesisContext of(ManifestSynthesisRequest request) {
     return new ManifestSynthesisContext(request);
   }
 
-  /** Context carrying the pre-synthesis-resolved age key alongside the request. */
+  /** Context carrying the pre-synthesis-resolved age key + signing key alongside the request. */
   public static ManifestSynthesisContext of(
-      ManifestSynthesisRequest request, Optional<SopsAgeMaterial> sopsAgeMaterial) {
-    return new ManifestSynthesisContext(request, sopsAgeMaterial);
+      ManifestSynthesisRequest request,
+      Optional<SopsAgeMaterial> sopsAgeMaterial,
+      Optional<SigningKeyMaterial> signingKeyMaterial) {
+    return new ManifestSynthesisContext(request, sopsAgeMaterial, signingKeyMaterial);
   }
 
   public static ManifestSynthesisContext current() {
@@ -138,6 +151,10 @@ public final class ManifestSynthesisContext {
 
   public Optional<SopsAgeMaterial> sopsAgeMaterial() {
     return sopsAgeMaterial;
+  }
+
+  public Optional<SigningKeyMaterial> signingKeyMaterial() {
+    return signingKeyMaterial;
   }
 
   /** Restores the previous binding when closed. */

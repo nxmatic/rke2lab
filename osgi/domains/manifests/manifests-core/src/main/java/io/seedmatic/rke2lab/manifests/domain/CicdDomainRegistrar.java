@@ -6,6 +6,7 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.units.cicd.PacSecretManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.cicd.PacWebhookManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.cicd.RenderPipelineManifestsUnit;
+import io.seedmatic.rke2lab.manifests.units.cicd.RenderSigningSecretManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.cicd.RepositoryManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.cicd.TektonPipelinesManifestsUnit;
 import java.util.List;
@@ -23,6 +24,7 @@ public final class CicdDomainRegistrar implements ManifestsDomainRegistrar {
             new TektonPipelinesManifestsUnit(),
             new RepositoryManifestsUnit(),
             new RenderPipelineManifestsUnit(),
+            new RenderSigningSecretManifestsUnit(),
             new PacSecretManifestsUnit(),
             new PacWebhookManifestsUnit()));
   }

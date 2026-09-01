@@ -290,6 +290,31 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                       // NRI plugin injects the cicd/toolchain FloxEnv (JDK 25 + maven) here.
                       "name",
                       RENDER_STEP,
+                      // The commit-signing key the operator's grow emitted as
+                      // manifests-render-signing (RenderSigningSecretManifestsUnit), fed to the
+                      // in-cluster publish's revealSigningKey() (RKE2LAB_SIGNING_KEY) so it signs
+                      // the
+                      // rendered commit — the enclosure twin of the PaC-provided push token.
+                      // optional=true: on a cluster grown before this landed the env is unset and
+                      // the
+                      // delivery fails loud, rather than the pod failing to start on a missing
+                      // secret.
+                      "env",
+                      new Object[] {
+                        Map.of(
+                            "name",
+                            "RKE2LAB_SIGNING_KEY",
+                            "valueFrom",
+                            Map.of(
+                                "secretKeyRef",
+                                Map.of(
+                                    "name",
+                                    RenderSigningSecretManifestsUnit.SECRET_NAME,
+                                    "key",
+                                    RenderSigningSecretManifestsUnit.SSH_PRIVATE_KEY,
+                                    "optional",
+                                    true)))
+                      },
                       // A glibc base; the toolchain (java/maven) arrives via flox injection, not
                       // the
                       // image. No JDK baked in — dogfooding the flox NRI runtime.

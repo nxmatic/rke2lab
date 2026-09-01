@@ -11,6 +11,7 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.seedmatic.rke2lab.manifests.contract.SshToAgeConverter;
 import io.seedmatic.rke2lab.manifests.contract.node.NodeEnvContext;
+import io.seedmatic.rke2lab.manifests.contract.profiles.SigningKeyMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import io.seedmatic.rke2lab.manifests.internal.synthesis.OnFailure;
 import io.seedmatic.rke2lab.manifests.internal.synthesis.Phase;
@@ -126,12 +127,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // prerequisites, it does not fetch them. Gated on the enclosure: IN_CLUSTER the sops-age Secret
     // is a NODE_BOOTSTRAP bootstrap artifact already applied at the operator's grow (and the git
     // tree's key-store is sops-encrypted at rest), so the resolver skips rather than reads.
+    final Optional<EnclosureGate> enclosure = Optional.ofNullable(enclosureGate);
     final Optional<SopsAgeMaterial> sopsAgeMaterial =
-        new SopsAgeMaterialResolver(
-                sshToAgeConverter, ndhKeystore, Optional.ofNullable(enclosureGate))
-            .resolve();
+        new SopsAgeMaterialResolver(sshToAgeConverter, ndhKeystore, enclosure).resolve();
+    // The commit-signing key, resolved the same way (OPERATOR-only, § pac-in-cluster-render-spec):
+    // the operator's grow emits the manifests-render-signing Secret the in-cluster render mounts.
+    final Optional<SigningKeyMaterial> signingKeyMaterial =
+        new SigningKeyMaterialResolver(ndhKeystore, enclosure).resolve();
 
-    final var contextScope = ManifestSynthesisContext.of(request, sopsAgeMaterial).bind();
+    final var contextScope =
+        ManifestSynthesisContext.of(request, sopsAgeMaterial, signingKeyMaterial).bind();
     try (contextScope) {
       return synthesizeInContext(request);
     }
