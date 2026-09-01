@@ -1,6 +1,6 @@
 ---
 name: flox-envs-runtime-crd-delivery
-description: "Chantier — deliver flox envs at RUNTIME as a FloxEnv CRD + flox controller (design CONVERGED 2026-08-27, persisted in specs, code NOT started)"
+description: "Chantier — deliver flox envs at RUNTIME as a FloxEnv CRD + flox controller. Design CONVERGED 2026-08-27; component BUILT + integrated + DEPLOYED 2026-08-28 (resume: [[flox-controller-build-deploy-state]])."
 metadata:
   type: project
 ---
