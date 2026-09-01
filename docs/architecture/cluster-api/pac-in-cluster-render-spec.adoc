@@ -187,6 +187,14 @@ that must reach the pod — the signing key — rides the existing replicator la
 the Tekton clone lands sops-encrypted at rest, having no smudge filter). Both lanes push and sign as the
 SAME App/bot — the identity is uniform, only each secret's provenance differs by enclosure.
 
+That reach IS the sops-age pattern, applied to the signing key — the OPERATOR grow SEEDS it so a
+later in-cluster render can consume it. A pre-synthesis `SigningKeyMaterialResolver` reads {@code
+github-signing} from the ndh key-store (OPERATOR-only, enclosure-gated) into a `SigningKeyMaterial`
+on the synthesis context (the twin of `SopsAgeMaterialResolver`/`SopsAgeMaterial`);
+`RenderSigningSecretManifestsUnit` renders it as the NODE_BOOTSTRAP `manifests-render-signing` Secret
+in `tekton-pipelines`, which `RenderPipelineManifestsUnit` mounts into the `render-publish` step as
+`RKE2LAB_SIGNING_KEY` — exactly as `SopsAgeSecretManifestsUnit` emits `sops-age` for Flux.
+
 [mermaid]
 ....
 flowchart TB
