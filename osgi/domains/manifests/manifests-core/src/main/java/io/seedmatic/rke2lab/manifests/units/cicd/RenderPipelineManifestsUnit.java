@@ -221,30 +221,31 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           "\n",
                           "#!/usr/bin/env bash",
                           "set -euo pipefail",
-                          // Local repo + build-cache on the persistent PVC so unchanged modules
-                          // restore across runs; clean wipes module target/ only, not the PVC.
-                          "export MAVEN_REPO=\"$(workspaces.maven-cache.path)/repository\"",
-                          // Reactor discipline: -am builds siblings from target/, verify runs the
-                          // tests + staging gates before any push. Never `install`.
-                          "./mvnw -Dmaven.repo.local=\"$MAVEN_REPO\" -pl :manifests-cli -am clean verify",
-                          // PaC minted an App token into the mounted git_auth secret. Adopt its git
-                          // config AND extract the token into RKE2LAB_PUSH_TOKEN so the in-cluster
-                          // publish reveals it for the ff-push (the scion reads it in-container —
+                          // PaC minted an App token into the mounted git_auth secret; extract it
+                          // into RKE2LAB_PUSH_TOKEN so the in-cluster publish reveals it for the
+                          // ff-push (the scion reads it in-container —
                           // ManifestSynthesisScenario.revealGithubToken). Backticks, not $(...), so
                           // Tekton doesn't mistake the shell substitution for one of its own vars.
-                          // The exact git_auth layout finalises at first run.
                           "GIT_AUTH_DIR=\"$(workspaces.basic-auth.path)\"",
                           "if [ -f \"$GIT_AUTH_DIR/.git-credentials\" ]; then",
-                          "  cp \"$GIT_AUTH_DIR/.git-credentials\" \"$HOME/.git-credentials\"",
-                          "  cp \"$GIT_AUTH_DIR/.gitconfig\" \"$HOME/.gitconfig\" 2>/dev/null || true",
                           "  export RKE2LAB_PUSH_TOKEN=`sed -E 's#https://[^:]+:([^@]+)@.*#\\1#'"
-                              + " $HOME/.git-credentials | head -n1`",
+                              + " \"$GIT_AUTH_DIR/.git-credentials\" | head -n1`",
                           "fi",
-                          "java \\",
-                          "  -Drke2lab.manifests.outdir=\"$(workspaces.source.path)/render\" \\",
-                          "  -Drke2lab.manifests.cluster=\"$(params.cluster)\" \\",
-                          "  -Drke2lab.manifests.node=\"$(params.node)\" \\",
-                          "  -jar exec/manifests-cli/target/manifests-cli-*-exec.jar publish"))
+                          // The flox NRI plugin MOUNTED the cicd/maven env at /root/.flox but does
+                          // NOT auto-activate — the command must, exactly like the kdns container's
+                          // `flox activate --dir /root -- kdns`. Run build+publish inside the
+                          // activated env so JDK 25 + maven are on PATH (flox itself is on PATH via
+                          // the plugin's injection). -am builds siblings from target/; verify runs
+                          // the tests + staging gates before any push; never `install`.
+                          "flox activate --dir /root -- bash -euo pipefail -c '",
+                          "  ./mvnw -Dmaven.repo.local=\"$(workspaces.maven-cache.path)/repository\""
+                              + " -pl :manifests-cli -am clean verify",
+                          "  java \\",
+                          "    -Drke2lab.manifests.outdir=\"$(workspaces.source.path)/render\" \\",
+                          "    -Drke2lab.manifests.cluster=\"$(params.cluster)\" \\",
+                          "    -Drke2lab.manifests.node=\"$(params.node)\" \\",
+                          "    -jar exec/manifests-cli/target/manifests-cli-*-exec.jar publish",
+                          "'"))
                 })));
   }
 
