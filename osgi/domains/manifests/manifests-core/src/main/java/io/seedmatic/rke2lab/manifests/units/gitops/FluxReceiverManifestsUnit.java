@@ -46,8 +46,13 @@ public final class FluxReceiverManifestsUnit extends AbstractManifestsUnit {
   /** The notification-controller Service that terminates webhook POSTs (Flux ships it). */
   private static final String WEBHOOK_RECEIVER_SERVICE = "webhook-receiver";
 
-  /** The HMAC token Secret (name matches .secrets kubernetes.secrets.web-hook + the stub). */
-  private static final String WEBHOOK_TOKEN_SECRET = "flux-webhook-token";
+  /**
+   * The HMAC token Secret / replicator source name (matches {@code .secrets
+   * kubernetes.secrets.web-hook.name} + the stub). Public: the {@code cicd} PaC secret reads the
+   * SAME operator-chosen {@code github.webhook.token} from this replicator source for its {@code
+   * webhook.secret} (single source of truth for the shared webhook HMAC).
+   */
+  public static final String WEBHOOK_TOKEN_SECRET = "flux-webhook-token";
 
   /** The Tailscale MagicDNS leaf; the funnel URL is https://<this>.<tailnet>.ts.net. */
   private static final String FUNNEL_HOSTNAME = "flux-webhook";
