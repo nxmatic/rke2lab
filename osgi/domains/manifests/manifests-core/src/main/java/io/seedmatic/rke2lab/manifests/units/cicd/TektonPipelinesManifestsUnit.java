@@ -133,6 +133,16 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                 "all",
                 "targetNamespace",
                 "tekton-pipelines",
+                // coschedule=pipelineruns (default is `workspaces`): the affinity assistant pins a
+                // whole PipelineRun's pods to one node instead of one-assistant-per-PVC-workspace.
+                // The default caps a TaskRun at ONE PVC workspace ("more than one
+                // PersistentVolumeClaim is bound"); our render pipeline's build task needs TWO (the
+                // shared `source` PVC passed fetch->render + the persistent `maven-cache` PVC). On
+                // a
+                // single-node cluster this changes nothing scheduling-wise; the operator merges its
+                // other pipeline defaults.
+                "pipeline",
+                Map.of("coschedule", "pipelineruns"),
                 // The TektonConfig CRD requires result.{disabled,is_external_db,options} and
                 // pruner.disabled (no schema defaults) — a bare result.disabled fails dry-run.
                 // Results feature off (disabled) with an internal-DB posture + empty options;
