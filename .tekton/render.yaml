@@ -26,8 +26,19 @@ metadata:
     flox.dev/uid.step-render: "0"
     flox.dev/gid.step-render: "0"
 spec:
+  # The Pipeline is a RENDERED in-cluster manifest (RenderPipelineManifestsUnit), not inline here.
+  # PaC's own resolver does NOT consult the cluster for a bare pipelineRef.name (it wants inline /
+  # .tekton / a remote annotation) — so reference it through Tekton's CLUSTER resolver, which fetches
+  # render-manifests from the cluster. Keeps "Tekton objects are rendered manifests" intact.
   pipelineRef:
-    name: render-manifests
+    resolver: cluster
+    params:
+      - name: kind
+        value: pipeline
+      - name: name
+        value: render-manifests
+      - name: namespace
+        value: tekton-pipelines
   params:
     # PaC dynamic variables (the pushed commit + repo).
     - name: repo-url
