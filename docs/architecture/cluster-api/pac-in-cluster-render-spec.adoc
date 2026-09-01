@@ -143,10 +143,17 @@ distinct-but-dependent concepts:
   keystore, or not; re-emit `sops-age`, or not). It crosses the `seed.broker.port` membrane so OSGi
   branches on it explicitly — a named gate, never inferred from an empty projection.
 * `link:../../../host/host-runtime[ExecutionEnvironment]` — the RESOLVER instance that owns the
-  process env, derives the enclosure from it, and PROJECTS the enclosure-resolved sources:
-  `secretsGateway()` (already) and `renderSigning()` (the signing key + bot identity). The
-  projections are *derived from* the fact, so fact and sources are always coherent. They cross the
-  membrane as seam services, host-seeded like any other broker coordinate.
+  process env, derives the enclosure from it, and projects it: the named enclosure GATE that crosses
+  the membrane (mirroring how `RunMode` crosses as its `RunGate`/`LiveGate` projection — the fact
+  stays host-side, a projection carries the query), plus `secretsGateway()` (the `.secrets` door the
+  `ghapp` scion reads). Both are host-seeded seam services, derived from the same fact so they are
+  always coherent.
+
+The two *process* secrets (push token, signing key) are NOT `ExecutionEnvironment` projections —
+they are container-aware *scenario-side reveals*, twins of each other: `revealGithubToken()` (exists)
+and `revealSigningKey()` (new), each gated on the seeded enclosure and reading OPERATOR-side
+(cellar/keystore) or IN_CLUSTER-side (env, from a mounted Secret). The `secretsGateway()` projection
+is a different concern — the `.secrets` DOOR — not a process secret.
 
 [cols="1,2,2",options="header"]
 |===
@@ -159,12 +166,12 @@ distinct-but-dependent concepts:
   (`RKE2LAB_PUSH_TOKEN`), sowing NO `ghapp`/`auth`.
 
 | Signing key + bot identity
-| `renderSigning()` reads the ndh keystore (`sshPrivate("github-signing")` + `authorityDomain`) — the
-  `manifests publish` verb's current path.
-| `renderSigning()` reads a *mounted Secret* — the signing key rides the same NODE_BOOTSTRAP →
-  mittwald-replicator lane as `tekton.git`/`tekton.docker` (the OPERATOR bootstrap emits it from its
-  keystore, exactly as it emits `sops-age`), replicated into `tekton-pipelines`, mounted into
-  `render-publish`. The bot's authority domain is the code constant.
+| `revealSigningKey()` reads the ndh keystore (`sshPrivate("github-signing")` + `authorityDomain`) —
+  the `manifests publish` verb's current path.
+| `revealSigningKey()` reads the env (`RKE2LAB_SIGNING_KEY`) fed by a *mounted Secret* — the signing
+  key rides the same NODE_BOOTSTRAP → mittwald-replicator lane as `tekton.git`/`tekton.docker` (the
+  OPERATOR bootstrap emits it from its keystore, exactly as it emits `sops-age`), replicated into
+  `tekton-pipelines`, mounted into `render-publish`. The bot's authority domain is the code constant.
 
 | ndh keystore (`sops-age` age key, cluster-pki)
 | Read from the sops-smudged `.ndh-ssh.d/keys.yaml`.
@@ -185,17 +192,15 @@ flowchart TB
   Encl["ExecutionEnclosure (FACT)<br/>OPERATOR | IN_CLUSTER"]
   Env["ExecutionEnvironment (RESOLVER)<br/>derives + projects"]
   Encl -->|derives| Env
-  Env -->|projects| SG["secretsGateway()"]
-  Env -->|projects| RS["renderSigning()"]
+  Env -->|projects: named gate| Gate
+  Env -->|projects: .secrets door| SG["secretsGateway()"]
   subgraph OSGi["OSGi synthesis (across the seam)"]
-    Gate{"enclosure gate"}
-    Gate -->|OPERATOR| KS["read ndh keystore<br/>(sops-age, signing)"]
-    Gate -->|IN_CLUSTER| Skip["skip keystore<br/>signing ← renderSigning mount"]
+    Gate{"enclosure gate<br/>(seeded fact)"}
+    Gate -->|OPERATOR| KS["deliveryPlan + SopsAgeMaterialResolver<br/>read ndh keystore (sops-age, signing)"]
+    Gate -->|IN_CLUSTER| Skip["skip keystore<br/>revealSigningKey() ← env"]
   end
-  Encl -.->|crosses as named fact| Gate
-  RS -.->|crosses as seam service| Skip
-  SignSrc["OPERATOR keystore →<br/>NODE_BOOTSTRAP SourceSecret →<br/>replicator → tekton-pipelines →<br/>render-publish mount"]
-  SignSrc -.-> RS
+  SignSrc["OPERATOR keystore →<br/>NODE_BOOTSTRAP SourceSecret →<br/>replicator → tekton-pipelines →<br/>render-publish mount → RKE2LAB_SIGNING_KEY"]
+  SignSrc -.->|env| Skip
 ....
 
 [[tekton-in-source]]
@@ -301,7 +306,7 @@ commit — determinism + consistency with what an operator would render.
 | The render tried to read the ndh keystore in-cluster (the Tekton clone lands it sops-encrypted, no
   smudge filter). The enclosure gate is missing/misresolved: `SopsAgeMaterialResolver` +
   `deliveryPlan` must branch on the seeded `ExecutionEnclosure` and, in IN_CLUSTER, skip the keystore
-  and take the signing key from the `renderSigning()` mount instead.
+  and take the signing key from `revealSigningKey()` (the `RKE2LAB_SIGNING_KEY` env) instead.
 | The reconciled branch churns with empty commits
 | A structural re-render on an unchanged source is a no-op fast-forward; if it is not, check the
   render is deterministic (input hashing) — the NODE_BOOTSTRAP secrets must stay off the branch.
