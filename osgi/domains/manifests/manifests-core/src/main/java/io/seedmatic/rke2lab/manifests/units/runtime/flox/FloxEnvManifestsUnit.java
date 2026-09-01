@@ -225,6 +225,9 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     install.put("git", catalogAll("git"));
     install.put("bash", catalogAll("bash"));
     install.put("coreutils", catalogAll("coreutils"));
+    // cdk8s synthesis (the Java bindings via jsii) shells out to `node` — the render's `publish`
+    // runs the cdk8s App, so the runtime is mandatory (the dev shell gets it via cdk8s-cli).
+    install.put("nodejs", catalogAll("nodejs"));
     return manifest(install);
   }
 
