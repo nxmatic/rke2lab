@@ -17,9 +17,18 @@ the *planned* v2: a **domain-scoped** layout that reflects the codebase (`Manife
 domains) with cross-domain ordering *derived* from the rendered CRDs rather than the coarse global
 layer barrier.
 
-WARNING: v2 is a DESIGN (not yet implemented). The current model below is what ships today.
+NOTE: v2 ships INCREMENTALLY. Increments A (doc-scan foundation), B (the two gap-fixes below) and C
+(derived `CRD → CR` edges + retiring the global layer barrier) are IMPLEMENTED in
+`FluxServiceKustomizationPlanner`; only increment D (the domain-scoped three-level layout) remains
+DESIGN. So today the planner keeps the flat per-service layout (D not done) but the GLOBAL LAYER
+BARRIER IS GONE — every dependency is captured as a precise derived edge, enforced complete by a
+render-time fail-fast (see <<derivation>>).
 
-== Current model (shipped) — flat per-service, global layer barrier
+== Layout (shipped) — flat per-service; the global barrier is RETIRED (increment C)
+
+NOTE: the mermaid + `dependsOn` bullet below describe the FORMER global-barrier model for context.
+As of increment C the barrier is gone; `dependsOn` is now the derived edges of <<derivation>>. The
+flat per-service TREE (root → ~40 services) is unchanged until increment D.
 
 [mermaid]
 ....
@@ -63,71 +72,124 @@ or a boundary. Good: per-service progress in `flux get ks`, local failure, indep
 Both point at the same root: the *global layer barrier* is a coarse proxy for real dependencies, and
 `wait: true` health-checks every applied object indiscriminately.
 
-== v2 (planned) — domain-scoped, derived cross-domain edges
+.How each gap is closed today (increment B, implemented)
+* *Gap 1* — the planner scans each rendered doc and, for the operator groups it knows
+  (`tekton.dev` / `pipelinesascode.tekton.dev` / `triggers.tekton.dev`), adds a `dependsOn` edge
+  from each CR cell to the *operator cell* (the one rendering `TektonConfig config`), which carries
+  `spec.healthChecks: [TektonConfig config]` with `wait: false`. The CR cells reconcile only after
+  the operator has finished installing the CRDs. See <<operator-crds>>.
+* *Gap 2* is fixed at the SOURCE: the ZFS `StorageClass`es bind `Immediate` (not
+  `WaitForFirstConsumer`), so a PVC provisions its PV and Binds the moment it is applied — nothing
+  stays `Pending`, so `wait: true` no longer wedges. Topology-awareness (the only reason to defer to
+  first consumer) is moot on a single control node. The planner STILL derives `wait: false` for any
+  cell whose PVC resolves to a WFC class (reading each `StorageClass`'s `volumeBindingMode` + the
+  `is-default-class` annotation, then the PVC's explicit-or-default class) — a data-driven safety
+  net that stays dormant while no rendered class is WFC. See <<wfc-pvc>>.
+
+.Why not a mutating admission webhook for this?
+A webhook keys on what is present on the object AT ADMISSION. A PVC does not know at admission that a
+TaskRun will consume it — consumption is a runtime scheduling relationship, not a PVC attribute — so
+"a volume consumed by a TaskRun" is not a criterion a webhook can evaluate. The two things that ARE
+knowable live at the right layers already: the binding mode is a `StorageClass` (topology) property,
+and the Flux `wait` decision is derived at RENDER time with whole-tree visibility (StorageClass +
+PVC together) that a per-object webhook lacks. A mutator earns its keep only where the criterion is
+object-local — as the flox NRI plugin's container-name-keyed injection already is.
+
+== v2 — domain-scoped, derived cross-domain edges
 
 Goal: a Kustomization layout that **reflects the codebase** (the `ManifestDomainCatalog` domains),
-decouples domains, and derives cross-domain ordering from the rendered CRDs.
+decouples domains, and derives ordering from the rendered CRDs + the unit graph rather than a coarse
+barrier.
 
-=== Structure — three levels (ownership)
+=== Structure — three levels (ownership) (implemented, increment D)
 
 [mermaid]
 ....
 flowchart TB
-  Root["Kustomization 'flux' (root, OWNER)"]
-  Root --> Dgit["domain 'gitops'"]
+  Root["Kustomization 'flux' (root, OWNER)<br/>./flux/kustomization.yaml -> domain files"]
+  Root --> Dgit["domain 'gitops'<br/>(path ./flux/gitops)"]
   Root --> Dnet["domain 'networking'"]
-  Root --> Dcicd["domain 'cicd'"]
+  Root --> Dcicd["domain 'cicd'<br/>(path ./flux/cicd)"]
   Dcicd --> Ktek["cicd-tekton-pipelines<br/>(healthCheck: TektonConfig)"]
   Dcicd --> Krepo["cicd-repository"]
-  Dcicd --> Krender["cicd-render-pipeline<br/>(wait:false — WFC PVC)"]
+  Dcicd --> Krender["cicd-render-pipeline"]
   Dcicd --> Khook["cicd-pac-webhook"]
   Krepo -->|dependsOn| Ktek
   Krender -->|dependsOn| Ktek
 ....
 
-* Root `flux` owns per-**domain** Kustomizations; each domain Kustomization owns its per-**service**
-  Kustomizations. `flux tree` then shows the domain groups natively; `flux get ks` reads grouped.
-* *Intra-domain* ordering: the layer barrier applies WITHIN a domain (`crds → operators →
-  workloads`) + intra-layer service edges — unchanged, but domain-scoped.
-* *Cross-domain* ordering: **only** the derived `CRD → CR` edges (below) + the declared domain deps
-  from the registrars (`ManifestsDomain`'s second arg). The coarse GLOBAL barrier is RETIRED — no
-  more false coupling (e.g. `networking` workloads waiting on `cicd`'s slow operator).
+* Root `flux` (path `./flux`) reads an explicit `./flux/kustomization.yaml` listing ONLY the
+  per-**domain** Kustomization files — so kustomize never recurses into the `./flux/<domain>/`
+  service dirs (deterministic, independent of Flux's directory-scan behaviour). Each domain
+  Kustomization (path `./flux/<domain>`) reads `./flux/<domain>/kustomization.yaml` listing its
+  per-**service** Kustomizations. `flux tree` then shows the domain groups natively.
+* *Ordering stays at the SERVICE level* — the derived `CRD → CR` provider edges + the unit-graph
+  `service → service` edges (see <<derivation>>). A Flux `dependsOn` references a peer Kustomization
+  by name (all in `flux-system`), so a service edge holds ACROSS domains unchanged; the domain level
+  adds ownership/grouping only, NO inter-domain `dependsOn` (no re-introduced coupling).
+* Each domain Kustomization is `wait: false` with no decryption (it applies only Kustomization
+  objects). Readiness stays at the SERVICE level (each service is `wait: true`), consistent with
+  ordering living there too — a `wait: true` health roll-up at the domain would hold a
+  kustomize-controller worker for the whole health-check timeout while its services converge, and
+  ten domains doing that starve the controller's concurrency so services never get a reconcile slot
+  (a self-inflicted cold-start near-stall, observed on the first C+D re-grow). The honest
+  per-service verdict is `flux get ks`; the domain level is ownership/grouping only.
 
-The declared domain DAG today (registrars) is small: `gitops → platform`, `networking → cluster`,
-`runtime → cluster, platform`. An audit proved it is INCOMPLETE for `CRD → CR` (see below) — which is
-exactly why v2 DERIVES the edges instead of trusting the hand-declared list.
+The old declared domain DAG in the registrars (`gitops → platform`, …) is NOT used for reconcile
+ordering — an audit proved it INCOMPLETE for `CRD → CR` (the `cluster-api → platform` cert-manager
+edge was missing for months, hidden by the barrier). v2 DERIVES the edges instead, enforced complete
+by the fail-fast — see <<derivation>>.
 
-=== The derivation — `kind → CRD-defining cell`
+[#derivation]
+=== The derivation — CR → its CRD provider (implemented, increment C)
 
-The planner already runs post-explode with every written file. v2 adds two passes:
+The planner runs post-explode with every written file, scans each doc once, and derives every
+`dependsOn` from it — REPLACING the global barrier. A cell's `dependsOn` is the union of the
+declared service→service unit edges (each dep resolved to *every* cell of its coord — a multi-layer
+service is waited on whole) and the derived CR → CRD-provider edges below.
 
-. *Build the CRD-provider index* — scan every written doc; for each `CustomResourceDefinition`, key
-  `(spec.group, spec.names.kind)` to the cell that wrote it:
-+
-[source]
-----
-Map<GroupKind, Cell> crdProvider   // (group, kind) -> defining cell
-----
-. *Resolve every rendered CR's CRD dependency* — for each written doc, read `apiVersion` (→ group) +
-  `kind` and resolve:
-+
+.Reality the render exposed — most CRDs are NOT rendered
+[IMPORTANT]
+====
+Only THREE groups render their CRD as a `crds`-layer cell (`flox.seedmatic.io` ← `runtime/flox-controller`,
+`operator.tekton.dev` ← `cicd/tekton-pipelines`, `operator.cluster.x-k8s.io` ← `cluster-api/operator`;
+all via `UpstreamYamlInclusion`). Every other group's CRD is installed at RUNTIME by an
+operator/HelmChart, so it CANNOT be derived from a rendered CRD — it needs a declared installer. The
+spec's original "derive purely from the rendered tree" is therefore only partially possible; the
+planner uses two provider sources + a fail-fast.
+====
+
+For each rendered CR's `(group, kind)`:
+
 [cols="1,2",options="header"]
 |===
 | Case | Resolution
-| `(group,kind)` in `crdProvider`, provider cell ≠ this cell
-| add a DERIVED `dependsOn` (this cell → the CRD-defining cell) — may be cross-domain, e.g.
-  `cluster-api`'s `cert-manager.io` `Certificate` → `platform`'s cert-manager cell.
-| built-in kind (Deployment, Service, Secret, Namespace, Ingress, ConfigMap, …)
-| skip — no CRD.
-| `(group,kind)` not in the tree, but group is a KNOWN operator group (`tekton.dev`,
-  `pipelinesascode.tekton.dev`, `triggers.tekton.dev`)
-| the CRD is operator-installed → attach a healthCheck (see below), not a `dependsOn` edge.
-| otherwise (no provider, unknown group)
-| *fail-fast at render* — an unresolved CRD is a bug; failing loud beats a silent cold-start
-  fail-retry.
+| built-in group (core `v1`, `apps`, `batch`, `*.k8s.io`, …) or distro group (`helm.cattle.io`, RKE2's
+  helm-controller)
+| skip — the API server already serves it.
+| a rendered CRD provides it (`crdProviderCoord[(group,kind)]` from the scanned
+  `CustomResourceDefinition` docs)
+| depend on *every cell* of the provider's coord (CRD + any controller in the same service).
+| a declared runtime installer owns the group (`RUNTIME_INSTALLERS`: `tekton.*`→`cicd/tekton-pipelines`,
+  `*.toolkit.fluxcd.io`→`gitops/flux-instance`, `fluxcd.controlplane.io`→`gitops/flux-operator`,
+  `cert-manager.io`→`platform/cert-manager`, `cilium.io`/`gateway.networking.k8s.io`→`networking/cilium-config`,
+  `tailscale.com`→`mesh/tailscale`)
+| depend on every cell of the installer's coord; if the installer owns a readiness resource, gate on
+  it (see <<operator-crds>>).
+| otherwise (no rendered CRD, no known installer, not built-in/distro)
+| *fail-fast at render* (`IllegalStateException` naming the group/kind + a consuming cell) — an
+  unresolved CRD is a bug; failing loud beats the silent cold-start fail-retry the barrier masked.
+  This is what makes the captured dependency set PROVABLY complete: a rendered CR of an uncovered
+  group cannot ship.
 |===
 
-=== Operator-installed CRDs — a healthCheck that also fixes gap (1)
+An edge to a cell of the CR's OWN coord is skipped (a service that renders both its CRD and its CR
+needs no self-edge; Flux applies both within the one Kustomization). The whole set is exercised by
+`ManifestsBddInContainerTest` (full-set synthesis) — a green run proves the map covers every rendered
+group.
+
+[#operator-crds]
+=== Operator-installed CRDs — a healthCheck that also fixes gap (1) (implemented, increment B)
 
 CRDs an operator installs at runtime aren't cells, so no edge can be derived. A small explicit map
 routes them to the operator's readiness resource:
@@ -143,11 +205,18 @@ The operator cell (`cicd-tekton-pipelines`) gets `spec.healthChecks: [TektonConf
 `Ready` only once the operator has FINISHED installing the CRDs; the CR cells `dependsOn` the operator
 cell → they reconcile only after. This closes gap (1): no more `no matches for kind` at cold-start.
 
-=== `WaitForFirstConsumer` PVCs — no health-gate (gap 2)
+[#wfc-pvc]
+=== `WaitForFirstConsumer` PVCs — no health-gate (gap 2) (implemented, increment B)
 
-A cell that renders a PVC bound `WaitForFirstConsumer` gets `wait: false` (or excludes the PVC from
-an explicit `spec.healthChecks`), so a legitimately-`Pending`-until-first-consumer PVC never wedges
-the Kustomization at `Ready=false`.
+A cell that renders a PVC bound `WaitForFirstConsumer` gets `wait: false`, so a
+legitimately-`Pending`-until-first-consumer PVC never wedges the Kustomization at `Ready=false`. The
+planner derives this: it reads each rendered `StorageClass`'s `volumeBindingMode` + `is-default-class`
+annotation, resolves each PVC's effective class (explicit `storageClassName`, else the default), and
+flags the cell when that class is WFC.
+
+NOTE: today the ZFS classes bind `Immediate` (gap 2 fixed at the source — a PVC Binds at apply, so
+`wait: true` is safe), so this derivation flags nothing. It is the data-driven safety net for any
+future WFC class, not a currently-active path.
 
 == Anti-patterns
 

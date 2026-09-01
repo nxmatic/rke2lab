@@ -33,13 +33,15 @@ import software.constructs.Construct;
  *
  * <p><b>Root Kustomization:</b> a single {@code Kustomization} over {@code ./flux} — the in-branch
  * dir the {@link io.seedmatic.rke2lab.manifests.FluxServiceKustomizationPlanner} fills post-explode
- * with one child Kustomization per service {@code (layer, domain, package)} cell. The root applies
- * those children; each reconciles its own {@code ./<layer>/<domain>/<package>} path and carries the
- * dependsOn graph (layer barrier + service→service edges) that orders the reconcile — so an
- * operator sees per-service progress in {@code flux get kustomizations}, and a CR dry-runs only
- * once its CRD exists. {@code wait: true} makes the root Ready only once every child is. The two
- * Secrets (App-auth + age) ride the same local-only bootstrap lane so Flux comes up able to pull +
- * decrypt.
+ * with a three-level tree: an explicit {@code kustomization.yaml} listing the per-DOMAIN
+ * Kustomizations, each of which ({@code ./flux/<domain>}) owns its per-SERVICE Kustomizations. The
+ * root applies the domain Kustomizations; each service reconciles its own {@code
+ * ./<layer>/<domain>/<package>} path and carries the DERIVED dependsOn graph (CRD→CR provider edges
+ * + service→service edges — no global layer barrier) that orders the reconcile, so an operator sees
+ * per-service progress in {@code flux get kustomizations} (grouped by domain in {@code flux tree}),
+ * and a CR dry-runs only once its CRD exists. {@code wait: true} makes the root Ready only once
+ * every domain — and so every service — is. The two Secrets (App-auth + age) ride the same
+ * local-only bootstrap lane so Flux comes up able to pull + decrypt.
  */
 public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
 

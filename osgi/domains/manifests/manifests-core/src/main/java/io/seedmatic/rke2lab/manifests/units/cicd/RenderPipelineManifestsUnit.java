@@ -107,17 +107,23 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                                 "|PersistentVolumeClaim|" + NAMESPACE + "|" + MAVEN_CACHE_PVC))
                         .build())
                 .build());
-    // RWO on the default SC: the ~/.m2 local repo + maven-build-cache are single-writer; the
-    // pipeline runs concurrency 1 so no two renders race the cache (and a single-node cluster co-
-    // locates anyway). Unlike the coalesced `source` PVC, this one mounts cleanly under the
-    // affinity
-    // assistant on the default (exclusive) SC — verified live — so it needs no shared bind-mount.
+    // RWO on the SHARED ZFS class (bind-mount): the ~/.m2 local repo + maven-build-cache are
+    // single-writer and the pipeline runs concurrency 1, but under coschedule=pipelineruns the
+    // affinity assistant and the task pod co-locate on one node and BOTH mount this PVC — the
+    // exclusive (device-mount) default SC then fails "device already mounted", the same trap the
+    // coalesced `source` PVC hit. The shared bind-mount lets the same-node pods co-mount the one
+    // RWO
+    // volume. Both ZFS classes bind Immediate, so this PVC Binds at deploy (no
+    // Pending-until-consumer
+    // wedge of the Flux Kustomization's wait).
     pvc.addJsonPatch(
         JsonPatch.add(
             "/spec",
             Map.of(
                 "accessModes",
                 List.of("ReadWriteOnce"),
+                "storageClassName",
+                "openebs-zfs-shared",
                 "resources",
                 Map.of("requests", Map.of("storage", "10Gi")))));
   }

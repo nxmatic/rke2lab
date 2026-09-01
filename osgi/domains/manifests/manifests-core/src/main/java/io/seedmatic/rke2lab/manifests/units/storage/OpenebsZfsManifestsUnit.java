@@ -38,6 +38,11 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
     // Tekton's affinity assistant (a render PipelineRun's assistant + task pods share the `source`
     // PVC). Coherent with the host-provided ZFS (single pool import); RWX-over-nodes stays a future
     // design.
+    // Both bind Immediate (not WaitForFirstConsumer): the PV is provisioned the moment the PVC is
+    // created, so it Binds without waiting for a consumer pod — a Pending-until-consumer PVC
+    // otherwise wedges a Flux `wait: true` Kustomization at Ready=false. Topology-awareness (the
+    // reason to defer to first consumer) is moot on a single control node — the volume can only
+    // land there.
     createStorageClass(scope, "openebs-zfs", true, false);
     createStorageClass(scope, "openebs-zfs-shared", false, true);
     createHelmChart(scope, namespace, chartVersion);
@@ -91,7 +96,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
         JsonPatch.add("/parameters", parameters),
         JsonPatch.add("/provisioner", "zfs.csi.openebs.io"),
         JsonPatch.add("/reclaimPolicy", "Delete"),
-        JsonPatch.add("/volumeBindingMode", "WaitForFirstConsumer"));
+        JsonPatch.add("/volumeBindingMode", "Immediate"));
   }
 
   private void createHelmChart(
