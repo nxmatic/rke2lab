@@ -26,8 +26,8 @@ import software.constructs.Construct;
  *       source-controller to reconcile the {@code rke2lab} {@code GitRepository} at once;
  *   <li>the {@code flux-webhook-token} Secret it HMAC-validates against — a replica stub filled by
  *       mittwald from the replicator source (the same pull pattern as {@code floxhub-token}); the
- *       operator seeds the value at {@code github.webhook.token} in {@code .secrets} and configures
- *       the GitHub webhook's Secret field with the SAME value;
+ *       operator seeds the value at {@code github.webhook.secret} in {@code .secrets} and
+ *       configures the GitHub webhook's Secret field with the SAME value;
  *   <li>a Tailscale {@code Ingress} ({@code ingressClassName: tailscale}, {@code
  *       tailscale.com/funnel: "true"}) exposing the notification-controller's {@code
  *       webhook-receiver} Service publicly at {@code https://flux-webhook.<tailnet>.ts.net} with a
@@ -49,7 +49,7 @@ public final class FluxReceiverManifestsUnit extends AbstractManifestsUnit {
   /**
    * The HMAC token Secret / replicator source name (matches {@code .secrets
    * kubernetes.secrets.web-hook.name} + the stub). Public: the {@code cicd} PaC secret reads the
-   * SAME operator-chosen {@code github.webhook.token} from this replicator source for its {@code
+   * SAME operator-chosen {@code github.webhook.secret} from this replicator source for its {@code
    * webhook.secret} (single source of truth for the shared webhook HMAC).
    */
   public static final String WEBHOOK_TOKEN_SECRET = "flux-webhook-token";

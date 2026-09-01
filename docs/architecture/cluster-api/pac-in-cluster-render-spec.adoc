@@ -107,15 +107,19 @@ flowchart LR
 == Operator setup — extend the existing App, do not create a new one
 
 There is no Tekton/PaC webhook yet (`pipelines-as-code-secret` is unconfigured). What exists is the
-baked GitHub App + a repo-level Flux webhook (HMAC `github.webhook.token`). Configuring PaC EXTENDS
-the one App (the single automation identity) — a new App would fragment the identity and double the
-rotation. Out-of-band operator ceremony on the GitHub App:
+baked GitHub App, whose SINGLE webhook currently drives Flux (pointed at the `flux-webhook` funnel,
+HMAC `github.webhook.secret`) — there is no repo-level webhook. Configuring PaC EXTENDS the one App
+(the single automation identity) — a new App would fragment the identity and double the rotation.
+Out-of-band operator ceremony:
 
-* point the App's webhook URL at the PaC funnel — the App has ONE webhook URL, currently free (Flux
-  uses a SEPARATE repo-level webhook, so the two coexist without collision);
-* add the `push` event;
-* extend permissions with `checks:write` (PaC statuses) + `metadata:read`, on top of the `contents`
-  read (Flux pull) + write (render push) the App already carries.
+* the App has ONE webhook and PaC (in GitHub-App mode) needs it, so *repoint* the App's webhook URL
+  at the PaC funnel AND give Flux its trigger back via a *repo-level* webhook (same URL — the
+  `flux-webhook` funnel `/hook/<receiver-id>`, content-type `application/json`, secret
+  `github.webhook.secret`, `push` event). Flux's webhook is only an accelerant over its 1m poll, so
+  the brief move degrades to polling, never breaks;
+* add the `push` event to the App + subscribe `Check run` for statuses;
+* extend App permissions with `checks:write` (PaC statuses) + `metadata:read`, on top of the
+  `contents` read (Flux pull) + write (render push) the App already carries.
 
 [[auth]]
 == Auth — the App identity everywhere, the in-cluster token dissolved by PaC

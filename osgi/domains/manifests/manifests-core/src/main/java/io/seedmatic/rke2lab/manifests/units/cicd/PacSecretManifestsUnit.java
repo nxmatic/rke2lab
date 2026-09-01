@@ -35,7 +35,7 @@ import software.constructs.Construct;
  *   <li>{@code github-private-key} — the App's private key (PEM), from which PaC mints installation
  *       tokens.
  *   <li>{@code webhook.secret} — the App-webhook HMAC PaC validates incoming payloads against. The
- *       operator-chosen {@code github.webhook.token}, read from the {@code flux-webhook-token}
+ *       operator-chosen {@code github.webhook.secret}, read from the {@code flux-webhook-token}
  *       replicator source already on the context — the SINGLE source shared by the App webhook, the
  *       Flux receiver, and PaC (no duplicate reveal, no new synthesis material). Omitted when no
  *       replicator sources are sealed (a survey); PaC then runs without payload validation until it
@@ -112,7 +112,7 @@ public final class PacSecretManifestsUnit extends AbstractManifestsUnit {
   }
 
   /**
-   * The shared webhook HMAC secret ({@code github.webhook.token}), read from the {@code
+   * The shared webhook HMAC secret ({@code github.webhook.secret}), read from the {@code
    * flux-webhook-token} replicator source already revealed onto the context — the SINGLE source of
    * truth for the value the App webhook, the Flux receiver, and PaC all validate against (no
    * duplicate reveal, no new synthesis material). Empty when no replicator sources are sealed (a

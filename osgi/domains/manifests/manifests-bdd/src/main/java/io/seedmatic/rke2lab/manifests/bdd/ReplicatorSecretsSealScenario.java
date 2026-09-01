@@ -193,13 +193,14 @@ public class ReplicatorSecretsSealScenario
 
     /**
      * The Flux Receiver webhook HMAC secret: the operator-chosen shared value at {@code
-     * github.webhook.token} in {@code .secrets}, keyed {@code token} (what a Flux {@code Receiver}
-     * validates against). The SAME value goes in the GitHub webhook's Secret field.
+     * github.webhook.secret} in {@code .secrets}. The rendered Secret's data key stays {@code
+     * token} — the key a Flux {@code Receiver} validates against (and the {@code cicd} PaC secret
+     * reads), not configurable. The SAME value goes in the GitHub webhook's Secret field.
      */
     private Optional<SourceSecret> webhookSecret(
         final JsonNode mapping, final String namespace, final JsonNode github) {
-      final JsonNode token = github.path("webhook").path("token");
-      if (mapping.path("name").isMissingNode() || token.isMissingNode()) {
+      final JsonNode secret = github.path("webhook").path("secret");
+      if (mapping.path("name").isMissingNode() || secret.isMissingNode()) {
         return Optional.empty();
       }
       return Optional.of(
@@ -207,7 +208,7 @@ public class ReplicatorSecretsSealScenario
               mapping.path("name").asText(),
               namespace,
               "Opaque",
-              Map.of("token", token.asText()),
+              Map.of("token", secret.asText()),
               namespaces(mapping.path("replicateTo"))));
     }
 
