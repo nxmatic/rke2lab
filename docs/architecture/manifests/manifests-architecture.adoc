@@ -817,6 +817,9 @@ back to this doc — read them next to the code in your IDE. Start points:
   units within a domain
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] — single source of truth
   for domain IDs
+* link:flux-kustomization-planner.adoc[Flux Kustomization Planner] — how the synthesised tree becomes
+  the per-service Flux Kustomizations that reconcile it (current flat/global-barrier model + the
+  planned domain-scoped v2 with derived `CRD → CR` edges)
 * link:manifests-contribution-channels.adoc[Manifests Contribution Channels] — how a domain hands
   work to the synthesis: the three typed channels (units, node-env, host-assets), their aggregators,
   and the SCR shape they share

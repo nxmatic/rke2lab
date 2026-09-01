@@ -255,7 +255,9 @@ each child reconciles its own `./<layer>/<domain>/<package>` path. An operator s
 progress in `flux get kustomizations` (`mesh-headscale`, `runtime-flox-controller-crds`, …), a
 failure stays local to one service, and retries are independent — where the old flat per-layer
 stack lumped every domain's resources into four opaque `Kustomization`s. The reconcile ORDER still
-comes from the layers, now carried by the children's `dependsOn`:
+comes from the layers, now carried by the children's `dependsOn` (the planner's full mechanics, the
+two gaps a live cold-start exposed, and the planned domain-scoped v2 are in
+link:../manifests/flux-kustomization-planner.adoc[The Flux Kustomization Planner]):
 
 [mermaid,rendered-branches-layers,svg]
 ----
