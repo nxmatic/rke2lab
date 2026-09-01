@@ -204,16 +204,21 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
 
   /**
    * The CI render toolchain, injected by the flox NRI plugin into the Tekton {@code render-publish}
-   * step. {@code jdk25} + {@code maven} come from the catalog as the pinned rke2lab flake outputs
-   * (the SAME toolchain SSOT the dev shell uses — {@code github:seedmatic/rke2lab#jdk25}/{@code
-   * #maven} — re-exported by the flox-catalogue flake), so the in-cluster {@code clean verify} runs
-   * the spotless/shfmt gates at the same versions as dev. {@code git}/{@code bash}/{@code
-   * coreutils} are stock catalog packages for the clone + reactor scripts.
+   * step. Mirrors the dev {@code mavenToolchain} SSOT ({@code jdk25 maven shfmt shellcheck which},
+   * the pinned rke2lab flake outputs re-exported by the flox-catalogue flake) so the in-cluster
+   * {@code clean verify} runs the spotless gates at the same versions as dev — spotless
+   * version-checks the {@code shfmt} binary against the pom's {@code shfmt.version} (so it must be
+   * the PINNED flake build, not an arbitrary catalog version) and locates it by shelling out to
+   * {@code which shfmt} (the nix stdenv has no {@code which}, so it is mandatory). {@code
+   * git}/{@code bash}/{@code coreutils} are stock catalog packages for the clone + reactor scripts.
    */
   private Map<String, Object> mavenManifest() {
     final Map<String, Object> install = new LinkedHashMap<>();
     install.put("jdk25", flakeRef("jdk25"));
     install.put("maven", flakeRef("maven"));
+    install.put("shfmt", flakeRef("shfmt"));
+    install.put("shellcheck", flakeRef("shellcheck"));
+    install.put("which", flakeRef("which"));
     install.put("git", catalogAll("git"));
     install.put("bash", catalogAll("bash"));
     install.put("coreutils", catalogAll("coreutils"));
