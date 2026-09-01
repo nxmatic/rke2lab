@@ -33,7 +33,13 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
     final String chartVersion =
         ManifestSynthesisContext.current().componentVersions().of(Component.OPENEBS_ZFS_CHART);
     ApiObject namespace = createNamespace(scope);
-    createStorageClass(scope);
+    // Two classes off the same ZFS pool: the default exclusive-mount one, and a `shared: yes`
+    // variant (bind-mount) so several same-node pods can mount ONE RWO volume at once — needed by
+    // Tekton's affinity assistant (a render PipelineRun's assistant + task pods share the `source`
+    // PVC). Coherent with the host-provided ZFS (single pool import); RWX-over-nodes stays a future
+    // design.
+    createStorageClass(scope, "openebs-zfs", true, false);
+    createStorageClass(scope, "openebs-zfs-shared", false, true);
     createHelmChart(scope, namespace, chartVersion);
   }
 
@@ -52,29 +58,37 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private void createStorageClass(final Construct scope) {
+  private static final String ZFS_POOL = "tank/rke2/control-nodes/master";
+
+  private void createStorageClass(
+      final Construct scope, final String name, final boolean isDefault, final boolean shared) {
+    final Map<String, String> extraAnnotations =
+        isDefault ? Map.of("storageclass.kubernetes.io/is-default-class", "true") : Map.of();
     ApiObject storageClass =
         new ApiObject(
             scope,
-            "storageclass-openebs-zfs",
+            "storageclass-" + name,
             ApiObjectProps.builder()
                 .apiVersion("storage.k8s.io/v1")
                 .kind("StorageClass")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("openebs-zfs")
+                        .name(name)
                         .annotations(
                             manifestAnnotations.packageAnnotations(
-                                DOMAIN_NAME,
-                                PACKAGE_NAME,
-                                Map.of("storageclass.kubernetes.io/is-default-class", "true")))
+                                DOMAIN_NAME, PACKAGE_NAME, extraAnnotations))
                         .build())
                 .build());
 
+    // shared=yes → the ZFS dataset is bind-mounted, so several pods on the SAME node can mount one
+    // RWO volume concurrently (default is an exclusive device mount → "device already mounted").
+    final Map<String, String> parameters =
+        shared
+            ? Map.of("fstype", "zfs", "poolname", ZFS_POOL, "shared", "yes")
+            : Map.of("fstype", "zfs", "poolname", ZFS_POOL);
     storageClass.addJsonPatch(
         JsonPatch.add("/allowVolumeExpansion", true),
-        JsonPatch.add(
-            "/parameters", Map.of("fstype", "zfs", "poolname", "tank/rke2/control-nodes/master")),
+        JsonPatch.add("/parameters", parameters),
         JsonPatch.add("/provisioner", "zfs.csi.openebs.io"),
         JsonPatch.add("/reclaimPolicy", "Delete"),
         JsonPatch.add("/volumeBindingMode", "WaitForFirstConsumer"));

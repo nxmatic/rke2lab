@@ -51,11 +51,14 @@ spec:
     - name: node
       value: "{{ node }}"
   workspaces:
-    # Per-run scratch shared fetch -> render; RWO co-locates the two task pods on the single node.
+    # Per-run scratch shared fetch -> render. openebs-zfs-shared (shared=yes) lets the affinity
+    # assistant + the task pods co-mount this one RWO volume on the single node (the default
+    # exclusive SC gives "device already mounted").
     - name: source
       volumeClaimTemplate:
         spec:
           accessModes: [ReadWriteOnce]
+          storageClassName: openebs-zfs-shared
           resources:
             requests:
               storage: 2Gi
