@@ -271,12 +271,14 @@
 
         # The CI render toolchain the flox NRI plugin injects into the Tekton
         # render-publish step (the cicd/maven FloxEnv references these via
-        # floxcatalog:catalogue#jdk25 / #maven). Straight from nixpkgs — the SAME
-        # attributes the rke2lab build toolchain uses (mavenToolchain in the root
-        # flake is `inherit (pkgs) jdk25 maven …`), and both flakes follow
-        # flake-commons/nixpkgs, so the in-cluster `clean verify` runs the
-        # spotless/shfmt gates at the dev versions.
-        inherit (pkgs) jdk25 maven;
+        # floxcatalog:catalogue#jdk25 / #maven / #shfmt / #shellcheck / #which).
+        # Straight from nixpkgs — the SAME attributes the rke2lab build toolchain
+        # uses (mavenToolchain in the root flake is
+        # `inherit (pkgs) jdk25 maven shfmt shellcheck which`), and both flakes
+        # follow flake-commons/nixpkgs, so the in-cluster `clean verify` runs the
+        # spotless gates at the dev versions — spotless version-checks the shfmt
+        # binary and locates it via `which shfmt` (the nix stdenv has no `which`).
+        inherit (pkgs) jdk25 maven shfmt shellcheck which;
 
         default = kdns;
       };
