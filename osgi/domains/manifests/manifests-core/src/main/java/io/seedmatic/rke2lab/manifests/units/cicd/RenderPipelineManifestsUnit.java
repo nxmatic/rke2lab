@@ -14,32 +14,31 @@ import software.constructs.Construct;
 
 /**
  * The in-cluster render pipeline — the upstream half of the GitOps loop rendered as Tekton
- * manifests (see {@code docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc}). Three
- * Tasks wired by one Pipeline ({@code fetch → bootstrap → render}), plus the persistent Maven-cache
- * PVC:
+ * manifests (see {@code docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc}). Two Tasks
+ * wired by one Pipeline ({@code fetch → render}), plus the persistent Maven-cache PVC:
  *
  * <ul>
  *   <li>{@code git-fetch} — clones the source repo at the pushed revision into the shared {@code
  *       source} workspace, authenticating with PaC's {@code basic-auth} workspace (the {@code
  *       git_auth_secret} App token PaC injects into the PipelineRun).
- *   <li>{@code maven-cache-bootstrap} — shared, idempotent: seeds the {@code staging-extension}
- *       build closure (a startup {@code .mvn/extensions.xml} extension that can't be built by a
- *       normal reactor run) into the persistent maven-cache PVC, once, on a cold cache.
- *   <li>{@code render-publish} — {@code flox-annotated} (the NRI plugin injects a per-task FloxEnv
- *       under the {@code cicd} folder — JDK 25 + maven for this render task — into the {@code
- *       step-render} container), builds with the reactor discipline ({@code -pl :manifests-cli -am
- *       clean verify}, siblings from {@code target/}, never installed), then runs the {@code
- *       publish} verb — render into the plot + ff-push {@code manifests/<cluster>}.
+ *   <li>{@code render-publish} — {@code flox-annotated} (the NRI plugin injects the {@code
+ *       cicd/nix} FloxEnv — a minimal nix toolchain — into the {@code step-render} container), then
+ *       runs {@code nix run .#render-manifests}: the SINGLE render definition (shared with
+ *       dev/release, no hand-scripted mvn+java that drifts) builds {@code manifests-cli} with the
+ *       reactor discipline and seeds the {@code staging-extension} closure from a nix derivation
+ *       (no separate bootstrap task), then runs the {@code publish} verb — render into the plot +
+ *       ff-push {@code manifests/<cluster>}.
  * </ul>
  *
  * <p><b>Flox injection lives on the PipelineRun stub, not here.</b> Pod annotations are set by the
  * PipelineRun (the {@code .tekton/} source stub), not by a Pipeline or Task. The stub carries
- * {@code flox.dev/environment.step-render=cicd/<task-env>} (+ home/uid/gid) — the CI flox envs are
- * specialised PER TASK under the {@code cicd} folder ({@link
- * io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxEnvFolder#CICD}), not one coarse toolchain.
- * It propagates to every task pod, and only the {@code render-publish} pod owns a {@code
- * step-render} container, so the NRI plugin injects there and ignores it on the {@code git-fetch}
- * pod (no bare-key fallback — each container opts in BY NAME).
+ * {@code flox.dev/environment.step-render=cicd/nix} (+ home/uid/gid) — the CI flox env under the
+ * {@code cicd} folder ({@link
+ * io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxEnvFolder#CICD}) is a minimal nix
+ * toolchain; nix owns the build + exec closure. It propagates to every task pod, and only the
+ * {@code render-publish} pod owns a {@code step-render} container, so the NRI plugin injects there
+ * and ignores it on the {@code git-fetch} pod (no bare-key fallback — each container opts in BY
+ * NAME).
  *
  * <p><b>Workspaces:</b> the Pipeline DECLARES {@code source} (per-run, bound by the stub to a
  * {@code volumeClaimTemplate}), {@code maven-cache} (the persistent RWO PVC rendered here), and
@@ -51,9 +50,8 @@ import software.constructs.Construct;
  * mounted {@code git_auth} secret into {@code RKE2LAB_PUSH_TOKEN}, which the in-cluster {@code
  * publish} reveals for the ff-push (container-aware {@code
  * ManifestSynthesisScenario.revealGithubToken} — cellar OPERATOR, env IN_CLUSTER). The one forward
- * reference left is the render task's {@code cicd/<task-env>} FloxEnv (JDK 25 / maven), which the
- * flox-catalogue branch lands; the objects render structurally now so the resources materialise and
- * reconcile.
+ * reference left is the render task's {@code cicd/nix} FloxEnv, which the flox-catalogue branch
+ * lands; the objects render structurally now so the resources materialise and reconcile.
  */
 public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
 
@@ -68,12 +66,6 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
   /** Container name the flox NRI plugin keys on: {@code flox.dev/environment.step-render}. */
   private static final String RENDER_STEP = "render";
 
-  /**
-   * Container name of the shared maven-cache bootstrap step ({@code flox.dev/environment.step-
-   * bootstrap}). It also runs {@code mvnw}, so it opts into the same {@code cicd/maven} toolchain.
-   */
-  private static final String BOOTSTRAP_STEP = "bootstrap";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "render-pipeline");
 
@@ -85,7 +77,6 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     createMavenCachePvc(scope);
     createGitFetchTask(scope);
-    createMavenBootstrapTask(scope);
     createRenderPublishTask(scope);
     createPipeline(scope);
   }
@@ -186,77 +177,6 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                 })));
   }
 
-  /**
-   * The shared, idempotent maven-cache bootstrap: seeds the {@code staging-extension} build closure
-   * into the persistent maven-cache PVC. That extension is declared in {@code .mvn/extensions.xml}
-   * and loaded at mvn STARTUP, so it can't be built by a normal reactor run (chicken-and-egg) — the
-   * one-time fix is to build+install it with the extensions temporarily disabled. Idempotent: on a
-   * warm cache (the PVC persists) the jar is already there, so it no-ops. Reusable by any maven
-   * pipeline.
-   */
-  private void createMavenBootstrapTask(final Construct scope) {
-    final ApiObject task =
-        new ApiObject(
-            scope,
-            "task-maven-cache-bootstrap",
-            ApiObjectProps.builder()
-                .apiVersion("tekton.dev/v1")
-                .kind("Task")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name("maven-cache-bootstrap")
-                        .namespace(NAMESPACE)
-                        .annotations(
-                            packageProfile.packageAnnotations(
-                                "tekton.dev|Task|" + NAMESPACE + "|maven-cache-bootstrap"))
-                        .build())
-                .build());
-    task.addJsonPatch(
-        JsonPatch.add(
-            "/spec",
-            Map.of(
-                "workspaces",
-                new Object[] {Map.of("name", "source"), Map.of("name", "maven-cache")},
-                "steps",
-                new Object[] {
-                  Map.of(
-                      "name",
-                      BOOTSTRAP_STEP,
-                      "image",
-                      "debian:stable-slim",
-                      "workingDir",
-                      "$(workspaces.source.path)",
-                      "script",
-                      String.join(
-                          "\n",
-                          "#!/usr/bin/env bash",
-                          "set -euo pipefail",
-                          "export CACHE=\"$(workspaces.maven-cache.path)/repository\"",
-                          "JAR=\"$CACHE/io/seedmatic/rke2lab/staging-extension/1.0.0/"
-                              + "staging-extension-1.0.0.jar\"",
-                          "if [ -f \"$JAR\" ]; then",
-                          "  echo 'staging-extension already seeded in the cache — skipping'",
-                          "  exit 0",
-                          "fi",
-                          "echo 'seeding the staging-extension build closure into the maven cache'",
-                          // The extension is loaded at mvn startup, so build it with
-                          // .mvn/extensions.xml disabled, then restore it (trap = restore even on
-                          // failure) for the downstream render step. Install the parent chain FIRST
-                          // — bom + build-parent are local modules, so seeding them locally makes
-                          // build-parent's `import bom:1.0.0` resolve from the cache instead of
-                          // GitHub Packages (no token needed for the bootstrap); then the extension
-                          // (-am pulls bnd-read) resolves everything locally.
-                          "flox activate --dir /root -- bash -euo pipefail -c '",
-                          "  trap \"git restore .mvn/extensions.xml 2>/dev/null || true\" EXIT",
-                          "  rm .mvn/extensions.xml",
-                          "  ./mvnw -f bom/pom.xml install -Dmaven.repo.local=\"$CACHE\"",
-                          "  ./mvnw -f build-parent/pom.xml install -Dmaven.repo.local=\"$CACHE\"",
-                          "  ./mvnw -f maven-embed-staging-ext/pom.xml -pl :staging-extension -am"
-                              + " clean install -Dmaven.repo.local=\"$CACHE\"",
-                          "'"))
-                })));
-  }
-
   private void createRenderPublishTask(final Construct scope) {
     final ApiObject task =
         new ApiObject(
@@ -293,7 +213,7 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                 new Object[] {
                   Map.of(
                       // Container name = step-render; the PipelineRun stub flox-annotates it so the
-                      // NRI plugin injects the cicd/toolchain FloxEnv (JDK 25 + maven) here.
+                      // NRI plugin injects the cicd/nix FloxEnv (a minimal nix toolchain) here.
                       "name",
                       RENDER_STEP,
                       // The commit-signing key the operator's grow emitted as
@@ -349,21 +269,24 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           // packages:read.
                           "  export GH_TOKEN=\"$RKE2LAB_PUSH_TOKEN\"",
                           "fi",
-                          // The flox NRI plugin MOUNTED the cicd/maven env at /root/.flox but does
-                          // NOT auto-activate — the command must, exactly like the kdns container's
-                          // `flox activate --dir /root -- kdns`. Run build+publish inside the
-                          // activated env so JDK 25 + maven are on PATH (flox itself is on PATH via
-                          // the plugin's injection). -am builds siblings from target/; verify runs
-                          // the tests + staging gates before any push; never `install`.
-                          "flox activate --dir /root -- bash -euo pipefail -c '",
-                          "  ./mvnw -Dmaven.repo.local=\"$(workspaces.maven-cache.path)/repository\""
-                              + " -pl :manifests-cli -am clean verify",
-                          "  java \\",
-                          "    -Drke2lab.manifests.outdir=\"$(workspaces.source.path)/render\" \\",
-                          "    -Drke2lab.manifests.cluster=\"$(params.cluster)\" \\",
-                          "    -Drke2lab.manifests.node=\"$(params.node)\" \\",
-                          "    -jar exec/manifests-cli/target/manifests-cli-*-exec.jar publish",
-                          "'"))
+                          // The maven-cache PVC is the cache ROOT — it holds repository/ AND
+                          // build-cache/ side by side. M2_REPO points at its repository; the render
+                          // app derives MAVEN_BUILD_CACHE=dirname(M2_REPO)=the PVC, so the
+                          // maven-build-cache persists beside the repo on the PVC → renders are
+                          // incremental across pushes (only changed modules recompile).
+                          "export M2_REPO=\"$(workspaces.maven-cache.path)/repository\"",
+                          // The flox NRI plugin MOUNTED the cicd/nix env at /root/.flox (nix + git
+                          // on PATH; single-user nix builds into the writeable /nix overlay) but
+                          // does
+                          // NOT auto-activate — hence `flox activate --dir /root -- …`.
+                          // `nix run .#render-manifests` from the source checkout is the ONE render
+                          // definition (shared with dev/release, no hand-scripted mvn+java that
+                          // drifts): it builds manifests-cli (CRDs staged in), then publish signs +
+                          // ff-pushes manifests/<cluster>. outdir defaults to $PWD/render
+                          // (workingDir
+                          // = the source workspace).
+                          "flox activate --dir /root -- nix run .#render-manifests --"
+                              + " \"$(params.cluster)\" \"$(params.node)\""))
                 })));
   }
 
@@ -420,21 +343,9 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                       }),
                   Map.of(
                       "name",
-                      "bootstrap",
-                      "runAfter",
-                      new Object[] {"fetch"},
-                      "taskRef",
-                      Map.of("name", "maven-cache-bootstrap"),
-                      "workspaces",
-                      new Object[] {
-                        Map.of("name", "source", "workspace", "source"),
-                        Map.of("name", "maven-cache", "workspace", "maven-cache")
-                      }),
-                  Map.of(
-                      "name",
                       "render",
                       "runAfter",
-                      new Object[] {"bootstrap"},
+                      new Object[] {"fetch"},
                       "taskRef",
                       Map.of("name", "render-publish"),
                       "params",

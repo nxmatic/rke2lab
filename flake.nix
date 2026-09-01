@@ -197,8 +197,11 @@
         fi
         mkdir -p "$M2_REPO"
 
+        # Seed the staging-extension closure from the NIX-built repo ($STAGING_EXTENSION_REPO,
+        # set by each caller before this prelude) — the same store path for every mode, so the
+        # operator standalone build and the in-cluster render replay the identical bootstrap.
         for a in ${builtins.concatStringsSep " " stagingExtensionClosure}; do
-          src=${hostM2Repo}/$a
+          src="$STAGING_EXTENSION_REPO/$a"
           # Idempotent when the primary persists across builds (skip if already seeded).
           if [ -d "$src" ] && [ ! -e "$M2_REPO/$a" ]; then
             mkdir -p "$M2_REPO/$(dirname "$a")"
@@ -208,15 +211,9 @@
         done
 
         if [ ! -d "$M2_REPO/io/seedmatic/rke2lab/staging-extension" ]; then
-          cat <<EoE
-          FATAL: staging-extension not seeded from '${hostM2Repo}'." >&2
-          That path has no ~/.m2 artifacts. Either:
-            - pass your M2_REPO and GH_TOKEN lathrough, e.g.:
-                 sudo env M2_REPO="\$HOME" GH_TOKEN="\$(gh auth token)"
-                   darwin-rebuild switch --impure --flake .#nikopol
-        EoE
+          echo "FATAL: staging-extension not seeded from '$STAGING_EXTENSION_REPO'" >&2
           exit 1
-        fi  
+        fi
 
         mvnHost() {
           env GH_TOKEN="${hostGHToken}" mvn \
@@ -227,6 +224,31 @@
         }
       '';
 
+      # The staging-extension build closure, built by NIX (not seeded from a host ~/.m2 nor a
+      # per-mode Tekton bootstrap task). The `.mvn/extensions.xml` core extension is a reactor
+      # module needed at mvn STARTUP (before any reactor build) — a chicken-egg — so it is built
+      # WITHOUT itself (rm .mvn/extensions.xml) and installed into $out, a maven-repo store path.
+      # Every downstream reactor build (`mavenHostPrelude`) then SEEDS the closure from this ONE
+      # store path — so the operator standalone (seed-master's build) and the in-cluster render
+      # replay the identical bootstrap, zero per-mode duplication. Impure (host GH_TOKEN for any
+      # GitHub Packages dep of the parent chain), like the other reactor builds.
+      stagingExtensionRepoFor = pkgs: pkgs.stdenv.mkDerivation {
+        name = "rke2lab-staging-extension-repo";
+        src = ./.;
+        nativeBuildInputs = mavenBuildInputs pkgs;
+        buildPhase = ''
+          export HOME="$TMPDIR"
+          mkdir -p $out
+          rm .mvn/extensions.xml
+          env GH_TOKEN="${hostGHToken}" mvn -f bom/pom.xml install -Dmaven.repo.local="$out"
+          env GH_TOKEN="${hostGHToken}" mvn -f build-parent/pom.xml install -Dmaven.repo.local="$out"
+          env GH_TOKEN="${hostGHToken}" mvn -f maven-embed-staging-ext/pom.xml -pl :staging-extension -am \
+            clean install -Dmaven.repo.local="$out"
+        '';
+        installPhase = "true";
+        dontFixup = true;
+      };
+
       # netplan JAR build, parameterized by pkgs so the per-system `packages`
       # output can build it locally while `lib` uses the pinned set.
       netplanJarFor = pkgs: pkgs.stdenv.mkDerivation {
@@ -236,6 +258,7 @@
         nativeBuildInputs = mavenBuildInputs pkgs;
 
         buildPhase = ''
+          STAGING_EXTENSION_REPO=${stagingExtensionRepoFor pkgs}
           ${mavenHostPrelude}
 
           # Install parent POM and BOM first, then build the netplan CLI module.
@@ -360,6 +383,7 @@
           nativeBuildInputs = mavenBuildInputs pkgs;
 
           buildPhase = ''
+            STAGING_EXTENSION_REPO=${stagingExtensionRepoFor pkgs}
             ${mavenHostPrelude}
             ${stageFloxControllerCrds}
             mvnHost -Dshfmt.version=${pkgs.shfmt.version} -DskipTests ${mvnArgs} clean package

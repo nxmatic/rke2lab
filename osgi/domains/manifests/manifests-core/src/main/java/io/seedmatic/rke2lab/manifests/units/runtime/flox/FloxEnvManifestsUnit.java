@@ -20,7 +20,7 @@ import software.constructs.Construct;
 /**
  * Emits the workload {@code FloxEnv} CRs the flox-controller realises on each node — the runtime
  * successor to the baked {@code environment.d} tree. Covers {@code kdns} (networking), {@code
- * headscale}/{@code tailscale}/{@code headplane} (mesh), and the {@code maven} CI render toolchain
+ * headscale}/{@code tailscale}/{@code headplane} (mesh), and the {@code nix} CI render toolchain
  * (cicd).
  *
  * <p>Each env installs its workload package from the {@link FloxCatalogManifestsUnit} catalog via a
@@ -87,9 +87,9 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
       createEnv(scope, resolver, "tailscale-debug", FloxEnvFolder.MESH, tailscaleManifest(true));
       createEnv(scope, resolver, "headplane-debug", FloxEnvFolder.MESH, headplaneManifest(true));
     }
-    // The CI render toolchain (cicd/maven): the flox NRI plugin injects it into the Tekton
+    // The CI render toolchain (cicd/nix): the flox NRI plugin injects it into the Tekton
     // render-publish step (step-render). Always emitted — the toolchain is not debug-flavored.
-    createEnv(scope, resolver, "maven", FloxEnvFolder.CICD, mavenManifest());
+    createEnv(scope, resolver, "nix", FloxEnvFolder.CICD, nixManifest());
   }
 
   private void createEnv(
@@ -203,31 +203,21 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
   }
 
   /**
-   * The CI render toolchain, injected by the flox NRI plugin into the Tekton {@code render-publish}
-   * step. Mirrors the dev {@code mavenToolchain} SSOT ({@code jdk25 maven shfmt shellcheck which},
-   * the pinned rke2lab flake outputs re-exported by the flox-catalogue flake) so the in-cluster
-   * {@code clean verify} runs the spotless gates at the same versions as dev — spotless
-   * version-checks the {@code shfmt} binary against the pom's {@code shfmt.version} (so it must be
-   * the PINNED flake build, not an arbitrary catalog version) and locates it by shelling out to
-   * {@code which shfmt} (the nix stdenv has no {@code which}, so it is mandatory). {@code
-   * which}/{@code git}/{@code bash}/{@code coreutils} are stock catalog packages with {@code
-   * outputs: all} — {@code which}'s binary lives in a split output the default flake resolution
-   * misses (it locks the {@code -info} output), so {@code outputs: all} is what puts {@code which}
-   * on PATH for the clone + reactor scripts.
+   * The minimal CI render toolchain, injected by the flox NRI plugin into the Tekton {@code
+   * render-publish} step. The render runs {@code nix run .#render-manifests} (the single-definition
+   * render app), so nix owns the whole build + exec closure — the JDK/maven/spotless (shfmt,
+   * shellcheck) toolchain, node for the cdk8s synthesis, and the {@code staging-extension} seed all
+   * arrive through the flake, not this env. The pod has a writeable {@code /nix} overlay + the
+   * node's store + flox, but NOT the nix CLI, so {@code nix} is the one package that must be here;
+   * single-user nix (no daemon) builds into the overlay. {@code git}/{@code bash}/{@code coreutils}
+   * (stock catalog packages, {@code outputs: all}) back the step script + the ff-push.
    */
-  private Map<String, Object> mavenManifest() {
+  private Map<String, Object> nixManifest() {
     final Map<String, Object> install = new LinkedHashMap<>();
-    install.put("jdk25", flakeRef("jdk25"));
-    install.put("maven", flakeRef("maven"));
-    install.put("shfmt", flakeRef("shfmt"));
-    install.put("shellcheck", flakeRef("shellcheck"));
-    install.put("which", catalogAll("which"));
+    install.put("nix", catalog("nix"));
     install.put("git", catalogAll("git"));
     install.put("bash", catalogAll("bash"));
     install.put("coreutils", catalogAll("coreutils"));
-    // cdk8s synthesis (the Java bindings via jsii) shells out to `node` — the render's `publish`
-    // runs the cdk8s App, so the runtime is mandatory (the dev shell gets it via cdk8s-cli).
-    install.put("nodejs", catalogAll("nodejs"));
     return manifest(install);
   }
 
