@@ -210,7 +210,10 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
    * version-checks the {@code shfmt} binary against the pom's {@code shfmt.version} (so it must be
    * the PINNED flake build, not an arbitrary catalog version) and locates it by shelling out to
    * {@code which shfmt} (the nix stdenv has no {@code which}, so it is mandatory). {@code
-   * git}/{@code bash}/{@code coreutils} are stock catalog packages for the clone + reactor scripts.
+   * which}/{@code git}/{@code bash}/{@code coreutils} are stock catalog packages with {@code
+   * outputs: all} — {@code which}'s binary lives in a split output the default flake resolution
+   * misses (it locks the {@code -info} output), so {@code outputs: all} is what puts {@code which}
+   * on PATH for the clone + reactor scripts.
    */
   private Map<String, Object> mavenManifest() {
     final Map<String, Object> install = new LinkedHashMap<>();
@@ -218,7 +221,7 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     install.put("maven", flakeRef("maven"));
     install.put("shfmt", flakeRef("shfmt"));
     install.put("shellcheck", flakeRef("shellcheck"));
-    install.put("which", flakeRef("which"));
+    install.put("which", catalogAll("which"));
     install.put("git", catalogAll("git"));
     install.put("bash", catalogAll("bash"));
     install.put("coreutils", catalogAll("coreutils"));
