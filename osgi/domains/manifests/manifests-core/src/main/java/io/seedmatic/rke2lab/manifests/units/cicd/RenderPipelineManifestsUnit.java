@@ -96,18 +96,17 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                                 "|PersistentVolumeClaim|" + NAMESPACE + "|" + MAVEN_CACHE_PVC))
                         .build())
                 .build());
-    // RWO: the ~/.m2 local repo + maven-build-cache are single-writer; the pipeline runs
-    // concurrency 1 so no two renders race the cache (and a single-node cluster co-locates anyway).
-    // openebs-zfs-shared (shared=yes bind-mount): Tekton's affinity assistant may co-mount this
-    // volume alongside the task pod on the same node, which the default exclusive SC rejects.
+    // RWO on the default SC: the ~/.m2 local repo + maven-build-cache are single-writer; the
+    // pipeline runs concurrency 1 so no two renders race the cache (and a single-node cluster co-
+    // locates anyway). Unlike the coalesced `source` PVC, this one mounts cleanly under the
+    // affinity
+    // assistant on the default (exclusive) SC — verified live — so it needs no shared bind-mount.
     pvc.addJsonPatch(
         JsonPatch.add(
             "/spec",
             Map.of(
                 "accessModes",
                 List.of("ReadWriteOnce"),
-                "storageClassName",
-                "openebs-zfs-shared",
                 "resources",
                 Map.of("requests", Map.of("storage", "10Gi")))));
   }
