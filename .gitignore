@@ -592,3 +592,11 @@ docs/architecture/**/diag-*.svg
 docs/superpowers/
 .claude/policy-limits.json
 /.secrets
+
+# Local render/dev artifacts — `nix run .#render-manifests` (+ the dev-loop mvn) write
+# these into the working tree: the exploded render output, the consolidated manifest, the
+# node-bootstrap lane, and a repo-local maven cache. All regenerable, never committed.
+/render/
+/manifests.yaml
+/.bootstrap/
+/.maven-cache/

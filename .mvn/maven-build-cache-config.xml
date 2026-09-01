@@ -65,6 +65,35 @@
             </excludes>
         </global>
         <plugins>
+            <!-- Exclude the compiler's compilerArgs from the effective-POM hash: the ErrorProne
+                 flags file is passed as `-Xplugin:ErrorProne @<basedir>/.mvn/errorprone.flags`, an
+                 ABSOLUTE path. Under a nix build the basedir is a random sandbox dir
+                 (/nix/var/nix/builds/nix-<rand>-<n>/…), so the arg — and thus the pom hash — differs
+                 EVERY build → the build-cache could never hit under nix. The flags file is not a
+                 cache input (not in the glob nor under src/), and source/target/debug are tracked
+                 separately in executionControl/reconcile, so dropping compilerArgs from the hash is
+                 safe. -->
+            <plugin artifactId="maven-compiler-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <excludeProperty>compilerArgs</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+            <!-- Same absolute-path leak as compilerArgs, for the modules that carry shell scripts
+                 (manifests-core/-bdd/-cli): the shellcheck-maven-plugin resolves the binary as
+                 <externalBinaryPath>${maven.multiModuleProjectDirectory}/.flox/run/…/bin/shellcheck
+                 — under a nix build multiModuleProjectDirectory is the random sandbox dir, so the
+                 pom hash differs every build → those modules never hit. The binary is version-pinned
+                 by the flake toolchain (its content is not a cache input), so excluding the volatile
+                 path from the hash is safe. -->
+            <plugin artifactId="shellcheck-maven-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <excludeProperty>externalBinaryPath</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
             <!-- Exclude Jandex plugin fileSets identity noise (object hash varies each run) -->
             <plugin artifactId="jandex-maven-plugin">
                 <effectivePom>

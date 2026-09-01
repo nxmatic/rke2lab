@@ -139,6 +139,16 @@
       hostM2Repo = "${builtins.getEnv "M2_REPO"}";
       hostGHToken = "${builtins.getEnv "GH_TOKEN"}";
 
+      # Optional PERSISTENT maven primary repo + build-cache. When set — a dev cache dir (must
+      # be writable by the nix BUILD user, i.e. nixbld on a multi-user daemon: use /tmp/…, NOT
+      # $HOME) or the in-cluster PVC (single-user nix builds as the pod user) — the reactor build
+      # writes its resolved deps AND its maven-build-cache there, so successive builds are
+      # INCREMENTAL. The maven-build-cache hash is stable across nix builds ONLY once volatile
+      # absolute paths are excluded from it (see .mvn/maven-build-cache-config.xml — the compiler
+      # compilerArgs exclusion). Empty ⇒ a fresh tmpfs primary each build (the pure default: the
+      # nix store already caches the jar per-src, so seed-master/CI need nothing more).
+      buildCache = "${builtins.getEnv "MAVEN_BUILD_CACHE"}";
+
       # The io.seedmatic closure the `.mvn/extensions.xml` core extension needs at
       # bootstrap: staging-extension + its bnd-read dep + the parent-POM chain
       # (aggregator maven-embed-staging-ext → build-parent → root rke2lab). Model
@@ -176,12 +186,21 @@
         : "resolver whether it honors -Dmaven.repo.local or falls back to user.home. The"
         : "tail path ($hostM2Repo) is baked at eval time, so this override doesn't touch it."
         export HOME="$TMPDIR"
-        M2_REPO="$HOME/.m2/repository"
+        # Persistent primary local repo (MAVEN_BUILD_CACHE) when set, else a fresh tmpfs
+        # primary. The maven-build-cache extension defaults its location to the PARENT of
+        # maven.repo.local, so it lands at $cache/build-cache on its own → a persistent
+        # MAVEN_BUILD_CACHE makes successive builds incremental.
+        if [ -n "${buildCache}" ]; then
+          M2_REPO="${buildCache}/repository"
+        else
+          M2_REPO="$HOME/.m2/repository"
+        fi
         mkdir -p "$M2_REPO"
 
         for a in ${builtins.concatStringsSep " " stagingExtensionClosure}; do
           src=${hostM2Repo}/$a
-          if [ -d "$src" ]; then
+          # Idempotent when the primary persists across builds (skip if already seeded).
+          if [ -d "$src" ] && [ ! -e "$M2_REPO/$a" ]; then
             mkdir -p "$M2_REPO/$(dirname "$a")"
             cp -r "$src" "$M2_REPO/$a"
             chmod -R u+w "$M2_REPO/$a"
@@ -312,33 +331,70 @@
         # the build runs with sandbox=false (per the host nix.conf) so Maven can
         # resolve its dependency tree. java-systemd 3.0.0-rc.2 is a release now, so
         # the tail serves it — no seed needed beyond the staging-extension closure.
-        seedMasterJar = pkgs.stdenv.mkDerivation {
-          name = "rke2lab-seed-master";
+        # The flox-controller CRD staging snippet (single-sourced from the flake input,
+        # never vendored) onto the manifest-synthesis classpath so
+        # FloxControllerManifestsUnit emits it into the cluster's crds layer. Shared by
+        # both reactor builds AND the dev-loop `stage-flox-controller-crd` app — one
+        # definition, no duplication. Empty when the controller flake has no output for
+        # this system (darwin-eval guard).
+        # `install`, not `cp`: the store sources are read-only (nix-store mode), so a plain
+        # `cp` into the working tree leaves read-only files that a SECOND stage cannot
+        # overwrite ("Permission denied"). `install -m 644` unlinks + rewrites with a
+        # writable mode, so re-staging in the dev loop / the render app is idempotent (the
+        # crds/ dir is gitignored, so the mode is ours to set).
+        stageFloxControllerCrds = nixpkgs.lib.optionalString (floxControllerCrds != null) ''
+          mkdir -p ${floxControllerCrdResourceDir}
+          install -m 644 ${floxControllerCrds}/*.yaml ${floxControllerCrdResourceDir}/
+        '';
+
+        # One reactor build, factored: the shared Maven-in-nix closure (repo src, the
+        # mavenToolchain, the CRD staging, the `mvnHost` prelude, the spotless shfmt pin)
+        # captured ONCE, parameterized by the mvn module selector and the exec jars to
+        # install. Every store-built exe resolves deps + stages CRDs + gates spotless
+        # identically — so seed-master (whole reactor) and manifests-cli (the render exe)
+        # come from the SAME build logic, no drift.
+        buildReactorExe = { pname, mvnArgs ? "", jars }: pkgs.stdenv.mkDerivation {
+          name = "rke2lab-${pname}";
           src = ./.;
 
           nativeBuildInputs = mavenBuildInputs pkgs;
 
           buildPhase = ''
             ${mavenHostPrelude}
-
-            # Stage the flox-controller CRD (single-sourced from the flake, never
-            # vendored) onto the manifest-synthesis classpath so
-            # FloxControllerManifestsUnit emits it into the cluster's crds layer.
-            ${nixpkgs.lib.optionalString (floxControllerCrds != null) ''
-              mkdir -p ${floxControllerCrdResourceDir}
-              cp ${floxControllerCrds}/*.yaml ${floxControllerCrdResourceDir}/
-            ''}
-
-            # Pin spotless's shfmt to the flake binary so its version-check
-            # matches the binary on PATH.
-            mvnHost -Dshfmt.version=${pkgs.shfmt.version} -DskipTests clean package
+            ${stageFloxControllerCrds}
+            mvnHost -Dshfmt.version=${pkgs.shfmt.version} -DskipTests ${mvnArgs} clean package
           '';
 
           installPhase = ''
             mkdir -p $out/share/java
-            cp exec/seed-master/target/seed-master-*-exec.jar $out/share/java/seed-master.jar
-            cp exec/manifests-cli/target/manifests-cli-*-exec.jar $out/share/java/manifests.jar
+            ${nixpkgs.lib.concatMapStrings
+              (jar: "cp ${jar.glob} $out/share/java/${jar.name}\n") jars}
           '';
+        };
+
+        # The seed-master bootstrap app + the manifests jar it embeds, as one whole-reactor
+        # build (seed-master pulls manifests/netplan/systemd/incus, so the reactor builds
+        # once from the parent pom) — the deployable artifact Pulumi runs from the immutable
+        # store. mvnArgs defaults to "" (the exact whole-reactor `clean package` it always ran).
+        seedMasterJar = buildReactorExe {
+          pname = "seed-master";
+          jars = [
+            { glob = "exec/seed-master/target/seed-master-*-exec.jar"; name = "seed-master.jar"; }
+            { glob = "exec/manifests-cli/target/manifests-cli-*-exec.jar"; name = "manifests.jar"; }
+          ];
+        };
+
+        # The manifests-cli render exe alone — a lean `-pl :manifests-cli -am` build the
+        # `render-manifests` app runs (`nix build .#manifests-cli` → run the jar), mirroring
+        # deploy/seed-master. Same shared closure, so CRD staging + spotless gate are
+        # identical; the resulting fat jar is self-contained (CRDs baked in) so running it
+        # needs no maven cache, bootstrap or CRD staging at runtime.
+        manifestsCliJar = buildReactorExe {
+          pname = "manifests-cli";
+          mvnArgs = "-pl :manifests-cli -am";
+          jars = [
+            { glob = "exec/manifests-cli/target/manifests-cli-*-exec.jar"; name = "manifests.jar"; }
+          ];
         };
 
         # Per-system inspectable build of the blueprint YAML, plus its JSON projection.
@@ -516,6 +572,67 @@
           '';
         };
 
+        # In-cluster / standalone render: `nix run .#render-manifests`. The ONE
+        # definition of the render (build manifests-cli + `publish`), so the Tekton step
+        # no longer hand-scripts an mvn+java block that drifts from the dev/release build
+        # — it just calls this app. It is deliberately NOT a hermetic nix build: the mvn
+        # runs against an EXTERNAL cache DIR ($MAVEN_BUILD_CACHE — a repo-local default
+        # standalone, the maven-cache PVC mount in-cluster), so the build is INCREMENTAL
+        # across renders (a nix sandbox would wall the cache off → a cold build each time).
+        # Nix's role is the toolchain SSOT (jdk25/maven/shfmt/shellcheck/which via
+        # runtimeInputs — no `flox activate` needed) + the single definition; it is
+        # oblivious to what backs the cache dir (a host dir or a PVC — just a path).
+        renderApp = pkgs.writeShellApplication {
+          name = "rke2lab-render-manifests";
+          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 ];
+          text = ''
+            if [ ! -f pom.xml ] || [ ! -f flake.nix ]; then
+              echo "error: run from the rke2lab repo root" >&2
+              exit 1
+            fi
+
+            # cluster + node are the branch coordinate (manifests/<cluster>) publish
+            # delivers to — required (the jar rejects a publish without them). Positional
+            # so the caller reads `nix run .#render-manifests -- <cluster> <node>`; anything
+            # after is forwarded to the publish verb.
+            cluster="''${1:?usage: nix run .#render-manifests -- <cluster> <node> [publish args...]}"
+            node="''${2:?usage: nix run .#render-manifests -- <cluster> <node> [publish args...]}"
+            shift 2
+
+            outdir="''${RKE2LAB_MANIFESTS_OUTDIR:-$PWD/render}"
+
+            # ONE knob: M2_REPO. The persistent build cache is DERIVED from it (its parent), so
+            # maven.repo.local == M2_REPO and the maven-build-cache lands beside it
+            # ($M2_REPO/../build-cache) → incremental across renders without a second variable.
+            # M2_REPO must be writable by the nix build user (in-cluster: the PVC, single-user nix;
+            # dev multi-user: a world-writable ~/.m2 or a /tmp repo). Override MAVEN_BUILD_CACHE
+            # only for a deliberately split layout.
+            : "''${M2_REPO:?set M2_REPO to your maven repository, e.g. \$HOME/.m2/repository}"
+            export MAVEN_BUILD_CACHE="''${MAVEN_BUILD_CACHE:-$(dirname "$M2_REPO")}"
+
+            # Build the manifests-cli exe from the store — the shared reactor derivation
+            # stages the CRDs, resolves deps + gates spotless, so the fat jar is
+            # self-contained (no runtime maven cache, bootstrap or CRD staging). Mirrors
+            # `deploy`'s `nix build .#seed-master`. The build is IMPURE (mvnHost reads
+            # M2_REPO + GH_TOKEN) — the caller sets them (in-cluster: the maven-cache PVC +
+            # the PaC App token). Inner-build flags via RENDER_NIX_FLAGS (e.g. `-L`); flags
+            # on the OUTER `nix run` are consumed by nix building THIS wrapper, not the child.
+            read -r -a nixFlags <<< "''${RENDER_NIX_FLAGS:-}"
+            echo "==> building manifests-cli from the store" >&2
+            jar="$(nix build .#manifests-cli "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/manifests.jar"
+            [ -f "$jar" ] || { echo "error: store jar not found at $jar" >&2; exit 1; }
+
+            # Render into the plot + signed ff-push manifests/<cluster>. cluster/node from
+            # the positional args; RKE2LAB_SIGNING_KEY + RKE2LAB_PUSH_TOKEN come from the
+            # caller's environment (the Tekton step / the operator).
+            java \
+              "-Drke2lab.manifests.outdir=$outdir" \
+              "-Drke2lab.manifests.cluster=$cluster" \
+              "-Drke2lab.manifests.node=$node" \
+              -jar "$jar" publish "$@"
+          '';
+        };
+
         # flux9s: K9s-style TUI for Flux. nixpkgs pins 0.7.2, which chokes on our
         # RKE2/headscale serving chain; the upstream v1.0.3 release is built from
         # source so the flox dev env tracks latest. kube-rs links OpenSSL, so the
@@ -549,6 +666,7 @@
         packages = {
           inherit netplanJar networkBlueprintYaml networkBlueprintJson seedMasterJar;
           seed-master = seedMasterJar;
+          manifests-cli = manifestsCliJar;
           incus-client = incusClient;
           deploy = deployApp;
           flux9s = flux9sPkg;
@@ -558,6 +676,12 @@
           type = "app";
           program = "${deployApp}/bin/rke2lab-deploy";
           meta.description = "Build the seed-master jar and run pulumi preview/up against it";
+        };
+
+        apps.render-manifests = {
+          type = "app";
+          program = "${renderApp}/bin/rke2lab-render-manifests";
+          meta.description = "Render manifests/<cluster> + signed ff-push (build manifests-cli against $MAVEN_BUILD_CACHE, then publish)";
         };
 
         # Regenerate the committed network-blueprint.json from the netplan jar. Run on a
@@ -582,8 +706,7 @@
           type = "app";
           program = toString (pkgs.writeShellScript "stage-flox-controller-crd" ''
             set -euo pipefail
-            mkdir -p ${floxControllerCrdResourceDir}
-            cp ${floxControllerCrds}/*.yaml ${floxControllerCrdResourceDir}/
+            ${stageFloxControllerCrds}
             echo "staged flox-controller CRD into ${floxControllerCrdResourceDir}/ from ${floxControllerCrds}"
           '');
           meta.description = "Stage the flox-controller CRD (from the flake) onto the manifest-synthesis classpath";
