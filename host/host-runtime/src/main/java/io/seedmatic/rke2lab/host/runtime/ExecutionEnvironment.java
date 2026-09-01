@@ -1,5 +1,6 @@
 package io.seedmatic.rke2lab.host.runtime;
 
+import io.seedmatic.rke2lab.seed.broker.port.EnclosureGate;
 import io.seedmatic.rke2lab.seed.broker.port.SecretsGateway;
 import java.util.List;
 import java.util.Locale;
@@ -66,5 +67,15 @@ public final class ExecutionEnvironment {
               List.of(new TailscaleOauthClientGateway(), new DotSecretsGateway()));
       case IN_CLUSTER -> new EmptySecretsGateway();
     };
+  }
+
+  /**
+   * The ambient enclosure gate the host publishes into the framework — the named seam projection of
+   * {@link #enclosure()} the scion resolves (twin of the {@code RunGate} the run mode projects).
+   * The fact stays this host type; only this seam query crosses.
+   */
+  public EnclosureGate enclosureGate() {
+    final boolean inCluster = enclosure().inCluster();
+    return () -> inCluster;
   }
 }

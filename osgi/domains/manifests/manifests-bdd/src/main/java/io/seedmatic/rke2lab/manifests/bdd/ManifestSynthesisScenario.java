@@ -32,6 +32,7 @@ import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioCella
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioInputSeed;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.ScenarioPlayer;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.container.SeedScenario;
+import io.seedmatic.rke2lab.seed.broker.port.EnclosureGate;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.Sensitivity;
@@ -135,6 +136,14 @@ public class ManifestSynthesisScenario
   @OsgiService(await = false)
   private Optional<NdhKeystoreReader> keystore = Optional.empty();
 
+  // The ambient enclosure gate (host-published, § pac-in-cluster-render-spec auth): the
+  // deterministic
+  // fork for the ndh key-store reads. await=false + OPERATOR default (absent → read the key-store,
+  // the
+  // standalone/test path); an in-cluster render always publishes it (inCluster=true).
+  @OsgiService(await = false)
+  private Optional<EnclosureGate> enclosure = Optional.empty();
+
   @Override
   public Scenario<Given, When, Then> getScenario() {
     return scenario;
@@ -213,7 +222,16 @@ public class ManifestSynthesisScenario
   }
 
   private static final String TAILNET_AUTHORITY = "mammoth-skate";
+
+  // The tailnet authority DOMAIN (the key-store's authorities.mammoth-skate.domain). IN_CLUSTER the
+  // sops key-store is unreadable, so the bot identity takes this constant — the same deployment
+  // coupling TAILNET_AUTHORITY already carries.
+  private static final String TAILNET_DOMAIN = "mammoth-skate.ts.net";
   private static final String SIGNING_KEY = "github-signing";
+
+  // The env a mounted Secret feeds the IN_CLUSTER commit-signing key through (the NODE_BOOTSTRAP →
+  // replicator lane), the twin of the PaC-provided RKE2LAB_PUSH_TOKEN.
+  private static final String SIGNING_KEY_ENV = "RKE2LAB_SIGNING_KEY";
   private static final String RENDER_TOOL = "manifests-render";
   private static final String BRANCH_PREFIX = "manifests/";
 
@@ -249,17 +267,50 @@ public class ManifestSynthesisScenario
     if (rendered.isEmpty()) {
       return Optional.empty();
     }
-    final NdhKeystoreReader ks =
-        keystore.orElseThrow(
-            () -> new IllegalStateException("no ndh key-store — cannot sign the rendered commit"));
     final String cluster = facet.identity().orElseThrow().clusterId();
-    final GitIdentity bot =
-        new GitBotIdentities(ks.authorityDomain(TAILNET_AUTHORITY)).forTool(RENDER_TOOL);
     final boolean push = facet.facets().delivery().push();
     final Optional<String> token = push ? revealGithubToken() : Optional.empty();
+    // The bot identity + signing key are enclosure-resolved (§ pac-in-cluster-render-spec, auth):
+    // OPERATOR reads the sops-smudged ndh key-store at hand; IN_CLUSTER the git tree is
+    // sops-encrypted
+    // at rest, so the signing key rides the mounted Secret (revealSigningKey, RKE2LAB_SIGNING_KEY)
+    // and
+    // the authority domain is the code constant. The commit is ALWAYS signed, in both enclosures.
+    final GitIdentity bot;
+    final String signingKey;
+    if (enclosure.map(EnclosureGate::inCluster).orElse(false)) {
+      bot = new GitBotIdentities(TAILNET_DOMAIN).forTool(RENDER_TOOL);
+      signingKey =
+          revealSigningKey()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "in-cluster render has no "
+                              + SIGNING_KEY_ENV
+                              + " — the signing-key Secret was not mounted into render-publish"));
+    } else {
+      final NdhKeystoreReader ks =
+          keystore.orElseThrow(
+              () ->
+                  new IllegalStateException("no ndh key-store — cannot sign the rendered commit"));
+      bot = new GitBotIdentities(ks.authorityDomain(TAILNET_AUTHORITY)).forTool(RENDER_TOOL);
+      signingKey = ks.sshPrivate(SIGNING_KEY);
+    }
     return Optional.of(
-        new Delivery(
-            "render " + cluster + " manifests", bot, ks.sshPrivate(SIGNING_KEY), push, token));
+        new Delivery("render " + cluster + " manifests", bot, signingKey, push, token));
+  }
+
+  /**
+   * The commit-signing SSH private key for the IN_CLUSTER enclosure — the twin of {@link
+   * #revealGithubToken()}. OPERATOR reads it from the ndh key-store in {@link #deliveryPlan}; this
+   * reveals the in-cluster source: the {@code RKE2LAB_SIGNING_KEY} env a mounted Secret feeds (the
+   * signing key rides the {@code NODE_BOOTSTRAP} → replicator lane, never the sops-encrypted git
+   * tree the Tekton clone lands at rest). Empty when unmounted — the delivery then fails loud.
+   */
+  private Optional<String> revealSigningKey() {
+    return Optional.ofNullable(System.getenv(SIGNING_KEY_ENV))
+        .map(String::trim)
+        .filter(key -> !key.isEmpty());
   }
 
   /**

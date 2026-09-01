@@ -48,6 +48,7 @@ import io.seedmatic.rke2lab.seed.broker.port.AmendCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.Amendment;
 import io.seedmatic.rke2lab.seed.broker.port.AmendmentContributor;
 import io.seedmatic.rke2lab.seed.broker.port.Cellar;
+import io.seedmatic.rke2lab.seed.broker.port.EnclosureGate;
 import io.seedmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.ReadinessDeadlineOverride;
@@ -291,13 +292,19 @@ public class ClusterSeedScenario
       // enclosure it detects: this grow runs OPERATOR, so the chain is ndh's OAuth client (serving
       // `tailscale`, rke2lab's single source of trust for it) ahead of the operator's .secrets
       // (everything else). An in-cluster process would resolve a different chain.
+      final ExecutionEnvironment executionEnvironment = new ExecutionEnvironment(System.getenv());
       gardening
           .connection()
           .context()
           .registerService(
-              SecretsGateway.class,
-              new ExecutionEnvironment(System.getenv()).secretsGateway(),
-              new Hashtable<>());
+              SecretsGateway.class, executionEnvironment.secretsGateway(), new Hashtable<>());
+      // The ambient enclosure gate the render's scion resolves to fork keystore-vs-mounted signing
+      // (this grow runs OPERATOR — the ndh key-store is at hand). Published like the RunGate.
+      gardening
+          .connection()
+          .context()
+          .registerService(
+              EnclosureGate.class, executionEnvironment.enclosureGate(), new Hashtable<>());
       // The manifests FACET amendment — the operator config subtree the root read from Pulumi,
       // published as an ambient AmendmentContributor (the same generic FacetContributor the incus
       // FACET uses below). The incus scion that consults the manifests amend holds only the

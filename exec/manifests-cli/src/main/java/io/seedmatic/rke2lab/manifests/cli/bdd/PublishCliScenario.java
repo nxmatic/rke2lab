@@ -25,6 +25,7 @@ import io.seedmatic.rke2lab.seed.bdd.SessionSeed;
 import io.seedmatic.rke2lab.seed.bdd.sow.Gardening;
 import io.seedmatic.rke2lab.seed.broker.port.Amendment;
 import io.seedmatic.rke2lab.seed.broker.port.Cellar;
+import io.seedmatic.rke2lab.seed.broker.port.EnclosureGate;
 import io.seedmatic.rke2lab.seed.broker.port.OpaqueCellar;
 import io.seedmatic.rke2lab.seed.broker.port.Parcel;
 import io.seedmatic.rke2lab.seed.broker.port.SecretsGateway;
@@ -154,12 +155,18 @@ public class PublishCliScenario
       // container-blind: OPERATOR (this CLI runs on the operator's host) → ndh OAuth client ahead
       // of
       // the operator's .secrets.
+      final ExecutionEnvironment executionEnvironment = new ExecutionEnvironment(System.getenv());
       world
           .context()
           .registerService(
-              SecretsGateway.class,
-              new ExecutionEnvironment(System.getenv()).secretsGateway(),
-              new Hashtable<>());
+              SecretsGateway.class, executionEnvironment.secretsGateway(), new Hashtable<>());
+      // The ambient enclosure gate the render's scion resolves — IN_CLUSTER under Tekton (the
+      // KUBERNETES_SERVICE_HOST signal), so deliveryPlan skips the sops-encrypted key-store and
+      // reveals the signing key from the mounted Secret's env. Published like the SecretsGateway.
+      world
+          .context()
+          .registerService(
+              EnclosureGate.class, executionEnvironment.enclosureGate(), new Hashtable<>());
       // The offline durable backend for the ROOT drain (no persistent commissioner — no Pulumi);
       // the transactional cellar serves reads during the run, its end drain lands here + is
       // dropped.

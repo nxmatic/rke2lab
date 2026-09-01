@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests;
 import io.seedmatic.rke2lab.manifests.contract.SshToAgeConverter;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
+import io.seedmatic.rke2lab.seed.broker.port.EnclosureGate;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,13 +30,23 @@ final class SopsAgeMaterialResolver {
 
   private final SshToAgeConverter converter;
   private final NdhKeystoreReader keystore;
+  private final Optional<EnclosureGate> enclosure;
 
-  SopsAgeMaterialResolver(SshToAgeConverter converter, NdhKeystoreReader keystore) {
+  SopsAgeMaterialResolver(
+      SshToAgeConverter converter, NdhKeystoreReader keystore, Optional<EnclosureGate> enclosure) {
     this.converter = converter;
     this.keystore = keystore;
+    this.enclosure = enclosure;
   }
 
   Optional<SopsAgeMaterial> resolve() {
+    // IN_CLUSTER the sops-age Secret is a NODE_BOOTSTRAP artifact already applied at the operator's
+    // grow, and the git tree's key-store is sops-encrypted at rest — a render never re-derives it.
+    // Gate before touching the key-store (its plaintext presence is an OPERATOR fact).
+    if (enclosure.map(EnclosureGate::inCluster).orElse(false)) {
+      LOG.debug("In-cluster render — sops-age Secret is a bootstrap artifact, not re-emitted");
+      return Optional.empty();
+    }
     if (!keystore.present()) {
       LOG.debug("No ndh key-store present — sops-age Secret will be skipped");
       return Optional.empty();

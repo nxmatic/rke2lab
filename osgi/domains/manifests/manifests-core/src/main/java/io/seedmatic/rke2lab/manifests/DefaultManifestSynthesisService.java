@@ -17,6 +17,7 @@ import io.seedmatic.rke2lab.manifests.internal.synthesis.Phase;
 import io.seedmatic.rke2lab.manifests.internal.synthesis.PhaseRunner;
 import io.seedmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
+import io.seedmatic.rke2lab.seed.broker.port.EnclosureGate;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -40,6 +41,8 @@ import org.jspecify.annotations.Nullable;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.resolver.Resolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +92,18 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
   @Reference private NdhKeystoreReader ndhKeystore;
 
+  // The ambient enclosure gate (host-published, § pac-in-cluster-render-spec auth). OPTIONAL +
+  // DYNAMIC/GREEDY, not mandatory: the host publishes it AFTER this standing component activates,
+  // so
+  // a mandatory reference would never bind; the dynamic field is set when the host registers it,
+  // before synthesize() runs. Absent (a bare survey / test that publishes none) → OPERATOR default:
+  // read the key-store, the pre-existing behaviour.
+  @Reference(
+      cardinality = ReferenceCardinality.OPTIONAL,
+      policy = ReferencePolicy.DYNAMIC,
+      policyOption = ReferencePolicyOption.GREEDY)
+  private volatile @Nullable EnclosureGate enclosureGate;
+
   static final Set<String> SCRIPT_DATA_SUFFIXES =
       Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
 
@@ -108,9 +123,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     // Pre-synthesis step: resolve the age key (read the SSH key from the key-store, convert it via
     // the ssh-to-age edge) BEFORE binding the context, so units only render — synthesis takes its
-    // prerequisites, it does not fetch them.
+    // prerequisites, it does not fetch them. Gated on the enclosure: IN_CLUSTER the sops-age Secret
+    // is a NODE_BOOTSTRAP bootstrap artifact already applied at the operator's grow (and the git
+    // tree's key-store is sops-encrypted at rest), so the resolver skips rather than reads.
     final Optional<SopsAgeMaterial> sopsAgeMaterial =
-        new SopsAgeMaterialResolver(sshToAgeConverter, ndhKeystore).resolve();
+        new SopsAgeMaterialResolver(
+                sshToAgeConverter, ndhKeystore, Optional.ofNullable(enclosureGate))
+            .resolve();
 
     final var contextScope = ManifestSynthesisContext.of(request, sopsAgeMaterial).bind();
     try (contextScope) {

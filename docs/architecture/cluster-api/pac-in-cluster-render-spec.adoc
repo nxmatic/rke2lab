@@ -143,11 +143,12 @@ distinct-but-dependent concepts:
   keystore, or not; re-emit `sops-age`, or not). It crosses the `seed.broker.port` membrane so OSGi
   branches on it explicitly — a named gate, never inferred from an empty projection.
 * `link:../../../host/host-runtime[ExecutionEnvironment]` — the RESOLVER instance that owns the
-  process env, derives the enclosure from it, and projects it: the named enclosure GATE that crosses
-  the membrane (mirroring how `RunMode` crosses as its `RunGate`/`LiveGate` projection — the fact
-  stays host-side, a projection carries the query), plus `secretsGateway()` (the `.secrets` door the
-  `ghapp` scion reads). Both are host-seeded seam services, derived from the same fact so they are
-  always coherent.
+  process env, derives the enclosure from it, and projects it: the named `EnclosureGate` (a
+  `seed.broker.port` seam interface, `inCluster()` + a `through(operator, inCluster)` combinator)
+  that crosses the membrane, mirroring how `RunMode` crosses as its `RunGate`/`LiveGate` projection —
+  the fact (`ExecutionEnclosure`) stays host-side, the `EnclosureGate` projection carries the query.
+  Plus `secretsGateway()` (the `.secrets` door the `ghapp` scion reads). Both are host-seeded seam
+  services, derived from the same fact so they are always coherent.
 
 The two *process* secrets (push token, signing key) are NOT `ExecutionEnvironment` projections —
 they are container-aware *scenario-side reveals*, twins of each other: `revealGithubToken()` (exists)
