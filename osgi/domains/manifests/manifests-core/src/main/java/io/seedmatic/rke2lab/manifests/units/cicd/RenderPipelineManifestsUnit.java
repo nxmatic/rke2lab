@@ -235,11 +235,16 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           "echo 'seeding the staging-extension build closure into the maven cache'",
                           // The extension is loaded at mvn startup, so build it with
                           // .mvn/extensions.xml disabled, then restore it (trap = restore even on
-                          // failure) for the downstream render step. -pl :staging-extension -am
-                          // installs the whole closure (bnd-read + parents) the extension needs.
+                          // failure) for the downstream render step. Install the parent chain FIRST
+                          // — bom + build-parent are local modules, so seeding them locally makes
+                          // build-parent's `import bom:1.0.0` resolve from the cache instead of
+                          // GitHub Packages (no token needed for the bootstrap); then the extension
+                          // (-am pulls bnd-read) resolves everything locally.
                           "flox activate --dir /root -- bash -euo pipefail -c '",
                           "  trap \"git restore .mvn/extensions.xml 2>/dev/null || true\" EXIT",
                           "  rm .mvn/extensions.xml",
+                          "  ./mvnw -f bom/pom.xml install -Dmaven.repo.local=\"$CACHE\"",
+                          "  ./mvnw -f build-parent/pom.xml install -Dmaven.repo.local=\"$CACHE\"",
                           "  ./mvnw -f maven-embed-staging-ext/pom.xml -pl :staging-extension -am"
                               + " clean install -Dmaven.repo.local=\"$CACHE\"",
                           "'"))
@@ -306,6 +311,12 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           "if [ -f \"$GIT_AUTH_DIR/.git-credentials\" ]; then",
                           "  export RKE2LAB_PUSH_TOKEN=`sed -E 's#https://[^:]+:([^@]+)@.*#\\1#'"
                               + " \"$GIT_AUTH_DIR/.git-credentials\" | head -n1`",
+                          // The same App token authenticates .mvn/settings.xml to GitHub Packages
+                          // (${env.GH_TOKEN}) so the reactor resolves the private seedmatic
+                          // releases
+                          // (java-systemd, java-bbox-api-client). Requires the App to carry
+                          // packages:read.
+                          "  export GH_TOKEN=\"$RKE2LAB_PUSH_TOKEN\"",
                           "fi",
                           // The flox NRI plugin MOUNTED the cicd/maven env at /root/.flox but does
                           // NOT auto-activate — the command must, exactly like the kdns container's
