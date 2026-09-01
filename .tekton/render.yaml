@@ -25,6 +25,11 @@ metadata:
     flox.dev/home.step-render: "/root"
     flox.dev/uid.step-render: "0"
     flox.dev/gid.step-render: "0"
+    # The shared maven-cache bootstrap step also runs mvnw → same toolchain.
+    flox.dev/environment.step-bootstrap: "cicd/maven"
+    flox.dev/home.step-bootstrap: "/root"
+    flox.dev/uid.step-bootstrap: "0"
+    flox.dev/gid.step-bootstrap: "0"
 spec:
   # The Pipeline is a RENDERED in-cluster manifest (RenderPipelineManifestsUnit), not inline here.
   # PaC's own resolver does NOT consult the cluster for a bare pipelineRef.name (it wants inline /

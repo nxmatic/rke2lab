@@ -14,13 +14,17 @@ import software.constructs.Construct;
 
 /**
  * The in-cluster render pipeline — the upstream half of the GitOps loop rendered as Tekton
- * manifests (see {@code docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc}). Two Tasks
- * wired by one Pipeline, plus the persistent Maven-cache PVC:
+ * manifests (see {@code docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc}). Three
+ * Tasks wired by one Pipeline ({@code fetch → bootstrap → render}), plus the persistent Maven-cache
+ * PVC:
  *
  * <ul>
  *   <li>{@code git-fetch} — clones the source repo at the pushed revision into the shared {@code
  *       source} workspace, authenticating with PaC's {@code basic-auth} workspace (the {@code
  *       git_auth_secret} App token PaC injects into the PipelineRun).
+ *   <li>{@code maven-cache-bootstrap} — shared, idempotent: seeds the {@code staging-extension}
+ *       build closure (a startup {@code .mvn/extensions.xml} extension that can't be built by a
+ *       normal reactor run) into the persistent maven-cache PVC, once, on a cold cache.
  *   <li>{@code render-publish} — {@code flox-annotated} (the NRI plugin injects a per-task FloxEnv
  *       under the {@code cicd} folder — JDK 25 + maven for this render task — into the {@code
  *       step-render} container), builds with the reactor discipline ({@code -pl :manifests-cli -am
@@ -64,6 +68,12 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
   /** Container name the flox NRI plugin keys on: {@code flox.dev/environment.step-render}. */
   private static final String RENDER_STEP = "render";
 
+  /**
+   * Container name of the shared maven-cache bootstrap step ({@code flox.dev/environment.step-
+   * bootstrap}). It also runs {@code mvnw}, so it opts into the same {@code cicd/maven} toolchain.
+   */
+  private static final String BOOTSTRAP_STEP = "bootstrap";
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "render-pipeline");
 
@@ -75,6 +85,7 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     createMavenCachePvc(scope);
     createGitFetchTask(scope);
+    createMavenBootstrapTask(scope);
     createRenderPublishTask(scope);
     createPipeline(scope);
   }
@@ -166,6 +177,72 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           "git remote add origin \"$(params.repo-url)\"",
                           "git fetch -q --depth 1 origin \"$(params.revision)\"",
                           "git checkout -q FETCH_HEAD"))
+                })));
+  }
+
+  /**
+   * The shared, idempotent maven-cache bootstrap: seeds the {@code staging-extension} build closure
+   * into the persistent maven-cache PVC. That extension is declared in {@code .mvn/extensions.xml}
+   * and loaded at mvn STARTUP, so it can't be built by a normal reactor run (chicken-and-egg) — the
+   * one-time fix is to build+install it with the extensions temporarily disabled. Idempotent: on a
+   * warm cache (the PVC persists) the jar is already there, so it no-ops. Reusable by any maven
+   * pipeline.
+   */
+  private void createMavenBootstrapTask(final Construct scope) {
+    final ApiObject task =
+        new ApiObject(
+            scope,
+            "task-maven-cache-bootstrap",
+            ApiObjectProps.builder()
+                .apiVersion("tekton.dev/v1")
+                .kind("Task")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name("maven-cache-bootstrap")
+                        .namespace(NAMESPACE)
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "tekton.dev|Task|" + NAMESPACE + "|maven-cache-bootstrap"))
+                        .build())
+                .build());
+    task.addJsonPatch(
+        JsonPatch.add(
+            "/spec",
+            Map.of(
+                "workspaces",
+                new Object[] {Map.of("name", "source"), Map.of("name", "maven-cache")},
+                "steps",
+                new Object[] {
+                  Map.of(
+                      "name",
+                      BOOTSTRAP_STEP,
+                      "image",
+                      "debian:stable-slim",
+                      "workingDir",
+                      "$(workspaces.source.path)",
+                      "script",
+                      String.join(
+                          "\n",
+                          "#!/usr/bin/env bash",
+                          "set -euo pipefail",
+                          "export CACHE=\"$(workspaces.maven-cache.path)/repository\"",
+                          "JAR=\"$CACHE/io/seedmatic/rke2lab/staging-extension/1.0.0/"
+                              + "staging-extension-1.0.0.jar\"",
+                          "if [ -f \"$JAR\" ]; then",
+                          "  echo 'staging-extension already seeded in the cache — skipping'",
+                          "  exit 0",
+                          "fi",
+                          "echo 'seeding the staging-extension build closure into the maven cache'",
+                          // The extension is loaded at mvn startup, so build it with
+                          // .mvn/extensions.xml disabled, then restore it (trap = restore even on
+                          // failure) for the downstream render step. -pl :staging-extension -am
+                          // installs the whole closure (bnd-read + parents) the extension needs.
+                          "flox activate --dir /root -- bash -euo pipefail -c '",
+                          "  trap \"git restore .mvn/extensions.xml 2>/dev/null || true\" EXIT",
+                          "  rm .mvn/extensions.xml",
+                          "  ./mvnw -f maven-embed-staging-ext/pom.xml -pl :staging-extension -am"
+                              + " clean install -Dmaven.repo.local=\"$CACHE\"",
+                          "'"))
                 })));
   }
 
@@ -301,9 +378,21 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                       }),
                   Map.of(
                       "name",
-                      "render",
+                      "bootstrap",
                       "runAfter",
                       new Object[] {"fetch"},
+                      "taskRef",
+                      Map.of("name", "maven-cache-bootstrap"),
+                      "workspaces",
+                      new Object[] {
+                        Map.of("name", "source", "workspace", "source"),
+                        Map.of("name", "maven-cache", "workspace", "maven-cache")
+                      }),
+                  Map.of(
+                      "name",
+                      "render",
+                      "runAfter",
+                      new Object[] {"bootstrap"},
                       "taskRef",
                       Map.of("name", "render-publish"),
                       "params",
