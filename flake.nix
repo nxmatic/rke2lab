@@ -151,16 +151,20 @@
 
       # The io.seedmatic closure the `.mvn/extensions.xml` core extension needs at
       # bootstrap: staging-extension + its bnd-read dep + the parent-POM chain
-      # (aggregator maven-embed-staging-ext → build-parent → root rke2lab). Model
-      # building resolves every link BEFORE any POM, by the BootstrapCoreExtensionManager
-      # — which does NOT consult maven.repo.local.tail (the tail is wired into the main
-      # build's resolver only). So the whole closure must be seeded into the PRIMARY,
-      # from the host ~/.m2 where it is `mvn install`ed.
+      # (aggregator maven-embed-staging-ext → build-parent → root rke2lab) + the `bom`
+      # build-parent imports in dependencyManagement. Model building resolves every link
+      # (incl. reading staging-extension's descriptor → its parent chain → the bom import)
+      # BEFORE any POM, by the BootstrapCoreExtensionManager — which does NOT consult
+      # maven.repo.local.tail (the tail is wired into the main build's resolver only). So
+      # the WHOLE closure must be seeded into the PRIMARY, self-sufficiently: a warm host
+      # ~/.m2 masked the missing `bom` on dev, but a cold primary (the in-cluster render's
+      # fresh PVC repo) then failed reading the staging-extension descriptor (bom absent).
       stagingExtensionClosure = [
         "io/seedmatic/rke2lab/staging-extension"
         "io/seedmatic/rke2lab/bnd-read"
         "io/seedmatic/rke2lab/maven-embed-staging-ext"
         "io/seedmatic/rke2lab/build-parent"
+        "io/seedmatic/rke2lab/bom"
         "io/seedmatic/rke2lab/rke2lab"
       ];
 
