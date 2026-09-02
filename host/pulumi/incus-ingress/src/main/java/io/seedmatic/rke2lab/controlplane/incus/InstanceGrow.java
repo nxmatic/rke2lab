@@ -1,5 +1,7 @@
 package io.seedmatic.rke2lab.controlplane.incus;
 
+import com.pulumi.command.local.Command;
+import com.pulumi.command.local.CommandArgs;
 import com.pulumi.core.Output;
 import com.pulumi.incus.Image;
 import com.pulumi.incus.ImageArgs;
@@ -311,33 +313,96 @@ public final class InstanceGrow {
               return merged;
             });
 
-    new Instance(
-        "seed-instance",
-        InstanceArgs.builder()
-            .name(config.nodeName())
-            .project(config.incusProject())
-            .image(imageFingerprint)
-            .profiles(profileName.applyValue(List::of))
-            .config(configWithFingerprint)
-            .running(true)
-            .devices(seedInstanceDevices(plan))
+    final Instance instance =
+        new Instance(
+            "seed-instance",
+            InstanceArgs.builder()
+                .name(config.nodeName())
+                .project(config.incusProject())
+                .image(imageFingerprint)
+                .profiles(profileName.applyValue(List::of))
+                .config(configWithFingerprint)
+                .running(true)
+                .devices(seedInstanceDevices(plan))
+                .build(),
+            CustomResourceOptions.builder()
+                .provider(providerContext.provider())
+                .deleteBeforeReplace(true)
+                .replaceOnChanges(List.of("config", "config.*"))
+                // Ignore drift on `image` (the fingerprint is adopted, not managed) AND `devices`:
+                // incus
+                // stores devices as a MAP (keyed by name, unordered), but the provider models them
+                // as
+                // an
+                // ORDERED List, so a refresh returns them in the daemon's order — never our
+                // declared
+                // order — and Pulumi reads the whole list as changed, replacing the instance every
+                // run
+                // (kill + recreate → the node never stays up long enough to become ready). No
+                // declared
+                // order can win against the daemon's map; the device SET is fixed and applied at
+                // create,
+                // so ignoring post-create drift is correct.
+                .ignoreChanges(List.of("image", "devices"))
+                .build());
+
+    pruneStaleTailnetDevicesOnReplace(instance, imageFingerprint);
+  }
+
+  /**
+   * When the instance is REPLACED (a rebuilt node-base image → new fingerprint → {@code
+   * deleteBeforeReplace}), the old node's tailscale devices — the operator's ingress/funnel proxies
+   * — orphan in the tailnet and HOLD their MagicDNS names: the next node's proxies then drift to
+   * {@code pac-webhook-1}, {@code -2}, … and the GitHub-App webhook (pointed at {@code
+   * pac-webhook}) delivers to a dead device, so the in-cluster render never fires. This prunes them
+   * by running ndh's {@code manage-tailnet} against the Tailscale SaaS API, keyed on the SAME
+   * {@code imageFingerprint} trigger that armed the replacement — so it fires exactly once per
+   * replace and never on a no-op {@code up}.
+   *
+   * <p>The binary is ndh's {@code manage-tailnet}, injected as {@code RKE2LAB_MANAGE_TAILNET_BIN}
+   * by the deploy wrapper ({@code nix run .#deploy}); absent it (a dev-target run, not the release
+   * deploy) the prune is skipped — it is a release-deploy concern and the grow stays green without
+   * it. Auth is ndh's user-mirrored OAuth client (no rke2lab tailscale creds), read via {@code
+   * --client-secret-file} so {@code manage-tailnet} needs neither {@code .secrets} nor the age key.
+   *
+   * <p>{@code --stale-after 90s} is grounded in Tailscale's keepalive window: a connected device
+   * refreshes {@code lastSeen} every ~50s (+~10s offline grace), so 90s NEVER false-prunes a live
+   * device, while the old node — killed FIRST by {@code deleteBeforeReplace}, then offline for the
+   * whole new-instance boot — is already well past it, so no wait is needed. A prune failure is
+   * non-fatal (the cluster grew fine; a lingering device is a nuisance, not a breakage).
+   */
+  private void pruneStaleTailnetDevicesOnReplace(
+      Resource instance, Output<String> imageFingerprint) {
+    final String manageTailnetBin = System.getenv("RKE2LAB_MANAGE_TAILNET_BIN");
+    if (manageTailnetBin == null || manageTailnetBin.isBlank()) {
+      log.accept(
+          "tailnet prune: RKE2LAB_MANAGE_TAILNET_BIN unset (dev-target run) — skipping stale-device"
+              + " prune");
+      return;
+    }
+    // ndh's userSecretMirror writes the OAuth client to this user-owned path on the operator host —
+    // the SAME path host-runtime's TailscaleOauthClientGateway.NDH_CLIENT_PATH reads. This
+    // actualiser depends on no seed-master type (see the class doc), so the path is restated here
+    // rather than imported.
+    final String clientSecretFile =
+        Path.of(System.getProperty("user.home"), ".local/share/ndh/tailnet.tailscale.client")
+            .toString();
+
+    new Command(
+        "prune-stale-tailnet-devices",
+        CommandArgs.builder()
+            .environment(
+                Map.of("MANAGE_TAILNET", manageTailnetBin, "CLIENT_SECRET_FILE", clientSecretFile))
+            .create(
+                "\"$MANAGE_TAILNET\" --prune-stale-devices --stale-after 90s --yes"
+                    + " --client-secret-file \"$CLIENT_SECRET_FILE\""
+                    + " || { echo 'tailnet prune failed (non-fatal); stale devices may linger'"
+                    + " >&2; }")
+            // Re-run on instance replacement only: the fingerprint change that armed
+            // replaceOnChanges is the exact signal that the old node's devices just went stale.
+            .triggers(imageFingerprint.applyValue(fingerprint -> List.<Object>of(fingerprint)))
             .build(),
-        CustomResourceOptions.builder()
-            .provider(providerContext.provider())
-            .deleteBeforeReplace(true)
-            .replaceOnChanges(List.of("config", "config.*"))
-            // Ignore drift on `image` (the fingerprint is adopted, not managed) AND `devices`:
-            // incus
-            // stores devices as a MAP (keyed by name, unordered), but the provider models them as
-            // an
-            // ORDERED List, so a refresh returns them in the daemon's order — never our declared
-            // order — and Pulumi reads the whole list as changed, replacing the instance every run
-            // (kill + recreate → the node never stays up long enough to become ready). No declared
-            // order can win against the daemon's map; the device SET is fixed and applied at
-            // create,
-            // so ignoring post-create drift is correct.
-            .ignoreChanges(List.of("image", "devices"))
-            .build());
+        CustomResourceOptions.builder().dependsOn(List.of(instance)).build());
   }
 
   /**

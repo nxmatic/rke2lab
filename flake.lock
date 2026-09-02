@@ -22866,6 +22866,40 @@
         "type": "github"
       }
     },
+    "claude-hub": {
+      "inputs": {
+        "flake-commons": [
+          "ndh",
+          "flake-commons"
+        ],
+        "flake-utils": [
+          "ndh",
+          "claude-hub",
+          "flake-commons",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "ndh",
+          "claude-hub",
+          "flake-commons",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787133300,
+        "narHash": "sha256-AOcgCHAkv06I31Xi2Hii2n2Um81nXH6m/mxb3CFTiPw=",
+        "owner": "nxmatic",
+        "repo": "claude-hub",
+        "rev": "64ca588df427cd2f06d02cb8c7fe5f806937b6dc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nxmatic",
+        "ref": "main",
+        "repo": "claude-hub",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1774313767,
@@ -153016,6 +153050,7 @@
           "flake-commons",
           "chromium-bin"
         ],
+        "claude-hub": "claude-hub",
         "darwin": [
           "ndh",
           "flake-commons",
@@ -153116,11 +153151,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787087743,
-        "narHash": "sha256-fg8sB6mCwBWqiKRE6zT8CCrqo2QTi3D7HTnts/Iwd+A=",
+        "lastModified": 1788388005,
+        "narHash": "sha256-Dfs4X7BgRj067+N2dTt0UtnQ7Mlx24mXZukIzQbhxCQ=",
         "owner": "seedmatic",
         "repo": "ndh",
-        "rev": "2b4e56c23adfd849d10fd5b82dbaaeb57dc35732",
+        "rev": "b0dff75fe69611214af8d3df7d2be269b4972e06",
         "type": "github"
       },
       "original": {
@@ -307071,11 +307106,11 @@
         "systems": "systems_1032"
       },
       "locked": {
-        "lastModified": 1779260510,
-        "narHash": "sha256-kY6M1AOMR40Uu75wNRdEyLPzgVgjtfZ9QfMVx0CNITQ=",
+        "lastModified": 1787160369,
+        "narHash": "sha256-61uF+J8082tIc/TJIOtMwHmtik4+oAnI+rOWSbDimj4=",
         "owner": "nxmatic",
         "repo": "tailscale",
-        "rev": "e236ac9f83f300e91ffc184cdaa0bd185120a042",
+        "rev": "61f34186416e52163b7d598f9275edf65da09f52",
         "type": "github"
       },
       "original": {

@@ -559,6 +559,17 @@
             export PULUMI_CONFIG_PASSPHRASE="''${PULUMI_CONFIG_PASSPHRASE:-}"
             mkdir -p "$PULUMI_HOME" .pulumi-state
 
+            # ndh's manage-tailnet (pinned via the ndh flake input): InstanceGrow runs it as a
+            # local.Command to prune the old node's stale tailscale devices when the instance is
+            # replaced (they orphan their MagicDNS names → the new pac-webhook drifts to -1/-2 and
+            # the render webhook dies). Injected here (the release deploy path) so the store path is
+            # pinned to our lock; a dev-target run without it simply skips the prune. Referencing the
+            # store path here also makes it a runtime dep of this wrapper, so nix keeps it GC-rooted.
+            # `or ""` degrades gracefully when the locked ndh predates the manage-tailnet app: the
+            # export is then empty and InstanceGrow skips the prune (same as a dev-target run), so a
+            # stale lock never breaks `nix run .#deploy`; a lock bump wires the real path.
+            export RKE2LAB_MANAGE_TAILNET_BIN=${inputs.ndh.apps.${system}.manage-tailnet.program or ""}
+
             # Self-heal: a previous run killed before its restore trap fired can
             # leave Pulumi.yaml's binary pointing at a store path. Restore the
             # committed (Maven-target) file from git before swapping again.
