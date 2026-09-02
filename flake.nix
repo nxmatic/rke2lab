@@ -612,7 +612,11 @@
         # oblivious to what backs the cache dir (a host dir or a PVC — just a path).
         renderApp = pkgs.writeShellApplication {
           name = "rke2lab-render-manifests";
-          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 ];
+          # nodejs: the render's `publish` runs the cdk8s App, whose Java bindings (jsii) shell out
+          # to `node` — the dev shell gets it via cdk8s-cli, so the render app must carry it too
+          # (the deleted cicd/nix FloxEnv used to provide it). Without it the synthesis dies with
+          # `Cannot run program "node"`.
+          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 pkgs.nodejs ];
           text = ''
             if [ ! -f pom.xml ] || [ ! -f flake.nix ]; then
               echo "error: run from the rke2lab repo root" >&2
