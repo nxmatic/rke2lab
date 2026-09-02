@@ -4,6 +4,7 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
@@ -904,14 +905,14 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
     final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
     annotations.put(
-        "flox.dev/environment.headscale",
+        FloxAnnotation.ENVIRONMENT.forContainer("headscale"),
         debugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
     // The config-init INIT container also runs `flox activate` (it renders the
     // headscale config), so it must opt into flox injection too — the NRI plugin
-    // only puts flox on PATH for containers named by a flox.dev/environment.<c>
+    // only puts flox on PATH for containers named by a flox.seedmatic.io/environment.<c>
     // annotation; without this the init container fails "flox not found in $PATH".
     annotations.put(
-        "flox.dev/environment.config-init",
+        FloxAnnotation.ENVIRONMENT.forContainer("config-init"),
         debugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
     annotations.putAll(shellSidecar.sidecarAnnotations());
 
@@ -1054,7 +1055,9 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment.bootstrap", "mesh/headscale"))),
+                            Map.of(
+                                FloxAnnotation.ENVIRONMENT.forContainer("bootstrap"),
+                                "mesh/headscale"))),
                     "spec",
                     Map.of(
                         "containers",
@@ -1254,7 +1257,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
     final LinkedHashMap<String, String> gatewayAnnotations = new LinkedHashMap<>();
     gatewayAnnotations.put(
-        "flox.dev/environment.tailscale",
+        FloxAnnotation.ENVIRONMENT.forContainer("tailscale"),
         gatewayDebugPolicy.resolveMeshEnvironment("mesh/tailscale", "mesh/tailscale-debug"));
     gatewayAnnotations.putAll(gatewayShellSidecar.sidecarAnnotations());
 
@@ -1450,13 +1453,13 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
     final LinkedHashMap<String, String> clientAnnotations = new LinkedHashMap<>();
     clientAnnotations.put(
-        "flox.dev/environment.tailscale",
+        FloxAnnotation.ENVIRONMENT.forContainer("tailscale"),
         clientDebugPolicy.resolveMeshEnvironment("mesh/tailscale", "mesh/tailscale-debug"));
     // The wait-for-headscale INIT container runs `flox activate` + `kubectl wait`, so it
     // needs flox injection AND an env carrying kubectl — the headscale env (same as the
     // bootstrap script), NOT the tailscale env its main container uses.
     clientAnnotations.put(
-        "flox.dev/environment.wait-for-headscale",
+        FloxAnnotation.ENVIRONMENT.forContainer("wait-for-headscale"),
         clientDebugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
     clientAnnotations.putAll(clientShellSidecar.sidecarAnnotations());
 

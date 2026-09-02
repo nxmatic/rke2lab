@@ -4,6 +4,7 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
@@ -521,7 +522,9 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment.sync", "mesh/headplane"))),
+                            Map.of(
+                                FloxAnnotation.ENVIRONMENT.forContainer("sync"),
+                                "mesh/headplane"))),
                     "spec",
                     Map.of(
                         "containers",
@@ -801,7 +804,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     // running node process from the shared PID namespace.
     final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
     annotations.put(
-        "flox.dev/environment.headplane",
+        FloxAnnotation.ENVIRONMENT.forContainer("headplane"),
         debugPolicy.resolveMeshEnvironment("mesh/headplane", "mesh/headplane-debug"));
     annotations.putAll(shellSidecar.sidecarAnnotations());
 

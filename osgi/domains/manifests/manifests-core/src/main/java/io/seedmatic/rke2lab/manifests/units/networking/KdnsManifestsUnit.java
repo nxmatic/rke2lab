@@ -4,6 +4,7 @@ package io.seedmatic.rke2lab.manifests.units.networking;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.profiles.DelveSidecarProfile;
@@ -312,10 +313,10 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
         .ifPresent(containers::add);
 
     final LinkedHashMap<String, String> floxAnnotations = new LinkedHashMap<>();
-    floxAnnotations.put("flox.dev/environment.kdns", floxEnvironment);
-    floxAnnotations.put("flox.dev/home.kdns", "/root");
-    floxAnnotations.put("flox.dev/uid.kdns", "0");
-    floxAnnotations.put("flox.dev/gid.kdns", "0");
+    floxAnnotations.put(FloxAnnotation.ENVIRONMENT.forContainer("kdns"), floxEnvironment);
+    floxAnnotations.put(FloxAnnotation.HOME.forContainer("kdns"), "/root");
+    floxAnnotations.put(FloxAnnotation.UID.forContainer("kdns"), "0");
+    floxAnnotations.put(FloxAnnotation.GID.forContainer("kdns"), "0");
     floxAnnotations.putAll(shellSidecar.sidecarAnnotations());
 
     final List<Object> volumes = new ArrayList<>();

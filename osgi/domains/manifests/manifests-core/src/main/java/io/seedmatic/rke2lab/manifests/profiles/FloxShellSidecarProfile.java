@@ -1,6 +1,7 @@
 // @codebase
 package io.seedmatic.rke2lab.manifests.profiles;
 
+import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,8 +25,8 @@ import java.util.Optional;
  * layer-side wiring stays uniform.
  *
  * <p>The flox env injected into the sidecar is its own per-container annotation ({@code
- * flox.dev/environment.shell}); it can match the prod env or point at a debug variant like {@code
- * networking/kdns-debug} that adds {@code delve} on top.
+ * flox.seedmatic.io/environment.shell}); it can match the prod env or point at a debug variant like
+ * {@code networking/kdns-debug} that adds {@code delve} on top.
  */
 public final class FloxShellSidecarProfile {
 
@@ -151,11 +152,12 @@ public final class FloxShellSidecarProfile {
     if (!enabled()) {
       return Map.of();
     }
+    final String c = sidecarContainerName();
     LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
-    annotations.put("flox.dev/environment." + sidecarContainerName(), floxEnvironment);
-    annotations.put("flox.dev/home." + sidecarContainerName(), homePath);
-    annotations.put("flox.dev/uid." + sidecarContainerName(), uid);
-    annotations.put("flox.dev/gid." + sidecarContainerName(), gid);
+    annotations.put(FloxAnnotation.ENVIRONMENT.forContainer(c), floxEnvironment);
+    annotations.put(FloxAnnotation.HOME.forContainer(c), homePath);
+    annotations.put(FloxAnnotation.UID.forContainer(c), uid);
+    annotations.put(FloxAnnotation.GID.forContainer(c), gid);
     return Map.copyOf(annotations);
   }
 

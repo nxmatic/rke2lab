@@ -21,37 +21,39 @@ import software.constructs.Construct;
  *   <li>{@code git-fetch} — clones the source repo at the pushed revision into the shared {@code
  *       source} workspace, authenticating with PaC's {@code basic-auth} workspace (the {@code
  *       git_auth_secret} App token PaC injects into the PipelineRun).
- *   <li>{@code render-publish} — {@code flox-annotated} (the NRI plugin injects the {@code
- *       cicd/nix} FloxEnv — a minimal nix toolchain — into the {@code step-render} container), then
- *       runs {@code nix run .#render-manifests}: the SINGLE render definition (shared with
- *       dev/release, no hand-scripted mvn+java that drifts) builds {@code manifests-cli} with the
- *       reactor discipline and seeds the {@code staging-extension} closure from a nix derivation
- *       (no separate bootstrap task), then runs the {@code publish} verb — render into the plot +
+ *   <li>{@code render-publish} — nix-build-annotated (the flox NRI system gives the {@code
+ *       step-render} container the nix runtime: nix on PATH, daemonless {@code NIX_CONFIG}, and the
+ *       {@code /nix} store overlay hosted on a persistent PVC), then runs {@code nix run
+ *       .#render-manifests}: the SINGLE render definition (shared with dev/release, no
+ *       hand-scripted mvn+java that drifts) builds {@code manifests-cli} with the reactor
+ *       discipline and seeds the {@code staging-extension} closure from a nix derivation (no
+ *       separate bootstrap task), then runs the {@code publish} verb — render into the plot +
  *       ff-push {@code manifests/<cluster>}.
  * </ul>
  *
- * <p><b>Flox injection lives on the PipelineRun stub, not here.</b> Pod annotations are set by the
- * PipelineRun (the {@code .tekton/} source stub), not by a Pipeline or Task. The stub carries
- * {@code flox.dev/environment.step-render=cicd/nix} (+ home/uid/gid) — the CI flox env under the
- * {@code cicd} folder ({@link
- * io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxEnvFolder#CICD}) is a minimal nix
- * toolchain; nix owns the build + exec closure. It propagates to every task pod, and only the
- * {@code render-publish} pod owns a {@code step-render} container, so the NRI plugin injects there
- * and ignores it on the {@code git-fetch} pod (no bare-key fallback — each container opts in BY
- * NAME).
+ * <p><b>The nix-build capability lives on the PipelineRun stub, not here.</b> Pod annotations are
+ * set by the PipelineRun (the {@code .tekton/} source stub), not by a Pipeline or Task. The stub
+ * carries {@code flox.seedmatic.io/nix-build.step-render=<pvc-name>} — the value names the render's
+ * persistent nix-store PVC (a warm store reused across renders). The flox-controller webhook
+ * ensures that PVC (create-if-absent) + injects it as the {@code /nix} overlay upper backing +
+ * {@code NIX_CONFIG}; the NRI plugin puts {@code nix} on PATH. No flox env is involved — nix owns
+ * the whole build + exec closure. Only the {@code render-publish} pod owns a {@code step-render}
+ * container, so the injection applies there and is ignored on the {@code git-fetch} pod (no
+ * bare-key fallback — each container opts in BY NAME). See {@code
+ * docs/architecture/patterns/flox-store-resolved-runtime-and-builder.adoc} + {@link
+ * io.seedmatic.rke2lab.manifests.contract.FloxAnnotation}.
  *
  * <p><b>Workspaces:</b> the Pipeline DECLARES {@code source} (per-run, bound by the stub to a
  * {@code volumeClaimTemplate}), {@code maven-cache} (the persistent RWO PVC rendered here), and
- * {@code basic-auth} (PaC's {@code git_auth_secret}); the PipelineRun stub BINDS them. The build is
- * serialised (concurrency 1, set on the PaC {@code Repository}/stub) — a Maven local repo + build-
- * cache are not multi-writer safe.
+ * {@code basic-auth} (PaC's {@code git_auth_secret}); the PipelineRun stub BINDS them. The nix
+ * store is NOT a workspace — the webhook injects it as a raw volume from the annotation. The build
+ * is serialised (concurrency 1, set on the PaC {@code Repository}/stub) — a Maven local repo,
+ * build-cache, and the nix store are not multi-writer safe.
  *
  * <p>The push token is wired: the {@code render-publish} step extracts PaC's App token from the
  * mounted {@code git_auth} secret into {@code RKE2LAB_PUSH_TOKEN}, which the in-cluster {@code
  * publish} reveals for the ff-push (container-aware {@code
- * ManifestSynthesisScenario.revealGithubToken} — cellar OPERATOR, env IN_CLUSTER). The one forward
- * reference left is the render task's {@code cicd/nix} FloxEnv, which the flox-catalogue branch
- * lands; the objects render structurally now so the resources materialise and reconcile.
+ * ManifestSynthesisScenario.revealGithubToken} — cellar OPERATOR, env IN_CLUSTER).
  */
 public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
 
@@ -63,7 +65,9 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
 
   private static final String MAVEN_CACHE_PVC = "manifests-maven-cache";
 
-  /** Container name the flox NRI plugin keys on: {@code flox.dev/environment.step-render}. */
+  /**
+   * Container name the flox NRI plugin keys on: {@code flox.seedmatic.io/nix-build.step-render}.
+   */
   private static final String RENDER_STEP = "render";
 
   private final PackageMetadataProfile packageProfile =
@@ -212,8 +216,10 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                 "steps",
                 new Object[] {
                   Map.of(
-                      // Container name = step-render; the PipelineRun stub flox-annotates it so the
-                      // NRI plugin injects the cicd/nix FloxEnv (a minimal nix toolchain) here.
+                      // Container name = step-render; the PipelineRun stub carries
+                      // flox.seedmatic.io/nix-build.step-render=<pvc>, so the flox NRI system gives
+                      // this container the nix runtime: nix on PATH, NIX_CONFIG, and the /nix store
+                      // overlay hosted on the assigned (webhook-ensured) persistent PVC.
                       "name",
                       RENDER_STEP,
                       // The commit-signing key the operator's grow emitted as
@@ -275,18 +281,17 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           // maven-build-cache persists beside the repo on the PVC → renders are
                           // incremental across pushes (only changed modules recompile).
                           "export M2_REPO=\"$(workspaces.maven-cache.path)/repository\"",
-                          // The flox NRI plugin MOUNTED the cicd/nix env at /root/.flox (nix + git
-                          // on PATH; single-user nix builds into the writeable /nix overlay) but
-                          // does
-                          // NOT auto-activate — hence `flox activate --dir /root -- …`.
-                          // `nix run .#render-manifests` from the source checkout is the ONE render
-                          // definition (shared with dev/release, no hand-scripted mvn+java that
-                          // drifts): it builds manifests-cli (CRDs staged in), then publish signs +
-                          // ff-pushes manifests/<cluster>. outdir defaults to $PWD/render
-                          // (workingDir
-                          // = the source workspace).
-                          "flox activate --dir /root -- nix run .#render-manifests --"
-                              + " \"$(params.cluster)\" \"$(params.node)\""))
+                          // The flox NRI plugin put `nix` on PATH + injected NIX_CONFIG (daemonless
+                          // single-user) and hosts the /nix store overlay on the assigned
+                          // persistent
+                          // PVC — no flox env, no `flox activate`. `nix run .#render-manifests`
+                          // from
+                          // the source checkout is the ONE render definition (shared with
+                          // dev/release, no hand-scripted mvn+java that drifts): it builds
+                          // manifests-cli (CRDs staged in), then publish signs + ff-pushes
+                          // manifests/<cluster>. outdir defaults to $PWD/render (workingDir = the
+                          // source workspace).
+                          "nix run .#render-manifests -- \"$(params.cluster)\" \"$(params.node)\""))
                 })));
   }
 

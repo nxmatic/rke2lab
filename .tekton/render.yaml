@@ -17,15 +17,13 @@ metadata:
     pipelinesascode.tekton.dev/on-event: "[push]"
     pipelinesascode.tekton.dev/on-target-branch: "[feature/nixos-node-substrate]"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
-    # flox NRI injection (dogfooding): the plugin keys per-container on flox.dev/environment.<c> with
-    # NO bare-key fallback, so this names the render task's step container (step-render) explicitly.
-    # It propagates to every task pod; only the render-publish pod owns a step-render container, so
-    # the git-fetch pod ignores it. The render runs `nix run .#render-manifests`, so the CI env is a
-    # minimal nix toolchain under the cicd folder — nix owns the build + exec closure.
-    flox.dev/environment.step-render: "cicd/nix"
-    flox.dev/home.step-render: "/root"
-    flox.dev/uid.step-render: "0"
-    flox.dev/gid.step-render: "0"
+    # nix-build capability (dogfooding the flox NRI): the render runs `nix run .#render-manifests`.
+    # The value names the render's persistent nix-store PVC. The flox-controller webhook ensures
+    # that PVC (create-if-absent in this namespace) + injects it as the /nix store overlay upper +
+    # NIX_CONFIG; the NRI plugin puts nix on PATH. No flox env — nix owns the whole build+exec
+    # closure. Keyed per-container (NO bare-key fallback), so it names the render step container
+    # (step-render); only the render-publish pod owns one, so the git-fetch pod ignores it.
+    flox.seedmatic.io/nix-build.step-render: "manifests-nix-store"
 spec:
   # The Pipeline is a RENDERED in-cluster manifest (RenderPipelineManifestsUnit), not inline here.
   # PaC's own resolver does NOT consult the cluster for a bare pipelineRef.name (it wants inline /
@@ -67,6 +65,10 @@ spec:
     - name: maven-cache
       persistentVolumeClaim:
         claimName: manifests-maven-cache
+    # The persistent /nix store overlay upper/work PVC (RenderPipelineManifestsUnit); serialised, RWO.
+    - name: nix-store
+      persistentVolumeClaim:
+        claimName: manifests-nix-store
     # PaC injects the App token here — .git-credentials + .gitconfig for the clone + the ff-push.
     - name: basic-auth
       secret:

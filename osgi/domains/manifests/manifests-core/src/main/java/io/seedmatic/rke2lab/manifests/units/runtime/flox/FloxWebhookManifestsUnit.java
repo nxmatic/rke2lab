@@ -37,8 +37,8 @@ import software.constructs.Construct;
  *
  * <p>On the {@code operators} layer with the controller. {@code failurePolicy: Ignore} keeps pod
  * creation cluster-wide unblocked if the webhook is momentarily unavailable (e.g. during a
- * rollout); the injector self-filters (no-op on pods without a {@code flox.dev/environment.*}
- * annotation), so the broad pod rule is cheap.
+ * rollout); the injector self-filters (no-op on pods without a {@code
+ * flox.seedmatic.io/environment.*} annotation), so the broad pod rule is cheap.
  */
 public final class FloxWebhookManifestsUnit extends AbstractManifestsUnit {
 

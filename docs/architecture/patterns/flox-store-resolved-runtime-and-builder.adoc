@@ -212,12 +212,39 @@ resolves that reference (typed, validatable against status) and overlays the hos
 (`kubectl get/describe floxenv`). rke2lab keeps the env catalog + the operator `env-bumper`.
 
 The env's `spec.folder` — the on-node GC-root category the plugin readlinks
-(`<base>/<folder>/<name>`) and, identically, the `flox.dev/environment.<container>`
-pod-annotation prefix the plugin keys on — is a closed, durable vocabulary typed as
+(`<base>/<folder>/<name>`) and, identically, the `flox.seedmatic.io/environment.<container>`
+pod-annotation value the plugin keys on — is a closed, durable vocabulary typed as
 `FloxEnvFolder` (`networking`, `mesh`). It is a genuine single-source-of-truth: the
 `FloxEnvManifestsUnit`-emitted CR folder and the consuming pod's annotation prefix derive
 from the same enum, so they cannot silently diverge and make the plugin readlink a GC-root
 the controller never provisioned.
+
+=== The pod-injection annotation keys — `FloxAnnotation`
+
+The annotation KEYS the flox NRI system keys on are themselves a closed, durable
+vocabulary, typed as the `FloxAnnotation` enum in `manifests-contract` — the
+single-source-of-truth for the `flox.seedmatic.io/*` per-container annotation prefixes.
+Every rke2lab manifest that annotates a pod for flox emits `FloxAnnotation.<CAP>.forContainer(c)`
+(never a string literal), so the namespace + per-capability keys are defined once. The
+Go readers (the NRI plugin, the flox-controller webhook) carry their own copies of the
+same strings — two languages can't share a constant — so the enum's values are a *cross-repo
+contract* kept in sync with the plugin's and webhook's consts.
+
+The capabilities:
+
+* `environment` — reference a `FloxEnv` CR (above).
+* `home`/`uid`/`gid`/`debug`/`debug-port` — the flox-env identity + debug knobs.
+* `nix-build` — opt a container into the *remote nix builder* (Part 2 below): its value
+  names a persistent RWO PVC (the step's warm nix-store, reused across its task runs). The
+  flox-controller pod-mutating webhook (`PodFloxMutator`) ensures that PVC (create-if-absent
+  in the pod's namespace) and injects it as a volume mounted at `FloxAnnotation.NIX_BUILD_STORE_MOUNT`
+  plus the daemonless `NIX_CONFIG`; the NRI plugin hosts the `/nix` store overlay's upper/work
+  on that mount (a real disk store instead of its 2g tmpfs default) and puts `nix` on PATH. The
+  plugin OWNS bounding the store's growth via a threshold-gated `nix store gc` on the overlay —
+  which reaps unreferenced *upper* paths only (the node's read-only lower store is fully
+  GC-rooted, so it is untouched and the merged view stays coherent). This is how the in-cluster
+  `nix run .#render-manifests` build gets room + a persistent warm cache without shipping a flox
+  env: the nix runtime is a first-class flox-NRI capability the pod opts into by annotation.
 
 == Part 1 — Store-resolved runtime scripts (the fork-repo extraction)
 

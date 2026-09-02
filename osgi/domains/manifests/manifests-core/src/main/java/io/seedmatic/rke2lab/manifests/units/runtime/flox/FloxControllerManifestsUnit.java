@@ -180,7 +180,14 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
               Map.of(
                   "apiGroups", new Object[] {"source.toolkit.fluxcd.io"},
                   "resources", new Object[] {"gitrepositories"},
-                  "verbs", new Object[] {"get", "list", "watch"})
+                  "verbs", new Object[] {"get", "list", "watch"}),
+              // The pod-mutating webhook ensures (create-if-absent) the per-step persistent
+              // nix-store
+              // PVC named by a nix-build pod's flox.seedmatic.io/nix-build.<c> annotation.
+              Map.of(
+                  "apiGroups", new Object[] {""},
+                  "resources", new Object[] {"persistentvolumeclaims"},
+                  "verbs", new Object[] {"get", "create"})
             }));
     return clusterRole;
   }
