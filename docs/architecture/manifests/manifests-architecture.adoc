@@ -334,7 +334,7 @@ graph LR
       DOC["ManifestDocumentService<br/>deterministic YAML read"]
       FLOX["FloxRuntimeAssetService<br/>materialise installer assets"]
       REQ["ManifestExplodeRequest / …Result<br/>value records"]
-      ANN["ManifestAnnotations<br/>domain/package/order stamps"]
+      ANN["ManifestAnnotation + ManifestLayer<br/>domain/package/layer stamp enums"]
       PAW["ManifestDomainPolicyAware<br/>marker"]
     end
     subgraph core["manifests-core (@Component impls)"]
@@ -368,9 +368,14 @@ graph LR
 | `ManifestExplodeResult`
 | Result record for `explode(...)`: the `explodedTargetDir` and the `List<Path>` of files written.
 
-| `ManifestAnnotations`
-| The metadata annotation constants (`io.seedmatic.rke2lab/domain`, `/package`, …) that enable
-  exploding — the stamp every emitted resource carries so the explode step can bucket it.
+| `ManifestAnnotation` + `ManifestLayer`
+| The metadata annotation vocabulary, typed as enums (was loose `String` constants on a
+  `ManifestAnnotations` record). `ManifestAnnotation` is the annotation KEYS
+  (`io.seedmatic.rke2lab/domain`, `/package`, `/layer`, … + `key()` / `packageAnnotations(...)`);
+  `ManifestLayer` is the closed, ordered set of reconcile-layer VALUES
+  (`CRDS`/`FOUNDATION`/`OPERATORS`/`WORKLOADS`, `value()`) written under `MANIFEST_LAYER`. Typing
+  them makes a mistyped key/layer a compile error instead of a silent misroute. Every emitted
+  resource carries the domain/package/layer stamp so the explode step can bucket + order it.
 
 | `ManifestDocumentService`
 | SPI reading manifest YAML through the manifests world's deterministic parser (sorted keys, literal
@@ -693,7 +698,7 @@ Immutable configuration objects the runtime units build their pod specs from.
   `seedMasterJar` / `nix run .#stage-flox-controller-crd`) and emitted verbatim via
   `UpstreamYamlInclusion` — never re-modelled or vendored. The DaemonSet runs the baked
   `io.seedmatic.flox-controller` image (`FloxDebugPolicy#floxControllerImage`, `IfNotPresent`) on
-  nodes labelled `flox.seedmatic.io/enabled` (`ManifestAnnotations#NODE_FLOX_RUNTIME_LABEL`), mounting
+  nodes labelled `flox.seedmatic.io/enabled` (`ManifestAnnotation#NODE_FLOX_RUNTIME_LABEL`), mounting
   the host `/nix` + containerd socket so it realises closures + GC-roots and imports carrier images.
 
 | `FloxCatalogManifestsUnit`

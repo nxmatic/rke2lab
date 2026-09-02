@@ -3,8 +3,8 @@ package io.seedmatic.rke2lab.manifests.units.clusterapi;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.seedmatic.rke2lab.manifests.upstream.UpstreamYamlInclusion;
@@ -27,10 +27,7 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
   // layer, so any workload CR that targets those CRDs dry-runs only after this layer is healthy.
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(
-          ManifestDomainCatalog.CLUSTER_API,
-          OUTPUT_DIR,
-          false,
-          ManifestAnnotations.LAYER_OPERATORS);
+          ManifestDomainCatalog.CLUSTER_API, OUTPUT_DIR, false, ManifestLayer.OPERATORS);
 
   public ClusterApiOperatorManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

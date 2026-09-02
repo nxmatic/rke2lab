@@ -4,8 +4,9 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.Cdk8sApiObjectResolver;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.seedmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import io.seedmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit;
@@ -54,7 +55,7 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(
-          ManifestDomainCatalog.RUNTIME, OUTPUT_DIR, false, ManifestAnnotations.LAYER_OPERATORS);
+          ManifestDomainCatalog.RUNTIME, OUTPUT_DIR, false, ManifestLayer.OPERATORS);
 
   public FloxControllerManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID));
@@ -368,7 +369,7 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                         Map.entry("hostPID", true),
                         Map.entry(
                             "nodeSelector",
-                            Map.of(ManifestAnnotations.NODE_FLOX_RUNTIME_LABEL, "true")),
+                            Map.of(ManifestAnnotation.NODE_FLOX_RUNTIME_LABEL.key(), "true")),
                         Map.entry("tolerations", new Object[] {Map.of("operator", "Exists")}),
                         Map.entry(
                             "containers",

@@ -5,7 +5,7 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
@@ -152,7 +152,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                             packageProfile.packageAnnotations(
                                 "|Secret|${headscale-namespace}|"
                                     + MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name(),
-                                Map.of(ManifestAnnotations.LOCAL_CONFIG, "true")))
+                                Map.of(ManifestAnnotation.LOCAL_CONFIG.key(), "true")))
                         .build())
                 .build());
     secret.addJsonPatch(JsonPatch.add("/type", "Opaque"), JsonPatch.add("/data", Map.of()));

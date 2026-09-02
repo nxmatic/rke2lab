@@ -2,10 +2,11 @@
 package io.seedmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeService;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.contract.NodeBootstrapArtifact;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,9 +34,9 @@ import org.slf4j.LoggerFactory;
  * ({@code default} / {@code unknown}).
  *
  * <p>The per-resource file name is annotation-driven (see {@link #fileNameFor}): {@link
- * ManifestAnnotations#RKE2_CONFIG} resources are written verbatim ({@code <name>}) so {@code
- * rke2lab-config-install.sh} can glob them; {@link ManifestAnnotations#MANIFEST_GROUP} and {@link
- * ManifestAnnotations#LOCAL_CONFIG} resources become hidden dotfiles ({@code .<kind>-<name>.yml})
+ * ManifestAnnotation#RKE2_CONFIG} resources are written verbatim ({@code <name>}) so {@code
+ * rke2lab-config-install.sh} can glob them; {@link ManifestAnnotation#MANIFEST_GROUP} and {@link
+ * ManifestAnnotation#LOCAL_CONFIG} resources become hidden dotfiles ({@code .<kind>-<name>.yml})
  * that are never linked or globbed; everything else gets an {@code <order>-<kind>-<name>.yml} name
  * for cluster apply, where order is {@code 00-} for CRDs, {@code 01-} for other cluster-scoped
  * resources (no namespace), {@code 02-} for namespace-scoped resources.
@@ -92,12 +93,13 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
               if (kind.isEmpty()) {
                 return;
               }
-              if (isAnnotated(document, ManifestAnnotations.NODE_BOOTSTRAP)) {
+              if (isAnnotated(document, ManifestAnnotation.NODE_BOOTSTRAP.key())) {
                 bootstrapDocuments.add(document);
                 return;
               }
-              final String domain = annotation(document, ManifestAnnotations.DOMAIN, "default");
-              final String pkg = annotation(document, ManifestAnnotations.PACKAGE, "unknown");
+              final String domain =
+                  annotation(document, ManifestAnnotation.DOMAIN.key(), "default");
+              final String pkg = annotation(document, ManifestAnnotation.PACKAGE.key(), "unknown");
               final Optional<String> namespace = text(document.path("metadata").get("namespace"));
               final String name = sanitizeFileSegment(text(document.path("metadata").get("name")));
 
@@ -135,7 +137,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
    * Belt-and-suspenders: bind any Secret rendered into the branch tree to the sops clean filter, so
    * if one ever carries real data its {@code data}/{@code stringData} commits ENCRYPTED (the age
    * recipients in the repo's {@code .sops.yaml}), never plaintext. The PRIMARY guarantee stays that
-   * real-data secrets ride the {@link ManifestAnnotations#NODE_BOOTSTRAP} lane and never reach the
+   * real-data secrets ride the {@link ManifestAnnotation#NODE_BOOTSTRAP} lane and never reach the
    * branch at all; this {@code .gitattributes} is the second belt, engaged by any filter-aware
    * committer over the tree (the operator's git CLI, which carries the {@code sops-yaml} filter).
    */
@@ -154,20 +156,20 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
    * Resolves the per-resource file name from annotations, not from the resource name:
    *
    * <ul>
-   *   <li>{@link ManifestAnnotations#RKE2_CONFIG}: verbatim {@code <name>} (visible) so {@code
+   *   <li>{@link ManifestAnnotation#RKE2_CONFIG}: verbatim {@code <name>} (visible) so {@code
    *       rke2lab-config-install.sh} can glob it into {@code config.yaml.d}.
-   *   <li>{@link ManifestAnnotations#MANIFEST_GROUP} or {@link ManifestAnnotations#LOCAL_CONFIG}:
+   *   <li>{@link ManifestAnnotation#MANIFEST_GROUP} or {@link ManifestAnnotation#LOCAL_CONFIG}:
    *       hidden {@code .<kind>-<name>.yml} dotfile, never linked / globbed.
    *   <li>otherwise: {@code <order>-<kind>-<name>.yml} for cluster apply.
    * </ul>
    */
   private String fileNameFor(
       JsonNode document, String kind, Optional<String> namespace, String name) {
-    if (isAnnotated(document, ManifestAnnotations.RKE2_CONFIG)) {
+    if (isAnnotated(document, ManifestAnnotation.RKE2_CONFIG.key())) {
       return name;
     }
-    if (isAnnotated(document, ManifestAnnotations.MANIFEST_GROUP)
-        || isAnnotated(document, ManifestAnnotations.LOCAL_CONFIG)) {
+    if (isAnnotated(document, ManifestAnnotation.MANIFEST_GROUP.key())
+        || isAnnotated(document, ManifestAnnotation.LOCAL_CONFIG.key())) {
       return "." + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
     }
     final String order = orderPrefixFor(kind, namespace);
@@ -181,16 +183,16 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
   /**
    * The reconcile layer sub-dir a resource explodes into: a {@code CustomResourceDefinition} is
    * forced to {@code crds} by kind (so it applies before any CR, regardless of its unit's
-   * annotation); everything else takes its {@link ManifestAnnotations#MANIFEST_LAYER} annotation,
+   * annotation); everything else takes its {@link ManifestAnnotation#MANIFEST_LAYER} annotation,
    * defaulting to {@code workloads}. {@code FluxRootManifestsUnit} emits one {@code Kustomization}
    * per layer, chained by {@code dependsOn}.
    */
   private String layerFor(JsonNode document, String kind) {
     if (CRD_KIND.equals(kind)) {
-      return ManifestAnnotations.LAYER_CRDS;
+      return ManifestLayer.CRDS.value();
     }
     return annotation(
-        document, ManifestAnnotations.MANIFEST_LAYER, ManifestAnnotations.LAYER_WORKLOADS);
+        document, ManifestAnnotation.MANIFEST_LAYER.key(), ManifestLayer.WORKLOADS.value());
   }
 
   private String orderPrefixFor(String kind, Optional<String> namespace) {

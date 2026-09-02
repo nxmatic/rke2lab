@@ -35,7 +35,7 @@ needed:
   `sops-age` + `githubapp` Secrets Flux needs to pull and decrypt the branch.
 
 A unit joins the bootstrap set by carrying the `io.seedmatic.rke2lab/node-bootstrap`
-annotation (`ManifestAnnotations.NODE_BOOTSTRAP`), stamped once per unit by its
+annotation (`ManifestAnnotation.NODE_BOOTSTRAP`), stamped once per unit by its
 `PackageMetadataProfile(..., nodeBootstrap = true)` so no resource of a bootstrap unit
 can escape the lane.
 

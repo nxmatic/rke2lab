@@ -2,8 +2,8 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -22,8 +22,7 @@ public final class MeshSystemNamespaceManifestsUnit extends AbstractManifestsUni
   // the operators layer tries to create the HelmChart *in* mesh-system ("namespaces mesh-system not
   // found"). foundation applies before operators, so the namespace is Ready for both.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile(
-          "mesh", "system-namespace", false, ManifestAnnotations.LAYER_FOUNDATION);
+      new PackageMetadataProfile("mesh", "system-namespace", false, ManifestLayer.FOUNDATION);
 
   public MeshSystemNamespaceManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

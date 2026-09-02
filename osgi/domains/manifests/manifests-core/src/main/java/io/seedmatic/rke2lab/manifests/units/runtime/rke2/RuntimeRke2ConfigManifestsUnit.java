@@ -7,7 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.node.NodeEnvContext;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
@@ -171,9 +171,9 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
                             packageProfile.packageAnnotations(
                                 upstreamIdentifier,
                                 Map.of(
-                                    ManifestAnnotations.LOCAL_CONFIG,
+                                    ManifestAnnotation.LOCAL_CONFIG.key(),
                                     "true",
-                                    ManifestAnnotations.RKE2_CONFIG,
+                                    ManifestAnnotation.RKE2_CONFIG.key(),
                                     "true",
                                     "description.kpt.dev",
                                     description)))

@@ -1,7 +1,7 @@
 // @codebase
 package io.seedmatic.rke2lab.manifests;
 
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,10 +117,10 @@ public abstract class AbstractManifestsUnit implements ManifestsUnit {
 
   private Map<String, String> groupMarkerAnnotations(final String domainId) {
     final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
-    annotations.put(ManifestAnnotations.LOCAL_CONFIG, "true");
-    annotations.put(ManifestAnnotations.MANIFEST_GROUP, "true");
-    annotations.put(ManifestAnnotations.DOMAIN, domainId);
-    annotations.put(ManifestAnnotations.PACKAGE, outputDir());
+    annotations.put(ManifestAnnotation.LOCAL_CONFIG.key(), "true");
+    annotations.put(ManifestAnnotation.MANIFEST_GROUP.key(), "true");
+    annotations.put(ManifestAnnotation.DOMAIN.key(), domainId);
+    annotations.put(ManifestAnnotation.PACKAGE.key(), outputDir());
     return Map.copyOf(annotations);
   }
 }

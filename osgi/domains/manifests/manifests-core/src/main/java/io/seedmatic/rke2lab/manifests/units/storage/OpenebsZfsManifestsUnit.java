@@ -4,7 +4,7 @@ package io.seedmatic.rke2lab.manifests.units.storage;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import java.util.List;
@@ -21,8 +21,6 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
 
   private static final String DOMAIN_NAME = "storage";
   private static final String PACKAGE_NAME = "openebs-zfs";
-
-  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
   public OpenebsZfsManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
@@ -58,7 +56,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("openebs")
-                    .annotations(manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
+                    .annotations(ManifestAnnotation.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                     .build())
             .build());
   }
@@ -80,7 +78,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
                     ApiObjectMetadata.builder()
                         .name(name)
                         .annotations(
-                            manifestAnnotations.packageAnnotations(
+                            ManifestAnnotation.packageAnnotations(
                                 DOMAIN_NAME, PACKAGE_NAME, extraAnnotations))
                         .build())
                 .build());
@@ -113,7 +111,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
                         .name("openebs-zfs")
                         .namespace("openebs")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
+                            ManifestAnnotation.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 

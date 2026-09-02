@@ -4,8 +4,9 @@ package io.seedmatic.rke2lab.manifests.units.networking;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
@@ -24,8 +25,7 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
   // they register the Gateway API CRDs at runtime; the GatewayClass overrides itself back to
   // workloads (below), so it dry-runs only after this installer has run.
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile(
-          "networking", "envoy-gateway", false, ManifestAnnotations.LAYER_OPERATORS);
+      new PackageMetadataProfile("networking", "envoy-gateway", false, ManifestLayer.OPERATORS);
 
   public EnvoyGatewayManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of(CiliumAdvancedManifestsUnit.MANIFEST_UNIT_ID));
@@ -102,8 +102,8 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
                             packageProfile.packageAnnotations(
                                 "gateway.networking.k8s.io|GatewayClass|default|envoy",
                                 Map.of(
-                                    ManifestAnnotations.MANIFEST_LAYER,
-                                    ManifestAnnotations.LAYER_WORKLOADS)))
+                                    ManifestAnnotation.MANIFEST_LAYER.key(),
+                                    ManifestLayer.WORKLOADS.value())))
                         .build())
                 .build());
 

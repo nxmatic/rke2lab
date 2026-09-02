@@ -12,7 +12,7 @@ import java.nio.file.Path;
 public enum NodeBootstrapArtifact {
 
   /**
-   * The single multi-doc file the exploder collects the {@link ManifestAnnotations#NODE_BOOTSTRAP}
+   * The single multi-doc file the exploder collects the {@link ManifestAnnotation#NODE_BOOTSTRAP}
    * resources into, for the host to seed onto the node over devlxd (see the {@code
    * rke2lab-server-manifests} guest unit).
    */

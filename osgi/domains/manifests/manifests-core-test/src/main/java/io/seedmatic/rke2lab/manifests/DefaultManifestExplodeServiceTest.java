@@ -3,7 +3,7 @@ package io.seedmatic.rke2lab.manifests;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeRequest;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeService;
@@ -66,8 +66,8 @@ class DefaultManifestExplodeServiceTest {
             "runtime",
             "rke2-config",
             Map.of(
-                ManifestAnnotations.LOCAL_CONFIG, "true",
-                ManifestAnnotations.RKE2_CONFIG, "true"));
+                ManifestAnnotation.LOCAL_CONFIG.key(), "true",
+                ManifestAnnotation.RKE2_CONFIG.key(), "true"));
 
     assertEquals("workloads/runtime/rke2-config/core.yaml", explodeOne(tmp, document));
   }
@@ -82,8 +82,8 @@ class DefaultManifestExplodeServiceTest {
             "runtime",
             "rke2-config",
             Map.of(
-                ManifestAnnotations.LOCAL_CONFIG, "true",
-                ManifestAnnotations.MANIFEST_GROUP, "true"));
+                ManifestAnnotation.LOCAL_CONFIG.key(), "true",
+                ManifestAnnotation.MANIFEST_GROUP.key(), "true"));
 
     assertEquals(
         "workloads/runtime/rke2-config/.configmap-rke2-config.group.yml",
@@ -99,7 +99,7 @@ class DefaultManifestExplodeServiceTest {
             null,
             "runtime",
             "cloud-config",
-            Map.of(ManifestAnnotations.LOCAL_CONFIG, "true"));
+            Map.of(ManifestAnnotation.LOCAL_CONFIG.key(), "true"));
 
     assertEquals(
         "workloads/runtime/cloud-config/.configmap-cloud-config.yml", explodeOne(tmp, document));
@@ -162,8 +162,8 @@ class DefaultManifestExplodeServiceTest {
       final String pkg,
       final Map<String, String> extraAnnotations) {
     final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
-    annotations.put(ManifestAnnotations.DOMAIN, domain);
-    annotations.put(ManifestAnnotations.PACKAGE, pkg);
+    annotations.put(ManifestAnnotation.DOMAIN.key(), domain);
+    annotations.put(ManifestAnnotation.PACKAGE.key(), pkg);
     annotations.putAll(extraAnnotations);
 
     final LinkedHashMap<String, Object> metadata = new LinkedHashMap<>();

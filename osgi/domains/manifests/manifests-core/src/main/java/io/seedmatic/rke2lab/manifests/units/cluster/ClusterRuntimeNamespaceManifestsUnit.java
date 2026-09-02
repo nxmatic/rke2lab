@@ -3,8 +3,8 @@ package io.seedmatic.rke2lab.manifests.units.cluster;
 
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,7 @@ public final class ClusterRuntimeNamespaceManifestsUnit extends AbstractManifest
   // workloads holds it) — namespaces the later layers rely on belong early.
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(
-          ManifestDomainCatalog.CLUSTER, OUTPUT_DIR, false, ManifestAnnotations.LAYER_FOUNDATION);
+          ManifestDomainCatalog.CLUSTER, OUTPUT_DIR, false, ManifestLayer.FOUNDATION);
 
   public ClusterRuntimeNamespaceManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());

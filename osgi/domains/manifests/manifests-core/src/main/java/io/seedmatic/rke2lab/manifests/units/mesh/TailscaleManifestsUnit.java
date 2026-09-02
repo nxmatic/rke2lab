@@ -4,8 +4,9 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
@@ -72,8 +73,8 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                             packageProfile.packageAnnotations(
                                 "helm.cattle.io|HelmChart|${tailscale-namespace}|tailscale-operator",
                                 Map.of(
-                                    ManifestAnnotations.MANIFEST_LAYER,
-                                    ManifestAnnotations.LAYER_OPERATORS)))
+                                    ManifestAnnotation.MANIFEST_LAYER.key(),
+                                    ManifestLayer.OPERATORS.value())))
                         .build())
                 .build());
 

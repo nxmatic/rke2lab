@@ -3,7 +3,7 @@ package io.seedmatic.rke2lab.manifests.units.clusterapi;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
@@ -129,7 +129,7 @@ public final class ClusterKubeconfigManifestsUnit extends AbstractManifestsUnit 
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|Secret|" + namespace + "|" + name,
-                                Map.of(ManifestAnnotations.LOCAL_CONFIG, "true")))
+                                Map.of(ManifestAnnotation.LOCAL_CONFIG.key(), "true")))
                         .build())
                 .build());
 
