@@ -37,35 +37,39 @@ public final class PackageMetadataProfile {
     this.defaultLayer = defaultLayer;
   }
 
-  // Merge the lane + layer markers into whatever the caller passed — a single seam so no call site
-  // can forget them. A per-resource MANIFEST_LAYER in extraAnnotations always wins; otherwise the
-  // unit's non-default layer is stamped (workloads stays implicit — absent means workloads).
-  private Map<String, String> withLane(final Map<String, String> extraAnnotations) {
-    final LinkedHashMap<String, String> merged = new LinkedHashMap<>(extraAnnotations);
+  // Stamp the base DOMAIN + PACKAGE markers, then merge the lane + layer markers into whatever the
+  // caller passed — a single instance seam so no call site can forget them. A per-resource
+  // MANIFEST_LAYER in extraAnnotations always wins; otherwise the unit's non-default layer is
+  // stamped (workloads stays implicit — absent means workloads).
+  private Map<String, String> stamp(final Map<String, String> extraAnnotations) {
+    final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
+    annotations.put(ManifestAnnotation.DOMAIN.key(), domain);
+    annotations.put(ManifestAnnotation.PACKAGE.key(), packageName);
+    annotations.putAll(extraAnnotations);
     if (nodeBootstrap) {
-      merged.put(ManifestAnnotation.NODE_BOOTSTRAP.key(), "true");
+      annotations.put(ManifestAnnotation.NODE_BOOTSTRAP.key(), "true");
     }
-    if (!merged.containsKey(ManifestAnnotation.MANIFEST_LAYER.key())
+    if (!annotations.containsKey(ManifestAnnotation.MANIFEST_LAYER.key())
         && defaultLayer != ManifestLayer.WORKLOADS) {
-      merged.put(ManifestAnnotation.MANIFEST_LAYER.key(), defaultLayer.value());
+      annotations.put(ManifestAnnotation.MANIFEST_LAYER.key(), defaultLayer.value());
     }
-    return merged;
+    return Map.copyOf(annotations);
   }
 
   public Map<String, String> packageAnnotations(final String upstreamIdentifier) {
-    return ManifestAnnotation.packageAnnotations(domain, packageName, withLane(Map.of()));
+    return stamp(Map.of());
   }
 
   public Map<String, String> packageAnnotations(
       final String upstreamIdentifier, final Map<String, String> extraAnnotations) {
-    return ManifestAnnotation.packageAnnotations(domain, packageName, withLane(extraAnnotations));
+    return stamp(extraAnnotations);
   }
 
   public Map<String, String> packageAnnotationsWithoutUpstream() {
-    return ManifestAnnotation.packageAnnotations(domain, packageName, withLane(Map.of()));
+    return stamp(Map.of());
   }
 
   public Map<String, String> templateAnnotations(final Map<String, String> extraAnnotations) {
-    return ManifestAnnotation.packageAnnotations(domain, packageName, withLane(extraAnnotations));
+    return stamp(extraAnnotations);
   }
 }

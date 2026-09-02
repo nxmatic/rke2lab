@@ -1,9 +1,6 @@
 // @codebase
 package io.seedmatic.rke2lab.manifests.contract;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * The metadata annotation KEYS rke2lab stamps on rendered manifests — a closed vocabulary typed as
  * an enum (was loose {@code String} constants on a {@code ManifestAnnotations} record) so a key is
@@ -77,25 +74,5 @@ public enum ManifestAnnotation {
   /** The annotation key. */
   public String key() {
     return key;
-  }
-
-  /**
-   * The base package-metadata annotations for a rendered resource: {@link #DOMAIN} + {@link
-   * #PACKAGE} (in a stable order), plus any extra annotations the caller merges. The pure
-   * map-building behavior a manifest unit's {@code PackageMetadataProfile} calls.
-   */
-  public static Map<String, String> packageAnnotations(
-      final String domain, final String packageName, final Map<String, String> extraAnnotations) {
-    final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
-    annotations.put(DOMAIN.key, domain);
-    annotations.put(PACKAGE.key, packageName);
-    annotations.putAll(extraAnnotations);
-    return Map.copyOf(annotations);
-  }
-
-  /** {@link #DOMAIN} + {@link #PACKAGE} only (no extra annotations). */
-  public static Map<String, String> packageAnnotations(
-      final String domain, final String packageName) {
-    return packageAnnotations(domain, packageName, Map.of());
   }
 }

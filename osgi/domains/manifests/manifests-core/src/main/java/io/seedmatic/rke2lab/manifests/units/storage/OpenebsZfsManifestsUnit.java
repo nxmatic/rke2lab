@@ -4,9 +4,9 @@ package io.seedmatic.rke2lab.manifests.units.storage;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
+import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -21,6 +21,9 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
 
   private static final String DOMAIN_NAME = "storage";
   private static final String PACKAGE_NAME = "openebs-zfs";
+
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile(DOMAIN_NAME, PACKAGE_NAME);
 
   public OpenebsZfsManifestsUnit() {
     super(MANIFEST_UNIT_ID, List.of());
@@ -56,7 +59,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("openebs")
-                    .annotations(ManifestAnnotation.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
+                    .annotations(packageProfile.packageAnnotationsWithoutUpstream())
                     .build())
             .build());
   }
@@ -77,9 +80,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name(name)
-                        .annotations(
-                            ManifestAnnotation.packageAnnotations(
-                                DOMAIN_NAME, PACKAGE_NAME, extraAnnotations))
+                        .annotations(packageProfile.templateAnnotations(extraAnnotations))
                         .build())
                 .build());
 
@@ -110,8 +111,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
                     ApiObjectMetadata.builder()
                         .name("openebs-zfs")
                         .namespace("openebs")
-                        .annotations(
-                            ManifestAnnotation.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
+                        .annotations(packageProfile.packageAnnotationsWithoutUpstream())
                         .build())
                 .build());
 
