@@ -713,11 +713,18 @@
         // floxNriPluginPackages
         // floxControllerPackages
         // toolchainPackages
-        # manage-tailnet (darwin-only, passthrough of the ndh flake package): the flox env installs
-        # it as `github:seedmatic/rke2lab#manage-tailnet` so the incus GROW's local.Command finds it
-        # on PATH for a plain `pulumi up`. rke2lab's flake.lock is the single ndh pin.
+        # manage-tailnet (darwin-only): rke2lab OVER-SEEDS ndh's bare package with its own context —
+        # the OAuth client ndh user-mirrors at ~/.local/share/ndh/tailnet.tailscale.client
+        # (TailscaleOauthClientGateway.NDH_CLIENT_PATH). The wrapper pre-supplies --client-secret-file
+        # so a caller here just runs `manage-tailnet <action>` and it authenticates without a
+        # .secrets/age key — the incus GROW's local.Command, or the operator by hand. Per-invocation
+        # policy (--stale-after, --yes) stays the caller's. The flox env installs it as
+        # `github:seedmatic/rke2lab#manage-tailnet`; flake.lock is the single ndh pin.
         // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
-          manage-tailnet = inputs.ndh.packages.${system}.manage-tailnet;
+          manage-tailnet = pkgs.writeShellScriptBin "manage-tailnet" ''
+            exec ${inputs.ndh.packages.${system}.manage-tailnet}/bin/manage-tailnet \
+              --client-secret-file "$HOME/.local/share/ndh/tailnet.tailscale.client" "$@"
+          '';
         };
 
         apps.deploy = {
