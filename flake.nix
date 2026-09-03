@@ -505,7 +505,7 @@
         # spotless gate.
         toolchainPackages = mavenToolchain pkgs;
 
-        # Release deploy: `nix run .#deploy -- <stack>`. Runs `pulumi up` against
+        # Cluster GROW: `nix run .#grow -- <stack>`. Runs `pulumi up` against
         # the STORE-built seed-master jar instead of the mutable Maven target the
         # dev loop uses. A Pulumi project is more than Pulumi.yaml — the stack
         # config (Pulumi.<stack>.yaml, committed) and stack state
@@ -522,8 +522,8 @@
         # a JRE to run the seed-master jar, and the incus client the provider
         # shells out to. The PULUMI_* vars are set here too, mirroring the flox
         # env's [vars]: local file:// backend under the repo, empty passphrase.
-        deployApp = pkgs.writeShellApplication {
-          name = "rke2lab-deploy";
+        growApp = pkgs.writeShellApplication {
+          name = "rke2lab-grow";
           runtimeInputs = [
             pkgs.coreutils
             pkgs.nix
@@ -535,13 +535,13 @@
           # ndh's manage-tailnet on PATH: InstanceGrow runs it as a local.Command to prune the old
           # node's stale tailscale devices when the instance is replaced (they orphan their MagicDNS
           # names → the new pac-webhook drifts to -1/-2 and the render webhook dies). The flox env
-          # carries it too, so a plain `pulumi up` prunes; here it covers `nix run .#deploy`.
+          # carries it too, so a plain `pulumi up` prunes; here it covers `nix run .#grow`.
           # darwin-only: ndh exposes the package only for aarch64-darwin (the operator host).
           ++ pkgs.lib.optional (system == "aarch64-darwin") inputs.ndh.packages.${system}.manage-tailnet;
           text = ''
             usage() {
               cat >&2 <<'USAGE'
-usage: nix run .#deploy -- <stack> [preview|up] [pulumi args...]
+usage: nix run .#grow -- <stack> [preview|up] [pulumi args...]
 
   <stack>    Pulumi stack name (required), e.g. dev
   preview    read-only diff, no apply (default)
@@ -574,7 +574,7 @@ USAGE
             # stack with no error). Catch it with a corrective hint.
             case "$stack" in
               preview | up)
-                echo "error: '$stack' is an action, not a stack — did you mean: nix run .#deploy -- <stack> $stack" >&2
+                echo "error: '$stack' is an action, not a stack — did you mean: nix run .#grow -- <stack> $stack" >&2
                 usage
                 exit 2
                 ;;
@@ -609,12 +609,13 @@ USAGE
               git checkout -- Pulumi.yaml
             fi
 
-            # Flags for the inner `nix build .#seed-master` go via
-            # DEPLOY_NIX_FLAGS, e.g. `DEPLOY_NIX_FLAGS='-L -v -v' nix run .#deploy -- dev`.
-            # Flags given to the OUTER `nix run` (e.g. `nix run .#deploy -L ...`)
-            # are consumed by nix to build/run THIS wrapper; the seed-master
-            # build is a separate child `nix` process and does not inherit them.
-            read -r -a nixFlags <<< "''${DEPLOY_NIX_FLAGS:-}"
+            # The inner `nix build .#seed-master` is a SEPARATE child nix process — flags on the
+            # OUTER `nix run` (e.g. `nix run .#grow -L …`) go to building THIS wrapper, not it. So it
+            # always gets `-L` (surface the build log), plus whatever the shared NIX_FLAGS env adds,
+            # e.g. `NIX_FLAGS='--rebuild -Lvv' nix run .#grow -- dev up`. Same var across every app.
+            nixFlags=( -L )
+            read -r -a extraNixFlags <<< "''${NIX_FLAGS:-}"
+            nixFlags+=( "''${extraNixFlags[@]}" )
 
             echo "==> building seed-master from the store" >&2
             jar="$(nix build .#seed-master "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/seed-master.jar"
@@ -688,11 +689,14 @@ USAGE
             # Build the manifests-cli exe from the store — the shared reactor derivation
             # stages the CRDs, resolves deps + gates spotless, so the fat jar is
             # self-contained (no runtime maven cache, bootstrap or CRD staging). Mirrors
-            # `deploy`'s `nix build .#seed-master`. The build is IMPURE (mvnHost reads
+            # `grow`'s `nix build .#seed-master`. The build is IMPURE (mvnHost reads
             # M2_REPO + GH_TOKEN) — the caller sets them (in-cluster: the maven-cache PVC +
-            # the PaC App token). Inner-build flags via RENDER_NIX_FLAGS (e.g. `-L`); flags
-            # on the OUTER `nix run` are consumed by nix building THIS wrapper, not the child.
-            read -r -a nixFlags <<< "''${RENDER_NIX_FLAGS:-}"
+            # the PaC App token). The inner build is a SEPARATE child nix process, so it always
+            # gets `-L` (surface the build log) plus the shared NIX_FLAGS env (e.g.
+            # `NIX_FLAGS='--rebuild -Lvv'`); OUTER `nix run` flags build THIS wrapper, not the child.
+            nixFlags=( -L )
+            read -r -a extraNixFlags <<< "''${NIX_FLAGS:-}"
+            nixFlags+=( "''${extraNixFlags[@]}" )
             echo "==> building manifests-cli from the store" >&2
             jar="$(nix build .#manifests-cli "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/manifests.jar"
             [ -f "$jar" ] || { echo "error: store jar not found at $jar" >&2; exit 1; }
@@ -743,7 +747,7 @@ USAGE
           seed-master = seedMasterJar;
           manifests-cli = manifestsCliJar;
           incus-client = incusClient;
-          deploy = deployApp;
+          grow = growApp;
           flux9s = flux9sPkg;
         }
         // floxNriPluginPackages
@@ -763,10 +767,10 @@ USAGE
           '';
         };
 
-        apps.deploy = {
+        apps.grow = {
           type = "app";
-          program = "${deployApp}/bin/rke2lab-deploy";
-          meta.description = "Build the seed-master jar and run pulumi preview/up against it";
+          program = "${growApp}/bin/rke2lab-grow";
+          meta.description = "Grow the cluster: build the seed-master jar and run pulumi preview/up against it";
         };
 
         apps.render-manifests = {
