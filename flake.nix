@@ -24,6 +24,14 @@
 
     # Use flake-commons as aggregator to stay synchronized with nix-darwin-home
     flake-commons.url = "github:seedmatic/nix-flake-commons/develop";
+    # Cut the devenv/cachix/nix cluster: we consume NONE of it (no devShell here uses devenv/cachix),
+    # yet flake-commons pulls `cachix` → `devenv` → the `nix` flake, a MUTUALLY-RECURSIVE input tree
+    # (~470 devenv_N + ~505 nix_N + cachix_N + duplicate nixpkgs-23-11) — ~11.5k lock nodes that bloat
+    # eval + every `nix run` closure. `follows = ""` aliases each to this root (the cut idiom, like
+    # ndh.inputs.rke2lab). ndh + flox-* follow THIS flake-commons, so one cut cascades to all.
+    flake-commons.inputs.cachix.follows = "";
+    flake-commons.inputs.devenv.follows = "";
+    flake-commons.inputs.nix.follows = "";
 
     # Follow flake-commons versions
     nixpkgs.follows = "flake-commons/nixpkgs";
