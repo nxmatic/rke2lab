@@ -85,11 +85,19 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     final boolean staging = mojoExecutions.stream().anyMatch(StagingExecutionStrategy::isShade);
     final List<ResolvedBundle> resolved = staging ? resolveBundles(session) : null;
     if (staging) {
-      // Inject the shade/staging config BEFORE delegating: the mojos read it as they are
-      // configured.
-      reconfigureStaging(session, mojoExecutions, resolved);
+      // Inject the STAGING artifact-items BEFORE delegating: stage-embedded-bundles runs at
+      // generate-resources (before compile) and the staged SET is demand-independent (every
+      // domain/dual-realm bundle is staged regardless). The SHADE excludes are NOT injected here —
+      // they encode the dual-realm FLAT-keep, a per-assembly demand read from the exec's OWN
+      // compiled classes (DualRealmFlatDemand), which do not exist until compile runs during the
+      // delegated loop. So the wrapped runner injects them the moment before the shade mojo runs.
+      injectStaging(session, mojoExecutions, resolved);
     }
-    delegate().execute(mojoExecutions, session, mojoExecutionRunner);
+    final MojoExecutionRunner runner =
+        staging
+            ? shadeExcludeInjectingRunner(mojoExecutionRunner, session, resolved)
+            : mojoExecutionRunner;
+    delegate().execute(mojoExecutions, session, runner);
     if (staging) {
       // Run the staging-law gate AFTER delegating: compile has now populated target/classes, so the
       // gate can read the exec's REALM_BOUNDARY governance AND self-scan its host classes. Gating
@@ -102,28 +110,53 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     }
   }
 
-  /** Derive the staging closure from the resolved deps and inject both faces of the staging. */
-  private void reconfigureStaging(
+  /**
+   * Inject the staging artifact-items (the bundles copied intact under {@code META-INF/bundles/}).
+   * The staged SET is demand-independent — every domain/runtime/dual-realm bundle is staged
+   * regardless of whether a flat class consumes it — so it is computed with an EMPTY demand and
+   * injected up front, before the generate-resources stage mojo runs.
+   */
+  private void injectStaging(
       MavenSession session, List<MojoExecution> mojoExecutions, List<ResolvedBundle> resolved) {
-    final String module = session.getCurrentProject().getArtifactId();
-    final StagingClosure closure =
-        StagingClosure.compute(resolved, flatReferencedDualRealmGas(session, resolved));
-
-    int shadeAdded = 0;
+    final StagingClosure closure = StagingClosure.compute(resolved, Set.of());
     int stageAdded = 0;
     for (MojoExecution execution : mojoExecutions) {
-      if (isShade(execution)) {
-        shadeAdded = injectShadeExcludes(execution, closure);
-      } else if (isStageBundles(execution)) {
+      if (isStageBundles(execution)) {
         stageAdded = injectStagingArtifactItems(execution, closure);
       }
     }
     log.info(
-        "[osgi-staging] {}: derived {} bundles; +{} shade excludes, +{} staging items",
-        module,
+        "[osgi-staging] {}: derived {} bundles; +{} staging items",
+        session.getCurrentProject().getArtifactId(),
         closure.staged().size(),
-        shadeAdded,
         stageAdded);
+  }
+
+  /**
+   * Wrap the runner so the shade excludes are injected the instant BEFORE the shade mojo runs —
+   * when compile has populated the exec's {@code target/classes}, so {@link DualRealmFlatDemand}
+   * sees the exec's OWN host classes (e.g. a scenario referencing a {@code type=dual-realm}
+   * contract type). Injecting up front instead read a cold, pre-compile tree and folded such a
+   * carrier OSGi-only → the flat host copy vanished → a runtime {@code NoClassDefFoundError}.
+   * Mutating the execution's config here still lands BEFORE {@code getConfiguredMojo} (it runs
+   * inside the delegated run) — the constraint every staging reconfiguration depends on. The gate
+   * ({@link #enforceGates}) already runs post-compile for the same reason; this aligns the demand
+   * switch with it.
+   */
+  private MojoExecutionRunner shadeExcludeInjectingRunner(
+      MojoExecutionRunner delegate, MavenSession session, List<ResolvedBundle> resolved) {
+    return execution -> {
+      if (isShade(execution)) {
+        final StagingClosure closure =
+            StagingClosure.compute(resolved, flatReferencedDualRealmGas(session, resolved));
+        final int added = injectShadeExcludes(execution, closure);
+        log.info(
+            "[osgi-staging] {}: +{} shade excludes (post-compile dual-realm flat demand)",
+            session.getCurrentProject().getArtifactId(),
+            added);
+      }
+      delegate.run(execution);
+    };
   }
 
   /**
