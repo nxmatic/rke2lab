@@ -79,6 +79,31 @@ hand-script. It reaches each instance over *devlxd* (`user.rke2lab.*` keys), rea
 `nixos/identity.nix`. The former `RKE2LAB_MANIFESTS_PUBLISH_*` env→symlink flags are re-plumbed to
 Flux Kustomizations enabled/disabled on the rendered branch.
 
+== The ZFS dataset layout is a dataplan, owned by seed-master
+
+The *layout* of the cluster's ZFS datasets (`tank/rke2lab/*`: the per-node
+`control-nodes/<node>` ephemeral tree that backs containerd + the openebs-zfs
+`pvc-*` volumes, and the cross-grow `persist/*` tree) is no longer a static
+literal in ndh's `zfs-disko-config.nix`. It is a *cluster need*, so its single
+source of truth is rke2lab `seed-master`, provided to ndh as a *dataplan* — the
+storage twin of the netplan blueprint (see
+link:../patterns/dataplan-single-source.adoc[Dataplan SSOT]). ndh pulls
+`lib.dataplan` over the flake edge, merges it into `catalog.datasets`, and
+materialises it; the root is `tank/rke2lab` (owner, not the `rke2` distro).
+
+The two dataset natures split their *lifecycle* owner:
+
+* *ephemeral* `control-nodes/*` — wiped by *ndh* at instance renewal (host layer,
+  right timing: a fresh instance boots before rke2, no in-cluster agent, no
+  `nsenter` — ZFS is a `/dev/zfs` concern the host already owns);
+* *persist* `persist/*` — retained across grows, a *sibling* of `control-nodes`
+  so the wipe never reaches it; bound in-cluster by a static PV with a stable
+  handle (the funnel cert survives → no Let's Encrypt re-issuance).
+
+This diverges from the *tailnet device* prune, which stays in-cluster (a Job
+before the Tailscale operator registers) because the tailnet is SaaS-side and the
+host cannot reach it. Two prunes, two owners.
+
 == Related documentation
 
 * link:substrate-model.adoc[The substrate model] — the vision this table serves.

@@ -213,6 +213,7 @@ Store-Resolved Runtime] §Runtime env delivery.
 
 * link:../nixos-substrate/substrate-model.adoc[The substrate model] — the vision this delta renders.
 * link:../nixos-substrate/concern-ownership.adoc[Concern ownership] — the old→new redistribution table.
+* link:../patterns/dataplan-single-source.adoc[Dataplan SSOT] — the per-node `dataset` residue in the seed above is placed by a layout `seed-master` owns and hands to ndh (the storage twin of the netplan blueprint); root `tank/rke2lab`.
 * link:../nixos-substrate/node-bootstrap-delivery.adoc[Node-side bootstrap delivery] — the shipped CNI/Flux seam.
 * link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] — Diagram D's target: runtime env delivery via the FloxEnv CRD + flox controller.
 * link:seed.adoc[Seed orchestration L1] — the host pipeline that seeds master and runs the GROW.

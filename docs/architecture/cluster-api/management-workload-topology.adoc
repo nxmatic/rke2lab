@@ -468,11 +468,15 @@ This topology changes three materialization surfaces:
   synthesis context / scenario states.
 . *Disko — per-host, across two bare-metals.* `nix-darwin-home`'s `zfs-disko-config.nix` is
   currently a single-cluster, hand-listed tree (`rke2/control-nodes/{master,peer1,peer2,peer3}/containerd`,
-  `mountpoint=legacy`; the guest *mounts* it, it does not create it). It must gain a cluster
-  dimension (`rke2/<cluster>/<node>/containerd`) and split per host — `bioskop-nixos` carries the
-  management node's dataset + the `bioskop-wrkld` datasets; `nikopol-nixos` carries the
-  `nikopol-wrkld` datasets — ideally projected from `ClusterNetworkBlueprint` rather than
-  hand-listed. `peer3` is dropped (three etcd members, odd quorum).
+  `mountpoint=legacy`; the guest *mounts* it, it does not create it). It stops being a static
+  literal: the layout becomes a *dataplan* owned by rke2lab `seed-master` and pulled into ndh's
+  `catalog.datasets`, materialised per host (see
+  link:../patterns/dataplan-single-source.adoc[Dataplan SSOT]). The root renames `rke2` -> `rke2lab`
+  (owner, not the distro); the tree gains a cluster dimension (`rke2lab/<cluster>/<node>/containerd`)
+  and splits per host — `bioskop-nixos` carries the management node's dataset + the `bioskop-wrkld`
+  datasets; `nikopol-nixos` carries the `nikopol-wrkld` datasets. The dataplan is a *storage* artifact
+  (its own `lib.dataplan`), NOT a field of `ClusterNetworkBlueprint` — a dataset is not a network fact
+  (decompose by nature). `peer3` is dropped (three etcd members, odd quorum).
 . *CAPN — two incus remotes (one per host), scoped per project.* CAPN in the management cluster
   provisions instances on *both* hypervisors — `bioskop-nixos`'s incus and `nikopol-nixos`'s incus —
   each remote scoped to the workload's own <<incus-tenancy,Incus project>>, so each workload's

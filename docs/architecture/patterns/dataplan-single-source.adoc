@@ -1,0 +1,247 @@
+= Dataplan as Cross-Repo Single Source of Truth
+:toc: left
+:toclevels: 3
+
+== Overview
+
+The cluster's ZFS *dataset layout* — the tree a node needs so that a cluster can
+be grown on it (the ephemeral per-node datasets that back containerd + the
+openebs-zfs `pvc-*` volumes, and the *persist* datasets that must outlive a
+cold-start) — is defined once in rke2lab's `seed-master` and consumed identically
+by *three* parties:
+
+* *nix-darwin-home* (ndh), which materialises the datasets on the host `tank` pool
+  via `disko`, *before* the cluster exists;
+* rke2lab's *manifests* — the `openebs-zfs` StorageClass pool and the statically
+  provisioned *persist* PV both name datasets from the layout;
+* rke2lab's *node substrate* (`nixos/containerd.nix`), which mounts the per-node
+  containerd dataset.
+
+This is the storage twin of
+link:netplan-blueprint-single-source.adoc[the netplan blueprint]: rke2lab is the
+source of truth for a cluster-scoped fact, ndh pulls it over a flake edge and
+merges it into its catalog. Where the netplan owns *addressing*, the *dataplan*
+owns the *dataset layout*.
+
+The name is deliberate. `dataplan` : `netplan` :: dataset layout : network layout.
+
+== Why a single source is load-bearing here
+
+Two independent forces make a hand-copied dataset tree a latent bug:
+
+. *etcd is wiped at every cold-start.* A re-grow deletes+recreates the instance;
+  node-local etcd is gone, so every PVC→PV→`ZFSVolume` binding vanishes. Dynamic
+  openebs-zfs provisioning therefore *cannot* persist across grows — a fresh
+  cluster mints a new random `pvc-<uid>` and the surviving dataset is re-orphaned.
+  Anything that must survive (the Tailscale funnel Let's Encrypt cert, the render
+  Maven cache) needs a *stable dataset handle* declared out-of-band of etcd. That
+  handle is a dataplan entry.
+. *The same path is named in three places.* `tank/rke2lab/persist/...` and
+  `tank/rke2lab/control-nodes/<node>` appear in ndh's `disko` config, in the
+  `openebs-zfs` StorageClass `poolname`, and (for persist) in the static PV's
+  `volumeHandle`. A literal in each drifts silently — the exact failure mode the
+  link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog] discipline
+  exists to prevent, applied to dataset paths.
+
+== The two natures of a dataplan entry
+
+[cols="1,3",options="header"]
+|===
+| Nature | Meaning
+
+| *ephemeral*
+| Per-node, GC'd on grow: `tank/rke2lab/control-nodes/<node>` and its
+  `containerd` child. openebs-zfs provisions its dynamic `pvc-*` *under* this
+  pre-created dataset. Reclaim is `Delete`; the whole subtree is wiped by ndh at
+  instance renewal (see link:../nixos-substrate/concern-ownership.adoc[concern
+  ownership]).
+
+| *persist*
+| Cross-grow, retained: `tank/rke2lab/persist/*` (the funnel cert state, the
+  render Maven cache). A *sibling* of `control-nodes` — that topological
+  placement *is* the exemption mechanism: `zfs destroy -r
+  tank/rke2lab/control-nodes` never touches it. Reclaim is `Retain`; bound in the
+  cluster by a *static* PV with a stable handle.
+|===
+
+== The SSOT flow
+
+[mermaid]
+....
+flowchart TB
+  SM["seed-master\ndataplan SSOT (Java)"]:::src
+  DJ["nix build .#dataplanJson\n-> dataplan.json (checked-in)"]:::gen
+  LIB["lib.dataplan\n(fromJSON . readFile, anti-IFD)"]:::gen
+  CAT[("ndh catalog.datasets\ncontributor-merge (checkMerge)")]:::data
+  DISKO["ndh zfs-disko-config.nix\nmaterialise on tank"]:::host
+  SC["openebs-zfs StorageClass\npoolname = layout root"]:::k8s
+  PV["static persist PV\nvolumeHandle = persist dataset"]:::k8s
+  CTD["nixos/containerd.nix\nmount control-nodes/<node>/containerd"]:::host
+
+  SM --> DJ --> LIB
+  LIB -->|"ndh pulls via flake input, unions"| CAT --> DISKO
+  SM -->|"read in-repo"| SC
+  SM -->|"read in-repo"| PV
+  SM -->|"read in-repo"| CTD
+
+  classDef src fill:#dae8fc,stroke:#6c8ebf,color:#000;
+  classDef gen fill:#d5e8d4,stroke:#82b366,color:#000;
+  classDef data fill:#fde68a,stroke:#b45309,color:#000;
+  classDef host fill:#ffe6cc,stroke:#d79b00,color:#000;
+  classDef k8s fill:#e1d5e7,stroke:#9673a6,color:#000;
+....
+
+[cols="1,3"]
+|===
+| Legend | Meaning
+
+| blue   | the source of truth (seed-master)
+| green  | the generated, checked-in projection + flake export
+| yellow | ndh catalog data (merged from contributors)
+| orange | host-side materialisation (disko, containerd mount)
+| purple | in-cluster consumers (StorageClass, static PV)
+|===
+
+== Ownership split (rke2lab vs ndh)
+
+Mirrors the netplan split-ownership exactly — each repo owns the fact that is
+*its* concern:
+
+[cols="2,3",options="header"]
+|===
+| Fact | Owner
+
+| The `tank` zpool geometry (raidz1, `rootFsOptions`) and the host `nerd/*` trees
+  (root/nix/var/`persist` impermanence)
+| *ndh* — physical + host concern. Note ndh's host `nerd/persist -> /persist`
+  (NixOS impermanence) is distinct from the cluster `tank/rke2lab/persist`.
+
+| The materialisation *law* — the `addDatasetOptions` / `addPostMountHook` /
+  `datasetsWithHooks` helpers
+| *ndh* — how any declared dataset is normalised (`canmount=noauto`, snapshot
+  props, post-mount hooks).
+
+| The cluster dataset *layout* under `tank/rke2lab/*` (ephemeral + persist)
+| *rke2lab seed-master* — a cluster need, provided to ndh like the netplan.
+|===
+
+== The root rename: `rke2` -> `rke2lab`
+
+The layout root moves from `tank/rke2/*` to `tank/rke2lab/*`. `rke2` names the
+Kubernetes distro; the datasets belong to *rke2lab* (the project that owns the
+layout), so the root must name the owner, not the technology — the same reasoning
+that makes seed-master the SSOT. This is a greenfield rename: because etcd is
+wiped and the tree is re-grown each cold-start, and because the *persist* tier
+does not exist yet, there is nothing precious under the old `tank/rke2`. The
+cutover is a one-off `zfs destroy -r tank/rke2` at the first grow on the new root.
+
+Most of the change *collapses into the SSOT*: once the root lives in the dataplan,
+the StorageClass pool, the disko materialisation, the containerd mount and the
+persist PV all pick it up from one place. Two by-hand stragglers remain: ndh's
+`zfs.d/zpool-init.sh` iterator (`zfs list -r tank/rke2`) and doc/comment mentions.
+
+`"rke2"` used elsewhere as a *node kind* (the tailnet/host `kind = "rke2"`) is the
+distro identifier, NOT a dataset path — it does not change.
+
+== The dataplan entry shape
+
+The twin of the netplan *segment* shape. Each entry is:
+
+[source]
+----
+{ path, type, mountpoint, options }
+----
+
+* `path` — dataset path relative to the pool root, e.g.
+  `rke2lab/control-nodes/master/containerd`, `rke2lab/persist/funnel-cert`.
+* `type` — `zfs_fs` (the disko dataset type).
+* `mountpoint` — e.g. `legacy` for the containerd child (mounted by the kubelet /
+  containerd, not auto).
+* `options` — the ZFS property map, carried verbatim so the extraction from ndh's
+  current static literal is *behaviour-preserving*.
+
+== The committed projection (anti-IFD)
+
+The dataplan is consumed as a *checked-in* `dataplan.json`, read purely
+(`builtins.fromJSON (builtins.readFile ./dataplan.json)`) and surfaced as a flat,
+system-independent `lib.dataplan`. seed-master regenerates it via `nix build
+.#dataplanJson`.
+
+This is the *committed-projection* option that
+link:netplan-blueprint-single-source.adoc[the netplan doc] weighed and — in
+practice — the netplan blueprint later adopted (`network-blueprint.json` is read
+purely today). The dataplan starts there: it keeps `nixos-rebuild` on the host off
+the Java/Maven hot-path, which matters because ndh materialises the datasets at
+*host provisioning time*, before any cluster exists to run the jar.
+
+IMPORTANT placement caveat (inherited from the netplan doc): `dataplan.json` must
+NOT live as a Maven *resource* of the module that generates it — that packages the
+output into the very jar that emits it (a real chicken-and-egg). It is a
+top-level, lock-like file outside the generating module's input path.
+
+== Usage — do / don't
+
+❌ *Don't* hardcode the layout root or a dataset path:
+
+[source,java]
+----
+private static final String ZFS_POOL = "tank/rke2/control-nodes/master"; // drifts
+----
+
+✅ *Do* read the dataplan SSOT (the single accessor), so the StorageClass pool,
+the persist PV handle, the containerd mount and ndh's disko materialisation all
+agree by construction:
+
+[source,java]
+----
+// pool + per-dataset paths resolved from the dataplan, never a literal
+final String pool = dataplan.ephemeralRoot();            // tank/rke2lab/control-nodes/<node>
+final String certHandle = dataplan.persist("funnel-cert"); // tank/rke2lab/persist/funnel-cert
+----
+
+== Implementation plan
+
+*rke2lab side (do first):*
+
+. Author the dataplan SSOT in `seed-master` (a typed layout model — NOT in the
+  netplan/network domain; a dataset is a storage concern, decompose by nature).
+. Add `nix build .#dataplanJson` -> checked-in `dataplan.json` -> flat
+  `lib.dataplan` (mirror `networkBlueprintJson` / `lib.networkBlueprint`).
+. Rename the root to `tank/rke2lab`; point `OpenebsZfsManifestsUnit`,
+  `nixos/containerd.nix`, and the new persist PV at the SSOT.
+
+*ndh side (follow-up):*
+
+. Add a `catalog.datasets` dimension in `catalog/default.nix` with the
+  `mergeByKey`/`checkMerge` law copied from the `segments` block (key = dataset
+  path), unioning `lib.dataplan` in.
+. Materialise `catalog.datasets` in `modules/nixos/zfs-disko-config.nix` — the
+  static `tank/rke2/*` subtree is deleted and replaced by the merged layout;
+  pass `catalog` through `modules/nixos/disko.nix`.
+. Update `zfs.d/zpool-init.sh` to the new root.
+
+== Open questions
+
+. *Producer emit mechanism*: how seed-master emits `dataplan.json` — a CLI verb
+  (like the netplan `yamlExport`, which drives an in-container scion), or a
+  simpler host-flat export since the layout is *declared*, not derived from a
+  bundle-only contract type. To settle at implementation.
+. *openebs-zfs adoption*: confirm the node plugin *adopts* a pre-existing dataset
+  from a hand-authored `ZFSVolume` CR (vs erroring "dataset exists"), and that the
+  CR delete-finalizer does not `zfs destroy` the persist dataset on teardown
+  (cluster-destroy bypasses the CSI, so it should not).
+. *Ephemeral wipe owner*: the `control-nodes/*` wipe is ndh's (host layer, at
+  instance renewal), diverging from the tailnet prune (in-cluster). Confirm the
+  wipe hook's exact placement in ndh's instance-renewal path.
+
+== Related Documentation
+
+* link:netplan-blueprint-single-source.adoc[Netplan Blueprint SSOT] — the network
+  twin this pattern mirrors (ownership split, flake-edge pull, committed
+  projection).
+* link:../nixos-substrate/concern-ownership.adoc[NixOS substrate — concern
+  ownership] — where the per-node dataset + the ephemeral wipe land.
+* link:../cluster-api/management-workload-topology.adoc[Management/workload
+  topology] — the dataset tree this layout renders.
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog pattern] — the
+  single-source-of-truth-for-identifiers discipline this applies to dataset paths.
