@@ -3657,12 +3657,12 @@
     },
     {
       "install_id": "manage-tailnet",
-      "locked-url": "github:seedmatic/rke2lab/f8fe67dfef52cfa577cf66a876eed71545eec7b8?narHash=sha256-JCamXMicJId79NCMclm%2BxJSvb8LDPat0Z%2B/PMHsyfv4%3D",
+      "locked-url": "github:seedmatic/rke2lab/9bd37c2e7a2a7a5722c748b3454b7d77852861be?narHash=sha256-pWusd8Oq%2BadTSWNcI5mElvY15v4GKJcOCUOKtF9CbIM%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-darwin.manage-tailnet",
-      "derivation": "/nix/store/654vyrarzpzih4vqj89qqyd6g5rdfqjq-io.seedmatic.ndh-manage-tailnet.drv",
+      "derivation": "/nix/store/mijk0qfq2x71zz687dh7ms21wn99pj6p-manage-tailnet.drv",
       "outputs": {
-        "out": "/nix/store/bbz3bf207k8iiwj2dkzz5hrsjj1vrvmd-io.seedmatic.ndh-manage-tailnet"
+        "out": "/nix/store/ny2vpmjqzwaf4pp9fpphjl8p93dmx8q4-manage-tailnet"
       },
       "output-names": [
         "out"
@@ -3673,7 +3673,7 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-darwin",
       "system": "aarch64-darwin",
-      "name": "io.seedmatic.ndh-manage-tailnet",
+      "name": "manage-tailnet",
       "broken": false,
       "unfree": false,
       "priority": 5
