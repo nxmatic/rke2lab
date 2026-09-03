@@ -44,7 +44,13 @@ shfmt.flake = "github:seedmatic/rke2lab#shfmt"
 shellcheck.flake = "github:seedmatic/rke2lab#shellcheck"
 claude-code.pkg-path = "claude-code"
 flux9s.flake = "github:seedmatic/rke2lab/feature/nixos-node-substrate#flux9s"
+# ndh's manage-tailnet on PATH, so the incus GROW's local.Command prunes stale
+# tailscale devices on a plain `pulumi up` (not only via `nix run .#deploy`).
+# darwin-only: ndh exposes the package for aarch64-darwin (the operator host) alone.
+manage-tailnet.flake = "github:seedmatic/rke2lab/feature/nixos-node-substrate#manage-tailnet"
+manage-tailnet.systems = ["aarch64-darwin"]
 k9s.pkg-path = "k9s"
+tektoncd-cli.pkg-path = "tektoncd-cli"
 
 
 ## Environment Variables ---------------------------------------------

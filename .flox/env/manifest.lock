@@ -157,6 +157,12 @@
       "lazygit": {
         "pkg-path": "lazygit"
       },
+      "manage-tailnet": {
+        "flake": "github:seedmatic/rke2lab/feature/nixos-node-substrate#manage-tailnet",
+        "systems": [
+          "aarch64-darwin"
+        ]
+      },
       "maven": {
         "flake": "github:seedmatic/rke2lab#maven"
       },
@@ -214,6 +220,9 @@
       "ssh-to-age": {
         "pkg-path": "ssh-to-age",
         "pkg-group": "keyhole"
+      },
+      "tektoncd-cli": {
+        "pkg-path": "tektoncd-cli"
       },
       "tubekit": {
         "pkg-path": "tubekit",
@@ -3053,6 +3062,64 @@
       "priority": 5
     },
     {
+      "attr_path": "tektoncd-cli",
+      "broken": false,
+      "derivation": "/nix/store/09yx4r0wnilvsmphbbj0x8mh928g7mpb-tektoncd-cli-0.44.0.drv",
+      "description": "Provides a CLI for interacting with Tekton - tkn",
+      "install_id": "tektoncd-cli",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "tektoncd-cli-0.44.0",
+      "pname": "tektoncd-cli",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:43:53.811976Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.44.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/n1r7ipa8i74ixc9ywn65l64m528n338i-tektoncd-cli-0.44.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "tektoncd-cli",
+      "broken": false,
+      "derivation": "/nix/store/pzncsv18mknaasq3gbikp7hhf7b3ddhk-tektoncd-cli-0.44.0.drv",
+      "description": "Provides a CLI for interacting with Tekton - tkn",
+      "install_id": "tektoncd-cli",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "tektoncd-cli-0.44.0",
+      "pname": "tektoncd-cli",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:17:15.903494Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.44.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/8y8fib3mc5y0jjs7qjrab66fklyfjm11-tektoncd-cli-0.44.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "visualvm",
       "broken": false,
       "derivation": "/nix/store/h5839c0px0rsz8qn4m5w25aq0r0bkwcf-visualvm-2.2.drv",
@@ -3174,6 +3241,64 @@
       },
       "system": "aarch64-linux",
       "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "install_id": "flux9s",
+      "locked-url": "github:seedmatic/rke2lab/c50cd9a20345158f40d63c4220c94356ea5678cf?narHash=sha256-0EBquImI00aLYoH4QtU%2BK/6yTT0bEqeXXXXKsW3ED9c%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.flux9s",
+      "derivation": "/nix/store/jk623z7y6wns6b8crf09yrw6yjmxm25j-flux9s-1.0.3.drv",
+      "outputs": {
+        "out": "/nix/store/k47v1gjfvgalffs49qhcvs8ydmmmdmz9-flux9s-1.0.3"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "flux9s-1.0.3",
+      "pname": "flux9s",
+      "version": "1.0.3",
+      "description": "K9s-inspired terminal UI for monitoring Flux GitOps resources",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "flux9s",
+      "locked-url": "github:seedmatic/rke2lab/c50cd9a20345158f40d63c4220c94356ea5678cf?narHash=sha256-0EBquImI00aLYoH4QtU%2BK/6yTT0bEqeXXXXKsW3ED9c%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.flux9s",
+      "derivation": "/nix/store/f33vlhr01nfy55nxib4xdv1dipljjk05-flux9s-1.0.3.drv",
+      "outputs": {
+        "out": "/nix/store/b9ajf5i38dvnax3i8zsavprkvyzvgrgh-flux9s-1.0.3"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "flux9s-1.0.3",
+      "pname": "flux9s",
+      "version": "1.0.3",
+      "description": "K9s-inspired terminal UI for monitoring Flux GitOps resources",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
       "priority": 5
     },
     {
@@ -3531,13 +3656,13 @@
       "priority": 5
     },
     {
-      "install_id": "flux9s",
-      "locked-url": "github:seedmatic/rke2lab/c50cd9a20345158f40d63c4220c94356ea5678cf?narHash=sha256-0EBquImI00aLYoH4QtU%2BK/6yTT0bEqeXXXXKsW3ED9c%3D",
+      "install_id": "manage-tailnet",
+      "locked-url": "github:seedmatic/rke2lab/f8fe67dfef52cfa577cf66a876eed71545eec7b8?narHash=sha256-JCamXMicJId79NCMclm%2BxJSvb8LDPat0Z%2B/PMHsyfv4%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.flux9s",
-      "derivation": "/nix/store/jk623z7y6wns6b8crf09yrw6yjmxm25j-flux9s-1.0.3.drv",
+      "locked-flake-attr-path": "packages.aarch64-darwin.manage-tailnet",
+      "derivation": "/nix/store/654vyrarzpzih4vqj89qqyd6g5rdfqjq-io.seedmatic.ndh-manage-tailnet.drv",
       "outputs": {
-        "out": "/nix/store/k47v1gjfvgalffs49qhcvs8ydmmmdmz9-flux9s-1.0.3"
+        "out": "/nix/store/bbz3bf207k8iiwj2dkzz5hrsjj1vrvmd-io.seedmatic.ndh-manage-tailnet"
       },
       "output-names": [
         "out"
@@ -3548,42 +3673,7 @@
       "requested-outputs-to-install": [],
       "package-system": "aarch64-darwin",
       "system": "aarch64-darwin",
-      "name": "flux9s-1.0.3",
-      "pname": "flux9s",
-      "version": "1.0.3",
-      "description": "K9s-inspired terminal UI for monitoring Flux GitOps resources",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "flux9s",
-      "locked-url": "github:seedmatic/rke2lab/c50cd9a20345158f40d63c4220c94356ea5678cf?narHash=sha256-0EBquImI00aLYoH4QtU%2BK/6yTT0bEqeXXXXKsW3ED9c%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.flux9s",
-      "derivation": "/nix/store/f33vlhr01nfy55nxib4xdv1dipljjk05-flux9s-1.0.3.drv",
-      "outputs": {
-        "out": "/nix/store/b9ajf5i38dvnax3i8zsavprkvyzvgrgh-flux9s-1.0.3"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "flux9s-1.0.3",
-      "pname": "flux9s",
-      "version": "1.0.3",
-      "description": "K9s-inspired terminal UI for monitoring Flux GitOps resources",
-      "licenses": [
-        "Apache-2.0"
-      ],
+      "name": "io.seedmatic.ndh-manage-tailnet",
       "broken": false,
       "unfree": false,
       "priority": 5
@@ -3619,6 +3709,12 @@
         "k9s": {
           "pkg-path": "k9s"
         },
+        "manage-tailnet": {
+          "flake": "github:seedmatic/rke2lab/feature/nixos-node-substrate#manage-tailnet",
+          "systems": [
+            "aarch64-darwin"
+          ]
+        },
         "maven": {
           "flake": "github:seedmatic/rke2lab#maven"
         },
@@ -3633,6 +3729,9 @@
         },
         "shfmt": {
           "flake": "github:seedmatic/rke2lab#shfmt"
+        },
+        "tektoncd-cli": {
+          "pkg-path": "tektoncd-cli"
         }
       },
       "vars": {
