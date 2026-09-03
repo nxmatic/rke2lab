@@ -523,7 +523,13 @@
             pulumiPkg
             pkgs.jdk25
             incusClient
-          ];
+          ]
+          # ndh's manage-tailnet on PATH: InstanceGrow runs it as a local.Command to prune the old
+          # node's stale tailscale devices when the instance is replaced (they orphan their MagicDNS
+          # names → the new pac-webhook drifts to -1/-2 and the render webhook dies). The flox env
+          # carries it too, so a plain `pulumi up` prunes; here it covers `nix run .#deploy`.
+          # darwin-only: ndh exposes the package only for aarch64-darwin (the operator host).
+          ++ pkgs.lib.optional (system == "aarch64-darwin") inputs.ndh.packages.${system}.manage-tailnet;
           text = ''
             if [ ! -f Pulumi.yaml ]; then
               echo "error: run from the rke2lab repo root (no Pulumi.yaml here)" >&2
@@ -558,17 +564,6 @@
             export PULUMI_BACKEND_URL="''${PULUMI_BACKEND_URL:-file://$PWD/.pulumi-state}"
             export PULUMI_CONFIG_PASSPHRASE="''${PULUMI_CONFIG_PASSPHRASE:-}"
             mkdir -p "$PULUMI_HOME" .pulumi-state
-
-            # ndh's manage-tailnet (pinned via the ndh flake input): InstanceGrow runs it as a
-            # local.Command to prune the old node's stale tailscale devices when the instance is
-            # replaced (they orphan their MagicDNS names → the new pac-webhook drifts to -1/-2 and
-            # the render webhook dies). Injected here (the release deploy path) so the store path is
-            # pinned to our lock; a dev-target run without it simply skips the prune. Referencing the
-            # store path here also makes it a runtime dep of this wrapper, so nix keeps it GC-rooted.
-            # `or ""` degrades gracefully when the locked ndh predates the manage-tailnet app: the
-            # export is then empty and InstanceGrow skips the prune (same as a dev-target run), so a
-            # stale lock never breaks `nix run .#deploy`; a lock bump wires the real path.
-            export RKE2LAB_MANAGE_TAILNET_BIN=${inputs.ndh.apps.${system}.manage-tailnet.program or ""}
 
             # Self-heal: a previous run killed before its restore trap fired can
             # leave Pulumi.yaml's binary pointing at a store path. Restore the
@@ -714,7 +709,16 @@
           incus-client = incusClient;
           deploy = deployApp;
           flux9s = flux9sPkg;
-        } // floxNriPluginPackages // floxControllerPackages // toolchainPackages;
+        }
+        // floxNriPluginPackages
+        // floxControllerPackages
+        // toolchainPackages
+        # manage-tailnet (darwin-only, passthrough of the ndh flake package): the flox env installs
+        # it as `github:seedmatic/rke2lab#manage-tailnet` so the incus GROW's local.Command finds it
+        # on PATH for a plain `pulumi up`. rke2lab's flake.lock is the single ndh pin.
+        // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+          manage-tailnet = inputs.ndh.packages.${system}.manage-tailnet;
+        };
 
         apps.deploy = {
           type = "app";

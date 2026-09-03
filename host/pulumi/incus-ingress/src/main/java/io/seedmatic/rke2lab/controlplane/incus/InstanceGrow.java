@@ -359,10 +359,11 @@ public final class InstanceGrow {
    * {@code imageFingerprint} trigger that armed the replacement — so it fires exactly once per
    * replace and never on a no-op {@code up}.
    *
-   * <p>The binary is ndh's {@code manage-tailnet}, injected as {@code RKE2LAB_MANAGE_TAILNET_BIN}
-   * by the deploy wrapper ({@code nix run .#deploy}); absent it (a dev-target run, not the release
-   * deploy) the prune is skipped — it is a release-deploy concern and the grow stays green without
-   * it. Auth is ndh's user-mirrored OAuth client (no rke2lab tailscale creds), read via {@code
+   * <p>{@code manage-tailnet} is expected ON PATH — ndh exposes it as a flake package that BOTH
+   * rke2lab surfaces carry: the flox env installs it (a plain {@code pulumi up}) and the deploy
+   * wrapper's {@code runtimeInputs} bring it ({@code nix run .#deploy}). Absent from PATH (some
+   * other runner) the create skips — pruning is a nicety, the grow stays green without it. Auth is
+   * ndh's user-mirrored OAuth client (no rke2lab tailscale creds), read via {@code
    * --client-secret-file} so {@code manage-tailnet} needs neither {@code .secrets} nor the age key.
    *
    * <p>{@code --stale-after 90s} is grounded in Tailscale's keepalive window: a connected device
@@ -373,13 +374,6 @@ public final class InstanceGrow {
    */
   private void pruneStaleTailnetDevicesOnReplace(
       Resource instance, Output<String> imageFingerprint) {
-    final String manageTailnetBin = System.getenv("RKE2LAB_MANAGE_TAILNET_BIN");
-    if (manageTailnetBin == null || manageTailnetBin.isBlank()) {
-      log.accept(
-          "tailnet prune: RKE2LAB_MANAGE_TAILNET_BIN unset (dev-target run) — skipping stale-device"
-              + " prune");
-      return;
-    }
     // ndh's userSecretMirror writes the OAuth client to this user-owned path on the operator host —
     // the SAME path host-runtime's TailscaleOauthClientGateway.NDH_CLIENT_PATH reads. This
     // actualiser depends on no seed-master type (see the class doc), so the path is restated here
@@ -388,13 +382,17 @@ public final class InstanceGrow {
         Path.of(System.getProperty("user.home"), ".local/share/ndh/tailnet.tailscale.client")
             .toString();
 
+    // Always declared (never gated in Java) so the resource never appears/disappears from state
+    // between a plain `pulumi up` and `nix run .#deploy`; the create skips IN-SHELL when
+    // manage-tailnet is not on PATH.
     new Command(
         "prune-stale-tailnet-devices",
         CommandArgs.builder()
-            .environment(
-                Map.of("MANAGE_TAILNET", manageTailnetBin, "CLIENT_SECRET_FILE", clientSecretFile))
+            .environment(Map.of("CLIENT_SECRET_FILE", clientSecretFile))
             .create(
-                "\"$MANAGE_TAILNET\" --prune-stale-devices --stale-after 90s --yes"
+                "if ! command -v manage-tailnet >/dev/null 2>&1; then echo 'tailnet prune:"
+                    + " manage-tailnet not on PATH — skipping' >&2; exit 0; fi; "
+                    + "manage-tailnet --prune-stale-devices --stale-after 90s --yes"
                     + " --client-secret-file \"$CLIENT_SECRET_FILE\""
                     + " || { echo 'tailnet prune failed (non-fatal); stale devices may linger'"
                     + " >&2; }")
