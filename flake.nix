@@ -609,6 +609,14 @@ USAGE
               git checkout -- Pulumi.yaml
             fi
 
+            # Maven-in-nix cache knob — SAME model as `.#render-manifests`: M2_REPO is the ONE knob
+            # (the read-only tail with the released private deps), and the persistent maven-build-cache
+            # is DERIVED beside it (its parent) unless MAVEN_BUILD_CACHE is set explicitly. Both are
+            # read IMPURELY (getEnv) by the inner `nix build .#seed-master`, so exporting them here
+            # makes that build INCREMENTAL instead of a cold tmpfs primary every `nix run .#grow`.
+            : "''${M2_REPO:?set M2_REPO to your maven repository, e.g. \$HOME/.m2/repository}"
+            export MAVEN_BUILD_CACHE="''${MAVEN_BUILD_CACHE:-$(dirname "$M2_REPO")}"
+
             # The inner `nix build .#seed-master` is a SEPARATE child nix process — flags on the
             # OUTER `nix run` (e.g. `nix run .#grow -L …`) go to building THIS wrapper, not it. So it
             # always gets `-L` (surface the build log), plus whatever the shared NIX_FLAGS env adds,
