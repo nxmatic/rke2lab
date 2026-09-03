@@ -539,18 +539,46 @@
           # darwin-only: ndh exposes the package only for aarch64-darwin (the operator host).
           ++ pkgs.lib.optional (system == "aarch64-darwin") inputs.ndh.packages.${system}.manage-tailnet;
           text = ''
+            usage() {
+              cat >&2 <<'USAGE'
+usage: nix run .#deploy -- <stack> [preview|up] [pulumi args...]
+
+  <stack>    Pulumi stack name (required), e.g. dev
+  preview    read-only diff, no apply (default)
+  up         apply, non-interactive (pulumi up --yes)
+  -h,--help  this message
+
+Anything after the verb is passed through to pulumi (e.g. --diff, --target).
+USAGE
+            }
+
+            # -h/--help works from anywhere (before the repo-root check).
+            case "''${1:-}" in
+              -h | --help) usage; exit 0 ;;
+            esac
+
             if [ ! -f Pulumi.yaml ]; then
               echo "error: run from the rke2lab repo root (no Pulumi.yaml here)" >&2
+              usage
               exit 1
             fi
 
             stack="''${1:-}"
             if [ -z "$stack" ]; then
-              echo "usage: nix run .#deploy -- <stack> [preview|up] [pulumi args...]" >&2
-              echo "  preview  read-only diff, no apply (default)" >&2
-              echo "  up       apply, non-interactive (pulumi up --yes)" >&2
+              echo "error: missing <stack> argument" >&2
+              usage
               exit 2
             fi
+            # Guard the common slip: an ACTION verb given where the stack is expected
+            # (`-- up` would silently make the stack "up", then preview a nonexistent
+            # stack with no error). Catch it with a corrective hint.
+            case "$stack" in
+              preview | up)
+                echo "error: '$stack' is an action, not a stack — did you mean: nix run .#deploy -- <stack> $stack" >&2
+                usage
+                exit 2
+                ;;
+            esac
             shift
 
             # Action verb (default: preview — safe, read-only). `up` applies
@@ -561,7 +589,7 @@
             case "$action" in
               preview | up) shift ;;
               -*) action="preview" ;;  # no verb given, first arg is a pulumi flag
-              *) echo "error: unknown action '$action' (preview|up)" >&2; exit 2 ;;
+              *) echo "error: unknown action '$action' (preview|up)" >&2; usage; exit 2 ;;
             esac
 
             # Pulumi project env (mirrors the flox env's [vars]); each
