@@ -1,0 +1,68 @@
+{
+  "pool" : "tank",
+  "datasets" : [ {
+    "path" : "rke2lab",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/control-nodes",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/control-nodes/master",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/control-nodes/master/containerd",
+    "type" : "zfs_fs",
+    "options" : {
+      "mountpoint" : "legacy"
+    }
+  }, {
+    "path" : "rke2lab/control-nodes/peer1",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/control-nodes/peer1/containerd",
+    "type" : "zfs_fs",
+    "options" : {
+      "mountpoint" : "legacy"
+    }
+  }, {
+    "path" : "rke2lab/control-nodes/peer2",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/control-nodes/peer2/containerd",
+    "type" : "zfs_fs",
+    "options" : {
+      "mountpoint" : "legacy"
+    }
+  }, {
+    "path" : "rke2lab/control-nodes/peer3",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/control-nodes/peer3/containerd",
+    "type" : "zfs_fs",
+    "options" : {
+      "mountpoint" : "legacy"
+    }
+  }, {
+    "path" : "rke2lab/persist",
+    "type" : "zfs_fs",
+    "options" : { }
+  }, {
+    "path" : "rke2lab/persist/funnel-cert",
+    "type" : "zfs_fs",
+    "options" : {
+      "mountpoint" : "legacy"
+    }
+  }, {
+    "path" : "rke2lab/persist/maven-cache",
+    "type" : "zfs_fs",
+    "options" : {
+      "mountpoint" : "legacy"
+    }
+  } ]
+}

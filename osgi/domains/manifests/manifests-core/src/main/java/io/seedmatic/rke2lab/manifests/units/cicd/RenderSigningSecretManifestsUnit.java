@@ -6,6 +6,7 @@ import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SigningKeyMaterial;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import io.seedmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -40,7 +41,10 @@ public final class RenderSigningSecretManifestsUnit extends AbstractManifestsUni
 
   public static final String SSH_PRIVATE_KEY = "ssh-private";
 
-  private static final String NAMESPACE = "tekton-pipelines";
+  // rke2lab-system — where the render PipelineRun executes (the render-publish step mounts this
+  // key).
+  // Moved off tekton-pipelines with the pipeline; rides the NODE_BOOTSTRAP lane, applied here.
+  private static final String NAMESPACE = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "render-signing", true);

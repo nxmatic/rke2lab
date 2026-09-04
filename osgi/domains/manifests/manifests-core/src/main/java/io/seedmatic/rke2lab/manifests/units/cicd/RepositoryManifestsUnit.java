@@ -6,6 +6,7 @@ import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import io.seedmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -18,8 +19,9 @@ import software.constructs.Construct;
  * The Pipelines-as-Code {@code Repository} CR — the Tekton TWIN of the Flux {@code GitRepository}
  * ({@code FluxRootManifestsUnit}). Where the Flux {@code GitRepository} declares the OUTPUT branch
  * ({@code manifests/<cluster>}) it pulls, this {@code Repository} declares the SOURCE repo
- * (rke2lab) PaC watches for pushes and binds it to the execution namespace ({@code
- * tekton-pipelines}, where PaC runs the matched PipelineRuns).
+ * (rke2lab) PaC watches for pushes and binds it to the execution namespace ({@code rke2lab-system},
+ * where PaC runs the matched PipelineRuns — rke2lab owns the runs; the PaC controller stays in
+ * {@code tekton-pipelines}).
  *
  * <p>The per-cluster attachment rides {@code spec.params}: the {@code .tekton/} PipelineRun stub on
  * the source branch reads {@code {{ cluster }}} / {@code {{ node }}} from here (PaC exposes a
@@ -37,7 +39,12 @@ public final class RepositoryManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.CICD + "/repository";
 
-  private static final String NAMESPACE = "tekton-pipelines";
+  // rke2lab-system (runtime-system) is the EXECUTION namespace: PaC runs the matched PipelineRuns
+  // in
+  // the Repository's own namespace, and rke2lab owns those runs — not tekton-pipelines (the Tekton/
+  // PaC controllers' system). The PaC controller (tekton-pipelines) watches Repository CRs and
+  // creates the runs here.
+  private static final String NAMESPACE = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
   private static final String REPOSITORY_NAME = "rke2lab";
 

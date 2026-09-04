@@ -19,7 +19,7 @@
 
   <modules>
     <module>seed-master</module>
-    <module>netplan-cli</module>
+    <module>plan-cli</module>
     <module>manifests-cli</module>
   </modules>
 </project>

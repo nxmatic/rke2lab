@@ -139,7 +139,7 @@
       # Host ~/.m2 reuse for the Maven-in-nix builds. These read the host env at eval
       # time — they resolve ONLY when the eval is IMPURE. rke2lab as the top-level flake
       # has `nixConfig.pure-eval = false`, but when nix-darwin-home consumes it as an
-      # input (building netplanJar via lib.networkBlueprint) that config is ignored and
+      # input (building planJar via lib.networkBlueprint) that config is ignored and
       # the eval is PURE → getEnv returns "" → hostM2Repo becomes "/.m2/repository" and
       # hostGHToken "". So that path MUST be evaluated impurely: `darwin-rebuild … --impure`
       # (or the equivalent on the consuming flake). Without it the seed below copies
@@ -263,8 +263,8 @@
 
       # netplan JAR build, parameterized by pkgs so the per-system `packages`
       # output can build it locally while `lib` uses the pinned set.
-      netplanJarFor = pkgs: pkgs.stdenv.mkDerivation {
-        name = "rke2lab-netplan";
+      planJarFor = pkgs: pkgs.stdenv.mkDerivation {
+        name = "rke2lab-plan";
         src = ./.;  # Need full repo for parent POM + BOM resolution
 
         nativeBuildInputs = mavenBuildInputs pkgs;
@@ -273,26 +273,26 @@
           STAGING_EXTENSION_REPO=${stagingExtensionRepoFor pkgs}
           ${mavenHostPrelude}
 
-          # Install parent POM and BOM first, then build the netplan CLI module.
-          # netplan-cli depends on the pure netplan core (osgi/netplan/netplan-core),
-          # so it builds through the reactor (`-pl :netplan-cli -am`) rather than a
-          # standalone `-f` — `-am` pulls the core sibling from source.
+          # Install parent POM and BOM first, then build the plan CLI module. plan-cli
+          # multiplexes both plan exports (network + dataset), driving the netplan +
+          # dataplan scions; it builds through the reactor (`-pl :plan-cli -am`) so `-am`
+          # pulls the netplan-core / dataplan-contract siblings from source.
           mvnHost install:install-file -Dfile=pom.xml -DpomFile=pom.xml
           mvnHost -f build-parent/pom.xml install
           mvnHost -f bom/pom.xml install
-          mvnHost -pl :netplan-cli -am \
+          mvnHost -pl :plan-cli -am \
             -Dshfmt.version=${pkgs.shfmt.version} clean package -DskipTests
         '';
 
         installPhase = ''
           mkdir -p $out/share/java
-          cp exec/netplan-cli/target/netplan-cli-*-exec.jar $out/share/java/rke2lab-netplan.jar
+          cp exec/plan-cli/target/plan-cli-*-exec.jar $out/share/java/rke2lab-plan.jar
         '';
       };
 
       # Generate the network blueprint YAML from the Java source of truth.
       networkBlueprintYamlFor = pkgs:
-        let netplanJar = netplanJarFor pkgs;
+        let planJar = planJarFor pkgs;
         in pkgs.stdenv.mkDerivation {
           name = "rke2lab-network-blueprint";
 
@@ -301,8 +301,8 @@
           dontUnpack = true;
 
           buildPhase = ''
-            # NetplanCli dispatcher routes to yamlExport command
-            java -jar ${netplanJar}/share/java/rke2lab-netplan.jar yamlExport > blueprint.yaml
+            # PlanCli dispatcher: the `network` plane's export (the former yamlExport verb).
+            java -jar ${planJar}/share/java/rke2lab-plan.jar network export > blueprint.yaml
           '';
 
           installPhase = ''
@@ -310,6 +310,16 @@
             cp blueprint.yaml $out/network-blueprint.yaml
           '';
         };
+
+      # The dataplan (ZFS dataset layout) export — the `dataset` plane. The scion writes
+      # dataplan.json (already JSON), so the CLI emits it raw; no yq conversion needed. The
+      # REGEN artifact for the checked-in ./dataplan.json, the storage twin of
+      # networkBlueprintJson; seed-master's DataplanLayout stays the source of truth.
+      dataplanJsonFor = pkgs:
+        let planJar = planJarFor pkgs;
+        in pkgs.runCommand "dataplan.json" { buildInputs = [ pkgs.jdk25 ]; } ''
+          java -jar ${planJar}/share/java/rke2lab-plan.jar dataset export > $out
+        '';
 
       # The consumed blueprint is PURE committed data — read from the checked-in
       # network-blueprint.json, no IFD, no build. The reason is NOT "no builder": the
@@ -324,6 +334,12 @@
       # source of truth, materialized into the JSON at regen time on a jar-capable host:
       #   nix build .#networkBlueprintJson && cp result network-blueprint.json && commit
       networkBlueprintData = builtins.fromJSON (builtins.readFile ./network-blueprint.json);
+
+      # The consumed dataplan is PURE committed data too — the ZFS dataset layout read from
+      # the checked-in dataplan.json (regen: `nix build .#dataplanJson && cp result
+      # dataplan.json && commit`). ndh pulls this via `lib.dataplan` and unions it into
+      # catalog.datasets; seed-master's DataplanLayout is the source of truth.
+      dataplanData = builtins.fromJSON (builtins.readFile ./dataplan.json);
 
       # Regeneration only (NOT on the consumed data path): the jar-built YAML on the
       # pinned blueprintSystem, surfaced via networkBlueprintYamlPath for inspection.
@@ -355,7 +371,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        netplanJar = netplanJarFor pkgs;
+        planJar = planJarFor pkgs;
 
         # Build the seed-master bootstrap app (and the manifests jar it embeds)
         # as a single reactor build, so the deployable artifact Pulumi runs comes
@@ -444,6 +460,10 @@
         } ''
           yq -o=json '.' ${networkBlueprintYamlFor pkgs}/network-blueprint.yaml > $out
         '';
+
+        # The dataplan REGEN artifact — the `dataset` plane emits JSON directly, so this
+        # is the export as-is (no yq). `nix build .#dataplanJson`, then cp to ./dataplan.json.
+        dataplanJson = dataplanJsonFor pkgs;
 
         # Darwin-buildable incus client. The full `incus` daemon is Linux-only
         # (requires lxc, libcap, cowsql, etc.), but nixpkgs ships a `client.nix`
@@ -751,7 +771,7 @@ USAGE
 
       in {
         packages = {
-          inherit netplanJar networkBlueprintYaml networkBlueprintJson seedMasterJar;
+          inherit planJar networkBlueprintYaml networkBlueprintJson dataplanJson seedMasterJar;
           seed-master = seedMasterJar;
           manifests-cli = manifestsCliJar;
           incus-client = incusClient;
@@ -799,6 +819,19 @@ USAGE
             echo "regenerated network-blueprint.json from ${networkBlueprintJson}"
           '');
           meta.description = "Regenerate the committed network-blueprint.json from the netplan jar";
+        };
+
+        # Regenerate the committed dataplan.json from the plan jar (`dataset` plane). The storage
+        # twin of regen-blueprint: `nix run .#regen-dataplan` on a jar-capable host, then ndh pulls
+        # the refreshed layout via `lib.dataplan`. seed-master's DataplanLayout stays the truth.
+        apps.regen-dataplan = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "regen-dataplan" ''
+            set -euo pipefail
+            cat ${dataplanJson} > dataplan.json
+            echo "regenerated dataplan.json from ${dataplanJson}"
+          '');
+          meta.description = "Regenerate the committed dataplan.json from the plan jar (dataset plane)";
         };
 
         # Stage the flox-controller CRD (single-sourced from the flox-controller flake)
@@ -851,6 +884,18 @@ USAGE
               fi
               touch $out
             '';
+          # The dataplan twin: fail if committed dataplan.json diverges from the plan jar output.
+          dataplan-fresh =
+            pkgs.runCommand "dataplan-fresh" { nativeBuildInputs = [ pkgs.jq ]; } ''
+              jq -S . ${./dataplan.json} > committed.json
+              jq -S . ${dataplanJson} > fresh.json
+              if ! diff -u committed.json fresh.json; then
+                echo "dataplan.json is STALE vs the dataplan Java source (DataplanLayout)." >&2
+                echo "Regenerate on this jar-capable host: nix run .#regen-dataplan" >&2
+                exit 1
+              fi
+              touch $out
+            '';
         };
 
         # The declared source of truth for the Maven-build toolchain. `mvn` from
@@ -882,6 +927,10 @@ USAGE
       # Built once on `blueprintSystem`; the data is the same everywhere.
       lib = {
         inherit networkBlueprint;
+        # The ZFS dataset layout ndh pulls into catalog.datasets (the dataplan — storage twin
+        # of networkBlueprint). Pure committed data, system-independent; seed-master's
+        # DataplanLayout is the source of truth, materialised into ./dataplan.json at regen.
+        dataplan = dataplanData;
         # Raw YAML store path for inspection (the pinned, canonical build).
         networkBlueprintYamlPath = "${networkBlueprintYaml}/network-blueprint.yaml";
       };

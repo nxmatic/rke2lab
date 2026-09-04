@@ -14,8 +14,8 @@
   <name>osgi/domains/netplan/netplan-core</name>
   <description>Network configuration synthesis: typed netplan models rendered to the YAML the host
     network layer consumes. The impl facet of the netplan domain — implements the netplan-contract
-    port and exposes its api/ for the netplan-cli north-adapter (exec/netplan-cli) to drive; carries
-    no exec/shade of its own.</description>
+    port and exposes its api/ for the plan CLI north-adapter (exec/plan-cli, network plane) to
+    drive; carries no exec/shade of its own.</description>
 
   <dependencies>
     <dependency>

@@ -100,6 +100,12 @@
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-contract</artifactId>
     </dependency>
+    <!-- The dataplan layout SSOT: OpenebsZfsManifestsUnit names its StorageClass pools + the static
+         persist PV from DataplanLayout (tank/rke2lab/*), never a hardcoded ZFS path. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>dataplan-contract</artifactId>
+    </dependency>
     <!-- The ndh keystore reader seam: SopsAgeMaterialResolver reads the rke2-cluster SSH key through
          it (the single reader, realised by ndh-core), no longer navigating keys.yaml itself. -->
     <dependency>

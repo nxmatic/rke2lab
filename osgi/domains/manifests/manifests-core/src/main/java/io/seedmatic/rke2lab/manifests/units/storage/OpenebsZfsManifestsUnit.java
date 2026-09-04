@@ -1,6 +1,7 @@
 // @codebase
 package io.seedmatic.rke2lab.manifests.units.storage;
 
+import io.seedmatic.rke2lab.dataplan.contract.DataplanLayout;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
@@ -44,8 +45,17 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
     // otherwise wedges a Flux `wait: true` Kustomization at Ready=false. Topology-awareness (the
     // reason to defer to first consumer) is moot on a single control node — the volume can only
     // land there.
-    createStorageClass(scope, "openebs-zfs", true, false);
-    createStorageClass(scope, "openebs-zfs-shared", false, true);
+    // The dataset pools are named from the dataplan SSOT (tank/rke2lab/*) — never a hardcoded ZFS
+    // path — the same layout ndh materialises on the host and the persist PV binds against.
+    final DataplanLayout layout = DataplanLayout.canonical();
+    final String ephemeralPool = layout.controlNodePool("master");
+    createStorageClass(scope, "openebs-zfs", true, false, ephemeralPool, "Delete");
+    createStorageClass(scope, "openebs-zfs-shared", false, true, ephemeralPool, "Delete");
+    // The persist tier: a Retain, non-default class on tank/rke2lab/persist so the funnel cert +
+    // maven-cache PVs survive a cold-start re-grow (etcd is wiped, so a stable dataset + a static
+    // PV
+    // are the only cross-grow handle). Nothing lands here unless it names the class explicitly.
+    createStorageClass(scope, "openebs-zfs-persist", false, false, layout.persistPool(), "Retain");
     createHelmChart(scope, namespace, chartVersion);
   }
 
@@ -64,10 +74,13 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private static final String ZFS_POOL = "tank/rke2/control-nodes/master";
-
   private void createStorageClass(
-      final Construct scope, final String name, final boolean isDefault, final boolean shared) {
+      final Construct scope,
+      final String name,
+      final boolean isDefault,
+      final boolean shared,
+      final String poolName,
+      final String reclaimPolicy) {
     final Map<String, String> extraAnnotations =
         isDefault ? Map.of("storageclass.kubernetes.io/is-default-class", "true") : Map.of();
     ApiObject storageClass =
@@ -88,13 +101,13 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
     // RWO volume concurrently (default is an exclusive device mount → "device already mounted").
     final Map<String, String> parameters =
         shared
-            ? Map.of("fstype", "zfs", "poolname", ZFS_POOL, "shared", "yes")
-            : Map.of("fstype", "zfs", "poolname", ZFS_POOL);
+            ? Map.of("fstype", "zfs", "poolname", poolName, "shared", "yes")
+            : Map.of("fstype", "zfs", "poolname", poolName);
     storageClass.addJsonPatch(
         JsonPatch.add("/allowVolumeExpansion", true),
         JsonPatch.add("/parameters", parameters),
         JsonPatch.add("/provisioner", "zfs.csi.openebs.io"),
-        JsonPatch.add("/reclaimPolicy", "Delete"),
+        JsonPatch.add("/reclaimPolicy", reclaimPolicy),
         JsonPatch.add("/volumeBindingMode", "Immediate"));
   }
 

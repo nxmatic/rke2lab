@@ -10,15 +10,18 @@
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>netplan-cli</artifactId>
+  <artifactId>plan-cli</artifactId>
   <version>0.0.0-SNAPSHOT</version>
-  <name>exec/netplan-cli</name>
-  <description>Netplan CLI: the executable north-adapter for the blueprint export. The yamlExport
-    verb drives NetplanCliScenario on the embedded JUnit launcher (the same BDD-as-engine machinery
-    seed-master + manifests-cli use), sowing the `netplan` coordinate through the broker; that grows
-    NetplanBlueprintScenario in-container (where ClusterNetworkBlueprint, a type=contract bundle
-    record, is reachable) which writes blueprint.json into a SOIL temp dir. The CLI reads that
-    host-neutral JSON back and converts it to YAML — no contract type crosses to the flat host.</description>
+  <name>exec/plan-cli</name>
+  <description>Plan CLI: the executable north-adapter for the cross-repo plan exports, multiplexing
+    two planes over one door — `plan network export` (the network blueprint, sowing the `netplan`
+    coordinate) and `plan dataset export` (the ZFS dataset layout, sowing the `dataplan` coordinate).
+    Each verb drives PlanCliScenario on the embedded JUnit launcher (the same BDD-as-engine machinery
+    seed-master + manifests-cli use), sowing the plane's coordinate through the broker; that grows
+    the domain scion in-container (NetplanBlueprintScenario / DataplanScenario, where the
+    type=contract records are reachable) which writes its export JSON into a SOIL temp dir. The CLI
+    reads that host-neutral JSON back and renders it (YAML for network, JSON for dataset) — no
+    contract type crosses to the flat host. The domains stay separate; only the ingress is unified.</description>
 
   <dependencies>
     <!-- The host-world boot infrastructure: OsgiRuntime + (transitively) the whole boot stack
@@ -38,8 +41,8 @@
       <artifactId>jackson-core</artifactId>
     </dependency>
 
-    <!-- BDD-as-engine: the CLI drives NetplanCliScenario on the embedded JUnit launcher, sowing the
-         `netplan` coordinate through the broker instead of referencing a type=contract bundle record
+    <!-- BDD-as-engine: the CLI drives PlanCliScenario on the embedded JUnit launcher, sowing the
+         plane's coordinate through the broker instead of referencing a type=contract bundle record
          flat host-side. Mirrors the manifests-cli dep set. -->
     <!-- The launcher engine + OSGi connection contract: the host scenario reaches
          OsgiConnection/SeedRuntime/ScenarioCellar/RunRole/TxIdSeed/LogFileSeed/ScenarioOutcomeSeed. -->
@@ -47,7 +50,7 @@
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>scenario-engine</artifactId>
     </dependency>
-    <!-- The neutral launcher core (JUnitLauncherCore) NetplanCli names directly. -->
+    <!-- The neutral launcher core (JUnitLauncherCore) PlanCli names directly. -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>junit-launcher</artifactId>
@@ -64,7 +67,7 @@
       <artifactId>seed-broker-port</artifactId>
     </dependency>
     <!-- The broker mechanism (embed type=runtime): DefaultSeedBroker + DefaultAmendmentAssembler,
-         staged under META-INF/bundles + published by SCR so the sow resolves the netplan door. -->
+         staged under META-INF/bundles + published by SCR so the sow resolves the plane's door. -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-runtime</artifactId>
@@ -78,12 +81,20 @@
       <artifactId>pax-logback-config</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- The netplan SCION bundle (embed type=model): NetplanRunbookHandler + NetplanAmendReflector
-         serve the `netplan` coordinates and grow NetplanBlueprintScenario in-container. Staged INTACT;
-         it pulls netplan-contract into the staged world via its import closure (no flat host copy). -->
+    <!-- The netplan SCION bundle (embed type=model): serves the `netplan` coordinates and grows
+         NetplanBlueprintScenario in-container. Staged INTACT; it pulls netplan-contract into the
+         staged world via its import closure (no flat host copy). The `network` plane's door. -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>netplan-bdd</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- The dataplan SCION bundle (embed type=model): serves the `dataplan` coordinates and grows
+         DataplanScenario in-container (pulls dataplan-contract via its import closure). The `dataset`
+         plane's door. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>dataplan-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- jGiven-in-OSGi wrap, dual-realm (staged as a bundle AND kept host-flat): the host root
@@ -94,7 +105,7 @@
       <scope>runtime</scope>
     </dependency>
     <!-- jGiven the host scenario compiles against (ScenarioTestBase, Stage, annotations) + its
-         JUnit5 extension + the ReportModel/ExecutionStatus NetplanCli reads the run verdict from. -->
+         JUnit5 extension + the ReportModel/ExecutionStatus PlanCli reads the run verdict from. -->
     <dependency>
       <groupId>com.tngtech.jgiven</groupId>
       <artifactId>jgiven-core</artifactId>
@@ -130,8 +141,8 @@
       <artifactId>junit-jupiter-params</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- The scenario builds the SOIL amendment as a JsonNode, and NetplanCli parses blueprint.json
-         then re-emits it as YAML — jackson-databind + jackson-dataformat-yaml are compile deps. -->
+    <!-- The scenario builds the SOIL amendment as a JsonNode, and PlanCli parses the export JSON
+         then re-emits it (YAML/JSON) — jackson-databind + jackson-dataformat-yaml are compile deps. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
@@ -201,7 +212,7 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <configuration>
-          <mainClass>io.seedmatic.rke2lab.netplan.cli.NetplanCli</mainClass>
+          <mainClass>io.seedmatic.rke2lab.plan.cli.PlanCli</mainClass>
         </configuration>
       </plugin>
       <!-- Flags + artifact filter inherited from build-parent's managed shade
@@ -224,7 +235,7 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>io.seedmatic.rke2lab.netplan.cli.NetplanCli</mainClass>
+                  <mainClass>io.seedmatic.rke2lab.plan.cli.PlanCli</mainClass>
                 </transformer>
               </transformers>
             </configuration>

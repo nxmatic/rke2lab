@@ -41,10 +41,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * type=contract} bundle record — it lives in the bundle realm and cannot cross the host frontier as
  * a TYPE (a flat reference {@code NoClassDefFoundError}s, the realm-boundary law is right). So the
  * derivation runs HERE, where the type is reachable, and the result crosses to the host as pure
- * JSON: the scion serialises the metadata tree to {@code blueprint.json}, the netplan-cli reads
- * that generic JSON (never the contract type) and converts it to YAML flat. SAFE for the flake
- * bridge — nix-darwin-home re-parses via {@code yq -o=json}, so only the DATA matters, not YAML
- * formatting.
+ * JSON: the scion serialises the metadata tree to {@code blueprint.json}, the plan CLI (network
+ * plane) reads that generic JSON (never the contract type) and converts it to YAML flat. SAFE for
+ * the flake bridge — nix-darwin-home re-parses via {@code yq -o=json}, so only the DATA matters,
+ * not YAML formatting.
  *
  * <p>MODE-BLIND like the manifests scion: a pure FS materialiser with no live touch, so it runs
  * identically in both modes; the materialisation target is carried by the SOIL amendment alone (the

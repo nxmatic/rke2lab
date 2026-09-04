@@ -4,6 +4,7 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import io.seedmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -59,7 +60,10 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.CICD + "/render-pipeline";
 
-  private static final String NAMESPACE = "tekton-pipelines";
+  // rke2lab OWNS the render pipeline (its Pipeline/Tasks/PVC + the PipelineRuns PaC creates against
+  // the Repository CR), so it lives in rke2lab-system — the runtime-system namespace (which already
+  // hosts flox-controller), NOT tekton-pipelines (that is the Tekton/PaC controllers' own system).
+  private static final String NAMESPACE = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
   private static final String PIPELINE_NAME = "render-manifests";
 

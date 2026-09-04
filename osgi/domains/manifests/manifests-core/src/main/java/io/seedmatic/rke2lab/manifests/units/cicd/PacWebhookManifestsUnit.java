@@ -4,6 +4,7 @@ import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
+import io.seedmatic.rke2lab.manifests.units.mesh.FunnelStatePersistenceManifestsUnit;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -63,8 +64,14 @@ public final class PacWebhookManifestsUnit extends AbstractManifestsUnit {
                             packageProfile.packageAnnotations(
                                 "networking.k8s.io|Ingress|" + NAMESPACE + "|pac-webhook",
                                 // Funnel = public internet; the Tailscale operator provisions the
-                                // funnel + Let's Encrypt cert.
-                                Map.of("tailscale.com/funnel", "true")))
+                                // funnel + Let's Encrypt cert. proxy-class opts this proxy into the
+                                // stable TS_KUBE_SECRET so its identity/cert persists across grows
+                                // (FunnelStatePersistenceManifestsUnit) — no LE re-issuance.
+                                Map.of(
+                                    "tailscale.com/funnel",
+                                    "true",
+                                    "tailscale.com/proxy-class",
+                                    FunnelStatePersistenceManifestsUnit.PROXY_CLASS)))
                         .build())
                 .build());
     ingress.addJsonPatch(

@@ -59,7 +59,7 @@ flowchart LR
   Dev["dev push<br/>rke2lab source @R"] -->|App webhook| PW["PaC webhook<br/>(Tailscale funnel)"]
   PW --> PaC["PaC controller<br/>auth as the App"]
   PaC -->|match .tekton/ + Repository CR| PLR["PipelineRun<br/>pod flox-annote, NRI toolchain"]
-  subgraph P["PipelineRun (tekton-pipelines)"]
+  subgraph P["PipelineRun (rke2lab-system)"]
     F["PaC fetch @R<br/>+ git_auth_secret = App token"] --> B["mvn -pl :manifests-cli -am clean verify<br/>cache: PVC ~/.m2 RWO, concurrency 1"]
     B --> Pub["manifests publish<br/>push with the PaC token"]
   end
@@ -103,6 +103,46 @@ flowchart LR
 | `manifests-render` ServiceAccount + RBAC
 | The PipelineRun identity: mount the `~/.m2` PVC, consume the `git_auth_secret`.
 |===
+
+[#namespaces]
+== Namespaces — rke2lab owns its runs, Tekton owns its controllers
+
+The render loop is split across two namespaces by OWNERSHIP, not lumped in `tekton-pipelines`:
+
+[cols="1,2",options="header"]
+|===
+| Namespace | What lives there
+
+| `rke2lab-system` (the runtime-system namespace, already home to flox-controller)
+| rke2lab's OWN render artifacts — the `Repository` CR (which binds the source repo to THIS
+  execution namespace), the `render-manifests` `Pipeline` + its `git-fetch`/`render-publish` Tasks,
+  the Maven-cache PVC, the `manifests-render-signing` Secret, and the PipelineRuns PaC creates. PaC
+  runs a matched PipelineRun in the `Repository`'s namespace — so this is where the runs execute.
+
+| `tekton-pipelines`
+| The Tekton + Pipelines-as-Code CONTROLLERS (their system), the global `pipelines-as-code-secret`
+  the PaC controller reads to act as the App, and the Tailscale funnel `Ingress` (its backend is the
+  `pipelines-as-code-controller` Service, which must be co-located).
+|===
+
+The PaC controller (in `tekton-pipelines`) watches `Repository` CRs cluster-wide and creates the
+PipelineRun in the CR's namespace, so its RBAC must reach `rke2lab-system` (verified at grow).
+
+[#funnel-durability]
+=== Durable funnel identity — no Let's Encrypt re-issuance across grows
+
+The `pac-webhook` funnel's LE cert was re-issued every cold-start because the Tailscale proxy
+returned as a NEW device (fresh node key): the operator stores the proxy's tailscaled state (node
+key + cert) in a Secret named after the pod (`TS_KUBE_SECRET=$(POD_NAME)`), etcd-ephemeral, lost on
+re-grow → enough re-grows in 168h hit the per-FQDN 5-cert limit → `getCertPEM: 429` → no TLS → dead
+webhooks. Persisting etcd would make a cold-start inconsistent (it carries the old cluster forward),
+so the fix is SURGICAL — persist ONLY the funnel identity (`FunnelStatePersistenceManifestsUnit`, in
+`mesh-system`): a `ProxyClass` pins `TS_KUBE_SECRET` to a stable name; a static PV + `ZFSVolume`
+adopt the dataplan's `tank/rke2lab/persist/funnel-cert` dataset (`Retain`); a restore Job (before the
+operator provisions the proxy) writes the saved state back, a backup Job (after) mirrors it out. The
+proxy returns as the SAME device → Tailscale serves the existing cert → no re-issuance. The proxy
+cannot mount the PVC itself (ProxyClass exposes no volume), so a helper Job does. See
+link:../patterns/dataplan-single-source.adoc[Dataplan SSOT] (the persist tier).
 
 == Operator setup — extend the existing App, do not create a new one
 
@@ -217,7 +257,9 @@ flowchart TB
 
 The Tekton objects — the `Pipeline` `render-manifests` + its `Task`(s), the PaC `Repository` CR, the
 `pipelines-as-code-secret`, the funnel `Ingress` — are *ordinary K8S resources*, so they are RENDERED
-by `cicd` `ManifestsUnit`s and reconciled by Flux like everything else, living in `tekton-pipelines`.
+by `cicd` `ManifestsUnit`s and reconciled by Flux like everything else. They split by ownership (see
+<<namespaces>>): the pipeline, Repository, Tasks and signing Secret in `rke2lab-system`; the global
+`pipelines-as-code-secret` and the funnel `Ingress` in `tekton-pipelines`.
 There is no dedicated `tekton/<cluster>` branch, no remote pipeline resolution, no second rendered
 branch — earlier drafts explored those; they were a design detour. The Tekton pipeline is not special;
 it is a manifest.

@@ -68,10 +68,12 @@ in
   };
 
   # The zfs snapshotter's backing dataset — a legacy-mountpoint dataset (owned by the incus guest)
-  # whose leaf is the NODE NAME (not the hostname): tank/rke2/control-nodes/<node-name>/containerd.
-  # The dataset is created out-of-band (hypervisor / a provisioning step). The node name is dynamic
-  # (per-node), so the mount cannot be a static systemd.mounts unit — this oneshot reads it from the
-  # identity env file and mounts before rke2. mount.zfs comes from pkgs.zfs on the unit PATH.
+  # whose leaf is the NODE NAME (not the hostname): tank/rke2lab/control-nodes/<node-name>/containerd.
+  # The dataset is created out-of-band by ndh from rke2lab's dataplan (the SSOT of the tank/rke2lab
+  # layout — see docs/architecture/patterns/dataplan-single-source.adoc), materialised on the host
+  # pool before the cluster. The node name is dynamic (per-node), so the mount cannot be a static
+  # systemd.mounts unit — this oneshot reads it from the identity env file and mounts before rke2.
+  # mount.zfs comes from pkgs.zfs on the unit PATH.
   systemd.services.rke2lab-zfs-containerd = {
     description = "rke2lab containerd zfs snapshotter dataset mount";
     after = [ "rke2lab-identity.service" ];
@@ -90,7 +92,7 @@ in
     script = ''
       set -euo pipefail
       mountpoint=/var/lib/rancher/rke2/agent/containerd/io.containerd.snapshotter.v1.zfs
-      dataset="tank/rke2/control-nodes/''${RKE2LAB_NODE_NAME}/containerd"
+      dataset="tank/rke2lab/control-nodes/''${RKE2LAB_NODE_NAME}/containerd"
       install -d -m 0755 "$mountpoint"
       if ! mountpoint -q "$mountpoint"; then
         mount -t zfs "$dataset" "$mountpoint"

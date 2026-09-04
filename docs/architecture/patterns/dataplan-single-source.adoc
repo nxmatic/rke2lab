@@ -61,7 +61,12 @@ Two independent forces make a hand-copied dataset tree a latent bug:
   render Maven cache). A *sibling* of `control-nodes` — that topological
   placement *is* the exemption mechanism: `zfs destroy -r
   tank/rke2lab/control-nodes` never touches it. Reclaim is `Retain`; bound in the
-  cluster by a *static* PV with a stable handle.
+  cluster by a *static* PV with a stable handle. The funnel-cert use is INDIRECT:
+  the Tailscale proxy cannot mount a PVC (its ProxyClass exposes no volume), so a
+  helper Job mirrors the proxy's state Secret to/from this dataset — persisting the
+  funnel *identity* only (NOT etcd, which would break a clean cold-start). See
+  link:../cluster-api/pac-in-cluster-render-spec.adoc#funnel-durability[Durable
+  funnel identity].
 |===
 
 == The SSOT flow
