@@ -16,7 +16,10 @@ package io.seedmatic.rke2lab.manifests.units.runtime.flox;
 public enum FloxEnvFolder {
   NETWORKING("networking"),
   MESH("mesh"),
-  CICD("cicd");
+  CICD("cicd"),
+  // A cross-cutting toolchain tier — not a workload domain. kube/base carries the kube-API
+  // scripting tools (kubectl + yq-go) that helper Jobs activate; domain envs will `[include]` it.
+  KUBE("kube");
 
   private final String value;
 

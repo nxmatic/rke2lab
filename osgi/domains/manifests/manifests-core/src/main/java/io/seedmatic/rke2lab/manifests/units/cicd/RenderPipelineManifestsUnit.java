@@ -124,7 +124,7 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                 "storageClassName",
                 "openebs-zfs-shared",
                 "resources",
-                Map.of("requests", Map.of("storage", "10Gi")))));
+                Map.of("requests", Map.of("storage", "4Gi")))));
   }
 
   private void createGitFetchTask(final Construct scope) {

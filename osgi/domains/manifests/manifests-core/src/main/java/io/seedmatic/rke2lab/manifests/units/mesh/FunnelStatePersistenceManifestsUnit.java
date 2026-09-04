@@ -3,7 +3,9 @@ package io.seedmatic.rke2lab.manifests.units.mesh;
 
 import io.seedmatic.rke2lab.dataplan.contract.DataplanLayout;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.seedmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
@@ -69,10 +71,22 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
 
   private static final String STORAGE_CLASS = "openebs-zfs-persist";
   private static final String PV_NAME = "pac-webhook-funnel-cert";
-  private static final String CAPACITY = "1Gi";
+  // A cert-state Secret mirror (tailscale node key + cert) is a few KB; 16Mi is generous headroom.
+  // ZFS backs this as a DATASET with a refquota (thin) so the request is intent, not a reservation.
+  private static final String CAPACITY = "16Mi";
+  // Same size in bytes — openebs ZFSVolume.capacity wants a byte count. MUST equal CAPACITY.
+  private static final String CAPACITY_BYTES = "16777216";
 
-  /** A kubectl-capable image for the mirror Jobs; pin via ComponentVersions if drift bites. */
-  private static final String KUBECTL_IMAGE = "rancher/kubectl:v1.31.4";
+  /**
+   * The mirror Jobs are flox-runtime workloads, not baked images: a minimal flox base image + the
+   * {@code kube/base} FloxEnv (kubectl + yq-go) activated by the {@code
+   * flox.seedmatic.io/environment.<container>} annotation the flox NRI keys on. No kubectl/jq baked
+   * into an image — dogfooding the flox runtime, same as the render pipeline's nix injection.
+   */
+  private static final String MIRROR_ENV = "kube/base";
+
+  /** The one container each mirror Job runs — the flox env annotation opts it in by name. */
+  private static final String MIRROR_CONTAINER = "mirror";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "funnel-state");
@@ -403,10 +417,7 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
           if kubectl get -n %s secret %s >/dev/null 2>&1; then break; fi
           sleep 5
         done
-        kubectl get -n %s secret %s -o json \\
-          | jq 'del(.metadata.managedFields,.metadata.resourceVersion,.metadata.uid,\\
-                    .metadata.creationTimestamp,.metadata.ownerReferences,.status)' \\
-          > /persist/state.yaml
+        kubectl get -n %s secret %s -o yaml | yq 'del(.metadata.managedFields) | del(.metadata.resourceVersion) | del(.metadata.uid) | del(.metadata.creationTimestamp) | del(.metadata.ownerReferences) | del(.status)' > /persist/state.yaml
         echo "backed up funnel state to the persist volume"
         """
             .formatted(STATE_SECRET, NAMESPACE, STATE_SECRET, NAMESPACE, STATE_SECRET));
@@ -419,6 +430,7 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
       final String name,
       final ManifestLayer layer,
       final String script) {
+    final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
     final ApiObject jobObject =
         new ApiObject(
             scope,
@@ -443,6 +455,14 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
                 3,
                 "template",
                 Map.of(
+                    // The flox NRI plugin only puts the env on PATH for a container NAMED by a
+                    // flox.seedmatic.io/environment.<c> annotation — opt the mirror container into
+                    // kube/base (kubectl + yq-go).
+                    "metadata",
+                    Map.of(
+                        "annotations",
+                        Map.of(
+                            FloxAnnotation.ENVIRONMENT.forContainer(MIRROR_CONTAINER), MIRROR_ENV)),
                     "spec",
                     Map.of(
                         "serviceAccountName",
@@ -453,11 +473,14 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
                         new Object[] {
                           Map.of(
                               "name",
-                              "mirror",
+                              MIRROR_CONTAINER,
                               "image",
-                              KUBECTL_IMAGE,
+                              floxImage,
+                              // Enter the activated kube/base env, then run the mirror script.
                               "command",
-                              new Object[] {"/bin/sh", "-c", script},
+                              new Object[] {
+                                "flox", "activate", "--dir", "/root", "--", "bash", "-c", script
+                              },
                               "volumeMounts",
                               new Object[] {Map.of("name", "persist", "mountPath", "/persist")})
                         },

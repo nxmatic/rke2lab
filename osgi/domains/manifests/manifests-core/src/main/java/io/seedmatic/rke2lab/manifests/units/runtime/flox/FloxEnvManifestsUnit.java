@@ -74,6 +74,10 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     // headscale-debug env deliberately drops) and headplane's agent-sync Job annotates
     // mesh/headplane. Emitting only the selected flavor left those Jobs' flox-wait blocked forever
     // on a prod GC-root the controller never provisioned (the mesh-debug bootstrap wedge).
+    // kube/base — the cross-cutting kube-API scripting tier (kubectl + yq-go). Always prod: helper
+    // Jobs (e.g. the funnel-state mirror) activate it directly; domain envs will `[include]` it to
+    // stop re-declaring the same tools. No debug flavor — it is a toolchain base, not a workload.
+    createEnv(scope, resolver, "base", FloxEnvFolder.KUBE, kubeBaseManifest());
     final boolean net = policy.networkingEnabled();
     createEnv(scope, resolver, "kdns", FloxEnvFolder.NETWORKING, kdnsManifest(false));
     if (net) {
@@ -198,6 +202,26 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     install.put("headplane-agent", flakeRef("headplane-agent"));
     install.put("headplane-ssh-wasm", flakeRef("headplane-ssh-wasm"));
     return manifest(install);
+  }
+
+  /** The kube/base env — the shared kube-API scripting toolchain, no workload flake. */
+  private Map<String, Object> kubeBaseManifest() {
+    final Map<String, Object> install = new LinkedHashMap<>();
+    kubeApiScriptingInstall(install);
+    return manifest(install);
+  }
+
+  /**
+   * The kube-API scripting fragment: a shell ({@code bash}/{@code coreutils}) plus {@code kubectl}
+   * + {@code yq-go}. The single source for the tools a helper Job needs to read/patch cluster
+   * objects — {@code kube/base} installs exactly this, and domain envs will {@code [include]} it
+   * rather than re-listing the same packages.
+   */
+  private void kubeApiScriptingInstall(final Map<String, Object> install) {
+    install.put("bash", catalogAll("bash"));
+    install.put("coreutils", catalogAll("coreutils"));
+    install.put("kubectl", catalogAll("kubectl"));
+    install.put("yq-go", catalogAll("yq-go"));
   }
 
   /**
