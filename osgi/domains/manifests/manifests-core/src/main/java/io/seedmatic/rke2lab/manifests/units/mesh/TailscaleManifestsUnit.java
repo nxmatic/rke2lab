@@ -148,12 +148,24 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                         .name("operator-oauth")
                         .namespace(TAILSCALE_NAMESPACE)
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
+                        // OPERATORS layer, WITH the HelmChart that consumes it — NOT the default
+                        // workloads. The operator pod mounts this secret to start, so it must exist
+                        // by the time the operator reconciles; leaving it in workloads put it in
+                        // the
+                        // SAME cell as the Connector CR, whose dry-run fails ("no matches for kind
+                        // Connector") until the operator has registered the CRD — a failure that
+                        // aborts the whole workloads/mesh/tailscale apply, so the secret was never
+                        // created and the operator never started (a circular deadlock the grow lost
+                        // non-deterministically). In the operators cell it applies independently of
+                        // the Connector; the replicator (a separate platform cell) fills it.
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "",
                                 Map.of(
                                     "replicator.v1.mittwald.de/replicate-from",
-                                    "rke2lab-replicator-source/operator-oauth")))
+                                    "rke2lab-replicator-source/operator-oauth",
+                                    ManifestAnnotation.MANIFEST_LAYER.key(),
+                                    ManifestLayer.OPERATORS.value())))
                         .build())
                 .build());
 
