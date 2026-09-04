@@ -158,6 +158,26 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                     "keep",
                     100,
                     "schedule",
-                    "0 8 * * *"))));
+                    "0 8 * * *"),
+                // Extend the git_auth installation token PaC mints so it can read a PRIVATE flake
+                // input the render pulls (seedmatic/claude-hub, transitively via ndh). By default
+                // secret-github-app-token-scoped=true scopes the token to the payload repo
+                // (rke2lab)
+                // only → nix 404s on the private claude-hub. scope-extra-repos widens it to
+                // rke2lab + claude-hub (least-privilege vs token-scoped=false = the whole
+                // installation). The operator writes these settings into the operator-managed
+                // pipelines-as-code ConfigMap (a direct edit would be reverted). The operand is
+                // "openshift-pipeline-as-code" even on k8s, so the config path is
+                // platforms.openshift.
+                "platforms",
+                Map.of(
+                    "openshift",
+                    Map.of(
+                        "pipelinesAsCode",
+                        Map.of(
+                            "settings",
+                            Map.of(
+                                "secret-github-app-scope-extra-repos",
+                                "seedmatic/claude-hub")))))));
   }
 }

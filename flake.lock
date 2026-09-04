@@ -22823,13 +22823,13 @@
       "locked": {
         "lastModified": 1787133300,
         "narHash": "sha256-AOcgCHAkv06I31Xi2Hii2n2Um81nXH6m/mxb3CFTiPw=",
-        "owner": "nxmatic",
+        "owner": "seedmatic",
         "repo": "claude-hub",
         "rev": "64ca588df427cd2f06d02cb8c7fe5f806937b6dc",
         "type": "github"
       },
       "original": {
-        "owner": "nxmatic",
+        "owner": "seedmatic",
         "ref": "main",
         "repo": "claude-hub",
         "type": "github"
@@ -152674,11 +152674,6 @@
           "flake-commons",
           "darwin"
         ],
-        "devenv": [
-          "ndh",
-          "flake-commons",
-          "devenv"
-        ],
         "disko": [
           "ndh",
           "flake-commons",
@@ -152769,11 +152764,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788417465,
-        "narHash": "sha256-VR7QZLgkW0A6jzcX73/mL0YBBtU2DQ2y+kVR2LMJyWM=",
+        "lastModified": 1788546302,
+        "narHash": "sha256-NK+umP2YNEwKUAzXbchzzbOS8Yq6EUiD/+iD0SBdg2o=",
         "owner": "seedmatic",
         "repo": "ndh",
-        "rev": "4cff38f88606ae411ca6dcb79d7b226412b5eafc",
+        "rev": "baa59d4865a020cf779ab89e8a85bc508e18d556",
         "type": "github"
       },
       "original": {

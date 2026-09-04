@@ -278,6 +278,17 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           // (java-systemd, java-bbox-api-client). Requires the App to carry
                           // packages:read.
                           "  export GH_TOKEN=\"$RKE2LAB_PUSH_TOKEN\"",
+                          // nix must AUTHENTICATE its flake-input fetches: the closure pulls a
+                          // PRIVATE input (seedmatic/claude-hub, transitively via ndh), and the
+                          // flox
+                          // NRI sets NIX_CONFIG (experimental-features) but NO access-tokens, so
+                          // nix
+                          // fetches the github: archive unauthenticated → HTTP 404 on the private
+                          // repo. Append the App token (the same one PaC minted) so nix reads it AS
+                          // the App. Requires PaC to scope the git_auth token to include claude-hub
+                          // (secret-github-app-scope-extra-repos) — a repo-scoped token still 404s.
+                          "  export NIX_CONFIG=\"${NIX_CONFIG:-}\"$'\\n'\"access-tokens ="
+                              + " github.com=$RKE2LAB_PUSH_TOKEN\"",
                           "fi",
                           // The maven-cache PVC is the cache ROOT — it holds repository/ AND
                           // build-cache/ side by side. M2_REPO points at its repository; the render
