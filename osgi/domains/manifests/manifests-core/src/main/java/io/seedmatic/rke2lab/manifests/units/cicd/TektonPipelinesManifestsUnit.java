@@ -166,12 +166,13 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                 // only → nix 404s on the private claude-hub. scope-extra-repos widens it to
                 // rke2lab + claude-hub (least-privilege vs token-scoped=false = the whole
                 // installation). The operator writes these settings into the operator-managed
-                // pipelines-as-code ConfigMap (a direct edit would be reverted). The operand is
-                // "openshift-pipeline-as-code" even on k8s, so the config path is
-                // platforms.openshift.
+                // pipelines-as-code ConfigMap (a direct edit would be reverted). This is the
+                // KUBERNETES Tekton operator (not OpenShift): its validating webhook REQUIRES PaC
+                // settings under platforms.kubernetes and REJECTS platforms.openshift — despite the
+                // operand being named "openshift-pipeline-as-code".
                 "platforms",
                 Map.of(
-                    "openshift",
+                    "kubernetes",
                     Map.of(
                         "pipelinesAsCode",
                         Map.of(
