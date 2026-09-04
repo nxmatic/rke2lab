@@ -8,6 +8,8 @@ target~claude/
 jgiven-reports/
 # Claude scratch working area (never committed)
 .claude/scratch/
+# Claude usage telemetry (local only, not content)
+.claude/usage-data/
 
 # OS
 .DS_Store

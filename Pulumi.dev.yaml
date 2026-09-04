@@ -48,12 +48,12 @@ config:
       cicd: "true"
     debug:
       mesh:
-        enabled: "true"
+        enabled: "false"
       networking:
-        enabled: "true"
+        enabled: "false"
       nriPlugins:
         flox:
-          enabled: "true"
+          enabled: "false"
     # Arms the force-push of the rendered tree to manifests/<clusterId> at the end of synthesis
     # (needs the sealed GitHub App token, contents:write). Default off = render + signed commit stay
     # LOCAL until armed; set "false" to return to a local-only render (then push by hand).
