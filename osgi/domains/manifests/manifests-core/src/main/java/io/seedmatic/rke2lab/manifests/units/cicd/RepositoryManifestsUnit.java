@@ -95,6 +95,15 @@ public final class RepositoryManifestsUnit extends AbstractManifestsUnit {
                   Map.of("name", "cluster", "value", identity.clusterName()),
                   Map.of("name", "node", "value", identity.nodeName())
                 },
+                // Serialise the render: PaC queues PipelineRuns and runs ONE at a time. The render
+                // shares a single RWO maven-cache PVC (local repo + maven-build-cache) and the /nix
+                // store overlay across runs — none of which is multi-writer safe, and RWO is
+                // node-scoped so on this single-node cluster two concurrent runs WOULD co-mount and
+                // race the cache into corruption. concurrency_limit=1 is what actually enforces the
+                // "one render at a time" the pipeline assumes (previously only claimed in
+                // comments).
+                "concurrency_limit",
+                1,
                 // Read the PipelineRun definition from the branch that was pushed (the grow branch
                 // is the source of truth); PaC's provenance is only `source` or `default_branch`.
                 "settings",
