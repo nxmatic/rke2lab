@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests.units.cicd;
 import io.seedmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.seedmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.ingress.PacWebhookFunnel;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.seedmatic.rke2lab.manifests.units.mesh.FunnelStatePersistenceManifestsUnit;
 import java.util.List;
@@ -37,9 +38,6 @@ public final class PacWebhookManifestsUnit extends AbstractManifestsUnit {
 
   private static final int CONTROLLER_PORT = 8080;
 
-  /** The Tailscale MagicDNS leaf; the funnel URL is https://<this>.<tailnet>.ts.net. */
-  private static final String FUNNEL_HOSTNAME = "pac-webhook";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "pac-webhook");
 
@@ -58,7 +56,7 @@ public final class PacWebhookManifestsUnit extends AbstractManifestsUnit {
                 .kind("Ingress")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("pac-webhook")
+                        .name(PacWebhookFunnel.LEAF)
                         .namespace(NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -82,7 +80,7 @@ public final class PacWebhookManifestsUnit extends AbstractManifestsUnit {
                 "tailscale",
                 // tls.hosts[0] is the MagicDNS leaf → https://pac-webhook.<tailnet>.ts.net.
                 "tls",
-                new Object[] {Map.of("hosts", new Object[] {FUNNEL_HOSTNAME})},
+                new Object[] {Map.of("hosts", new Object[] {PacWebhookFunnel.LEAF})},
                 "defaultBackend",
                 Map.of(
                     "service",

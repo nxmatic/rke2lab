@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.controlplane.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.seedmatic.rke2lab.manifests.ingress.PacWebhookFunnel;
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
 import java.io.IOException;
@@ -41,8 +42,10 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>{@code ghapp create} — open GitHub's PRE-FILLED "New GitHub App" form (a top-level GET that
  *       carries the operator's session; a loopback manifest POST cannot, by GitHub's {@code
- *       SameSite} hardening). The operator creates the App and generates a private key (PEM →
- *       {@code ~/Downloads}).
+ *       SameSite} hardening). The form carries the webhook already ACTIVE with its URL + event
+ *       subscriptions filled, so the operator's only irreducible clicks are Create + Generate a
+ *       private key (PEM → {@code ~/Downloads}); the webhook SECRET (the one field GitHub forbids
+ *       as a URL param) is set later by the grow's webhook scion, AS the App — never on the UI.
  *   <li>{@code ghapp install} — open the App's install page; the operator installs it on the org.
  *   <li>{@code ghapp seed <appId> [pemPath]} — forge the App JWT from the PEM, resolve the
  *       installation id via {@code GET /app/installations}, and write the {@code githubApp} block
@@ -61,14 +64,31 @@ public final class GithubAppCli {
   /**
    * GitHub's PRE-FILLED "New GitHub App" form for the {@code seedmatic} org — a top-level GET so
    * the operator's {@code SameSite} session cookie rides along and they land authenticated, with
-   * the App's shape (name, homepage, permissions) already filled.
+   * the App's shape ALREADY filled: name, homepage, permissions, AND the webhook (active + URL +
+   * event subscriptions). Pre-filling the webhook is what removes the operator's manual GitHub-UI
+   * steps — the events cannot be set through any API (only this form or the UI), and the webhook
+   * URL/secret are otherwise hand-entered. The one field GitHub forbids as a URL param is the
+   * webhook SECRET; the grow's ghapp webhook scion sets it (and re-points the URL on rename) AS the
+   * App, so the operator never touches the webhook page. Webhook URL = the PaC funnel FQDN, built
+   * from the shared {@link PacWebhookFunnel} leaf + the default tailnet (the same endpoint the grow
+   * reconciles to). Events = the Pipelines-as-Code set (check_run/check_suite/commit_comment/
+   * issue_comment/pull_request/push); {@code events[]} is percent-encoded so {@link URI#create}
+   * accepts the brackets.
    */
   private static final URI REGISTRATION_URL =
       URI.create(
           "https://github.com/organizations/seedmatic/settings/apps/new"
               + "?name=seedmatic-rke2lab"
               + "&url=https://github.com/seedmatic/rke2lab"
-              + "&webhook_active=false"
+              + "&webhook_active=true"
+              + "&webhook_url="
+              + new PacWebhookFunnel(BootstrapConfig.DEFAULT_TAILNET).url()
+              + "&events%5B%5D=check_run"
+              + "&events%5B%5D=check_suite"
+              + "&events%5B%5D=commit_comment"
+              + "&events%5B%5D=issue_comment"
+              + "&events%5B%5D=pull_request"
+              + "&events%5B%5D=push"
               + "&contents=write&statuses=write&pull_requests=write&checks=write&metadata=read");
 
   private static final URI INSTALL_URL =

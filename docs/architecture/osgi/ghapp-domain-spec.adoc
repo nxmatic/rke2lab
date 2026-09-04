@@ -6,9 +6,12 @@
 ====
 *Status:* 🟡 Domain built; declaration moved out of the grow into the `ghapp` CLI (2026-08-13).
 `ghapp-contract` (`GithubAppCredentials`, `GhAppCoordinate`, `GithubAppMinter`, `TokenScope`,
-`MintedToken`), `ghapp-edge` (`GithubAppTokenMinter`) and `ghapp-bdd` (`GithubAppScenario` — a pure
-rehydrate — + `GithubAppRunbookHandler`) build green, as does the host-side `GithubAppCli` operator
-command. Still pending: the writer token seal and the Flux reader render. This is the domain
+`MintedToken`, plus the webhook-reconcile trio `GithubAppWebhookConfigurer` / `WebhookConfig` /
+`WebhookReconcileInput`), `ghapp-edge` (`GithubAppTokenMinter`, `GithubAppWebhookConfigurerEdge`) and
+`ghapp-bdd` (`GithubAppScenario` — a pure rehydrate — + `GithubAppRunbookHandler`, and the grow-sown
+`GithubAppWebhookScenario` + `GithubAppWebhookRunbookHandler` + `GithubAppWebhookAmendReflector`) build
+green, as does the host-side `GithubAppCli` operator command. Still pending: the writer token seal and
+the Flux reader render. This is the domain
 realisation of the cross-cutting vision in
 link:../cluster-api/github-credential-model.adoc[GitHub Credential Model].
 ====
@@ -37,12 +40,17 @@ link:../cluster-api/github-credential-model.adoc[credential-model vision]; this 
 The domain follows the standard `contract` / `edge` / `bdd` layout (like `auth`, `bbox`, `incus`):
 
 * *ghapp-contract* (`type=contract`) — the vocabulary: `GithubAppCredentials` (the sealed cellar case),
-  `GhAppCoordinate`, the `GithubAppMinter` verb (mint a scoped token), `TokenScope`, `MintedToken`.
-* *ghapp-edge* (`type=edge`, one `@Component`) — the GitHub-API contact: `GithubAppTokenMinter` signs
-  the App JWT and mints scoped installation tokens.
+  `GhAppCoordinate`, the `GithubAppMinter` verb (mint a scoped token), `TokenScope`, `MintedToken`, and
+  the webhook-reconcile trio — the `GithubAppWebhookConfigurer` verb, its `WebhookConfig` (`url` +
+  `secret`), and the `WebhookReconcileInput` amendment wire-record (see <<The webhook reconcile>>).
+* *ghapp-edge* (`type=edge`, two `@Component`s) — the GitHub-API contact: `GithubAppTokenMinter` signs
+  the App JWT and mints scoped installation tokens; `GithubAppWebhookConfigurerEdge` PATCHes the App's
+  webhook config. Both `cultivating`-gated.
 * *ghapp-bdd* (`@SeedScenario`) — `GithubAppScenario`, a *pure rehydrate*: seal the credentials into
   the run from the cellar or from the `.secrets` `githubApp` block (via the read-only
-  `SecretsGateway`). No browser, no registration.
+  `SecretsGateway`). No browser, no registration. And `GithubAppWebhookScenario` (+ its
+  `GithubAppWebhookRunbookHandler` / `GithubAppWebhookAmendReflector`) — the grow-sown reconcile of the
+  App's webhook to the current funnel.
 * *GithubAppCli* — the host-side `ghapp` operator command (a `seed-master` subcommand), driving the
   declaration ceremony (`create` / `install` / `seed`) out-of-band. See <<The ghapp CLI>>.
 
@@ -235,6 +243,64 @@ This *replaces* the current `gh auth token` → sealed `GithubToken` → `JgitCh
 the push must never be left without a credential. `GithubAppMinter` is fail-fast: it returns a token or
 throws, never a silent fallback.
 
+== The webhook reconcile — pointing the App at the funnel
+
+The App does not only mint tokens; it also carries a *webhook* GitHub POSTs its events to, so
+Pipelines-as-Code can start a render PipelineRun on a push. Two of that webhook's fields drift after
+creation and would otherwise be hand-edited in the GitHub UI: the *URL* (it changes whenever the
+Tailscale funnel is renamed — the way we win a fresh Let's Encrypt cert budget) and the *secret* (the
+shared HMAC value PaC validates against, which GitHub forbids as a registration URL parameter). The
+`ghapp` domain reconciles both AS the App, on every grow — so the operator never opens the webhook
+page.
+
+The verb is `GithubAppWebhookConfigurer.configure(GithubAppCredentials, WebhookConfig)`: it signs the
+App JWT and calls `PATCH /app/hook/config` with the desired `WebhookConfig` (a `url` + `secret`
+record; content-type and `insecure_ssl` are edge constants). The one *edge* that satisfies it,
+`GithubAppWebhookConfigurerEdge`, carries `rke2lab.gardening=cultivating` — filtered out under a
+survey/preview frontier, so the reconcile PENDS rather than touching GitHub. This is the exact
+posture of `GithubAppMinter`/`GithubAppTokenMinter`, one door further.
+
+The scion `GithubAppWebhookScenario` is grow-sown at coordinate `ghapp-webhook`. It reads the App
+`GithubAppCredentials` from the cellar (sealed by `GithubAppScenario`) and the shared
+`github.webhook.secret` from `.secrets` in-container, and takes the *one host-held fact* — the funnel
+URL — through its `WebhookReconcileInput` (a `@SeedContract("runbook")` wire-record whose single
+`@Amendment(Amendment.FUNNEL)` component the host fills). Only the host holds the URL: the MagicDNS
+leaf is the shared `PacWebhookFunnel.LEAF` constant, but the tailnet suffix is host-config appended by
+Tailscale at runtime — never on the in-container synthesis context — so `seed-master` builds
+`PacWebhookFunnel(tailnet).url()` and sows it as the `FUNNEL` amendment. The amend door
+(`GithubAppWebhookAmendReflector`) binds that neutral role onto the input field; the runbook handler
+(`GithubAppWebhookRunbookHandler`) decodes the reconciled trigger and plays the scenario. Absence of
+any input (no cellar credentials, no secret, no cultivating edge) is the honest local skip — the
+reconcile is a best-effort convenience, never a hard gate on the grow.
+
+[mermaid,ghapp-webhook,svg]
+----
+flowchart LR
+  CEL[("cellar<br/>GithubAppCredentials (SEALED)")]
+  SEC[(".secrets<br/>github.webhook.secret")]
+  subgraph SM["seed-master (host)"]
+    URL["PacWebhookFunnel(tailnet).url()<br/>https://&lt;leaf&gt;.&lt;tailnet&gt;"]
+  end
+  subgraph OSGI["ghapp-webhook scion (in-container)"]
+    SCN["GithubAppWebhookScenario<br/>resolve creds + secret"]
+    CFG["GithubAppWebhookConfigurer.configure<br/>(creds, WebhookConfig(url, secret))"]
+    SCN --> CFG
+  end
+  GH[("GitHub App · webhook config")]
+  URL -->|"FUNNEL amendment (String)"| SCN
+  CEL --> SCN
+  SEC --> SCN
+  CFG -->|"PATCH /app/hook/config (App JWT)"| GH
+  classDef c fill:#eef,stroke:#88a,stroke-width:1.6px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class SCN,CFG c; class URL h;
+----
+
+*Read it*: the funnel URL is the only fact that crosses the membrane (a plain String, by role); the
+secret and credentials are resolved in-container. A funnel rename is one edit to `PacWebhookFunnel.LEAF`
+— host URL, Ingress host, and the persisted proxy identity all follow — and the next grow re-points
+the App with no UI.
+
 == The domain — contract / edge / bdd / host CLI (UML)
 
 [mermaid,ghapp-uml,svg]
@@ -279,6 +345,23 @@ classDiagram
     +install()
     +seed(appId, pemPath)
   }
+  class WebhookConfig {
+    <<record>>
+    +url
+    +secret
+  }
+  class WebhookReconcileInput {
+    <<record>>
+    +funnelUrl @Amendment(FUNNEL)
+  }
+  class GithubAppWebhookConfigurer {
+    <<port>>
+    +configure(GithubAppCredentials, WebhookConfig)
+  }
+  class GithubAppWebhookConfigurerEdge {
+    <<edge>>
+    +configure(GithubAppCredentials, WebhookConfig)
+  }
   GithubAppCredentials ..> GhAppCoordinate : sealed at
   GithubAppMinter ..> GithubAppCredentials : consumes
   GithubAppMinter ..> TokenScope : scopes
@@ -286,6 +369,10 @@ classDiagram
   GithubAppTokenMinter ..|> GithubAppMinter : implements
   GithubAppScenario ..> GithubAppCredentials : rehydrates + seals
   GithubAppCli ..> GithubAppCredentials : writes .secrets block
+  GithubAppWebhookConfigurer ..> GithubAppCredentials : consumes
+  GithubAppWebhookConfigurer ..> WebhookConfig : applies
+  GithubAppWebhookConfigurerEdge ..|> GithubAppWebhookConfigurer : implements
+  WebhookReconcileInput ..> WebhookConfig : the scion assembles
 ----
 
 *Read it*: the *contract* is pure vocabulary (records + enums + the `GithubAppMinter` verb). One

@@ -28,6 +28,7 @@ import io.seedmatic.rke2lab.incus.ingress.Growth;
 import io.seedmatic.rke2lab.incus.ingress.IncusGrowCoordinate;
 import io.seedmatic.rke2lab.incus.ingress.IngressConfig;
 import io.seedmatic.rke2lab.incus.ingress.InstanceGrowPlan;
+import io.seedmatic.rke2lab.manifests.ingress.PacWebhookFunnel;
 import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsBundle;
 import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsCoordinate;
 import io.seedmatic.rke2lab.osgi.runtime.scenario.engine.ConnectionReceiver;
@@ -189,6 +190,8 @@ public class ClusterSeedScenario
         .the_github_writer_token_is_sealed(hostScenario, hostTree)
         .and()
         .the_replicator_secrets_are_sealed(hostScenario, hostTree)
+        .and()
+        .the_github_app_webhook_is_reconciled(hostScenario, hostTree)
         .and()
         .the_instance_is_provisioned(hostScenario, hostTree)
         .and()
@@ -545,6 +548,32 @@ public class ClusterSeedScenario
       sowAndGraft
           .sowing("replicator-secrets", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the replicator secrets are sealed");
+      return self();
+    }
+
+    @NestedSteps
+    @As("the github app webhook is reconciled")
+    public When the_github_app_webhook_is_reconciled(
+        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
+      // The ghapp webhook scion re-points the org App's webhook at the current Tailscale funnel and
+      // sets its shared HMAC secret — the App-level settings the operator would otherwise change by
+      // hand in the GitHub UI on every funnel rename. ONE amendment hands the neutral FUNNEL role
+      // the funnel endpoint URL: the ONLY host-held fact, since the MagicDNS leaf is a manifest
+      // constant but the tailnet suffix is host-config, appended by Tailscale at runtime and never
+      // on the in-container synthesis context. The scion reads the App credentials from the cellar
+      // (sealed by the ghapp registration above) and the webhook secret from .secrets in-container.
+      // The edge is gardening-gated (rke2lab.gardening=cultivating), so under a survey/preview this
+      // crossing no-ops rather than calling GitHub.
+      final JsonNode funnelUrl =
+          JsonNodeFactory.instance.textNode(new PacWebhookFunnel(config.tailnet()).url());
+      sowAndGraft
+          .sowing(
+              "ghapp-webhook",
+              gardening,
+              hostScenario,
+              hostTree,
+              Map.of(Amendment.FUNNEL, funnelUrl))
+          .the_scion_is_sown_and_grafted("the github app webhook is reconciled");
       return self();
     }
 

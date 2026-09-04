@@ -120,9 +120,9 @@
       blueprintSystem = "aarch64-darwin";
 
       # Single source of truth for the Maven-build toolchain. This one attrset
-      # feeds three consumers: the build derivations below, `devShells.default`,
-      # and the re-exported `packages` that the flox env pins against — so dev
-      # loop, devShell, and store build all resolve the same versions from this
+      # feeds two consumers: the build derivations below, and the re-exported
+      # `packages` that the flox env pins against — so the dev loop and the store
+      # build resolve the same versions from this
       # flake's nixpkgs. Spotless version-checks the shfmt binary it finds on
       # PATH against its configured `${shfmt.version}`, so the build passes
       # `-Dshfmt.version=${shfmt.version}` to keep binary and config identical,
@@ -896,13 +896,6 @@ USAGE
               fi
               touch $out
             '';
-        };
-
-        # The declared source of truth for the Maven-build toolchain. `mvn` from
-        # here (or via the flox env that consumes these versions) sees the same
-        # shfmt/shellcheck the store build does.
-        devShells.default = pkgs.mkShell {
-          packages = mavenBuildInputs pkgs;
         };
       }
     )) // {

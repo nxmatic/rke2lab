@@ -9,6 +9,7 @@ import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.ManifestLayer;
+import io.seedmatic.rke2lab.manifests.ingress.PacWebhookFunnel;
 import io.seedmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +21,8 @@ import software.constructs.Construct;
 
 /**
  * Durable Tailscale funnel identity — the surgical fix for the Let's Encrypt rate-limit that
- * repeatedly wedged the render loop. The {@code pac-webhook} funnel's Let's Encrypt cert is
- * re-issued every cold-start because the proxy comes back as a NEW tailscale device (fresh node
+ * repeatedly wedged the render loop. The PaC funnel's ({@link PacWebhookFunnel}) Let's Encrypt cert
+ * is re-issued every cold-start because the proxy comes back as a NEW tailscale device (fresh node
  * key): the operator stores the proxy's tailscaled state (node key + cert) in a Secret named after
  * the pod ({@code TS_KUBE_SECRET=$(POD_NAME)}), which is etcd-ephemeral and lost on re-grow. Enough
  * re-grows in 168h hit the per-FQDN 5-cert limit → {@code getCertPEM: 429} → the funnel serves no
@@ -58,10 +59,10 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
   private static final String NAMESPACE = MeshRefs.MESH_SYSTEM_NAMESPACE.name();
 
   /** The stable proxy-state Secret name the ProxyClass pins TS_KUBE_SECRET to (vs the pod name). */
-  public static final String STATE_SECRET = "ts-pac-webhook-state";
+  public static final String STATE_SECRET = "ts-" + PacWebhookFunnel.LEAF + "-state";
 
-  /** The ProxyClass the pac-webhook Ingress opts into via tailscale.com/proxy-class. */
-  public static final String PROXY_CLASS = "pac-webhook";
+  /** The ProxyClass the funnel Ingress opts into via tailscale.com/proxy-class. */
+  public static final String PROXY_CLASS = PacWebhookFunnel.LEAF;
 
   /** The stable node name the persist dataset + PV are pinned to (openebs is node-local). */
   private static final String NODE_NAME = "bioskop-mgmt-master";
@@ -70,7 +71,7 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
   private static final String OPENEBS_NAMESPACE = "openebs";
 
   private static final String STORAGE_CLASS = "openebs-zfs-persist";
-  private static final String PV_NAME = "pac-webhook-funnel-cert";
+  private static final String PV_NAME = PacWebhookFunnel.LEAF + "-funnel-cert";
   // A cert-state Secret mirror (tailscale node key + cert) is a few KB; 16Mi is generous headroom.
   // ZFS backs this as a DATASET with a refquota (thin) so the request is intent, not a reservation.
   private static final String CAPACITY = "16Mi";

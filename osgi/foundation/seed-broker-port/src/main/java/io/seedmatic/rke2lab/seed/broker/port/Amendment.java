@@ -57,6 +57,16 @@ public @interface Amendment {
    */
   String IMAGE = "image";
 
+  /**
+   * The public funnel endpoint URL — the Tailscale funnel FQDN ({@code
+   * https://<leaf>.<tailnet>.ts.net}) a domain must point an external callback at. Only the host
+   * holds it: the MagicDNS leaf is a shared manifest constant, but the tailnet suffix is
+   * host-config ({@code BootstrapConfig.tailnet}), and Tailscale appends it at runtime — it is
+   * never on the in-container synthesis context. The host fills it; the ghapp webhook scion binds
+   * it onto the App's hook config.
+   */
+  String FUNNEL = "funnel";
+
   /** The neutral gardening role of this amendment (e.g. {@link #SOIL}, {@link #FACET}). */
   String value();
 }

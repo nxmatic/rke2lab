@@ -51,8 +51,9 @@ public record BootstrapConfig(
   private static final String DEFAULT_VMNET_NETWORK_NAME = "vmnet-br";
   // The tailscale tailnet DNS suffix. Resolvable host/automount addresses use the MagicDNS FQDN
   // <host>.<tailnet> so they route over the tailscale overlay (stable across the physical LAN),
-  // rather than the LAN mDNS <host>.local.
-  private static final String DEFAULT_TAILNET = "mammoth-skate.ts.net";
+  // rather than the LAN mDNS <host>.local. Package-visible so the ghapp CLI pre-fills the App
+  // registration form's webhook URL with the same funnel FQDN the grow reconciles to.
+  static final String DEFAULT_TAILNET = "mammoth-skate.ts.net";
   private static final URI DEFAULT_API_ENDPOINT = URI.create("https://10.66.106.10:6443");
   private static final boolean DEFAULT_AUTOMOUNT = true;
   private static final int DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT = 12434;

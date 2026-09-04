@@ -29,10 +29,17 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
-    <!-- Cellar / Parcel / SeedCoordinate / RunbookCoordinate / SeedHandler / Sensitivity / SeedEnvelope. -->
+    <!-- Cellar / Parcel / SeedCoordinate / RunbookCoordinate / SeedHandler / Sensitivity / SeedEnvelope
+         / AmendCoordinate / AmendmentAssembler. -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>seed-broker-port</artifactId>
+    </dependency>
+    <!-- SeedCodec + AmendmentBinder: the webhook amend reflector binds the FUNNEL role onto the
+         WebhookReconcileInput, and the runbook handler decodes the reconciled trigger. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>seed-broker-codec</artifactId>
     </dependency>
     <!-- GenericRunbookHandler, ScenarioPlayer, @SeedScenario, CellarReceiver, ScenarioCellar, OsgiService. -->
     <dependency>

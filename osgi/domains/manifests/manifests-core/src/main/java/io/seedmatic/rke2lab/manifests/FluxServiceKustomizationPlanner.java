@@ -541,6 +541,14 @@ final class FluxServiceKustomizationPlanner {
     spec.put("path", cell.path());
     spec.put("prune", true);
     spec.put("wait", wait);
+    // Recreate immutable resources whose apply would otherwise fail. A service cell may render a
+    // one-shot Job (e.g. the funnel-cert restore/backup) whose pod template changes across renders;
+    // Job.spec.template is immutable, so a plain server-side apply fails "field is immutable" and
+    // wedges the whole cell (Ready=false) until an operator deletes the Job by hand. force makes
+    // Flux delete-and-recreate on that failure. A no-op for normally-patchable resources — Flux
+    // only
+    // forces when an apply actually fails on immutability.
+    spec.put("force", true);
     spec.put(
         "sourceRef",
         Map.of("kind", "GitRepository", "name", FluxRootManifestsUnit.GIT_REPOSITORY_NAME));
