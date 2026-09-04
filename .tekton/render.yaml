@@ -36,8 +36,12 @@ spec:
         value: pipeline
       - name: name
         value: render-manifests
+      # rke2lab OWNS the render pipeline, so RenderPipelineManifestsUnit renders it into
+      # rke2lab-system (the runtime-system namespace), NOT tekton-pipelines (the PaC/Tekton
+      # controllers' own system). The cluster resolver must look there, or the PipelineRun fails
+      # CouldntGetPipeline ("render-manifests" not found).
       - name: namespace
-        value: tekton-pipelines
+        value: rke2lab-system
   params:
     # PaC dynamic variables (the pushed commit + repo).
     - name: repo-url
