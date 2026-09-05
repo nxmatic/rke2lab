@@ -561,13 +561,16 @@
             fi
             appId=$(yq -r '.github.app.appId' "$secrets")
             installationId=$(yq -r '.github.app.installationId' "$secrets")
-            key=$(mktemp); trap 'rm -f "$key"' EXIT
-            yq -r '.github.app.privateKeyPem' "$secrets" > "$key"
             b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
             now=$(date +%s)
             header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | b64url)
             payload=$(printf '%s' "{\"iat\":$((now - 60)),\"exp\":$((now + 540)),\"iss\":\"$appId\"}" | b64url)
-            signature=$(printf '%s' "$header.$payload" | openssl dgst -sha256 -sign "$key" -binary | b64url)
+            # Sign WITHOUT ever writing the private key to disk: the key is fed to openssl through a
+            # process-substitution fd (an anonymous pipe, never a tmpfs file), and the data to sign
+            # arrives on stdin. openssl reads the key sequentially so a pipe is fine.
+            signature=$(printf '%s' "$header.$payload" \
+              | openssl dgst -sha256 -sign <(yq -r '.github.app.privateKeyPem' "$secrets") -binary \
+              | b64url)
             jwt="$header.$payload.$signature"
             curl -sS -X POST \
               -H "Authorization: Bearer $jwt" \
@@ -686,8 +689,15 @@ USAGE
             # (.secrets github.app), never a personal `gh auth token`. The inner `nix build`
             # reads GH_TOKEN impurely (hostGHToken), so export it here first.
             if [ -f .secrets ]; then
-              echo "==> minting a GitHub App token for the build (packages:read)" >&2
-              GH_TOKEN="$(mint-gh-app-token)"; export GH_TOKEN
+              # Non-fatal: if the mint fails (e.g. a checkout whose .secrets carries an encrypted
+              # key), fall back to the ambient GH_TOKEN instead of aborting the whole build. The
+              # `if` condition swallows the non-zero exit (set -e does not fire on a tested command).
+              if minted="$(mint-gh-app-token)"; then
+                GH_TOKEN="$minted"; export GH_TOKEN
+                echo "==> using a GitHub App token for the build (packages:read)" >&2
+              else
+                echo "==> mint-gh-app-token failed; falling back to the ambient GH_TOKEN" >&2
+              fi
             fi
 
             echo "==> building seed-master from the store" >&2
@@ -774,8 +784,15 @@ USAGE
             # org-owned GitHub App (.secrets github.app), never a personal token. In-cluster there is
             # no .secrets and the Tekton step already set GH_TOKEN from PaC's App token, so skip.
             if [ -f .secrets ]; then
-              echo "==> minting a GitHub App token for the build (packages:read)" >&2
-              GH_TOKEN="$(mint-gh-app-token)"; export GH_TOKEN
+              # Non-fatal: if the mint fails (e.g. a checkout whose .secrets carries an encrypted
+              # key), fall back to the ambient GH_TOKEN instead of aborting the whole build. The
+              # `if` condition swallows the non-zero exit (set -e does not fire on a tested command).
+              if minted="$(mint-gh-app-token)"; then
+                GH_TOKEN="$minted"; export GH_TOKEN
+                echo "==> using a GitHub App token for the build (packages:read)" >&2
+              else
+                echo "==> mint-gh-app-token failed; falling back to the ambient GH_TOKEN" >&2
+              fi
             fi
 
             echo "==> building manifests-cli from the store" >&2
