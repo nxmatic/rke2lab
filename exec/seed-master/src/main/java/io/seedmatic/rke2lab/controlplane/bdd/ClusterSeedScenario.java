@@ -187,8 +187,6 @@ public class ClusterSeedScenario
         .and()
         .the_github_app_is_registered(hostScenario, hostTree)
         .and()
-        .the_github_writer_token_is_sealed(hostScenario, hostTree)
-        .and()
         .the_replicator_secrets_are_sealed(hostScenario, hostTree)
         .and()
         .the_github_app_webhook_is_reconciled(hostScenario, hostTree)
@@ -517,21 +515,6 @@ public class ClusterSeedScenario
       sowAndGraft
           .sowing("ghapp", gardening, hostScenario, hostTree)
           .the_scion_is_sown_and_grafted("the github app is registered");
-      return self();
-    }
-
-    @NestedSteps
-    @As("the github writer token is sealed")
-    public When the_github_writer_token_is_sealed(
-        @Hidden ScenarioModel hostScenario, @Hidden ReportModel hostTree) {
-      // auth-seal delegates to ghapp: it reveals the sealed App credentials, mints a WRITER
-      // installation token, and seals it as a GithubToken for the rendered-branch push to reveal.
-      // Sown AFTER the ghapp registration (the credentials must be sealed first) and before
-      // incus-provision (which sub-sows manifests, the push consumer). No amendment: the scion
-      // reveals + mints in-container, so the sow carries an empty trigger.
-      sowAndGraft
-          .sowing("auth", gardening, hostScenario, hostTree)
-          .the_scion_is_sown_and_grafted("the github writer token is sealed");
       return self();
     }
 

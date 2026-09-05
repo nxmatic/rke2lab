@@ -124,9 +124,10 @@
     </dependency>
     <!-- The version-bump scion's service impls (embed type=model/edge), staged INTACT like the other
          bundles so VersionBumpScenario's @OsgiService injections resolve bundle-side: worktree-core
-         (JgitWorktree — jgit stage/commit), auth-edge (CliAuthTokenContact — `gh auth token`),
-         ndh-core (DefaultNdhKeystoreReader — the tailnet authorityDomain). runtime scope: the host
-         never compiles against an impl, only stages it; the contracts arrive transitively. -->
+         (JgitWorktree — jgit stage/commit), auth-edge (GithubWriterTokenMintEdge — mints a fresh
+         WRITER token for the release query, @References ghapp's GithubAppMinter below), ndh-core
+         (DefaultNdhKeystoreReader — the tailnet authorityDomain). runtime scope: the host never
+         compiles against an impl, only stages it; the contracts arrive transitively. -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>worktree-core</artifactId>
@@ -145,9 +146,10 @@
     <!-- The publish verb's auth sub-graph (embed type=model/edge), staged INTACT so the `publish`
          flow's in-container scions resolve bundle-side: ghapp-bdd (the `ghapp` scion — rehydrates the
          one org App's credentials from .secrets through the SecretsGateway seam) + ghapp-edge (the
-         GithubAppMinter @Component), then auth-bdd (the `auth` scion — mints a WRITER token from
-         those credentials and seals AuthCoordinate.GITHUB_TOKEN, which the manifests delivery reveals
-         to push). synthesize needs none of these; publish grows all three coordinates in order. -->
+         GithubAppMinter @Component). The push token is NOT sealed: the manifests delivery reveals the
+         App credentials and mints a fresh WRITER token AT THE POINT OF USE via the auth-edge
+         GithubWriterTokenMintEdge (embedded above) — no durable, staleable seal. synthesize needs
+         none of these; publish grows the ghapp coordinate then mints on demand. -->
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ghapp-bdd</artifactId>
@@ -156,11 +158,6 @@
     <dependency>
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>ghapp-edge</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.seedmatic.rke2lab</groupId>
-      <artifactId>auth-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
     <!-- bouncycastle on the FLAT host classpath so BootPlanner can system-export the packages

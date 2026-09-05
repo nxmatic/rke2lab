@@ -22,6 +22,13 @@
       <groupId>io.seedmatic.rke2lab</groupId>
       <artifactId>auth-contract</artifactId>
     </dependency>
+    <!-- The on-demand push-token edge delegates to the ghapp minter: mint(GithubAppCredentials,
+         TokenScope.WRITER). ghapp-contract types stay INSIDE this edge — the pure-JDK
+         GithubWriterTokenMint port keeps them off the consumer (manifests). -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>ghapp-contract</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>

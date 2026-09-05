@@ -6,8 +6,7 @@ import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import io.seedmatic.rke2lab.auth.contract.AuthCoordinate;
-import io.seedmatic.rke2lab.auth.contract.GithubToken;
+import io.seedmatic.rke2lab.auth.contract.GithubWriterTokenMint;
 import io.seedmatic.rke2lab.manifests.bdd.versions.GitBotIdentities;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
@@ -143,6 +142,13 @@ public class ManifestSynthesisScenario
   // standalone/test path); an in-cluster render always publishes it (inCluster=true).
   @OsgiService(await = false)
   private Optional<EnclosureGate> enclosure = Optional.empty();
+
+  // The on-demand push-token mint (auth-edge, cultivating). OPERATOR mints a FRESH WRITER token
+  // here at the moment of the push, from the durable App credentials revealed at GhAppCase — the
+  // ephemeral (~1 h) token is never sealed, so it can't go stale between a mint and a much later
+  // reveal. Absent under a survey/preview frontier → the push is skipped.
+  @OsgiService(await = false)
+  private Optional<GithubWriterTokenMint> writerTokenMint = Optional.empty();
 
   @Override
   public Scenario<Given, When, Then> getScenario() {
@@ -318,26 +324,31 @@ public class ManifestSynthesisScenario
    * host/host-runtime} {@code ExecutionEnclosure} FACT names):
    *
    * <ul>
-   *   <li>OPERATOR — the {@code auth}-seal minted a token from a {@code gh} session and filed it
-   *       SEALED; revealed here from the cellar ({@link AuthCoordinate#GITHUB_TOKEN}).
-   *   <li>IN_CLUSTER — the renderer runs inside a Tekton PipelineRun; there is no {@code gh}
-   *       session and nothing fills the cellar. Pipelines-as-Code has already minted an App token
-   *       and the {@code render-publish} step extracts it from the mounted {@code git_auth} secret
-   *       into {@code RKE2LAB_PUSH_TOKEN}. Read in-container — the token never crosses the
-   *       host↔OSGi membrane (no seam word), the twin locality of the cellar reveal.
+   *   <li>OPERATOR — mint a FRESH {@code WRITER} installation token HERE, at the moment of the
+   *       push, from the durable App credentials revealed at {@link GhAppCase} (the ghapp
+   *       registration sealed them). The {@code auth} {@link GithubWriterTokenMint} edge holds the
+   *       mint; the token is ephemeral (≈1 h) and never sealed, so it cannot go stale between a
+   *       mint and a much later reveal (the trap a pre-provisioning seal fell into — minted before
+   *       the cluster came up, dead by the time the push ran).
+   *   <li>IN_CLUSTER — the renderer runs inside a Tekton PipelineRun; there is no cellar and the
+   *       mint edge is absent. Pipelines-as-Code has already minted an App token and the {@code
+   *       render-publish} step extracts it from the mounted {@code git_auth} secret into {@code
+   *       RKE2LAB_PUSH_TOKEN}. Read in-container — the token never crosses the host↔OSGi membrane
+   *       (no seam word), the twin locality of the mint.
    * </ul>
    *
-   * <p>Empty when neither is present (a survey / a render that isn't a push) — the push is then
-   * simply skipped. The cellar wins when both are set (an operator run never sets the env).
+   * <p>Empty when neither is present (a survey / preview, where the {@code cultivating}-gated mint
+   * edge is filtered out; or a render that isn't a push) — the push is then simply skipped. The
+   * OPERATOR mint wins when both are reachable (an operator run never sets the env).
    */
   private Optional<String> revealGithubToken() {
-    final Optional<String> sealed =
-        (cellar == null || parcel.isEmpty())
-            ? Optional.empty()
-            : cellar
-                .fetch(parcel.orElseThrow(), AuthCoordinate.GITHUB_TOKEN, GithubToken.class)
-                .map(GithubToken::token);
-    return sealed.or(
+    final Optional<String> minted =
+        writerTokenMint.flatMap(
+            mint ->
+                revealGithubApp()
+                    .flatMap(
+                        app -> mint.mint(app.appId(), app.installationId(), app.privateKeyPem())));
+    return minted.or(
         () ->
             Optional.ofNullable(System.getenv("RKE2LAB_PUSH_TOKEN"))
                 .map(String::trim)
@@ -379,27 +390,6 @@ public class ManifestSynthesisScenario
     @Override
     public String domain() {
       return "cluster-pki";
-    }
-  }
-
-  /**
-   * The ghapp registration's {@code github-app} cellar case, addressed by its NEUTRAL wire
-   * coordinate so the manifests realm reveals the sealed App credentials without a compile link to
-   * {@code ghapp-contract} (naming {@code GhAppCoordinate} would drag its flat copy into the
-   * standalone {@code manifests-cli} assembly). The {@code slug}/{@code domain} here MUST match
-   * {@code GhAppCoordinate.GITHUB_APP}; the cellar matches a read case by slug.
-   */
-  private enum GhAppCase implements SeedCoordinate {
-    GITHUB_APP;
-
-    @Override
-    public String slug() {
-      return "github-app";
-    }
-
-    @Override
-    public String domain() {
-      return "ghapp";
     }
   }
 

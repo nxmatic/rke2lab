@@ -16,9 +16,9 @@ import org.osgi.service.component.annotations.Component;
  * RunbookCoordinate("ghapp")}) and the bundle-private scenario the launcher plays on THIS bundle's
  * loader.
  *
- * <p>A NO-INPUT scion, like the cluster-pki and auth seals: {@link GithubAppScenario} reads the App
- * manifest resource and drives its edges in-container, so there is no trigger to decode — {@link
- * #seedFrom} seeds nothing, and the grow sows the crossing with an empty {@code {}} trigger.
+ * <p>A NO-INPUT scion, like the cluster-pki seal: {@link GithubAppScenario} reads the App manifest
+ * resource and drives its edges in-container, so there is no trigger to decode — {@link #seedFrom}
+ * seeds nothing, and the grow sows the crossing with an empty {@code {}} trigger.
  */
 @Component(service = SeedHandler.class)
 public final class GithubAppRunbookHandler extends GenericRunbookHandler {

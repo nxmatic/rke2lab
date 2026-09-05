@@ -420,9 +420,9 @@ public final class Main {
     @Override
     public void run() {
       // Drive PublishCliScenario on the embedded launcher — synthesize + delivery. It sows ghapp →
-      // auth → manifests through the broker: ghapp rehydrates the App credentials from .secrets,
-      // auth seals the WRITER token, manifests renders into the SOIL and pushes
-      // manifests/<cluster>.
+      // manifests through the broker: ghapp rehydrates the App credentials from .secrets, then
+      // manifests renders into the SOIL, mints a fresh WRITER token on demand from those
+      // credentials, and pushes manifests/<cluster>.
       // The same in-container operation the grow drives, minus the Pulumi envelope.
       final String txId = UUID.randomUUID().toString();
       try {

@@ -54,7 +54,7 @@ import software.constructs.Construct;
  * <p>The push token is wired: the {@code render-publish} step extracts PaC's App token from the
  * mounted {@code git_auth} secret into {@code RKE2LAB_PUSH_TOKEN}, which the in-cluster {@code
  * publish} reveals for the ff-push (container-aware {@code
- * ManifestSynthesisScenario.revealGithubToken} — cellar OPERATOR, env IN_CLUSTER).
+ * ManifestSynthesisScenario.revealGithubToken} — on-demand App mint OPERATOR, env IN_CLUSTER).
  */
 public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
 

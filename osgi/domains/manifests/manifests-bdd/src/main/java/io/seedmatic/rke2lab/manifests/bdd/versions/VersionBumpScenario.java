@@ -10,9 +10,10 @@ import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
-import io.seedmatic.rke2lab.auth.contract.AuthCoordinate;
-import io.seedmatic.rke2lab.auth.contract.GithubToken;
+import io.seedmatic.rke2lab.auth.contract.GithubWriterTokenMint;
+import io.seedmatic.rke2lab.manifests.bdd.GhAppCase;
 import io.seedmatic.rke2lab.manifests.contract.ManifestVersionsBumpInput;
+import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.BumpLevel;
 import io.seedmatic.rke2lab.manifests.ingress.Component;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
@@ -50,10 +51,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * all bundle-side (unreachable to the flat host, which is exactly why the bump is a scion): the
  * {@link Worktree} (jgit stage/commit) and the {@link NdhKeystoreReader} (the tailnet {@code
  * authorityDomain} the bot email is minted from). The GitHub token for the release query is NOT
- * shelled here: it is revealed uniformly from the cellar at {@link AuthCoordinate#GITHUB_TOKEN}
- * (the one the {@code auth-seal} scion mints from the App via {@code ghapp}), empty for a
- * standalone CLI run whose ephemeral cellar never sealed one — the query then runs anonymously
- * (rate-limited), never against a personal {@code gh auth token}.
+ * shelled here: it is minted ON DEMAND from the one org-owned App — the durable App credentials
+ * revealed at {@link GhAppCase} + the {@link GithubWriterTokenMint} edge — empty for a standalone
+ * CLI run with no sealed credentials, so the query then runs anonymously (rate-limited), never
+ * against a personal {@code gh auth token}.
  */
 @SeedScenario
 public class VersionBumpScenario
@@ -144,6 +145,12 @@ public class VersionBumpScenario
 
     @OsgiService private Optional<NdhKeystoreReader> ndh = Optional.empty();
 
+    // The on-demand push-token mint (auth-edge, cultivating): mints a FRESH token from the App
+    // credentials for the release query, at the point of use. Absent for a standalone CLI bump (no
+    // sealed App creds / a survey frontier) → the query runs anonymously.
+    @OsgiService(await = false)
+    private Optional<GithubWriterTokenMint> writerTokenMint = Optional.empty();
+
     @ScenarioStage Narration narration;
 
     @NestedSteps
@@ -194,17 +201,21 @@ public class VersionBumpScenario
     }
 
     /**
-     * The GitHub token, from the ONE source of trust: the {@link GithubToken} the {@code auth-seal}
-     * scion minted from the App (via {@code ghapp}) and filed SEALED at {@link
-     * AuthCoordinate#GITHUB_TOKEN}, revealed here uniformly. Empty when there is no plot or the
-     * seal did not run (a standalone CLI bump, whose ephemeral cellar sealed none) — the upstream
-     * release query then runs anonymously (rate-limited), never against a personal {@code gh auth
-     * token}.
+     * The GitHub token, from the ONE source of trust: mint a FRESH token from the one org-owned App
+     * at the point of use — reveal the durable App credentials at {@link GhAppCase} (the ghapp
+     * registration sealed them) and mint via the {@code auth} {@link GithubWriterTokenMint} edge.
+     * The token is ephemeral and never stored, so it can't go stale (the trap a durable seal fell
+     * into). Empty when there is no plot, no sealed credentials (a standalone CLI bump), or the
+     * {@code cultivating}-gated mint edge is filtered out — the upstream release query then runs
+     * anonymously (rate-limited), never against a personal {@code gh auth token}.
      */
     private Optional<String> resolveGithubToken(Cellar cellar) {
       return parcel
-          .flatMap(plot -> cellar.fetch(plot, AuthCoordinate.GITHUB_TOKEN, GithubToken.class))
-          .map(GithubToken::token);
+          .flatMap(plot -> cellar.fetch(plot, GhAppCase.GITHUB_APP, GithubAppMaterial.class))
+          .flatMap(
+              app ->
+                  writerTokenMint.flatMap(
+                      mint -> mint.mint(app.appId(), app.installationId(), app.privateKeyPem())));
     }
 
     private String commitMessage(VersionBumper.BumpApplication application) {

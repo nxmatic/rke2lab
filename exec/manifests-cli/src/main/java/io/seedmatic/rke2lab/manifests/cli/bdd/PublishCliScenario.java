@@ -45,17 +45,16 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * coordinates the grow does, minus the Pulumi envelope (see the seed-master {@code
  * ClusterSeedScenario} auth sub-graph).
  *
- * <p>Three sows in order, sharing the run's transactional {@link ScenarioCellar} and {@link Parcel}
+ * <p>Two sows in order, sharing the run's transactional {@link ScenarioCellar} and {@link Parcel}
  * (so the sealed anchors flow between them):
  *
  * <ol>
  *   <li>{@code ghapp} — rehydrates the one org-owned GitHub App's credentials from {@code .secrets}
  *       through the {@link SecretsGateway} this scenario registers (resolved container-blind via
  *       {@link ExecutionEnvironment}: OPERATOR here).
- *   <li>{@code auth} — mints a WRITER token from those credentials and seals {@code
- *       AuthCoordinate.GITHUB_TOKEN}, the token the delivery reveals to push.
  *   <li>{@code manifests} — renders into the SOIL and, with the FACET's {@code delivery.push}
- *       armed, commits (signed) + pushes {@code manifests/<cluster>}.
+ *       armed, mints a FRESH WRITER token on demand from those credentials (no seal) and commits
+ *       (signed) + pushes {@code manifests/<cluster>}.
  * </ol>
  *
  * <p>The push authenticates as the GitHub App (the identity baked for this automation), exactly as
@@ -110,7 +109,7 @@ public class PublishCliScenario
         Objects.requireNonNull(
             cellar, "the ScenarioCellar was not injected before the scenario ran");
     given().i_have_access_to_the_open_gardening(seedRun, world, tx);
-    when().the_app_token_is_sealed_and_the_manifests_are_delivered();
+    when().the_app_credentials_are_sealed_and_the_manifests_are_delivered();
     then().the_branch_is_delivered();
   }
 
@@ -184,18 +183,15 @@ public class PublishCliScenario
     @ScenarioState ManifestsCliRun.Identity identity;
     @ScenarioState JsonNode facet;
     @ProvidedScenarioState String ghappRunbook;
-    @ProvidedScenarioState String authRunbook;
     @ProvidedScenarioState String manifestsRunbook;
 
-    @As("the app token is sealed and the manifests are delivered")
-    public When the_app_token_is_sealed_and_the_manifests_are_delivered() {
-      // (1) rehydrate the App credentials from .secrets, (2) mint + seal the WRITER token — both
-      // ride the shared cellar so the manifests delivery below reveals the token. Neither carries
-      // an
-      // amendment (the scion falls back to its own door defaults).
+    @As("the app credentials are sealed and the manifests are delivered")
+    public When the_app_credentials_are_sealed_and_the_manifests_are_delivered() {
+      // (1) rehydrate the App credentials from .secrets — they ride the shared cellar so the
+      // manifests delivery below reveals them and mints a FRESH WRITER token on demand (no seal, no
+      // staleable durable token). No amendment (the scion falls back to its own door defaults).
       this.ghappRunbook = gardening.sow("ghapp", Map.of(), cellar);
-      this.authRunbook = gardening.sow("auth", Map.of(), cellar);
-      // (3) render into the SOIL + deliver: a COMPLETE manifests input — mandatory FACET (with
+      // (2) render into the SOIL + deliver: a COMPLETE manifests input — mandatory FACET (with
       // delivery.push armed), SOIL, IDENTITY. Same amendments the incus crossing sows in the grow.
       final Map<String, JsonNode> amendments = new LinkedHashMap<>();
       amendments.put(Amendment.FACET, facet);
@@ -213,18 +209,16 @@ public class PublishCliScenario
     }
   }
 
-  /** The THEN asserts EACH scion passed — a broken ghapp/auth silently skips the push otherwise. */
+  /** The THEN asserts EACH scion passed — a broken ghapp silently skips the push otherwise. */
   public static class Then extends Stage<Then> {
 
     @ScenarioState String ghappRunbook;
-    @ScenarioState String authRunbook;
     @ScenarioState String manifestsRunbook;
 
     @As("the rendered branch is delivered")
     public Then the_branch_is_delivered() {
       final ScenarioGraft graft = new ScenarioGraft();
       graft.assertPassed(ghappRunbook, "the github app rehydrate");
-      graft.assertPassed(authRunbook, "the writer token seal");
       graft.assertPassed(manifestsRunbook, "the manifests render + delivery");
       return self();
     }

@@ -361,14 +361,7 @@
       <artifactId>cluster-pki-bdd</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- The auth-seal scion: embedded like cluster-pki-bdd, sown early to seal the GitHub token
-         (gh auth token) into the cellar for the rendered-branch force-push to reveal. -->
-    <dependency>
-      <groupId>io.seedmatic.rke2lab</groupId>
-      <artifactId>auth-bdd</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <!-- The ghapp scion + its token-minter edge: embedded like the auth / cluster-pki scions so the
+    <!-- The ghapp scion + its token-minter edge: embedded like the cluster-pki scion so the
          broker has a "ghapp" handler and the minter @Component publishes. ghapp-contract rides in
          transitively via the scion's import closure. runtime scope — seed-master never compiles
          against them; it sows the neutral RunbookCoordinate("ghapp") through the broker. -->
@@ -383,9 +376,16 @@
       <scope>runtime</scope>
     </dependency>
     <!-- The auth edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
-         flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl;
-         the launch-secrets updater resolves AuthTokenContact from the registry (singleSpiProvider).
-         The edge MUST be embedded or the token contact never publishes. -->
+         flattened into the uber-jar. runtime scope — seed-master never compiles against the edge impl.
+         It publishes TWO @Components: CliAuthTokenContact (the launch-secrets updater resolves
+         AuthTokenContact from the registry for the FloxHub token) and GithubWriterTokenMintEdge (the
+         on-demand push-token mint the manifests synthesis reveals a fresh WRITER token through — it
+         @References ghapp's GithubAppMinter, embedded above). MUST be embedded or neither publishes. -->
+    <dependency>
+      <groupId>io.seedmatic.rke2lab</groupId>
+      <artifactId>auth-edge</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- Domain contracts/edges are GONE from the host: seed-master speaks ONLY seed (the broker
          membrane below). The staging code that still names cluster/systemd/incus/netplan/auth/doctor
          types is migrating onto the broker in the scenario-rewrite chantier; until then it does not

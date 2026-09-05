@@ -158,11 +158,6 @@
       </dependency>
       <dependency>
         <groupId>io.seedmatic.rke2lab</groupId>
-        <artifactId>auth-bdd</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.seedmatic.rke2lab</groupId>
         <artifactId>ghapp-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
