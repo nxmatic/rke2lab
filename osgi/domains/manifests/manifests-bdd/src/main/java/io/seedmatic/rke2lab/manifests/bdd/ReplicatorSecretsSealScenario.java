@@ -40,9 +40,11 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The mapping lives in {@code .secrets}: {@code kubernetes.sourceNamespace} + {@code
  * kubernetes.secrets.<key>.{name,replicateTo}} name each source secret and its allowed target
- * namespaces; the credential data comes from the matching {@code tekton.*} / {@code tailscale.*}
- * block. Three known shapes are bridged (git basic-auth, docker dockerconfigjson, tailscale oauth)
- * — the one domain-specific step the split {@code .secrets} layout requires.
+ * namespaces; the credential data comes from the matching {@code flox.*} / {@code github.*} /
+ * {@code tailscale.*} block. The bridged shapes are the FloxHub token, the GitHub webhook secret,
+ * and the tailscale oauth — the one domain-specific step the split {@code .secrets} layout
+ * requires. (Tekton git/docker source secrets were dropped: git auth flows from the App via PaC's
+ * dynamic git_auth, and no in-cluster build pulls a private registry.)
  *
  * <p>Absence — no {@code kubernetes.secrets} block — seals an empty material (the honest local
  * skip): the render then produces no source secrets and the replicator's targets stay at their
@@ -119,7 +121,6 @@ public class ReplicatorSecretsSealScenario
       final JsonNode k = kubernetes.orElseThrow();
       final String sourceNamespace = k.path("sourceNamespace").asText();
       final JsonNode secretsMap = k.path("secrets");
-      final Optional<JsonNode> tekton = read(gateway, "tekton");
       final Optional<JsonNode> tailscale = read(gateway, "tailscale");
       final Optional<JsonNode> flox = read(gateway, "flox");
       final Optional<JsonNode> github = read(gateway, "github");
@@ -131,50 +132,11 @@ public class ReplicatorSecretsSealScenario
           gh ->
               webhookSecret(secretsMap.path("web-hook"), sourceNamespace, gh)
                   .ifPresent(sources::add));
-      tekton.ifPresent(
-          t -> {
-            final JsonNode git = t.path("git");
-            gitSecret(secretsMap.path("tekton").path("git"), sourceNamespace, git)
-                .ifPresent(sources::add);
-            dockerSecret(
-                    secretsMap.path("tekton").path("docker"), sourceNamespace, t.path("docker"))
-                .ifPresent(sources::add);
-          });
       tailscale.ifPresent(
           ts ->
               oauthSecret(secretsMap.path("tailscale"), sourceNamespace, ts.path("oauth"))
                   .ifPresent(sources::add));
       return new ReplicatorSourceSecretsMaterial(List.copyOf(sources));
-    }
-
-    private Optional<SourceSecret> gitSecret(
-        final JsonNode mapping, final String namespace, final JsonNode git) {
-      if (mapping.path("name").isMissingNode() || git.isMissingNode()) {
-        return Optional.empty();
-      }
-      return Optional.of(
-          new SourceSecret(
-              mapping.path("name").asText(),
-              namespace,
-              "kubernetes.io/basic-auth",
-              Map.of(
-                  "username", git.path("username").asText(),
-                  "password", git.path("password").asText()),
-              namespaces(mapping.path("replicateTo"))));
-    }
-
-    private Optional<SourceSecret> dockerSecret(
-        final JsonNode mapping, final String namespace, final JsonNode docker) {
-      if (mapping.path("name").isMissingNode() || docker.isMissingNode()) {
-        return Optional.empty();
-      }
-      return Optional.of(
-          new SourceSecret(
-              mapping.path("name").asText(),
-              namespace,
-              "kubernetes.io/dockerconfigjson",
-              Map.of(".dockerconfigjson", docker.path("configJson").asText()),
-              namespaces(mapping.path("replicateTo"))));
     }
 
     private Optional<SourceSecret> floxSecret(

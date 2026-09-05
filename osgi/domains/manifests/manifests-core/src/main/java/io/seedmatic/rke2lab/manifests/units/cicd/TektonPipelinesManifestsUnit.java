@@ -42,20 +42,10 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
     new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile, context.yaml());
 
     // The operator CREATES targetNamespace (tekton-pipelines) only when it reconciles TektonConfig,
-    // but our replicated Secrets target it in the same layer. Pre-create it here so Flux — which
-    // applies Namespaces before namespaced resources — lands the Secrets; the operator then adopts
-    // the existing namespace as its targetNamespace.
+    // but PaC's secret (pipelines-as-code-secret) targets it in the same layer. Pre-create it here
+    // so Flux — which applies Namespaces before namespaced resources — lands it; the operator then
+    // adopts the existing namespace as its targetNamespace.
     createTargetNamespace(scope);
-    createReplicatedSecret(
-        scope,
-        "tekton-git-auth",
-        "kubernetes.io/basic-auth",
-        "rke2lab-replicator-source/tekton-git-auth");
-    createReplicatedSecret(
-        scope,
-        "tekton-docker-config",
-        "kubernetes.io/dockerconfigjson",
-        "rke2lab-replicator-source/tekton-docker-config");
     createTektonConfig(scope);
   }
 
@@ -72,40 +62,6 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                     .annotations(packageProfile.packageAnnotations("|Namespace||tekton-pipelines"))
                     .build())
             .build());
-  }
-
-  private void createReplicatedSecret(
-      final Construct scope, final String name, final String type, final String replicateFrom) {
-    ApiObject secret =
-        new ApiObject(
-            scope,
-            "secret-" + name,
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("Secret")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(name)
-                        .namespace("tekton-pipelines")
-                        .annotations(
-                            packageProfile.packageAnnotations(
-                                "|Secret|tekton-pipelines|" + name,
-                                Map.of("replicator.v1.mittwald.de/replicate-from", replicateFrom)))
-                        .labels(Map.of("app.kubernetes.io/replicated", "true"))
-                        .build())
-                .build());
-
-    // Valid placeholders until the mittwald replicator overwrites the data from the source secret:
-    // a dockerconfigjson value MUST parse as JSON (an empty string fails apiserver validation with
-    // "unexpected end of JSON input"), so seed the canonical empty docker config.
-    Map<String, String> emptyData =
-        switch (type) {
-          case "kubernetes.io/basic-auth" -> Map.of("username", "", "password", "");
-          case "kubernetes.io/dockerconfigjson" -> Map.of(".dockerconfigjson", "{\"auths\":{}}");
-          default -> Map.of();
-        };
-
-    secret.addJsonPatch(JsonPatch.add("/type", type), JsonPatch.add("/stringData", emptyData));
   }
 
   private void createTektonConfig(final Construct scope) {
