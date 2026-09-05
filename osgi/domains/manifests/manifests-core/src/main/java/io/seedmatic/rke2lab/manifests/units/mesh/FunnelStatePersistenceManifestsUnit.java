@@ -40,10 +40,9 @@ import software.constructs.Construct;
  *       tier the dataplan created (a helper Job can mount it; the proxy itself cannot — ProxyClass
  *       exposes no volume);
  *   <li>a {@link #restoreJob} (before the operator provisions the proxy) writes the saved state
- *       back into the stable Secret, and a {@link #backupJob} (after the proxy stabilises) mirrors
- *       the current Secret back to the PVC. The node key never rotates, so no periodic poll — a
- *       one-shot backup per grow re-captures the current state (incl. any cert renewed in the last
- *       life).
+ *       back into the stable Secret, and a {@link #backupJob} mirrors the current Secret back to
+ *       the PVC once the funnel CERT is present (it waits on the cert key itself — not the Secret,
+ *       not pod readiness — and never overwrites a good backup with a cert-less state).
  * </ol>
  *
  * <p>All state resources live in {@code mesh-system} (where the operator creates the proxy + its
@@ -400,10 +399,16 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
   }
 
   /**
-   * Backup Job (workloads layer, after the proxy stabilises): mirror the current state Secret to
-   * the persist volume, stripped of server-set metadata so it re-applies cleanly. Runs once per
-   * grow — the node key never rotates, so no periodic poll; this re-captures whatever is current
-   * (incl. a cert renewed during the last cluster's life).
+   * Backup Job (workloads layer): mirror the current state Secret to the persist volume, stripped
+   * of server-set metadata so it re-applies cleanly. It must wait for the funnel CERT — not merely
+   * the Secret, and not the proxy pod: readiness does not gate on the cert (measured, the cert is
+   * written tens of seconds AFTER the pod is Ready), and the restore seeds the Secret early, so a
+   * secret-exists / pod-Ready wait captured a cert-LESS state — every grow then re-persisted no
+   * cert, so the restore was always cert-less, so {@code getCertPEMCached} always missed and the
+   * proxy always re-issued (the Let's Encrypt rate-limit spiral). {@code set -e} plus the cert wait
+   * give the fix its teeth: on a timeout the write below never runs, so a good backup is never
+   * clobbered with a cert-less state. On a re-grow the restored Secret already carries a valid cert
+   * (the proxy reuses it, zero ACME issuance) and the wait returns at once.
    */
   private void backupJob(final Construct scope) {
     job(
@@ -413,15 +418,23 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
         ManifestLayer.WORKLOADS,
         """
         set -euo pipefail
-        echo "waiting for the tailscale funnel state secret %s"
-        for i in $(seq 1 60); do
-          if kubectl get -n %s secret %s >/dev/null 2>&1; then break; fi
-          sleep 5
-        done
-        kubectl get -n %s secret %s -o yaml | yq 'del(.metadata.managedFields) | del(.metadata.resourceVersion) | del(.metadata.uid) | del(.metadata.creationTimestamp) | del(.metadata.ownerReferences) | del(.status)' > /persist/state.yaml
-        echo "backed up funnel state to the persist volume"
+        ns=%s
+        secret=%s
+        echo "waiting for the funnel state secret ${secret} to exist"
+        kubectl wait --for=create -n "$ns" "secret/${secret}" --timeout=300s
+        echo "waiting for the proxy device to register (device_fqdn)"
+        kubectl wait --for=jsonpath='{.data.device_fqdn}' -n "$ns" "secret/${secret}" --timeout=300s
+        # The cert key is <device_fqdn>.crt; derive the FQDN at runtime (no tailnet name hardcoded)
+        # and escape its dots for the jsonpath. Waiting on the cert key ITSELF is load-bearing — see
+        # the method javadoc for why the Secret / pod-Ready are the wrong signal.
+        fqdn="$(kubectl get -n "$ns" secret "$secret" -o jsonpath='{.data.device_fqdn}' | base64 -d | sed 's/\\.$//')"
+        esc="$(echo "${fqdn}.crt" | sed 's/\\./\\\\./g')"
+        echo "waiting for the funnel cert ${fqdn}.crt to be issued and written"
+        kubectl wait --for="jsonpath={.data.${esc}}" -n "$ns" "secret/${secret}" --timeout=900s
+        kubectl get -n "$ns" secret "$secret" -o yaml | yq 'del(.metadata.managedFields) | del(.metadata.resourceVersion) | del(.metadata.uid) | del(.metadata.creationTimestamp) | del(.metadata.ownerReferences) | del(.metadata.annotations."kubectl.kubernetes.io/last-applied-configuration") | del(.status)' > /persist/state.yaml
+        echo "backed up funnel state (with cert) to the persist volume"
         """
-            .formatted(STATE_SECRET, NAMESPACE, STATE_SECRET, NAMESPACE, STATE_SECRET));
+            .formatted(NAMESPACE, STATE_SECRET));
   }
 
   /** A one-shot Job mounting the persist PVC, running the given kubectl script in the layer. */
