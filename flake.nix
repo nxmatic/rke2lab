@@ -542,6 +542,42 @@
         # a JRE to run the seed-master jar, and the incus client the provider
         # shells out to. The PULUMI_* vars are set here too, mirroring the flox
         # env's [vars]: local file:// backend under the repo, empty passphrase.
+        # Mint a short-lived (~1h) GitHub App INSTALLATION token from the one org-owned App's
+        # credentials in .secrets (github.app), so the maven build resolves private GitHub Packages
+        # (java-systemd, java-bbox-api-client) AS THE APP — never a personal `gh auth token`. There
+        # is no cluster/cellar at BUILD time, so this is the shell twin of the OSGi ghapp minter
+        # (which is itself what the build produces — chicken-and-egg forbids reusing it here). Least
+        # privilege: packages:read, the only scope maven needs. The grow / render wrappers export its
+        # output as GH_TOKEN before the inner `nix build`; in-cluster there is no .secrets and the
+        # caller sets GH_TOKEN from PaC's App token instead.
+        mintGhAppTokenApp = pkgs.writeShellApplication {
+          name = "mint-gh-app-token";
+          runtimeInputs = [ pkgs.coreutils pkgs.openssl pkgs.curl pkgs.yq-go ];
+          text = ''
+            secrets="''${1:-.secrets}"
+            if [ ! -f "$secrets" ]; then
+              echo "mint-gh-app-token: no $secrets (github.app credentials)" >&2
+              exit 1
+            fi
+            appId=$(yq -r '.github.app.appId' "$secrets")
+            installationId=$(yq -r '.github.app.installationId' "$secrets")
+            key=$(mktemp); trap 'rm -f "$key"' EXIT
+            yq -r '.github.app.privateKeyPem' "$secrets" > "$key"
+            b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+            now=$(date +%s)
+            header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | b64url)
+            payload=$(printf '%s' "{\"iat\":$((now - 60)),\"exp\":$((now + 540)),\"iss\":\"$appId\"}" | b64url)
+            signature=$(printf '%s' "$header.$payload" | openssl dgst -sha256 -sign "$key" -binary | b64url)
+            jwt="$header.$payload.$signature"
+            curl -sS -X POST \
+              -H "Authorization: Bearer $jwt" \
+              -H "Accept: application/vnd.github+json" \
+              -d '{"permissions":{"packages":"read"}}' \
+              "https://api.github.com/app/installations/$installationId/access_tokens" \
+              | yq -p json -r '.token'
+          '';
+        };
+
         growApp = pkgs.writeShellApplication {
           name = "rke2lab-grow";
           runtimeInputs = [
@@ -551,6 +587,7 @@
             pulumiPkg
             pkgs.jdk25
             incusClient
+            mintGhAppTokenApp
           ]
           # ndh's manage-tailnet on PATH: InstanceGrow runs it as a local.Command to prune the old
           # node's stale tailscale devices when the instance is replaced (they orphan their MagicDNS
@@ -645,6 +682,14 @@ USAGE
             read -r -a extraNixFlags <<< "''${NIX_FLAGS:-}"
             nixFlags+=( "''${extraNixFlags[@]}" )
 
+            # GH_TOKEN for the inner maven build: mint from the one org-owned GitHub App
+            # (.secrets github.app), never a personal `gh auth token`. The inner `nix build`
+            # reads GH_TOKEN impurely (hostGHToken), so export it here first.
+            if [ -f .secrets ]; then
+              echo "==> minting a GitHub App token for the build (packages:read)" >&2
+              GH_TOKEN="$(mint-gh-app-token)"; export GH_TOKEN
+            fi
+
             echo "==> building seed-master from the store" >&2
             jar="$(nix build .#seed-master "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/seed-master.jar"
             [ -f "$jar" ] || { echo "error: store jar not found at $jar" >&2; exit 1; }
@@ -688,7 +733,7 @@ USAGE
           # openssh: the publish signs the rendered commit with RKE2LAB_SIGNING_KEY via `ssh-keygen`
           # (SshCommitSigner → jgit), which openssh provides (`Cannot run program "ssh-keygen"`
           # without it). Both were implicit on dev / the deleted cicd/nix FloxEnv.
-          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 pkgs.nodejs pkgs.openssh ];
+          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 pkgs.nodejs pkgs.openssh mintGhAppTokenApp ];
           text = ''
             if [ ! -f pom.xml ] || [ ! -f flake.nix ]; then
               echo "error: run from the rke2lab repo root" >&2
@@ -725,6 +770,14 @@ USAGE
             nixFlags=( -L )
             read -r -a extraNixFlags <<< "''${NIX_FLAGS:-}"
             nixFlags+=( "''${extraNixFlags[@]}" )
+            # GH_TOKEN for the inner maven build: on the operator (dev render), mint from the one
+            # org-owned GitHub App (.secrets github.app), never a personal token. In-cluster there is
+            # no .secrets and the Tekton step already set GH_TOKEN from PaC's App token, so skip.
+            if [ -f .secrets ]; then
+              echo "==> minting a GitHub App token for the build (packages:read)" >&2
+              GH_TOKEN="$(mint-gh-app-token)"; export GH_TOKEN
+            fi
+
             echo "==> building manifests-cli from the store" >&2
             jar="$(nix build .#manifests-cli "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/manifests.jar"
             [ -f "$jar" ] || { echo "error: store jar not found at $jar" >&2; exit 1; }
@@ -776,6 +829,7 @@ USAGE
           manifests-cli = manifestsCliJar;
           incus-client = incusClient;
           grow = growApp;
+          mint-gh-app-token = mintGhAppTokenApp;
           flux9s = flux9sPkg;
         }
         // floxNriPluginPackages
@@ -805,6 +859,14 @@ USAGE
           type = "app";
           program = "${renderApp}/bin/rke2lab-render-manifests";
           meta.description = "Render manifests/<cluster> + signed ff-push (build manifests-cli against $MAVEN_BUILD_CACHE, then publish)";
+        };
+
+        # Standalone: `GH_TOKEN=$(nix run .#mint-gh-app-token) nix build .#seed-master` — mint a
+        # packages:read GitHub App token from .secrets for a direct (non-grow) maven build.
+        apps.mint-gh-app-token = {
+          type = "app";
+          program = "${mintGhAppTokenApp}/bin/mint-gh-app-token";
+          meta.description = "Mint a short-lived packages:read GitHub App installation token from .secrets (github.app)";
         };
 
         # Regenerate the committed network-blueprint.json from the netplan jar. Run on a
