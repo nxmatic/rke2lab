@@ -820,8 +820,13 @@ USAGE
             facetArgs=()
             if [ -n "''${GH_TOKEN:-}" ]; then
               facetTmp="$(mktemp)"
-              if git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN" \
-                   fetch -q --depth 1 origin "manifests/$cluster" 2>/dev/null \
+              # GitHub git-over-HTTPS wants BASIC auth (x-access-token:<token>), NOT bearer — a bearer
+              # extraheader silently 401s and the fetch falls through to the operator posture. base64
+              # -w0 so no newline breaks the header. Fetch stderr is surfaced (no 2>/dev/null) so a
+              # real failure is visible in the render step log.
+              authHeader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+              if git -c "http.https://github.com/.extraheader=$authHeader" \
+                   fetch -q --depth 1 origin "manifests/$cluster" \
                  && git show FETCH_HEAD:manifest.yaml 2>/dev/null \
                       | yq '.data["facet.json"]' > "$facetTmp" 2>/dev/null \
                  && [ -s "$facetTmp" ] && [ "$(cat "$facetTmp")" != "null" ]; then
