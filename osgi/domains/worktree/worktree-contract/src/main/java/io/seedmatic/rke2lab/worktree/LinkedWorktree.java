@@ -47,8 +47,12 @@ public interface LinkedWorktree extends AutoCloseable {
    * identity — a rendered branch is machine-made, attributable to the tool, never to the ambient
    * {@code user.name}). {@code sshSigningKey} is the caller's OpenSSH PRIVATE key the commit is
    * SSH-signed with (git SSHSIG, {@code git} namespace); {@link Optional#empty()} commits unsigned.
-   * The commit accretes on the branch's tip (a null-commit base + one commit per render). Returns
-   * the new commit sha. Local only — {@link #push} is the separate, credentialed act.
+   * The commit accretes on the branch's tip (a null-commit base + one commit per render that
+   * CHANGES the tree). A render that reproduces the tip byte-for-byte commits nothing — every
+   * webhook/reconcile fires a render, so an unchanged one must not churn the branch with an empty
+   * commit; it returns the unchanged tip sha instead, and the follow-up {@link #push} is a
+   * fast-forward no-op. Returns the delivered commit sha (new, or the unchanged tip). Local only —
+   * {@link #push} is the separate, credentialed act.
    */
   String commit(String message, GitIdentity identity, Optional<String> sshSigningKey);
 

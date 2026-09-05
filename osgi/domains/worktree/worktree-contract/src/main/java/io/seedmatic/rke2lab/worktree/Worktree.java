@@ -48,10 +48,12 @@ public interface Worktree {
   /**
    * Commit the staged changes with {@code message}, authored AND committed as {@code identity} — an
    * automated commit carries an explicit per-tool bot identity (minted by the caller from the PKI
-   * keystore's tailnet domain), never the ambient {@code user.name} of whoever ran the tool.
-   * Returns the new commit sha. Local only — no push (that is where a remote credential, and thus
-   * the auth edge, would enter; deliberately out of scope here). jgit stays sealed. The worktree
-   * stays domain-neutral: the tool identity is the CALLER's value.
+   * keystore's tailnet domain), never the ambient {@code user.name} of whoever ran the tool. When
+   * the staged tree matches HEAD nothing is committed — no empty commit — and the unchanged tip sha
+   * is returned. Returns the delivered commit sha (new, or the unchanged tip). Local only — no push
+   * (that is where a remote credential, and thus the auth edge, would enter; deliberately out of
+   * scope here). jgit stays sealed. The worktree stays domain-neutral: the tool identity is the
+   * CALLER's value.
    *
    * <p>{@code sshSigningKey} is the caller's OpenSSH PRIVATE key (e.g. the ndh {@code
    * github-signing} key) the commit is SSH-signed with (git SSHSIG, {@code git} namespace) — so the

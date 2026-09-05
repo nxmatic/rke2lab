@@ -18,6 +18,7 @@ import java.util.Set;
 import org.eclipse.jgit.api.CommitCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.api.errors.EmptyCommitException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.Constants;
@@ -119,7 +120,12 @@ final class JgitCheckout {
           git.commit()
               .setMessage(message)
               .setAuthor(identity.name(), identity.email())
-              .setCommitter(identity.name(), identity.email());
+              .setCommitter(identity.name(), identity.email())
+              // A render that reproduces the branch tip byte-for-byte must NOT accrete an empty
+              // commit: every webhook/reconcile fires a render, so unchanged renders would churn
+              // the branch with empty commits. Refuse it here and fall through to the unchanged
+              // tip.
+              .setAllowEmpty(false);
       // Sign with the caller's OWN key when supplied (git SSHSIG via ssh-keygen — jgit ships no ssh
       // signer, so we inject one), else force signing OFF so a repo `commit.gpgsign=true` /
       // `gpg.format=ssh` does not fail an unsigned bot commit.
@@ -129,8 +135,25 @@ final class JgitCheckout {
               key -> commit.setSign(true).setSigner(new SshCommitSigner(key)),
               () -> commit.setSign(false));
       return commit.call().getName();
+    } catch (EmptyCommitException unchanged) {
+      // Nothing changed vs the tip: the delivered sha IS the unchanged tip, and the follow-up push
+      // is a fast-forward no-op (the ref is already there) rather than an empty-commit advance.
+      return headSha();
     } catch (GitAPIException ex) {
       throw new IllegalStateException("cannot commit in " + worktree, ex);
+    }
+  }
+
+  /** The current HEAD sha — the tip a caller falls back to when a render committed nothing new. */
+  private String headSha() {
+    try (Repository repository = open()) {
+      final ObjectId head = repository.resolve(Constants.HEAD);
+      if (head == null) {
+        throw new IllegalStateException("no HEAD to return after an empty commit in " + worktree);
+      }
+      return head.name();
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot read HEAD of " + worktree, ex);
     }
   }
 
