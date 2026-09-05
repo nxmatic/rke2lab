@@ -257,6 +257,14 @@ public final class Main {
           new PrintStream(Files.newOutputStream(bootLog), true, StandardCharsets.UTF_8);
       System.setOut(bootFile);
       System.setErr(bootFile);
+      // Same policy at the logback level: seed-master is headless under Pulumi, so SUPPRESS the
+      // logback console appender PaxLogbackConfigurer adds by default (a standalone CLI keeps it,
+      // to
+      // narrate live). Property literal (seed-master does not depend on the pax fragment) —
+      // PaxLogbackConfigurer.CONSOLE_PROPERTY. Without this the console appender would just
+      // duplicate
+      // into this redirected boot file, beside logback's own .local.d/seed-master.log.
+      System.setProperty("rke2lab.log.console", "false");
     } catch (IOException ex) {
       throw new UncheckedIOException("failed to redirect the raw console to the boot file", ex);
     }

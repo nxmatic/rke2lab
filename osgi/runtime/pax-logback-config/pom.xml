@@ -30,6 +30,14 @@
       <artifactId>logback-classic</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- logback-core: ConsoleAppender lives here (logback-classic only carries the classic API the
+         policy already used). Same provided shape — at runtime the fragment links against pax's
+         embedded logback via Fragment-Host; bnd's !ch.qos.logback.* negation already covers it. -->
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <!-- Bundle / BundleContext / ServiceReference: the configurer reaches pax's live context through
          the bundle. provided — the framework's system bundle exports org.osgi.framework at runtime. -->
     <dependency>

@@ -3,6 +3,9 @@ package io.seedmatic.rke2lab.osgi.runtime.logback;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -75,6 +78,40 @@ public final class PaxLogbackConfigurer {
     final LoggerContext context = resolveContext(paxBundle);
     treeLevels.forEach((name, level) -> context.getLogger(name).setLevel(level));
     context.getLogger(Logger.ROOT_LOGGER_NAME).setLevel(Level.toLevel(rootLevelName, Level.INFO));
+    attachConsoleUnlessSuppressed(context);
+  }
+
+  /** The system property a host sets to {@code false} to SUPPRESS the console appender. */
+  protected static final String CONSOLE_PROPERTY = "rke2lab.log.console";
+
+  /**
+   * Attach a stdout {@link ConsoleAppender} to root — the DEFAULT — so a STANDALONE CLI (manifests
+   * / plan) shows its narration live. Suppressed only when {@code -Drke2lab.log.console=false}:
+   * that is seed-master's case, where the process stdout belongs to Pulumi and a logback console
+   * write would pollute the resource stream (and the native write wedges the boot under a remote
+   * debugger). This runs POST-{@code framework.start()}, past the boot-sensitive window the
+   * FILE-only bootstrap XML guards, so the appender is safe to add here. Idempotent name so a
+   * double-configure never double-attaches.
+   */
+  protected void attachConsoleUnlessSuppressed(LoggerContext context) {
+    if ("false".equalsIgnoreCase(System.getProperty(CONSOLE_PROPERTY, "true"))) {
+      return;
+    }
+    final Logger root = context.getLogger(Logger.ROOT_LOGGER_NAME);
+    if (root.getAppender("CONSOLE") != null) {
+      return;
+    }
+    final PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+    encoder.setContext(context);
+    encoder.setPattern("%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n");
+    encoder.start();
+    final ConsoleAppender<ILoggingEvent> console = new ConsoleAppender<>();
+    console.setContext(context);
+    console.setName("CONSOLE");
+    console.setTarget("System.out");
+    console.setEncoder(encoder);
+    console.start();
+    root.addAppender(console);
   }
 
   /**
