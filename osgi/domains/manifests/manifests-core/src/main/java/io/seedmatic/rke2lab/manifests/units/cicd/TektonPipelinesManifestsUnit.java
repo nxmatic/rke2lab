@@ -175,7 +175,17 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
                     "kubernetes",
                     Map.of(
                         "pipelinesAsCode",
+                        // enable MUST be set: the operator's TektonConfig.SetDefaults only defaults
+                        // Enable=true when the WHOLE pipelinesAsCode block is nil. Setting
+                        // `settings`
+                        // makes the block non-nil while Enable stays nil, and SetDefaults then
+                        // dereferences `*PipelinesAsCode.Enable` (tektonconfig_defaults.go:105) →
+                        // nil
+                        // pointer panic in the defaulting webhook → every TektonConfig apply is
+                        // rejected (EOF), wedging the whole Tekton install.
                         Map.of(
+                            "enable",
+                            true,
                             "settings",
                             Map.of(
                                 "secret-github-app-scope-extra-repos",
