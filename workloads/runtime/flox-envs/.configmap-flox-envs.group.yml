@@ -7,6 +7,7 @@ data:
     flox.seedmatic.io/v1alpha1|FloxEnv|rke2lab-system|headscale
     flox.seedmatic.io/v1alpha1|FloxEnv|rke2lab-system|tailscale
     flox.seedmatic.io/v1alpha1|FloxEnv|rke2lab-system|headplane
+    flox.seedmatic.io/v1alpha1|FloxEnv|rke2lab-system|tailnet
 kind: ConfigMap
 metadata:
   annotations:

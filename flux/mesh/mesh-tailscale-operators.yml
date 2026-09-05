@@ -14,6 +14,8 @@ spec:
   - name: mesh-funnel-cert-restore-workloads
   - name: mesh-system-namespace-foundation
   - name: mesh-system-namespace-workloads
+  - name: mesh-tailnet-purge-operators
+  - name: mesh-tailnet-purge-workloads
   force: true
   interval: 5m
   path: ./operators/mesh/tailscale

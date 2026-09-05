@@ -10,5 +10,7 @@ resources:
 - mesh-headscale.yml
 - mesh-system-namespace-foundation.yml
 - mesh-system-namespace-workloads.yml
+- mesh-tailnet-purge-operators.yml
+- mesh-tailnet-purge-workloads.yml
 - mesh-tailscale-operators.yml
 - mesh-tailscale-workloads.yml
