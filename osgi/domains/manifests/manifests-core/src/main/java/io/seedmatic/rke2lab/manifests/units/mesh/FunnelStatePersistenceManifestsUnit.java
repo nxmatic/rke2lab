@@ -236,7 +236,9 @@ public final class FunnelStatePersistenceManifestsUnit extends AbstractManifests
         # the method javadoc for why the Secret / pod-Ready are the wrong signal. Pure bash (strip the
         # trailing dot, escape dots) — the kube/base FloxEnv has bash + coreutils but NOT sed.
         fqdn="$(kubectl get -n "$ns" secret "$secret" -o jsonpath='{.data.device_fqdn}' | base64 -d)"
-        key="${fqdn%.}.crt"
+        # The strip below is doubled on purpose: this whole string is String.formatted(...), which
+        # reads a lone percent as a format conversion, so a literal one must be written twice.
+        key="${fqdn%%.}.crt"
         esc="${key//./\\\\.}"
         echo "waiting for the funnel cert ${key} to be issued and written"
         kubectl wait --for="jsonpath={.data.${esc}}" -n "$ns" "secret/${secret}" --timeout=900s
