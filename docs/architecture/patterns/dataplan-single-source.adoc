@@ -239,6 +239,28 @@ final String certHandle = dataplan.persist("funnel-cert"); // tank/rke2lab/persi
   instance renewal), diverging from the tailnet prune (in-cluster). Confirm the
   wipe hook's exact placement in ndh's instance-renewal path.
 
+== Contract types (the `dataplan-contract` bundle)
+
+The dataplan vocabulary is realised as an OSGi `type=contract` bundle
+(`io.seedmatic.rke2lab.dataplan.contract`), exported bundle-side and wired
+bundle-to-bundle — the host speaks only to the broker, never to a dataplan type.
+Its exported types:
+
+* `DataplanLayout` — the canonical cluster-ZFS layout: the pool roots + their
+  `Dataset` entries (path, tier, reclaim), the SSOT both the NixOS substrate and
+  the in-cluster openebs-zfs storage classes project from.
+* `DataplanCoordinate` — the domain's seed coordinates (the runbook + the sealed
+  layout case), the slugs the handlers speak through the broker.
+* `DataplanRunbookInput` — the runbook-input wire-record the front-door seeds the
+  dataplan scion through.
+
+A consumer imports the package in-container — `OpenebsZfsManifestsUnit` reads the
+layout to render the storage classes, `FunnelStatePersistenceManifestsUnit`
+adopts the pre-declared persist dataset. Without the bundle exporting this package
+(the bnd `Export-Package` + `io.seedmatic.rke2lab.embed;type=contract`
+capability), `manifests-core` cannot resolve its `dataplan.contract` import in any
+closure.
+
 == Related Documentation
 
 * link:netplan-blueprint-single-source.adoc[Netplan Blueprint SSOT] — the network
