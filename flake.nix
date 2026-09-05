@@ -688,10 +688,14 @@ USAGE
             # GH_TOKEN for the inner maven build: mint from the one org-owned GitHub App
             # (.secrets github.app), never a personal `gh auth token`. The inner `nix build`
             # reads GH_TOKEN impurely (hostGHToken), so export it here first.
-            if [ -f .secrets ]; then
-              # Non-fatal: if the mint fails (e.g. a checkout whose .secrets carries an encrypted
-              # key), fall back to the ambient GH_TOKEN instead of aborting the whole build. The
-              # `if` condition swallows the non-zero exit (set -e does not fire on a tested command).
+            # Mint ONLY when no token is already provided. In-cluster the Tekton step already set
+            # GH_TOKEN from PaC's App git_auth (the App-provided k8s Secret) AND .secrets is present
+            # but sops-ENCRYPTED at rest (no git smudge filter) — so keying off `[ -f .secrets ]`
+            # would wrongly try to mint from an unreadable encrypted key. Key off GH_TOKEN instead:
+            # set ⇒ in-cluster/explicit, use it; empty ⇒ the operator dropped `gh auth token`, mint.
+            if [ -z "''${GH_TOKEN:-}" ] && [ -f .secrets ]; then
+              # Non-fatal: if the mint fails (e.g. an encrypted key), do not abort the whole build.
+              # The `if` condition swallows the non-zero exit (set -e does not fire on a tested cmd).
               if minted="$(mint-gh-app-token)"; then
                 GH_TOKEN="$minted"; export GH_TOKEN
                 echo "==> using a GitHub App token for the build (packages:read)" >&2
@@ -781,12 +785,16 @@ USAGE
             read -r -a extraNixFlags <<< "''${NIX_FLAGS:-}"
             nixFlags+=( "''${extraNixFlags[@]}" )
             # GH_TOKEN for the inner maven build: on the operator (dev render), mint from the one
-            # org-owned GitHub App (.secrets github.app), never a personal token. In-cluster there is
-            # no .secrets and the Tekton step already set GH_TOKEN from PaC's App token, so skip.
-            if [ -f .secrets ]; then
-              # Non-fatal: if the mint fails (e.g. a checkout whose .secrets carries an encrypted
-              # key), fall back to the ambient GH_TOKEN instead of aborting the whole build. The
-              # `if` condition swallows the non-zero exit (set -e does not fire on a tested command).
+            # org-owned GitHub App (.secrets github.app), never a personal token. In-cluster the
+            # Tekton step already set GH_TOKEN from PaC's App token, so the guard below skips.
+            # Mint ONLY when no token is already provided. In-cluster the Tekton step already set
+            # GH_TOKEN from PaC's App git_auth (the App-provided k8s Secret) AND .secrets is present
+            # but sops-ENCRYPTED at rest (no git smudge filter) — so keying off `[ -f .secrets ]`
+            # would wrongly try to mint from an unreadable encrypted key. Key off GH_TOKEN instead:
+            # set ⇒ in-cluster/explicit, use it; empty ⇒ the operator dropped `gh auth token`, mint.
+            if [ -z "''${GH_TOKEN:-}" ] && [ -f .secrets ]; then
+              # Non-fatal: if the mint fails (e.g. an encrypted key), do not abort the whole build.
+              # The `if` condition swallows the non-zero exit (set -e does not fire on a tested cmd).
               if minted="$(mint-gh-app-token)"; then
                 GH_TOKEN="$minted"; export GH_TOKEN
                 echo "==> using a GitHub App token for the build (packages:read)" >&2
