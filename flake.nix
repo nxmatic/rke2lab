@@ -29,6 +29,12 @@
       url = "github:juanfont/headscale?ref=v0.29.3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # ndh (public) carries manage-tailnet — the bash tool that prunes stale tailnet
+    # devices via the Tailscale API. Re-exported below so the in-cluster prune Job
+    # gets it from THIS catalog like the other workloads. follows flake-commons (as
+    # the top-level rke2lab flake does) so the nixpkgs is unified.
+    ndh.url = "github:seedmatic/ndh/develop";
+    ndh.inputs.flake-commons.follows = "flake-commons";
   };
 
   outputs = {
@@ -38,6 +44,7 @@
     kdns-src,
     headplane,
     headscale,
+    ndh,
     ...
   }:
     flake-utils.lib.eachSystem [
@@ -280,6 +287,11 @@
         # from the catalog with `outputs: all`, not here: the default flake output
         # resolution locks its `-info` output, missing the binary.
         inherit (pkgs) jdk25 maven shfmt shellcheck;
+
+        # Re-exported from ndh (public): the in-cluster stale-tailnet-device prune Job installs it
+        # from this catalog via a FloxEnv and drives its --format=json JSON Lines output.
+        # aarch64-linux for the node; darwin rides along for local parity.
+        manage-tailnet = ndh.packages.${system}.manage-tailnet;
 
         default = kdns;
       };
