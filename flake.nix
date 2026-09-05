@@ -747,7 +747,7 @@ USAGE
           # openssh: the publish signs the rendered commit with RKE2LAB_SIGNING_KEY via `ssh-keygen`
           # (SshCommitSigner → jgit), which openssh provides (`Cannot run program "ssh-keygen"`
           # without it). Both were implicit on dev / the deleted cicd/nix FloxEnv.
-          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 pkgs.nodejs pkgs.openssh mintGhAppTokenApp ];
+          runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.git pkgs.jdk25 pkgs.nodejs pkgs.openssh pkgs.yq-go mintGhAppTokenApp ];
           text = ''
             if [ ! -f pom.xml ] || [ ! -f flake.nix ]; then
               echo "error: run from the rke2lab repo root" >&2
@@ -807,6 +807,31 @@ USAGE
             jar="$(nix build .#manifests-cli "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/manifests.jar"
             [ -f "$jar" ] || { echo "error: store jar not found at $jar" >&2; exit 1; }
 
+            # The facet follows the last grow: read the render facet the previous render RECORDED at
+            # the root of manifests/<cluster> (manifest.yaml, a local-config ConfigMap) and hand it to
+            # publish, so this render renders exactly what the grow decided — see
+            # docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc § render-config. Best
+            # effort, needs a token to read the branch; on the first grow / no recorded facet, publish
+            # falls back to the operator posture. `git archive --remote` is disabled on GitHub, so
+            # fetch the ref (objects only, no checkout) then read the blob with `git show` — the read
+            # is decoupled from the render worktree (which the delivery empties). Auth via an ephemeral
+            # http.extraheader (no token in the URL, no persisted credential).
+            export GIT_SSL_CAINFO="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+            facetArgs=()
+            if [ -n "''${GH_TOKEN:-}" ]; then
+              facetTmp="$(mktemp)"
+              if git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN" \
+                   fetch -q --depth 1 origin "manifests/$cluster" 2>/dev/null \
+                 && git show FETCH_HEAD:manifest.yaml 2>/dev/null \
+                      | yq '.data["facet.json"]' > "$facetTmp" 2>/dev/null \
+                 && [ -s "$facetTmp" ] && [ "$(cat "$facetTmp")" != "null" ]; then
+                facetArgs=( "-Drke2lab.manifests.facet.file=$facetTmp" )
+                echo "==> using the render facet recorded on manifests/$cluster" >&2
+              else
+                echo "==> no recorded render facet on manifests/$cluster; using the operator posture" >&2
+              fi
+            fi
+
             # Render into the plot + signed ff-push manifests/<cluster>. cluster/node from
             # the positional args; RKE2LAB_SIGNING_KEY + RKE2LAB_PUSH_TOKEN come from the
             # caller's environment (the Tekton step / the operator).
@@ -814,6 +839,7 @@ USAGE
               "-Drke2lab.manifests.outdir=$outdir" \
               "-Drke2lab.manifests.cluster=$cluster" \
               "-Drke2lab.manifests.node=$node" \
+              "''${facetArgs[@]}" \
               -jar "$jar" publish "$@"
           '';
         };

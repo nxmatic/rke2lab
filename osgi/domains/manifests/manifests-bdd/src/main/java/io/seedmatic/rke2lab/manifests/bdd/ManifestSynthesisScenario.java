@@ -1,5 +1,6 @@
 package io.seedmatic.rke2lab.manifests.bdd;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.Hidden;
@@ -560,6 +561,15 @@ public class ManifestSynthesisScenario
       } catch (IOException ex) {
         throw new UncheckedIOException("manifests synthesis failed", ex);
       }
+      // Record the facet that produced this tree at the branch ROOT, so the branch is
+      // self-describing and a later in-cluster render reads it back (the facet follows the grow —
+      // see docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc § render-config). Only
+      // for
+      // a real delivery worktree (root = the branch root the THEN stages + pushes); a bare survey /
+      // temp-dir render records nothing. This is written by the FLOW, not a ManifestsUnit: only
+      // here
+      // is the raw facet (incl. delivery) in hand, and the exploder has no root path.
+      rendered.ifPresent(worktree -> recordRenderFacet(worktree.path(), facet.facets()));
       return self();
     }
 
@@ -568,6 +578,38 @@ public class ManifestSynthesisScenario
         return Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
       } catch (IOException ex) {
         throw new UncheckedIOException("cannot create the synthesis outdir", ex);
+      }
+    }
+
+    // The self-describing render manifest at the branch root: a k8s ConfigMap carrying the
+    // effective
+    // facet, annotated config.kubernetes.io/local-config so nothing applies it (it also sits
+    // outside
+    // every Flux Kustomization path). The facet is serialised with the same field-named records the
+    // amend reflector binds, so read → decode → re-serialise is a fixpoint (no empty-commit churn).
+    private static final String RENDER_FACET_FILE = "manifest.yaml";
+    private static final ObjectMapper FACET_MAPPER = new ObjectMapper();
+
+    private void recordRenderFacet(Path root, ManifestsRunbookInput.Facets facets) {
+      try {
+        // Compact JSON in a single-quoted YAML scalar: JSON uses only double quotes, so no YAML
+        // escaping is needed. The read side (manifests-cli Main) parses data.facet.json back.
+        final String facetJson = FACET_MAPPER.writeValueAsString(facets);
+        final String configMap =
+            String.join(
+                "\n",
+                "apiVersion: v1",
+                "kind: ConfigMap",
+                "metadata:",
+                "  name: rke2lab-render-facet",
+                "  annotations:",
+                "    config.kubernetes.io/local-config: \"true\"",
+                "data:",
+                "  facet.json: '" + facetJson + "'",
+                "");
+        Files.writeString(root.resolve(RENDER_FACET_FILE), configMap);
+      } catch (IOException ex) {
+        throw new UncheckedIOException("cannot record the render facet at the branch root", ex);
       }
     }
   }

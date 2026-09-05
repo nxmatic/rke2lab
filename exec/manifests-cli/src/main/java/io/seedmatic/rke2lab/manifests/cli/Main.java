@@ -2,6 +2,7 @@
 package io.seedmatic.rke2lab.manifests.cli;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -26,6 +27,7 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -169,11 +171,50 @@ public final class Main {
           "publish needs -Drke2lab.manifests.cluster and -Drke2lab.manifests.node (the branch"
               + " manifests/<cluster> the render delivers to)");
     }
-    // The publish FACET = the operator posture plus delivery.push=true (the git-push gate
-    // ManifestSynthesisScenario reads); armed inline so no separate static helper is minted.
-    final ObjectNode facet = (ObjectNode) manifestsFacet();
-    facet.putObject("delivery").put("push", true);
+    // The FACET follows the last grow: prefer the render facet the previous render recorded on the
+    // branch (fetched to a file by the render wrapper, -Drke2lab.manifests.facet.file), so the
+    // in-cluster render renders exactly what the grow decided — see
+    // docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc § render-config. Absent (a
+    // first
+    // grow, or a local render with no recorded facet) → the operator posture, with delivery.push
+    // armed (the git-push gate ManifestSynthesisScenario reads). The recorded facet already carries
+    // its own delivery, so it is used verbatim.
+    final JsonNode facet =
+        recordedFacet()
+            .orElseGet(
+                () -> {
+                  final ObjectNode operator = (ObjectNode) manifestsFacet();
+                  operator.putObject("delivery").put("push", true);
+                  return operator;
+                });
     return ManifestsCliRun.of(outdir, identity, facet);
+  }
+
+  private static final ObjectMapper FACET_MAPPER = new ObjectMapper();
+
+  /**
+   * The render facet the previous render recorded at the branch root, if the render wrapper fetched
+   * it to a file ({@code -Drke2lab.manifests.facet.file} — raw JSON extracted from the branch's
+   * {@code manifest.yaml}). Empty when unset or unreadable → the caller falls back to the operator
+   * posture. The recorded facet already carries its {@code delivery}, so it is used verbatim.
+   */
+  private Optional<JsonNode> recordedFacet() {
+    return sysProperty("rke2lab.manifests.facet.file")
+        .flatMap(
+            path -> {
+              try {
+                final JsonNode facet = FACET_MAPPER.readTree(Path.of(path).toFile());
+                logger.info("Using the render facet recorded on the branch (from {})", path);
+                return Optional.of(facet);
+              } catch (IOException ex) {
+                logger.warn(
+                    "could not read the recorded render facet at {} ({}); using the operator"
+                        + " posture",
+                    path,
+                    ex.getMessage());
+                return Optional.empty();
+              }
+            });
   }
 
   private Optional<String> sysProperty(String key) {
