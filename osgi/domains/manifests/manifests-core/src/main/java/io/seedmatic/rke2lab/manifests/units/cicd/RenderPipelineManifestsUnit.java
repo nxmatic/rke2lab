@@ -263,6 +263,14 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           "\n",
                           "#!/usr/bin/env bash",
                           "set -euo pipefail",
+                          // Lift the publish's own logging into the container logs. Once the OSGi
+                          // framework boots, pax-logging drains SLF4J/JUL to the LogFileSeed file
+                          // (.local.d/manifests-publish.log), NOT stdout — so the container would
+                          // otherwise show only the Felix boot warnings. cat it on EXIT (a trap, so
+                          // a
+                          // failed render surfaces its log too).
+                          "trap 'echo === manifests-publish.log ===; cat"
+                              + " .local.d/manifests-publish.log 2>/dev/null || true' EXIT",
                           // PaC minted an App token into the mounted git_auth secret; extract it
                           // into RKE2LAB_PUSH_TOKEN so the in-cluster publish reveals it for the
                           // ff-push (the scion reads it in-container —
