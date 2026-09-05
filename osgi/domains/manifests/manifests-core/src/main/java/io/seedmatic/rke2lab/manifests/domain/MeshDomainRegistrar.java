@@ -3,6 +3,7 @@ package io.seedmatic.rke2lab.manifests.domain;
 import io.seedmatic.rke2lab.manifests.ManifestsDomain;
 import io.seedmatic.rke2lab.manifests.ManifestsDomainRegistrar;
 import io.seedmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.seedmatic.rke2lab.manifests.units.mesh.FunnelCertRestoreManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.mesh.FunnelStatePersistenceManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.mesh.HeadplaneManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.mesh.HeadscaleManifestsUnit;
@@ -23,6 +24,7 @@ public final class MeshDomainRegistrar implements ManifestsDomainRegistrar {
             new MeshSystemNamespaceManifestsUnit(),
             new HeadscaleManifestsUnit(),
             new HeadplaneManifestsUnit(),
+            new FunnelCertRestoreManifestsUnit(),
             new TailscaleManifestsUnit(),
             new FunnelStatePersistenceManifestsUnit()));
   }

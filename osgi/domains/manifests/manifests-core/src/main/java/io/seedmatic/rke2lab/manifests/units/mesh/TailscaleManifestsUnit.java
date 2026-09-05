@@ -32,7 +32,16 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
       new PackageMetadataProfile("mesh", "tailscale");
 
   public TailscaleManifestsUnit() {
-    super(MANIFEST_UNIT_ID, List.of(MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID));
+    // dependsOn funnel-cert-restore so Flux health-gates the restore Job to COMPLETION before this
+    // operator is up to provision any proxy — the proxy then adopts the pre-seeded funnel state
+    // Secret (cert reuse, no re-issuance) instead of racing it. See FunnelCertRestoreManifestsUnit
+    // +
+    // docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc § the ordering is STRUCTURAL.
+    super(
+        MANIFEST_UNIT_ID,
+        List.of(
+            MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID,
+            FunnelCertRestoreManifestsUnit.MANIFEST_UNIT_ID));
   }
 
   @Override
@@ -94,6 +103,12 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                 """
                 operatorConfig:
                   debug: true
+                # LE STAGING while validating funnel-cert persistence/reuse: staging has effectively
+                # unlimited rate limits, so a re-issuance during iteration does NOT burn the production
+                # 5-cert/FQDN/168h budget. Staging certs are UNTRUSTED (GitHub webhook TLS fails), so
+                # flip this back to false for production once the persisted cert is proven reused (0
+                # issuance). See docs .../pac-in-cluster-render-spec.adoc § funnel-durability.
+                useLetsEncryptStagingEnvironment: true
                 """,
                 "version",
                 version)));

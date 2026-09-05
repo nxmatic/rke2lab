@@ -131,18 +131,67 @@ PipelineRun in the CR's namespace, so its RBAC must reach `rke2lab-system` (veri
 [#funnel-durability]
 === Durable funnel identity — no Let's Encrypt re-issuance across grows
 
-The `pac-webhook` funnel's LE cert was re-issued every cold-start because the Tailscale proxy
-returned as a NEW device (fresh node key): the operator stores the proxy's tailscaled state (node
-key + cert) in a Secret named after the pod (`TS_KUBE_SECRET=$(POD_NAME)`), etcd-ephemeral, lost on
-re-grow → enough re-grows in 168h hit the per-FQDN 5-cert limit → `getCertPEM: 429` → no TLS → dead
-webhooks. Persisting etcd would make a cold-start inconsistent (it carries the old cluster forward),
-so the fix is SURGICAL — persist ONLY the funnel identity (`FunnelStatePersistenceManifestsUnit`, in
-`mesh-system`): a `ProxyClass` pins `TS_KUBE_SECRET` to a stable name; a static PV + `ZFSVolume`
-adopt the dataplan's `tank/rke2lab/persist/funnel-cert` dataset (`Retain`); a restore Job (before the
-operator provisions the proxy) writes the saved state back, a backup Job (after) mirrors it out. The
-proxy returns as the SAME device → Tailscale serves the existing cert → no re-issuance. The proxy
-cannot mount the PVC itself (ProxyClass exposes no volume), so a helper Job does. See
+The funnel's LE cert was re-issued every cold-start because the Tailscale proxy returned as a NEW
+device (fresh node key): the operator stores the proxy's tailscaled state (node key + cert) in a
+Secret named after the pod (`TS_KUBE_SECRET=$(POD_NAME)`), etcd-ephemeral, lost on re-grow → enough
+re-grows in 168h hit the per-FQDN 5-cert limit → `getCertPEM: 429` → no TLS → dead webhooks.
+Persisting etcd would make a cold-start inconsistent (it carries the old cluster forward), so the fix
+is SURGICAL — persist ONLY the funnel identity: a `ProxyClass` pins `TS_KUBE_SECRET` to a stable name;
+a static PV + `ZFSVolume` adopt the dataplan's `tank/rke2lab/persist/funnel-cert` dataset (`Retain`);
+a *restore* Job seeds the saved state into the stable Secret, and a *backup* Job mirrors it back out.
+The proxy then returns as the SAME device → Tailscale serves the existing cert → no re-issuance. The
+proxy cannot mount the PVC itself (ProxyClass exposes no volume), so the helper Jobs do. See
 link:../patterns/dataplan-single-source.adoc[Dataplan SSOT] (the persist tier).
+
+[#funnel-ordering]
+==== The ordering is STRUCTURAL — restore before the operator, not timing
+
+The invariant: when the tailscale proxy starts, its state Secret must ALREADY hold the persisted cert,
+so it reuses it (zero ACME). The operator is the SINGLE actor that creates the proxy (and the Secret,
+if absent) when it reconciles the funnel Ingress — so the restore must land the Secret *before the
+operator runs*. Leaning on Flux LAYER timing (operators-before-workloads) is not enough: the layers
+race, and a cold-start observed the proxy issue a fresh cert while the restore Job was still starved.
+The fix makes the order a DEPENDENCY GRAPH, not timing:
+
+* *`FunnelCertRestoreManifestsUnit`* (its own service) renders the restore Job + the PV/PVC/`ZFSVolume`
+  + its RBAC — it renders NO `tailscale.com` CR, so it depends only on openebs (the derived
+  `zfs.openebs.io` CRD edge), NOT on the tailscale operator.
+* *`TailscaleManifestsUnit`* (the operator) `dependsOn` `FunnelCertRestoreManifestsUnit` — so Flux
+  applies + health-gates the restore Job to completion BEFORE the operator is up to provision any
+  proxy. The operator then adopts the pre-seeded Secret (its `sts.go` `Get`+`MergeFrom`, no new
+  authkey).
+* *`FunnelStatePersistenceManifestsUnit`* keeps the `ProxyClass` + the backup Job; it `dependsOn` the
+  operator (the derived `tailscale.com` CRD edge for the `ProxyClass`). Splitting restore OUT breaks
+  the cycle (operator → restore, ProxyClass → operator) that one combined unit would form.
+
+The chain — `openebs → funnel-cert-restore → tailscale operator → ProxyClass/Ingress → proxy (adopts
+the seeded Secret) → backup` — is acyclic and gives the invariant by construction. It also SERIALISES
+the two Jobs (restore completes far up-chain; backup runs far down-chain), so they never contend for
+the one RWO persist PVC — no shared-mount storage class needed. The backup waits for the cert to be
+present in the Secret before mirroring (`kubectl wait --for=jsonpath` on the `<fqdn>.crt` key), which
+needs `list`+`watch` on its own Secret in the funnel-state Role.
+
+WARNING: the per-FQDN LE budget is REAL — 5 certs / exact FQDN / 168h. A grow that re-issues (the
+ordering broken) burns one. If the budget is exhausted before the fix holds, the escape hatch is to
+RENAME the funnel FQDN to a fresh one (a fresh 5-cert budget) — which requires updating the GitHub
+App's webhook URL to the new funnel host. Prefer getting the ordering right so the seeded cert is
+reused (0 issuance) and the treadmill stops.
+
+[NOTE]
+====
+*Validate with LE STAGING, then flip to production — a PAIR of toggles.* While proving the
+persistence/reuse mechanism, the tailscale operator runs `useLetsEncryptStagingEnvironment: true`
+(`TailscaleManifestsUnit`) — staging has effectively unlimited rate limits, so re-issuance during
+iteration never touches the production budget. Staging certs are UNTRUSTED, so for GitHub to still
+deliver the webhook during staging, *SSL verification is disabled on the GitHub App's webhook*. These
+two go together and must be flipped back TOGETHER for production:
+
+* `useLetsEncryptStagingEnvironment` → `false` (a trusted production cert), and
+* the GitHub App webhook's *SSL verification* → back ON.
+
+Do NOT ship one without the other: staging LE + SSL-verify-on ⇒ GitHub rejects the untrusted cert;
+production LE + SSL-verify-off ⇒ a working-but-unverified webhook that silently accepts a MITM.
+====
 
 == Operator setup — extend the existing App, do not create a new one
 
