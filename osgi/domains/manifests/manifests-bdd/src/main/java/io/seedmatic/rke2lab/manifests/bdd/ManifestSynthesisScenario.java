@@ -1,6 +1,8 @@
 package io.seedmatic.rke2lab.manifests.bdd;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.Hidden;
@@ -38,7 +40,9 @@ import io.seedmatic.rke2lab.seed.broker.port.SeedCoordinate;
 import io.seedmatic.rke2lab.seed.broker.port.Sensitivity;
 import io.seedmatic.rke2lab.worktree.GitIdentity;
 import io.seedmatic.rke2lab.worktree.LinkedWorktree;
+import io.seedmatic.rke2lab.worktree.Provenance;
 import io.seedmatic.rke2lab.worktree.RenderedBranch;
+import io.seedmatic.rke2lab.worktree.Worktree;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -132,6 +136,16 @@ public class ManifestSynthesisScenario
   // worktree the GROW mounts and is sealed with a signed commit.
   @OsgiService(await = false)
   private Optional<RenderedBranch> renderedBranch = Optional.empty();
+
+  // The SOURCE worktree — the checkout the process runs in (the Tekton FETCH_HEAD clone in-cluster,
+  // the grow's worktree otherwise). Its jgit provenance (HEAD sha + dirty) stamps the render's
+  // commit subject and the recorded manifest, so a rendered branch is traceable to the exact
+  // rke2lab
+  // rev that synthesised it — no wrapper plumbing, jgit is already in the boat. Same await=false
+  // shape as renderedBranch: present together (RenderedBranch is built @Reference Worktree), absent
+  // on a bare survey.
+  @OsgiService(await = false)
+  private Optional<Worktree> sourceWorktree = Optional.empty();
 
   @OsgiService(await = false)
   private Optional<NdhKeystoreReader> keystore = Optional.empty();
@@ -303,8 +317,27 @@ public class ManifestSynthesisScenario
       bot = new GitBotIdentities(ks.authorityDomain(TAILNET_AUTHORITY)).forTool(RENDER_TOOL);
       signingKey = ks.sshPrivate(SIGNING_KEY);
     }
-    return Optional.of(
-        new Delivery("render " + cluster + " manifests", bot, signingKey, push, token));
+    return Optional.of(new Delivery(renderCommitMessage(cluster), bot, signingKey, push, token));
+  }
+
+  /**
+   * The render commit subject, stamped with the SOURCE provenance so the branch is traceable to the
+   * rke2lab rev that synthesised it: {@code render <cluster> manifests @ <short-sha>[ (dirty)]}.
+   * The sha rides the worktree domain's jgit provenance (no wrapper plumbing); an empty sha (a
+   * first run with no {@code .git}) or an absent Worktree falls back to the bare subject.
+   */
+  private String renderCommitMessage(String cluster) {
+    final String subject = "render " + cluster + " manifests";
+    return sourceWorktree
+        .map(Worktree::provenance)
+        .filter(provenance -> !provenance.sha().isBlank())
+        .map(
+            provenance ->
+                subject
+                    + " @ "
+                    + provenance.sha().substring(0, Math.min(12, provenance.sha().length()))
+                    + (provenance.dirty() ? "-dirty" : ""))
+        .orElse(subject);
   }
 
   /**
@@ -476,6 +509,11 @@ public class ManifestSynthesisScenario
     // not threaded from the scenario through the Given as a step param.
     @OsgiService private Optional<ManifestSynthesisService> synthesis = Optional.empty();
 
+    // The source worktree (see the scenario field): its jgit provenance stamps the recorded render
+    // manifest with the rke2lab rev + dirty bit that synthesised this tree.
+    @OsgiService(await = false)
+    private Optional<Worktree> sourceWorktree = Optional.empty();
+
     @ProvidedScenarioState ManifestDomainPolicy domainPolicy;
     @ProvidedScenarioState ManifestSynthesisResult result;
 
@@ -569,7 +607,8 @@ public class ManifestSynthesisScenario
       // temp-dir render records nothing. This is written by the FLOW, not a ManifestsUnit: only
       // here
       // is the raw facet (incl. delivery) in hand, and the exploder has no root path.
-      rendered.ifPresent(worktree -> recordRenderFacet(worktree.path(), facet.facets()));
+      rendered.ifPresent(
+          linkedWorktree -> recordRenderFacet(linkedWorktree.path(), facet.facets()));
       return self();
     }
 
@@ -588,26 +627,30 @@ public class ManifestSynthesisScenario
     // every Flux Kustomization path). The facet is serialised with the same field-named records the
     // amend reflector binds, so read → decode → re-serialise is a fixpoint (no empty-commit churn).
     private static final String RENDER_FACET_FILE = "manifest.yaml";
-    private static final ObjectMapper FACET_MAPPER = new ObjectMapper();
+
+    // A human-readable YAML doc, NOT a ConfigMap: it sits at the branch root, outside every Flux
+    // Kustomization path, so nothing ever applies it — and native YAML reads far better than a JSON
+    // blob stuffed in a scalar. Deterministic serialisation (record component order, no doc-start
+    // marker, minimal quotes) keeps the empty-commit guard's fixpoint: same source + facet →
+    // identical bytes → no commit.
+    private static final YAMLMapper YAML_MAPPER =
+        YAMLMapper.builder()
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+            .build();
 
     private void recordRenderFacet(Path root, ManifestsRunbookInput.Facets facets) {
+      // source: the rke2lab rev that synthesised this tree (worktree jgit provenance — sha +
+      // dirty); facet: the effective policy the read side (manifests-cli Main, via the wrapper's
+      // `yq -o=json .facet`) decodes verbatim. A local record so both land in declaration order.
+      record RenderContext(Provenance source, ManifestsRunbookInput.Facets facet) {}
       try {
-        // Compact JSON in a single-quoted YAML scalar: JSON uses only double quotes, so no YAML
-        // escaping is needed. The read side (manifests-cli Main) parses data.facet.json back.
-        final String facetJson = FACET_MAPPER.writeValueAsString(facets);
-        final String configMap =
-            String.join(
-                "\n",
-                "apiVersion: v1",
-                "kind: ConfigMap",
-                "metadata:",
-                "  name: rke2lab-render-facet",
-                "  annotations:",
-                "    config.kubernetes.io/local-config: \"true\"",
-                "data:",
-                "  facet.json: '" + facetJson + "'",
-                "");
-        Files.writeString(root.resolve(RENDER_FACET_FILE), configMap);
+        final Provenance source =
+            sourceWorktree.map(Worktree::provenance).orElse(new Provenance("", false));
+        Files.writeString(
+            root.resolve(RENDER_FACET_FILE),
+            YAML_MAPPER.writeValueAsString(new RenderContext(source, facets)));
       } catch (IOException ex) {
         throw new UncheckedIOException("cannot record the render facet at the branch root", ex);
       }
@@ -664,12 +707,12 @@ public class ManifestSynthesisScenario
       if (rendered.isEmpty() || delivery.isEmpty()) {
         return self();
       }
-      final LinkedWorktree worktree = rendered.orElseThrow();
+      final LinkedWorktree linkedWorktree = rendered.orElseThrow();
       final Delivery plan = delivery.orElseThrow();
-      worktree.stageAll();
-      worktree.commit(plan.message(), plan.identity(), Optional.of(plan.signingKey()));
+      linkedWorktree.stageAll();
+      linkedWorktree.commit(plan.message(), plan.identity(), Optional.of(plan.signingKey()));
       if (plan.push()) {
-        plan.token().ifPresent(worktree::push);
+        plan.token().ifPresent(linkedWorktree::push);
       }
       return self();
     }

@@ -81,6 +81,14 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+    <!-- jackson-dataformat-yaml: the render facet is recorded as a human-readable YAML doc at the
+         branch root (YAMLMapper); the read side converts it back with `yq -o=json .facet`. bnd's
+         trailing `*` auto-imports the package, and snakeyaml is already in the runtime (manifests
+         -core ships it). -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+    </dependency>
     <!-- jGiven as compile deps: the scenario IS jGiven Stages. At runtime these packages resolve to
          the jgiven-wrap bundle, pulled into the live world by this bundle's import closure. -->
     <dependency>

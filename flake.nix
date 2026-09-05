@@ -828,7 +828,7 @@ USAGE
               if git -c "http.https://github.com/.extraheader=$authHeader" \
                    fetch -q --depth 1 origin "manifests/$cluster" \
                  && git show FETCH_HEAD:manifest.yaml 2>/dev/null \
-                      | yq '.data["facet.json"]' > "$facetTmp" 2>/dev/null \
+                      | yq -o=json '.facet' > "$facetTmp" 2>/dev/null \
                  && [ -s "$facetTmp" ] && [ "$(cat "$facetTmp")" != "null" ]; then
                 facetArgs=( "-Drke2lab.manifests.facet.file=$facetTmp" )
                 echo "==> using the render facet recorded on manifests/$cluster" >&2
