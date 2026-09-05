@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rke2lab-render-facet
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  facet.json: '{"publish":{"gitops":true,"networking":true,"clusterApi":true,"storage":true,"mesh":true,"highAvailability":true,"cicd":true},"debug":{"mesh":{"enabled":false},"networking":{"enabled":false},"nriPlugins":{"flox":{"enabled":false}}},"delivery":{"push":true}}'

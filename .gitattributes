@@ -1,0 +1,4 @@
+# Rendered Secrets are sops-filtered so their data/stringData commits encrypted, never
+# plaintext. Primary guarantee: real-data secrets ride the node-bootstrap lane (never here).
+**/*-secret-*.yml filter=sops-yaml
+**/.secret-*.yml filter=sops-yaml
