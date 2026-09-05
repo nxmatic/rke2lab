@@ -17,9 +17,8 @@ import software.constructs.Construct;
 
 /**
  * Binds the flox-controller's nix-flake catalog to a Flux source. The workload flox packages (kdns,
- * headscale, …) are defined in the {@code runtime/flox} flake, published to a dedicated {@value
- * #CATALOGUE_BRANCH} branch (the flake at branch root, a {@code git subtree split} of the {@code
- * runtime/flox} resource tree — NOT the per-cluster rendered {@code manifests/<slug>} branch, which
+ * headscale, …) are defined in a flake maintained at the ROOT of a dedicated {@value
+ * #CATALOGUE_BRANCH} branch (NOT the per-cluster rendered {@code manifests/<slug>} branch, which
  * carries only synthesised manifests). This unit emits:
  *
  * <ul>
@@ -42,7 +41,9 @@ public final class FloxCatalogManifestsUnit extends AbstractManifestsUnit {
   /** Exploded package dir (relative to the runtime domain). */
   public static final String OUTPUT_DIR = "flox-catalog";
 
-  /** Dedicated branch carrying the flake at its root (subtree split of {@code runtime/flox}). */
+  /**
+   * Dedicated branch carrying the catalog flake at its root (maintained directly on the branch).
+   */
   public static final String CATALOGUE_BRANCH = "flox-catalogue";
 
   /**

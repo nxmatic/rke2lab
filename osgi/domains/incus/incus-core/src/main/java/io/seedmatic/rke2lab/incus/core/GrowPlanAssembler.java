@@ -94,13 +94,13 @@ public final class GrowPlanAssembler {
    * SHA-256 of the nix sources that determine the built image — {@code flake.lock} (the pinned
    * inputs: nixpkgs, flox, flox-runtime — the last carries the baked NRI plugin + OCI hooks),
    * {@code flake.nix} (the nixosConfiguration wiring), and every file under {@code nixos/} (the
-   * modules). The flox {@code runtime/flox} tree is deliberately NOT folded: since the FloxEnv-CR
-   * migration the image no longer bakes envs from it (the workload closures are realised at runtime
-   * by the flox-controller, not baked), so it is the catalog SOURCE only and a catalog-only edit
-   * must not rebuild the node image. Folded over the sorted set with path + NUL + bytes, so two
-   * identical trees hash identically. A missing file/dir contributes nothing but the digest stays
-   * stable. Read-only: no shelling, so it is identical whether the run cultivates or surveys. Kept
-   * in lock-step with the {@code source_digest} in {@code build-node-base-image.sh}.
+   * modules). Since the FloxEnv-CR migration the image bakes NO flox envs — the workload closures
+   * are realised at runtime by the flox-controller from the {@code flox-catalogue} branch, so no
+   * catalog tree feeds this hash (the former in-tree {@code runtime/flox} source has been removed).
+   * Folded over the sorted set with path + NUL + bytes, so two identical trees hash identically. A
+   * missing file/dir contributes nothing but the digest stays stable. Read-only: no shelling, so it
+   * is identical whether the run cultivates or surveys. Kept in lock-step with the {@code
+   * source_digest} in {@code build-node-base-image.sh}.
    */
   private String imageSourceDigest() {
     final MessageDigest digest = sha256();
