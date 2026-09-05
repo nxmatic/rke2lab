@@ -32,16 +32,21 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
       new PackageMetadataProfile("mesh", "tailscale");
 
   public TailscaleManifestsUnit() {
-    // dependsOn funnel-cert-restore so Flux health-gates the restore Job to COMPLETION before this
-    // operator is up to provision any proxy — the proxy then adopts the pre-seeded funnel state
-    // Secret (cert reuse, no re-issuance) instead of racing it. See FunnelCertRestoreManifestsUnit
-    // +
+    // Two STRUCTURAL gates Flux health-gates to COMPLETION before this operator provisions any
+    // proxy:
+    //   - funnel-cert-restore — the proxy then adopts the pre-seeded funnel state Secret (cert
+    //     reuse, no re-issuance) instead of racing it (see FunnelCertRestoreManifestsUnit);
+    //   - tailnet-purge — the tailnet is cleared of a prior cluster's stale devices FIRST, so the
+    //     proxies never drift to a -1 MagicDNS suffix behind a lingering device (see
+    //     TailnetPurgeManifestsUnit). One gate covers funnel + controlplane + the operator's
+    // device.
     // docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc § the ordering is STRUCTURAL.
     super(
         MANIFEST_UNIT_ID,
         List.of(
             MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID,
-            FunnelCertRestoreManifestsUnit.MANIFEST_UNIT_ID));
+            FunnelCertRestoreManifestsUnit.MANIFEST_UNIT_ID,
+            TailnetPurgeManifestsUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

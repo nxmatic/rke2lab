@@ -8,6 +8,7 @@ import io.seedmatic.rke2lab.manifests.units.mesh.FunnelStatePersistenceManifests
 import io.seedmatic.rke2lab.manifests.units.mesh.HeadplaneManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.mesh.HeadscaleManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.mesh.MeshSystemNamespaceManifestsUnit;
+import io.seedmatic.rke2lab.manifests.units.mesh.TailnetPurgeManifestsUnit;
 import io.seedmatic.rke2lab.manifests.units.mesh.TailscaleManifestsUnit;
 import java.util.List;
 import org.osgi.service.component.annotations.Component;
@@ -25,6 +26,7 @@ public final class MeshDomainRegistrar implements ManifestsDomainRegistrar {
             new HeadscaleManifestsUnit(),
             new HeadplaneManifestsUnit(),
             new FunnelCertRestoreManifestsUnit(),
+            new TailnetPurgeManifestsUnit(),
             new TailscaleManifestsUnit(),
             new FunnelStatePersistenceManifestsUnit()));
   }

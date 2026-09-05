@@ -37,12 +37,5 @@
       <groupId>com.pulumi</groupId>
       <artifactId>pulumi</artifactId>
     </dependency>
-    <!-- The Pulumi Command provider: the local.Command that prunes stale tailscale devices when
-         the instance is replaced (a cold-start orphans the old node's operator proxies, which hold
-         the MagicDNS names the new node needs to reclaim). -->
-    <dependency>
-      <groupId>com.pulumi</groupId>
-      <artifactId>command</artifactId>
-    </dependency>
   </dependencies>
 </project>

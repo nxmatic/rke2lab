@@ -87,6 +87,10 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     createEnv(scope, resolver, "headscale", FloxEnvFolder.MESH, headscaleManifest(false));
     createEnv(scope, resolver, "tailscale", FloxEnvFolder.MESH, tailscaleManifest(false));
     createEnv(scope, resolver, "headplane", FloxEnvFolder.MESH, headplaneManifest(false));
+    // The tailnet-admin env for the stale-device prune Job (mesh-tailnet-purge): manage-tailnet +
+    // yq-go (the retry loop parses its --format=json JSON Lines). Always prod — an ops tool, no
+    // debug flavor.
+    createEnv(scope, resolver, "tailnet", FloxEnvFolder.MESH, tailnetManifest());
     if (mesh) {
       createEnv(scope, resolver, "headscale-debug", FloxEnvFolder.MESH, headscaleManifest(true));
       createEnv(scope, resolver, "tailscale-debug", FloxEnvFolder.MESH, tailscaleManifest(true));
@@ -201,6 +205,21 @@ public final class FloxEnvManifestsUnit extends AbstractManifestsUnit {
     // need — headplane symlinks /usr/libexec/headplane/agent to `command -v hp_agent`.
     install.put("headplane-agent", flakeRef("headplane-agent"));
     install.put("headplane-ssh-wasm", flakeRef("headplane-ssh-wasm"));
+    return manifest(install);
+  }
+
+  /**
+   * The tailnet-admin env for the stale-device prune Job: {@code manage-tailnet} (re-exported from
+   * ndh through the catalog) + a shell + {@code yq-go} (the prune loop parses {@code manage-tailnet
+   * --format=json} JSON Lines to know when the tailnet is clean). No {@code curl}: it is
+   * closure-pinned inside the manage-tailnet package itself.
+   */
+  private Map<String, Object> tailnetManifest() {
+    final Map<String, Object> install = new LinkedHashMap<>();
+    install.put("bash", catalogAll("bash"));
+    install.put("coreutils", catalogAll("coreutils"));
+    install.put("yq-go", catalogAll("yq-go"));
+    install.put("manage-tailnet", flakeRef("manage-tailnet"));
     return manifest(install);
   }
 
