@@ -280,10 +280,18 @@ final class FluxServiceKustomizationPlanner {
                         + "', which renders no cell in this tree — the CR outlives its installer");
               }
               for (final Cell consumer : consumers) {
-                if (!consumer.coord().equals(providerCoord)) {
-                  derivedEdges
-                      .computeIfAbsent(consumer, k -> new LinkedHashSet<>())
-                      .addAll(providerCells);
+                // Skip only the consumer's OWN cell, NOT its whole coord: when the CRD provider
+                // shares the consumer's coord (an operator whose HelmChart sits in the operators
+                // layer while its CR sits in workloads — the tailscale Connector), the real
+                // cross-layer edge (workloads -> operators) must still be emitted. A coord-level
+                // skip suppressed it, so the CR dry-ran before the operator registered its CRD.
+                final String consumerName = cellName(consumer, layersByCoord);
+                for (final String providerCell : providerCells) {
+                  if (!providerCell.equals(consumerName)) {
+                    derivedEdges
+                        .computeIfAbsent(consumer, k -> new LinkedHashSet<>())
+                        .add(providerCell);
+                  }
                 }
               }
             });
