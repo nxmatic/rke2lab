@@ -16,6 +16,7 @@ spec:
   interval: 5m
   path: ./workloads/mesh/tailnet-purge
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab

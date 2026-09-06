@@ -15,6 +15,7 @@ spec:
   interval: 5m
   path: ./workloads/gitops/flux-instance
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab

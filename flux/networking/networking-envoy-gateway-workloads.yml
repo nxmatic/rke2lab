@@ -16,6 +16,7 @@ spec:
   interval: 5m
   path: ./workloads/networking/envoy-gateway
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab

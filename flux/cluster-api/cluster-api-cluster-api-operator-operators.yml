@@ -20,6 +20,7 @@ spec:
   interval: 5m
   path: ./operators/cluster-api/cluster-api-operator
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab

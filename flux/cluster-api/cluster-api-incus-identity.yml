@@ -13,6 +13,7 @@ spec:
   interval: 5m
   path: ./workloads/cluster-api/incus-identity
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab

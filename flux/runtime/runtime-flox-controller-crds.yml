@@ -16,6 +16,7 @@ spec:
   interval: 5m
   path: ./crds/runtime/flox-controller
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab

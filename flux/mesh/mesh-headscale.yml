@@ -22,6 +22,7 @@ spec:
   interval: 5m
   path: ./workloads/mesh/headscale
   prune: true
+  retryInterval: 30s
   sourceRef:
     kind: GitRepository
     name: rke2lab
