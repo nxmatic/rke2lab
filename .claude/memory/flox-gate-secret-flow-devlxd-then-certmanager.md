@@ -6,7 +6,11 @@ metadata:
   type: project
 ---
 
-**Diagnostic conclusif (analyse read-only, non fixé). Plan tranché, à implémenter APRÈS compact.**
+**★ SHIPPÉ + VALIDÉ IN-CLUSTER (cold start bioskop-mgmt @823f6862, 2026-09-06).** Étape 1 = `ad5879c48` (+ fix render-mode `Optional`), étape 2 = `9949119f7`, poussés. Preuves live après grow : `MutatingWebhookConfiguration flox-controller` PRÉSENT (absent avant) ; Issuer+Certificate cert-manager READY → Secret `flox-controller-webhook-tls` ; `caBundle` injecté (ca-injector, 1536o) ; daemonset `--enable-webhook` ; Secret CAPI `bioskop-mgmt-kubeconfig` + ns `rke2lab-bioskop-mgmt` livrés par **devlxd/bootstrap** ; pods flox (headscale…) **`SchedulingGated`** au lieu de `CreateContainerError`. RÉSERVE : les pods créés AVANT l'enregistrement du webhook (tout début bootstrap : kdns, tailnet-purge) ne sont PAS gatés (un MutatingWebhook ne gate que les admissions postérieures) → self-heal NRI comme avant ; le webhook gate tout le post-boot. SÉPARÉ (pré-existant, non lié) : le **hook nix du pod render in-cluster** échoue (`StartError`, createContainer hook `name=nix` overlay `/nix` ← `/var/lib/flox-nri/nix-build-store`, flox-nri-plugin) → le render **in-cluster** reste cassé (le grow le contourne, render host-side) ; à traiter à part.
+
+---
+
+**Diagnostic conclusif d'origine (pour mémoire).**
 
 ## Symptôme
 Pendant la reconciliation cold-start (avant que les flox envs soient réalisés), le pod `tailnet-purge` (Job, ns `mesh-system`, annotation `flox.seedmatic.io/environment.purge: mesh/tailnet`) échoue `CreateContainerError` : `failed to resolve flox environment: flox environment mesh/tailnet not GC-rooted at /nix/var/nix/gcroots/flox-runtime/env/mesh/tailnet`. Self-heal par retry NRI quand le DaemonSet réalise le gcroot (~12 min de reconcile).
