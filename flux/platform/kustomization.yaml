@@ -4,4 +4,6 @@ kind: Kustomization
 resources:
 - platform-cert-manager-foundation.yml
 - platform-cert-manager-workloads.yml
+- platform-cluster-issuer-foundation.yml
+- platform-cluster-issuer-workloads.yml
 - platform-replicator.yml

@@ -14,6 +14,8 @@ spec:
   - name: cluster-runtime-system-namespace-workloads
   - name: platform-cert-manager-foundation
   - name: platform-cert-manager-workloads
+  - name: platform-cluster-issuer-foundation
+  - name: platform-cluster-issuer-workloads
   force: true
   interval: 5m
   path: ./operators/runtime/flox-webhook

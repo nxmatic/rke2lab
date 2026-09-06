@@ -13,6 +13,6 @@ spec:
   - flox-controller-webhook.rke2lab-system.svc
   - flox-controller-webhook.rke2lab-system.svc.cluster.local
   issuerRef:
-    kind: Issuer
-    name: flox-controller-webhook-selfsigned
+    kind: ClusterIssuer
+    name: rke2lab-ca
   secretName: flox-controller-webhook-tls

@@ -9,6 +9,9 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
+  dependsOn:
+  - name: platform-cluster-issuer-foundation
+  - name: platform-cluster-issuer-workloads
   force: true
   interval: 5m
   path: ./crds/cluster-api/cluster-api-operator

@@ -12,6 +12,8 @@ spec:
   dependsOn:
   - name: cluster-runtime-system-namespace-foundation
   - name: cluster-runtime-system-namespace-workloads
+  - name: platform-cluster-issuer-foundation
+  - name: platform-cluster-issuer-workloads
   force: true
   interval: 5m
   path: ./workloads/runtime/flox-webhook

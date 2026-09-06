@@ -2,19 +2,16 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cluster-api-cluster-api-operator-workloads
+  name: platform-cluster-issuer-workloads
   namespace: flux-system
 spec:
   decryption:
     provider: sops
     secretRef:
       name: sops-age
-  dependsOn:
-  - name: platform-cluster-issuer-foundation
-  - name: platform-cluster-issuer-workloads
   force: true
   interval: 5m
-  path: ./workloads/cluster-api/cluster-api-operator
+  path: ./workloads/platform/cluster-issuer
   prune: true
   sourceRef:
     kind: GitRepository

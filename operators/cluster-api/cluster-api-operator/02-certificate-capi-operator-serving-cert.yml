@@ -15,6 +15,6 @@ spec:
   - capi-operator-webhook-service.capi-operator-system.svc
   - capi-operator-webhook-service.capi-operator-system.svc.cluster.local
   issuerRef:
-    kind: Issuer
-    name: capi-operator-selfsigned-issuer
+    kind: ClusterIssuer
+    name: rke2lab-ca
   secretName: capi-operator-webhook-service-cert

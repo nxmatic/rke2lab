@@ -18,7 +18,6 @@ data:
     v1|Service|capi-operator-system|capi-operator-webhook-service
     apps/v1|Deployment|capi-operator-system|capi-operator-controller-manager
     cert-manager.io/v1|Certificate|capi-operator-system|capi-operator-serving-cert
-    cert-manager.io/v1|Issuer|capi-operator-system|capi-operator-selfsigned-issuer
     admissionregistration.k8s.io/v1|MutatingWebhookConfiguration||capi-operator-mutating-webhook-configuration
     admissionregistration.k8s.io/v1|ValidatingWebhookConfiguration||capi-operator-validating-webhook-configuration
     v1|Namespace||capi-system
