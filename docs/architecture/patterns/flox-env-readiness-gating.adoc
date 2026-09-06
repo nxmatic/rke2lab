@@ -189,6 +189,56 @@ pod could start against the prior subtree or mid-re-realisation.
 * *(u4) Priority resolves the queue, never the build* — an irreducible floor remains if the
   critical-path env is heavy and cache-cold.
 
+== Why the gate is INERT in-cluster today — the grow→cluster secret flow (2026-09-06)
+
+Live diagnostic on `bioskop-mgmt`: the gate gates *nothing*. `daemonset/flox-controller` runs with
+`--gcroot-base`/`--env-root` only — *no* `--enable-webhook` — and there is *no* flox
+`MutatingWebhookConfiguration`. The webhook AND the `PodGateReconciler` are registered only under
+`--enable-webhook` (the cluster-manager mode the DaemonSet enters when the flag is present), so with
+the flag absent no pod is ever gated: flox-consuming pods (e.g. `tailnet-purge`) schedule before
+their env is realised → `CreateContainerError: … not GC-rooted …`, self-healing only by NRI retry
+once the node-agent realises the gcroot.
+
+*Root cause — a secret-flow defect, not a gate bug.* `--enable-webhook` and the
+`MutatingWebhookConfiguration` are emitted ONLY when `ManifestSynthesisContext.webhookServing()
+.isPresent()` at render (`FloxControllerManifestsUnit`, `FloxWebhookManifestsUnit`). That serving
+cert is a cluster-pki leaf sealed ONLY at the GROW (`ClusterPkiCoordinate.WEBHOOK_SERVING`, durable
+cellar). The in-cluster steady-state render (`PublishCliScenario`) runs *secret-blind* — an
+`EphemeralCellar` seeded only by `ghapp`, with `.secrets` sops-encrypted at rest — so
+`revealWebhookServing()` is empty, the webhook renders OFF, and the branch loses it (the grow turns
+it on; the first in-cluster render strips it — proven at `manifests/bioskop-mgmt@e0f789d5`: no
+`--enable-webhook`, an empty `flox-webhook` group).
+
+This is *systemic*: every Secret that is reveal-gated AND rendered into the branch is stripped by a
+secret-blind in-cluster render — the flox webhook TLS, the operator/CAPI kubeconfig
+(`revealOperatorPki`), and the githubapp Secret (`revealGithubApp`). The replicator source secret
+already avoids it by riding the durable lane.
+
+*The two lanes for a grow→cluster secret:*
+
+* *Durable — NODE_BOOTSTRAP/devlxd*: the grow collects sealed material OUT of the branch into
+  `.bootstrap/rke2lab-bootstrap.yaml` (`SERVER_MANIFESTS`), poses it on the instance's
+  `user.rke2lab.server-manifests` devlxd key, and the master applies it at bootstrap. Off-git, never
+  touched by an in-cluster render.
+* *Fragile — branch-rendered*: a `Secret` rendered into the git branch, gated on the grow's cellar →
+  stripped in-cluster.
+
+*Fix — two steps (decided 2026-09-06):*
+
+. *Route the grow→cluster secrets through devlxd* — move the flox-webhook TLS, kubeconfig, and
+  githubapp units onto the NODE_BOOTSTRAP lane (as the replicator already is). This alone re-arms the
+  gate (the webhook is delivered durably, no longer stripped).
+. *Align cert provisioning with the K8s standard — cert-manager* — mint the flox webhook serving cert
+  in-cluster from a self-signed CA `Issuer`; cert-manager OWNS the Secret (never in the branch, never
+  pruned) and `ca-injector` fills the `MutatingWebhookConfiguration` `caBundle`. `--enable-webhook`
+  and the webhook manifests are then emitted UNCONDITIONALLY (no `webhookServing().isPresent()`
+  gate), and the whole cluster-pki `WEBHOOK_SERVING` path — whose only consumer is this webhook — is
+  deleted. The webhook cert MUST stay self-signed (it gates the tailscale pods themselves → a
+  Tailscale-signed cert is circular and pre-tailnet; its SAN is the internal `*.svc`), and needs no
+  persistence (the API server reads the ca-injected `caBundle`, so a per-lifetime self-signed CA is
+  self-consistent). A Tailscale-signed + `tank/rke2lab/persist`-backed cert is for EXTERNAL endpoints
+  (funnel/headscale `*.ts.net`) — a separate concern.
+
 == Migration path
 
 . *A (shipped)* — the webhook adds the `flox.seedmatic.io/env-ready` scheduling gate (replacing the
