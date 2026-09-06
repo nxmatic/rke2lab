@@ -144,9 +144,9 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
 
   private ApiObject createClusterRole(final Construct scope) {
     // The controller's kubebuilder RBAC markers: watch FloxEnvs + FloxCatalogs cluster-wide and
-    // patch
-    // their status, and read the Flux GitRepository a FloxCatalog resolves its catalog artifact
-    // from.
+    // patch their status; read the Flux GitRepository a FloxCatalog resolves its catalog artifact
+    // from; ensure the nix-build PVC the webhook names; and watch + update pods for the
+    // scheduling-gate reconciler.
     final ApiObject clusterRole =
         new ApiObject(
             scope,
@@ -188,7 +188,14 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
               Map.of(
                   "apiGroups", new Object[] {""},
                   "resources", new Object[] {"persistentvolumeclaims"},
-                  "verbs", new Object[] {"get", "create"})
+                  "verbs", new Object[] {"get", "create"}),
+              // The scheduling-gate reconciler (PodGateReconciler) watches gated pods and, once
+              // every referenced FloxEnv is realised at the current generation, narrows their
+              // nodeAffinity + removes the env-ready gate — an update to the pod spec.
+              Map.of(
+                  "apiGroups", new Object[] {""},
+                  "resources", new Object[] {"pods"},
+                  "verbs", new Object[] {"get", "list", "watch", "update"})
             }));
     return clusterRole;
   }
