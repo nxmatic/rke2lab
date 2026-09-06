@@ -9,7 +9,7 @@ metadata:
   name: tailnet-purge
   namespace: mesh-system
 spec:
-  backoffLimit: 3
+  backoffLimit: 20
   template:
     metadata:
       annotations:
