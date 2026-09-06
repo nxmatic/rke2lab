@@ -234,20 +234,29 @@ secret]):*
   host-consumed `local-config` dotfile). `githubapp` and the replicator source ALREADY ride the lane.
   This re-arms the CAPI kubeconfig delivery — but it does NOT re-arm the flox gate: the webhook is
   not a pure-secret case (below).
-. *Align the webhook with the K8s standard — cert-manager, Door 2 — THIS re-arms the gate.* The
-  webhook's `--enable-webhook` (on the DaemonSet), its `MutatingWebhookConfiguration`, and that
-  config's `caBundle` are ALL branch-rendered AND gated on `webhookServing().isPresent()`, so the
-  durable lane alone cannot re-arm the webhook (the `caBundle` in particular cannot be rendered
-  in-cluster without the cert — moving only the TLS Secret to Door 1 would be throwaway work). Mint
-  the flox webhook serving cert in-cluster from a self-signed CA `Issuer`; cert-manager OWNS the
-  Secret (never in the branch, never pruned) and `ca-injector` fills the `MutatingWebhookConfiguration`
-  `caBundle`. `--enable-webhook` and the webhook manifests are then emitted UNCONDITIONALLY (no
-  `webhookServing().isPresent()` gate), and the whole cluster-pki `WEBHOOK_SERVING` path — whose only
-  consumer is this webhook — is deleted. The webhook cert MUST stay self-signed (it gates the
-  tailscale pods themselves → a Tailscale-signed cert is circular and pre-tailnet; its SAN is the
-  internal `*.svc`), and needs no persistence (the API server reads the ca-injected `caBundle`, so a
-  per-lifetime self-signed CA is self-consistent). A Tailscale-signed + `tank/rke2lab/persist`-backed
-  cert is for EXTERNAL endpoints (funnel/headscale `*.ts.net`) — a separate concern.
+. *Align the webhook with the K8s standard — cert-manager, Door 2 — THIS re-arms the gate (SHIPPED
+  2026-09-06).* The webhook's `--enable-webhook` (on the DaemonSet), its
+  `MutatingWebhookConfiguration`, and that config's `caBundle` were ALL branch-rendered AND gated on
+  `webhookServing().isPresent()`, so the durable lane alone could not re-arm the webhook (the
+  `caBundle` in particular cannot be rendered in-cluster without the cert — moving only the TLS
+  Secret to Door 1 would be throwaway work). Now a self-signed `Issuer` signs a leaf serving
+  `Certificate` (SINGLE-TIER, the CAPI-operator pattern — `FloxWebhookManifestsUnit`); cert-manager
+  OWNS the Secret `flox-controller-webhook-tls` (never in the branch, never pruned) and `ca-injector`
+  fills the `MutatingWebhookConfiguration` `caBundle`. `--enable-webhook` and the webhook manifests
+  are emitted UNCONDITIONALLY (the `webhookServing().isPresent()` gate is gone), and the whole
+  cluster-pki `WEBHOOK_SERVING` path — whose only consumer was this webhook — is deleted (its
+  `SopsDecryptor` edge is KEPT: the two-tier follow-up reuses bundle-decryption). The webhook cert
+  MUST stay self-signed (it gates the tailscale pods themselves → a Tailscale-signed cert is circular
+  and pre-tailnet; its SAN is the internal `*.svc`), and needs no persistence (the API server reads
+  the ca-injected `caBundle`, so a per-lifetime self-signed CA is self-consistent). A Tailscale-signed
+  + `tank/rke2lab/persist`-backed cert is for EXTERNAL endpoints (funnel/headscale `*.ts.net`) — a
+  separate concern.
++
+NOTE: *Follow-up — two-tier with our own CA.* The single-tier leaf is an independent trust root per
+webhook; the planned convergence is a two-tier CA rooted in our *own* cluster-pki server-CA
+(delivered in-cluster via Door 1 as a Secret, referenced by a `CA` `ClusterIssuer`), so every
+in-cluster leaf (flox, CAPI, …) chains to our CA — realising the original cluster-pki vision with
+the cert-manager lifecycle. A distinct chantier; nothing in the single-tier shape forecloses it.
 
 == Migration path
 

@@ -26,13 +26,7 @@ public enum ClusterPkiCoordinate implements SeedCoordinate {
   // The operator's admin credentials (admin client cert + key + server-ca chain), minted from the
   // client-ca at seal time. SEALED — it carries the admin private key. The host reveals it after
   // the grow and writes the operator kubeconfig the readiness probe reads.
-  ADMIN_CREDENTIALS("admin-credentials"),
-
-  // The webhook serving TLS cert (serverAuth leaf + key + server-ca chain), minted from the
-  // server-ca at seal time with the flox-controller webhook Service DNS names in its SAN. SEALED —
-  // it carries the serving private key. The manifests layer reveals it to render the webhook's
-  // serving Secret + the CA bundle the ValidatingWebhookConfiguration pins.
-  WEBHOOK_SERVING("webhook-serving");
+  ADMIN_CREDENTIALS("admin-credentials");
 
   private static final String DOMAIN = "cluster-pki";
 

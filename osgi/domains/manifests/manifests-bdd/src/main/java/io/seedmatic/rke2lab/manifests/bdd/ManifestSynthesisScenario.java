@@ -26,7 +26,6 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
-import io.seedmatic.rke2lab.manifests.contract.profiles.WebhookServingMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsBundle;
 import io.seedmatic.rke2lab.manifests.ingress.ServerManifestsCoordinate;
 import io.seedmatic.rke2lab.ndh.contract.NdhKeystoreReader;
@@ -196,21 +195,6 @@ public class ManifestSynthesisScenario
     }
     return cellar.fetch(
         parcel.orElseThrow(), ClusterPkiCase.ADMIN_CREDENTIALS, OperatorPkiMaterial.class);
-  }
-
-  // Reveal the webhook serving TLS cert straight into the manifests-side WebhookServingMaterial:
-  // its
-  // three PEM fields mirror the cluster-pki WebhookServingCredentials record exactly, so the
-  // codec's
-  // structural decode reads the sealed case 1:1. Addressed by the NEUTRAL wire coordinate (see
-  // ClusterPkiCase) — no cluster-pki type is touched. Empty on a bare survey or before the seal
-  // filed.
-  private Optional<WebhookServingMaterial> revealWebhookServing() {
-    if (cellar == null || parcel.isEmpty()) {
-      return Optional.empty();
-    }
-    return cellar.fetch(
-        parcel.orElseThrow(), ClusterPkiCase.WEBHOOK_SERVING, WebhookServingMaterial.class);
   }
 
   /**
@@ -521,8 +505,7 @@ public class ManifestSynthesisScenario
    * the manifests realm knows that cross-realm wire name (the cellar matches a read case by slug).
    */
   private enum ClusterPkiCase implements SeedCoordinate {
-    ADMIN_CREDENTIALS("admin-credentials"),
-    WEBHOOK_SERVING("webhook-serving");
+    ADMIN_CREDENTIALS("admin-credentials");
 
     private final String slug;
 
@@ -560,11 +543,7 @@ public class ManifestSynthesisScenario
         .the_policy_is_derived_from_the_facet()
         .and()
         .the_manifests_are_synthesized(
-            revealOperatorPki(),
-            revealWebhookServing(),
-            revealGithubApp(),
-            revealReplicatorSources(),
-            rendered);
+            revealOperatorPki(), revealGithubApp(), revealReplicatorSources(), rendered);
     then()
         .every_enabled_domain_produced_its_units()
         .and()
@@ -661,7 +640,6 @@ public class ManifestSynthesisScenario
 
     public When the_manifests_are_synthesized(
         @Hidden Optional<OperatorPkiMaterial> operatorPki,
-        @Hidden Optional<WebhookServingMaterial> webhookServing,
         @Hidden Optional<GithubAppMaterial> githubApp,
         @Hidden Optional<ReplicatorSourceSecretsMaterial> replicatorSources,
         @Hidden Optional<LinkedWorktree> rendered) {
@@ -702,10 +680,6 @@ public class ManifestSynthesisScenario
       // The operator PKI revealed from the cellar (empty on a bare survey / before the seal filed):
       // the kubeconfig unit renders the operator + CAPI kubeconfigs from it, or nothing.
       builder.operatorPki(operatorPki);
-      // The webhook serving TLS cert revealed from the cellar (empty on a bare survey / before the
-      // seal filed): the flox-controller webhook unit renders its serving Secret + CA bundle from
-      // it, or nothing.
-      builder.webhookServing(webhookServing);
       // The one App credentials revealed from the cellar (empty on a bare survey / before the ghapp
       // registration filed): the githubapp Secret unit renders Flux's App-auth Secret from them, or
       // nothing.

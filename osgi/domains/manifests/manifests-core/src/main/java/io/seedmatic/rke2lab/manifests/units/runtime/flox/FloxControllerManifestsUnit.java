@@ -82,13 +82,10 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
     createDaemonSet(scope, context.resolver(), namespace, serviceAccount, clusterRoleBinding);
 
     // The FloxHub token target stub: mittwald fills it from the replicator source (pull pattern, as
-    // Tailscale/Tekton do). Emitted only when the webhook is enabled — same gate as the DaemonSet's
-    // FLOX_FLOXHUB_TOKEN env + the webhook's injection, which consume it. Without it the source
-    // secret
-    // (authorised to this namespace) is never pulled and the controller wedges on a missing secret.
-    if (ManifestSynthesisContext.current().webhookServing().isPresent()) {
-      createTokenReplicaStub(scope, context.resolver(), namespace);
-    }
+    // Tailscale/Tekton do), and the DaemonSet's FLOX_FLOXHUB_TOKEN env + the webhook injection
+    // consume it. Without it the source secret (authorised to this namespace) is never pulled and
+    // the controller wedges on a missing secret.
+    createTokenReplicaStub(scope, context.resolver(), namespace);
   }
 
   private void createTokenReplicaStub(
@@ -240,12 +237,6 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
     final Map<String, String> podLabels =
         Map.of("app.kubernetes.io/name", NAME, "app.kubernetes.io/component", "node-agent");
 
-    // The pod-mutating webhook is served from every DaemonSet pod (behind
-    // FloxWebhookManifestsUnit's
-    // Service) — but only when the serving cert exists (a real seal). No cert ⇒ no --enable-webhook
-    // and no cert mount, matching FloxWebhookManifestsUnit's own guard so the two never diverge.
-    final boolean webhookEnabled = ManifestSynthesisContext.current().webhookServing().isPresent();
-
     final java.util.List<Object> args =
         new java.util.ArrayList<>(
             List.of(
@@ -297,38 +288,41 @@ public final class FloxControllerManifestsUnit extends AbstractManifestsUnit {
                 Map.of(
                     "name", "CONTAINERD_ADDRESS",
                     "value", "/run/k3s/containerd/containerd.sock")));
-    if (webhookEnabled) {
-      args.add("--enable-webhook");
-      // Tell the webhook injector which (replicated) Secret carries the FloxHub token.
-      args.add("--token-secret-name=" + FLOXHUB_TOKEN_SECRET);
-      args.add("--token-secret-key=" + FLOXHUB_TOKEN_KEY);
-      // The controller's OWN flox subprocesses (realise via nsenter) authenticate with the same
-      // token. optional: the replicated Secret's key may not have landed yet (mittwald fills the
-      // stub async) — the controller must NOT wedge on it, so an absent key just leaves flox
-      // unauthenticated (warnings only) until a restart picks up the replicated value.
-      env.add(
-          Map.of(
-              "name",
-              "FLOX_FLOXHUB_TOKEN",
-              "valueFrom",
-              Map.of(
-                  "secretKeyRef",
-                  Map.of(
-                      "name", FLOXHUB_TOKEN_SECRET,
-                      "key", FLOXHUB_TOKEN_KEY,
-                      "optional", true))));
-      volumeMounts.add(
-          Map.of(
-              "name", "webhook-certs",
-              "mountPath", "/tmp/k8s-webhook-server/serving-certs",
-              "readOnly", true));
-      volumes.add(
-          Map.of(
-              "name",
-              "webhook-certs",
-              "secret",
-              Map.of("secretName", FloxWebhookManifestsUnit.TLS_SECRET_NAME)));
-    }
+    // The pod-mutating webhook is served from every DaemonSet pod (behind
+    // FloxWebhookManifestsUnit's
+    // Service). Always on: the serving cert is minted in-cluster by cert-manager (no reveal-gate),
+    // so enablement no longer depends on a grow-sealed secret that a secret-blind render would
+    // strip.
+    args.add("--enable-webhook");
+    // Tell the webhook injector which (replicated) Secret carries the FloxHub token.
+    args.add("--token-secret-name=" + FLOXHUB_TOKEN_SECRET);
+    args.add("--token-secret-key=" + FLOXHUB_TOKEN_KEY);
+    // The controller's OWN flox subprocesses (realise via nsenter) authenticate with the same
+    // token. optional: the replicated Secret's key may not have landed yet (mittwald fills the
+    // stub async) — the controller must NOT wedge on it, so an absent key just leaves flox
+    // unauthenticated (warnings only) until a restart picks up the replicated value.
+    env.add(
+        Map.of(
+            "name",
+            "FLOX_FLOXHUB_TOKEN",
+            "valueFrom",
+            Map.of(
+                "secretKeyRef",
+                Map.of(
+                    "name", FLOXHUB_TOKEN_SECRET,
+                    "key", FLOXHUB_TOKEN_KEY,
+                    "optional", true))));
+    volumeMounts.add(
+        Map.of(
+            "name", "webhook-certs",
+            "mountPath", "/tmp/k8s-webhook-server/serving-certs",
+            "readOnly", true));
+    volumes.add(
+        Map.of(
+            "name",
+            "webhook-certs",
+            "secret",
+            Map.of("secretName", FloxWebhookManifestsUnit.TLS_SECRET_NAME)));
 
     final ApiObject daemonSet =
         new ApiObject(

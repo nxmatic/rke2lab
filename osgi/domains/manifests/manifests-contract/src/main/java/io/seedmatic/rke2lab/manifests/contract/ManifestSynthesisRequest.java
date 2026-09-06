@@ -8,7 +8,6 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.IncusIdentityMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
-import io.seedmatic.rke2lab.manifests.contract.profiles.WebhookServingMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ComponentVersions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -31,7 +30,6 @@ public record ManifestSynthesisRequest(
     Optional<ImageState> imageState,
     Optional<IncusIdentityMaterial> incusIdentity,
     Optional<OperatorPkiMaterial> operatorPki,
-    Optional<WebhookServingMaterial> webhookServing,
     Optional<GithubAppMaterial> githubApp,
     Optional<ReplicatorSourceSecretsMaterial> replicatorSources)
     implements ManifestDomainPolicyAware {
@@ -62,7 +60,6 @@ public record ManifestSynthesisRequest(
     imageState = imageState == null ? Optional.empty() : imageState;
     incusIdentity = incusIdentity == null ? Optional.empty() : incusIdentity;
     operatorPki = operatorPki == null ? Optional.empty() : operatorPki;
-    webhookServing = webhookServing == null ? Optional.empty() : webhookServing;
     githubApp = githubApp == null ? Optional.empty() : githubApp;
     replicatorSources = replicatorSources == null ? Optional.empty() : replicatorSources;
   }
@@ -82,7 +79,6 @@ public record ManifestSynthesisRequest(
         .imageState(imageState)
         .incusIdentity(incusIdentity)
         .operatorPki(operatorPki)
-        .webhookServing(webhookServing)
         .githubApp(githubApp)
         .replicatorSources(replicatorSources);
   }
@@ -120,10 +116,6 @@ public record ManifestSynthesisRequest(
 
   public ManifestSynthesisRequest withOperatorPki(OperatorPkiMaterial material) {
     return toBuilder().operatorPki(Optional.of(material)).build();
-  }
-
-  public ManifestSynthesisRequest withWebhookServing(WebhookServingMaterial material) {
-    return toBuilder().webhookServing(Optional.of(material)).build();
   }
 
   public ManifestSynthesisRequest withGithubApp(GithubAppMaterial material) {
@@ -197,7 +189,6 @@ public record ManifestSynthesisRequest(
     private Optional<ImageState> imageState = Optional.empty();
     private Optional<IncusIdentityMaterial> incusIdentity = Optional.empty();
     private Optional<OperatorPkiMaterial> operatorPki = Optional.empty();
-    private Optional<WebhookServingMaterial> webhookServing = Optional.empty();
     private Optional<GithubAppMaterial> githubApp = Optional.empty();
     private Optional<ReplicatorSourceSecretsMaterial> replicatorSources = Optional.empty();
 
@@ -246,11 +237,6 @@ public record ManifestSynthesisRequest(
       return this;
     }
 
-    public Builder webhookServing(final Optional<WebhookServingMaterial> v) {
-      this.webhookServing = v;
-      return this;
-    }
-
     public Builder githubApp(final Optional<GithubAppMaterial> v) {
       this.githubApp = v;
       return this;
@@ -273,7 +259,6 @@ public record ManifestSynthesisRequest(
           imageState,
           incusIdentity,
           operatorPki,
-          webhookServing,
           githubApp,
           replicatorSources);
     }

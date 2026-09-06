@@ -24,7 +24,6 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
@@ -161,43 +160,6 @@ public final class ClusterCaGenerator {
 
   /** The operator's admin leaf: its certificate PEM + private-key PEM (endpoint-independent). */
   public record AdminLeaf(String certPem, String keyPem) {}
-
-  /**
-   * Mint a serverAuth serving leaf, signed by the cluster {@code server-ca} (the FIRST cert of
-   * {@code serverCaChainPem} — the server-CA itself, ahead of the intermediate + root). Unlike the
-   * admin leaf this carries a {@code subjectAlternativeName} (the supplied DNS names) and the
-   * {@code serverAuth} EKU, so kube's webhook client accepts it for TLS server verification.
-   * Subject {@code CN=<first dnsName>}, EC prime256v1 key, SEC1 PEM; the cert PEM is the leaf
-   * alone.
-   */
-  public ServingLeaf mintServing(
-      String serverCaChainPem, String serverCaKeyPem, List<String> dnsNames) {
-    try {
-      final X509Certificate serverCa = readCert(serverCaChainPem);
-      final PrivateKey serverCaKey = readKey(serverCaKeyPem);
-      final KeyPair servingKey = ec();
-      final GeneralName[] names =
-          dnsNames.stream()
-              .map(dns -> new GeneralName(GeneralName.dNSName, dns))
-              .toArray(GeneralName[]::new);
-      final X509Certificate servingCert =
-          signLeaf(
-              serverCa,
-              serverCaKey,
-              "CN=" + dnsNames.getFirst(),
-              servingKey.getPublic(),
-              KeyPurposeId.id_kp_serverAuth,
-              Optional.of(new GeneralNames(names)));
-      return new ServingLeaf(chainPem(servingCert), keyPem(servingKey.getPrivate()));
-    } catch (RuntimeException ex) {
-      throw ex;
-    } catch (Exception ex) {
-      throw new IllegalStateException("serving certificate minting failed", ex);
-    }
-  }
-
-  /** A serverAuth serving leaf: its certificate PEM + private-key PEM. */
-  public record ServingLeaf(String certPem, String keyPem) {}
 
   /**
    * The end-entity leaf profile: NOT a CA (BasicConstraints CA:false), KeyUsage critical {@code

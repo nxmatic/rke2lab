@@ -12,7 +12,6 @@ import io.seedmatic.rke2lab.manifests.contract.profiles.OperatorPkiMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.ReplicatorSourceSecretsMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SigningKeyMaterial;
 import io.seedmatic.rke2lab.manifests.contract.profiles.SopsAgeMaterial;
-import io.seedmatic.rke2lab.manifests.contract.profiles.WebhookServingMaterial;
 import io.seedmatic.rke2lab.manifests.ingress.ComponentVersions;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -135,10 +134,6 @@ public final class ManifestSynthesisContext {
 
   public Optional<OperatorPkiMaterial> operatorPki() {
     return request.operatorPki();
-  }
-
-  public Optional<WebhookServingMaterial> webhookServing() {
-    return request.webhookServing();
   }
 
   public Optional<GithubAppMaterial> githubApp() {

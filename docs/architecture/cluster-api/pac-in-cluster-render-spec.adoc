@@ -328,9 +328,10 @@ IMMUTABLE or ROTATING:
   the CR (no material) and nothing is stripped. Fits *rotating / derived* material — cert-manager (a
   `Certificate` → the controller mints + renews the TLS Secret, `ca-injector` fills a webhook
   `caBundle`), the mittwald replicator (the durable SOURCE fans out into target namespaces), and the
-  Tailscale operator (provisions the funnel `*.ts.net` cert in-cluster from the tailnet — the
-  `flox-controller` webhook TLS will follow this door via cert-manager, self-signed for its internal
-  `*.svc` SAN).
+  Tailscale operator (provisions the funnel `*.ts.net` cert in-cluster from the tailnet). The
+  `flox-controller` webhook TLS follows this door (shipped 2026-09-06): a self-signed cert-manager
+  `Issuer` + leaf `Certificate` for its internal `*.svc` SAN, `ca-injector` filling the
+  `MutatingWebhookConfiguration` `caBundle` — no grow-sealed secret, no reveal-gate.
 
 The doors are complementary, not alternatives: a rotating secret typically uses BOTH — Door 1 for its
 durable seed (the CA, the source), Door 2 for the in-cluster reconciliation that derives the live
