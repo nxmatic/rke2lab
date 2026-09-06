@@ -45,3 +45,12 @@ rules:
   verbs:
   - get
   - create
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - update
