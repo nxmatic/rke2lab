@@ -32,7 +32,7 @@ probing `rke2lab.target` as the substrate-ready signal.
 
 == See instead
 
-* link:../nixos-substrate/target-vision.adoc[NixOS Node-Substrate Target Vision] —
+* link:../nixos-substrate/substrate-model.adoc[NixOS Node-Substrate Model] —
   the declarative substrate that now owns the node's systemd units and ordering.
 * link:../../../nixos/[the `nixos/` modules] — the authoritative unit definitions.
 ====

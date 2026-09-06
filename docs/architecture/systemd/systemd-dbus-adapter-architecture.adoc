@@ -241,6 +241,5 @@ Recommended first pass export target names from this file:
 
 == Related Documentation
 
-* link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - How systemd units/scripts are built and deployed to nodes
 * link:../osgi/host-cellar-realisation-spec.adoc[Host Cellar realisation] - the host tree the instance mounts (supersedes host-slot-management)
-* link:troubleshooting-workflow.adoc[Troubleshooting Workflow] - Debugging systemd unit failures and state issues
+* link:../../guides/troubleshooting-workflow.adoc[Troubleshooting Workflow] - Debugging systemd unit failures and state issues

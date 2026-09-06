@@ -135,7 +135,7 @@ spec] (§ @Amendment) for the mechanism.
 flowchart TB
   pulumi["Pulumi single source cluster.name"]
   host["host reads config verbatim JSON string pre-seam"]
-  fac["ManifestsFacetContributor Amendment FACET"]
+  fac["FacetContributor Amendment FACET (manifests coordinate)"]
   sow["scenario sows WORKTREE identity plus SOIL"]
   asm["AmendmentAssembler gathers ambient fail-loud on orphan"]
   broker["SeedBroker routes the sow fail-loud on unserved"]

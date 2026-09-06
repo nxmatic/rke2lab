@@ -35,16 +35,20 @@ crosses no frontier.
   Optional<String>` (empty = the CLI is absent/unauthenticated/non-zero, a present value is trimmed and
   non-blank); and `AuthTokenSource`, the flat contract enum (`GITHUB`, `FLOXHUB`). No host config type
   crosses; the host maps its own env-var precedence and only asks the contact when the environment
-  yielded nothing. It also carries the sealed-token cellar vocabulary: `GithubToken`
-  (`@SeedContract("github-token")`, the token as a record) and `AuthCoordinate` (the `SeedCoordinate`
-  enum, `GITHUB_TOKEN` slug `github-token`, domain `auth`). The auth-seal files a `GithubToken` at
-  `AuthCoordinate.GITHUB_TOKEN` SEALED (`Sensitivity.SEALED`, `CellarCipher` at rest) from the ONE
-  source of trust — `gh auth token`, never an env var — and the rendered-branch force-push reveals it
-  on fetch. OSGi-only (sealed and revealed in-container), so unlike `ClusterPkiCoordinate` it is not
-  dual-realm.
+  yielded nothing. It also carries the GitHub push-token *mint verb*: `GithubWriterTokenMint`, a
+  pure-JDK `mint(appId, installationId, privateKeyPem) → Optional<String>` that mints a FRESH
+  `contents:write` installation token AT THE POINT OF USE from the durable App credentials a consumer
+  reveals from its own cellar case. The credential fields cross as plain strings so no `ghapp-contract`
+  type is dragged into a consumer that mirrors the App material; empty = the mint edge is filtered out
+  (survey/preview) so the caller skips the push. This SUPERSEDES the former durable auth-seal
+  (`GithubToken` filed SEALED at an `AuthCoordinate` and revealed on fetch): an installation token is
+  ephemeral (≈1 h), so a token sealed before provisioning had gone stale by the reveal after the cluster
+  came up — mint-on-demand is the fix. `GithubToken` and `AuthCoordinate` are deleted.
 * *auth-edge* (`type=edge`, `@Component`): `CliAuthTokenContact` — maps `GITHUB → gh auth token`,
   `FLOXHUB → flox auth token`, and shells nothing else. Pure `ProcessBuilder` over the JDK, no embedded
-  jars, mirroring incus-edge's ssh contact.
+  jars, mirroring incus-edge's ssh contact. Its sibling `GithubWriterTokenMintEdge` realises
+  `GithubWriterTokenMint` by delegating to the ghapp `GithubAppMinter` (the JWT-signing GitHub contact);
+  it is `cultivating`-gated, so it activates only when the minter is present.
 * *seed-master* (host): the updater keeps the env-var precedence and the YAML upsert;
   `ensureLaunchSecretsToken` resolves `AuthTokenContact` from the registry
   (`singleSpiProvider(AuthTokenContact.class)` on the already-held `BootedFramework`) and passes it into

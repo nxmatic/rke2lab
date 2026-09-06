@@ -35,7 +35,7 @@ Kubernetes dependency.
 
 == See instead
 
-* link:../nixos-substrate/target-vision.adoc[NixOS Node-Substrate Target Vision] —
+* link:../nixos-substrate/substrate-model.adoc[NixOS Node-Substrate Target Vision] —
   the declarative substrate that replaced the synthesised systemd installers.
 * link:../manifests/manifests-architecture.adoc[Manifests Architecture] — how the
   manifest units are synthesised and delivered today.

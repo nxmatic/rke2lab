@@ -718,7 +718,7 @@ stays at the host edge as a `PulumiOutputContributor` (SPI) + `PulumiOutputRegis
 assembly): each domain contributes a pure `Map` (no Pulumi dependency crosses the seam), the registry
 assembles them with unique-key + deterministic-order guarantees, host-side. This is orthogonal to the
 scenario model and unchanged by the turn — see link:../atlas/seed.adoc[seed orchestration L1] for
-the contributor/registry design and the `SystemdRuntimeStatusReport` typed record.
+the contributor/registry design and the `SystemdStatusSnapshot` typed record.
 
 [[dag-gate]]
 == The DAG gate — build-time topological safety for scenario-state
@@ -762,7 +762,7 @@ form is `SeedSystemdAdapterEndpointGate`), `DagGateSpikeTest` (the topological g
 * link:../atlas/seed.adoc[seed orchestration L1] — the graved avant/après (Diagram Q, socle shipped
   = invariant blue), the concept correspondence table (anchored on the shipped socle + the vertical),
   the four-invariant additivity verdict, and the collapsed go/no-go pointer. The output-gate design
-  (`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) lives here too.
+  (`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdStatusSnapshot`) lives here too.
 * link:../osgi/osgi-boot-decomposition-spec.adoc[OSGi boot decomposition] — the boot seam
   (`BootPlanner`/`FrameworkLauncher`) the launcher rests on; how the host boots the OSGi world the
   reasoning lives in.

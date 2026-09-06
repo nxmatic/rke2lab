@@ -1018,7 +1018,7 @@ USAGE
       }
     )) // {
       # The NixOS node substrate — the immutable Incus container image every RKE2 node
-      # boots from (docs/architecture/nixos-substrate/target-vision.adoc). System-pinned to
+      # boots from (docs/architecture/nixos-substrate/substrate-model.adoc). System-pinned to
       # aarch64-linux (Incus containers on the Apple-Silicon hypervisor); build via bioskop-nixos.
       # Build the artifacts: `.config.system.build.{squashfs,metadata}`, then
       # `incus image import <metadata>/tarball/*.tar.xz <squashfs> --alias rke2lab/node-base`.

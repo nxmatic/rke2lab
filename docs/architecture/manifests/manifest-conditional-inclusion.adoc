@@ -352,8 +352,9 @@ To add a new optional feature to an existing domain:
 
 Example: making the mesh **headplane** unit optional. The
 link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/MeshDomainRegistrar.java[MeshDomainRegistrar]
-today contributes all four mesh units (namespace, Headscale, Headplane, Tailscale)
-unconditionally via the plain `domain()`. To stage the headplane, it would override
+today contributes all its mesh units (namespace, Headscale, Headplane, Tailscale, the funnel
+cert-restore / state-persistence and tailnet-purge units) unconditionally via the plain
+`domain()`. To stage the headplane, it would override
 `domain(policy)` and gate only that unit — the same one-line branch as the ✅ pattern
 above, applied to `HeadplaneManifestsUnit`:
 
@@ -488,7 +489,7 @@ This documentation is directly linked to the implementation. Navigate to these f
 == Related Documentation
 
 * link:../bdd/bdd.adoc[BDD-as-engine] - the seeding expressed as jGiven scenarios on the JUnit launcher
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access patterns
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access patterns
 * link:../cluster-api/vcluster-implementation-plan.adoc[vCluster Implementation Plan — the current CAPI/GitOps roadmap]
 
 == Troubleshooting
@@ -610,5 +611,5 @@ final String remoteName = identity.incusRemoteName();
 == Related Documentation
 
 * link:manifests-architecture.adoc[Manifests Architecture] - Overall CDK8s generation system and the domain-registry status this mechanism depends on
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context pattern for cluster identity access
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context pattern for cluster identity access
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - How synthesized manifests reach live Kubernetes resources

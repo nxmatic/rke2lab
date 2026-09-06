@@ -453,7 +453,7 @@ pinned to the bare-metal the operator happened to run `pulumi up` on.
 == Materialization consequences
 
 NOTE: The concrete *delivery* of these materialized sets — per-cluster rendered branches
-`manifests/<host>-<role>` (force-pushed), consumed by `seed-master` (`-mgmt`) and CAPI/CAPN
+`manifests/<host>-<role>` (history-preserving fast-forward push), consumed by `seed-master` (`-mgmt`) and CAPI/CAPN
 (`-wrkld`) — is specified in link:manifests-rendered-branches.adoc[Manifests Rendered Branches]. The
 `gitops/workloads/…` path model described elsewhere is superseded by that branch-per-cluster model.
 

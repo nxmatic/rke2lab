@@ -6,7 +6,14 @@ toc::[]
 
 == Overview
 
-*Status*: DESIGN (2026-06-03)
+*Status*: IMPLEMENTED (design 2026-06-03; shipped since). The target model below is now the code in
+`AbstractManifestsUnit` (`osgi/domains/manifests/manifests-core`), with two naming differences from
+the original cadrage: the template method is named **`apply(ManifestsUnitContext context)`** (not
+`synthesize(scope)`) to match the `ManifestsUnit` interface, and the subclass hook is
+**`doSynthesize(Construct scope, ManifestsUnitContext context)`** (it also receives the context). The
+per-unit scope Construct, the group-marker `ConfigMap`, the pure constructor, direct `new XxxUnit()`
+registration, and the removal of `ManifestsUnit.lazy(...)` are all in place. Read `synthesize`/
+`delegate` in the figures below as today's `apply`/`scope`.
 
 A `ManifestsUnit` has two distinct moments that must not be conflated:
 

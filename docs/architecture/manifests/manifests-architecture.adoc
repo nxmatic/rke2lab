@@ -11,9 +11,17 @@ focused companions; see <<related-documentation>>.
 
 [NOTE]
 ====
-**Java package**: all code referenced here lives under `io.seedmatic.rke2lab.manifests`
-(directory `manifests/src/main/java/io/seedmatic/rke2lab/manifests/`). Units live in
-`units/<domain>/`, the node-environment SPI in `node/`.
+**Java packages**: the code referenced here lives under the OSGi manifests domain, split across two
+bundles both rooted at `io.seedmatic.rke2lab.manifests`:
+
+* `osgi/domains/manifests/manifests-contract/` — the SPIs and value types (the `…manifests.contract`
+  package: `ManifestDomainCatalog`, `ManifestDomainPolicy`, `ManifestAnnotation`, `ManifestLayer`,
+  the explode/document/flox SPIs, `profiles/BootstrapIdentity`, `node/NodeEnvContext`).
+* `osgi/domains/manifests/manifests-core/` — the implementations and the units (the plain
+  `…manifests` package: `AbstractManifestsUnit`, `DefaultManifestSynthesisService`, the `Default*`
+  SPI impls, `domain/` registrars, `node/DefaultNodeEnvContext`, `profiles/`, and `units/<domain>/`).
+
+The BDD narration (`ManifestSynthesisScenario`) lives in `osgi/domains/manifests/manifests-bdd/`.
 ====
 
 == Overview
@@ -27,7 +35,7 @@ installed into the cluster — synthesized from `ManifestsUnit` definitions in a
 The module once emitted a SECOND output tree — systemd unit files + `/srv/host` scripts, the
 bootstrap machinery that installed those manifests. That systemd synthesis was *dissolved* when
 the node moved to a declarative NixOS substrate (see
-link:../nixos-substrate/target-vision.adoc[target vision]); node unit ordering now lives in the
+link:../nixos-substrate/substrate-model.adoc[target vision]); node unit ordering now lives in the
 `nixos/` modules. What remains is the single K8s-manifest synthesis described here.
 ====
 
@@ -48,9 +56,10 @@ distinct vocabulary.
 
 |**ManifestsUnit**
 |`units/<domain>/<Name>ManifestsUnit.java`
-|The atomic build block. A CDK8s `Construct` that synthesizes one logical group of K8s
- resources *and* (optionally) the systemd installer service for them. Plural because one unit
- typically emits several `ApiObject` resources.
+|The atomic build block. A plain object holding metadata whose `doSynthesize(scope, context)` hook
+ synthesizes one logical group of K8s resources into a CDK8s scope it is *given* (it no longer *is* a
+ `Construct` — see <<manifestsunit>>). Plural because one unit typically emits several `ApiObject`
+ resources.
 
 |**ManifestsDomain**
 |`ManifestsDomain.java`
@@ -77,17 +86,20 @@ distinct vocabulary.
 ====
 There is **no** separate `Component` class and **no** singular `ManifestUnit`. An earlier design
 split each unit into a `Component` (CDK8s Construct) plus a `ManifestUnit` wrapper. Those were
-merged: today a single `*ManifestsUnit` class both extends `Construct` and carries the metadata
-and dependencies. If you find a doc or comment mentioning `Component`,
+merged: today a single `*ManifestsUnit` class carries the metadata and dependencies and synthesizes
+its resources into a `Construct` scope handed to `doSynthesize` (it no longer extends `Construct`
+itself). If you find a doc or comment mentioning `Component`,
 `ManifestUnit` (singular), `LayerDomain`, or `manifests/layers/`, it is stale.
 ====
 
 == Core Concepts
 
+[[manifestsunit]]
 === ManifestsUnit
 
 `ManifestsUnit` is the interface every unit implements; `AbstractManifestsUnit` is the base class
-that wires it into the CDK8s tree.
+that owns the CDK8s coupling via a template method (see
+link:manifests-unit-lifecycle.adoc[the unit lifecycle]).
 
 [source,java]
 ----
@@ -96,18 +108,20 @@ public interface ManifestsUnit {
   List<String> dependsOnManifestsUnitIds();
   default String outputDir() { /* last segment of manifestUnitId() */ }
 
-  // K8s synthesis — create ApiObjects.
+  // Template method (final in AbstractManifestsUnit): creates a scope Construct,
+  // calls doSynthesize, then emits the group marker.
   void apply(ManifestsUnitContext context);
 }
 ----
 
-A unit's single responsibility is **K8s synthesis**: create `ApiObject` instances as children of
-`this` (the unit IS-A Construct), which CDK8s walks into the consolidated `manifests.k8s.yaml`.
+A unit's single responsibility is **K8s synthesis**: create `ApiObject` instances in the CDK8s
+`scope` it is *handed*, which CDK8s walks into the consolidated `manifests.k8s.yaml`.
 
-==== The canonical constructor
+==== The pure constructor + doSynthesize hook
 
-`AbstractManifestsUnit` extends `software.constructs.Construct`. The canonical constructor takes
-the parent scope and an id, plus the unit metadata:
+A unit no longer *is* a `Construct`. `AbstractManifestsUnit implements ManifestsUnit`; its
+constructor is pure metadata initialization (id + dependency ids), and all domain logic lives in the
+`doSynthesize(Construct scope, ManifestsUnitContext context)` hook:
 
 [source,java]
 ----
@@ -119,43 +133,24 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "cilium-config");
 
-  public CiliumConfigManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public CiliumConfigManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());   // pure init — no scope, no I/O
+  }
 
-    // K8s resources created during construction — 'this' is the parent Construct
-    createHelmChartConfig();
-    createClustermeshRemoteUsersConfigMap();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createHelmChartConfig(scope);                  // 'scope' is the parent Construct
+    createClustermeshRemoteUsersConfigMap(scope);
   }
 }
 ----
 
-Because `AbstractManifestsUnit IS-A Construct`, calling `new ApiObject(this, …)` makes the unit
-the parent of its resources, so CDK8s walks `App → Chart → ManifestsUnit → ApiObject` during
-synthesis.
-
-[WARNING]
-====
-`AbstractManifestsUnit` currently retains a second, legacy constructor
-`(String manifestUnitId, List<String> deps)` that passes a `null` scope to `Construct`. This
-predates the Component merge and violates the project's uniformity and no-incomplete-state rules
-(see `CLAUDE.md`). It should be removed once every unit uses the canonical `(scope, id, …)` form;
-do not write new units against it.
-====
-
-==== Lazy construction
-
-When a registrar needs to reference a unit before a `Chart` scope exists, use the
-`ManifestsUnit.lazy(...)` factory, which defers real construction until `apply(Chart)`:
-
-[source,java]
-----
-ManifestsUnit.lazy(
-    ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
-    List.of(),
-    ClusterRuntimeNamespaceManifestsUnit::new);   // (Construct, String) -> unit
-----
-
-This avoids ever holding a unit with `null` scope (the lazy instantiation pattern in `CLAUDE.md`).
+The base `apply(context)` template method creates a fresh `Construct` under
+`context.chart()` (named after the unit id), calls `doSynthesize(scope, context)`, then emits a
+group marker into the same scope — so CDK8s walks `App → Chart → <per-unit Construct> → ApiObject`
+during synthesis. Registrars instantiate units directly with `new XxxManifestsUnit()`; there is no
+scope to defer, so the former `ManifestsUnit.lazy(...)` factory and the null-scope legacy
+constructor are both gone.
 
 === ManifestsDomain
 
@@ -183,9 +178,11 @@ CDK8s provides two base classes, and choosing wrong silently breaks the pipeline
 
 [IMPORTANT]
 ====
-**Every `ManifestsUnit` (and any helper Construct it uses) MUST extend `Construct`, never `Chart`.**
+**Any CDK8s node a unit creates (its per-unit scope, any helper `Construct`) MUST be a `Construct`,
+never a `Chart`.** The base creates the per-unit scope with `new Construct(context.chart(), …)`; a
+helper that reaches for `Chart` instead breaks the single-output model below.
 
-The only Charts in the codebase are the two created in `DefaultManifestSynthesisService`:
+The only `Chart` in the codebase is the one created in `DefaultManifestSynthesisService`:
 
 * `new Chart(app, "manifests")` — K8s resources
 ====
@@ -262,11 +259,11 @@ graph TB
     end
 
     subgraph "RKE2Lab Extension [Custom]"
-        Abstract["<b>AbstractManifestsUnit</b><br/>extends Construct + implements ManifestsUnit"]
+        Abstract["<b>AbstractManifestsUnit</b><br/>implements ManifestsUnit (plain object)<br/>apply() creates a per-unit Construct scope"]
         Iface["<b>ManifestsUnit</b> [interface]<br/>apply(ManifestsUnitContext)"]
 
-        Abstract -->|extends| CDK8sConstruct
         Abstract -->|implements| Iface
+        Abstract -.->|"apply() creates"| CDK8sConstruct
     end
 
     subgraph "Domain Model [Application]"
@@ -280,8 +277,8 @@ graph TB
         Flux -->|extends| Abstract
     end
 
-    CDK8sChart -.->|parent of| Cilium
-    Cilium -->|creates children| CDK8sApiObject
+    CDK8sChart -.->|"parent of per-unit scope"| CDK8sConstruct
+    CDK8sConstruct -->|"doSynthesize creates children"| CDK8sApiObject
 
     style CDK8sApp fill:#e1f5ff,stroke:#0066cc
     style CDK8sChart fill:#e1f5ff,stroke:#0066cc
@@ -299,21 +296,24 @@ domain model.
 
 === C4 L3: Construct tree at runtime
 
-After synthesis, each unit is a Construct owning its K8s `ApiObject`s.
+After synthesis, each unit's `apply()` has created a per-unit `Construct` scope (named after the
+unit id with `/` → `-`) owning its K8s `ApiObject`s plus the group-marker `ConfigMap`.
 
 [source,text]
 ----
 App
 └─ Chart ("manifests")
-   ├─ CiliumConfigManifestsUnit ("networking-cilium-config")
+   ├─ Construct ("networking-cilium-config")        <- created by CiliumConfigManifestsUnit.apply()
    │  ├─ ApiObject ("helmchartconfig-rke2-cilium")
-   │  └─ ApiObject ("configmap-clustermesh-remote-users")
-   └─ FluxOperatorManifestsUnit ("gitops-flux-operator")
-      └─ ApiObject ("helmchart-flux-operator")
+   │  ├─ ApiObject ("configmap-clustermesh-remote-users")
+   │  └─ ApiObject ("group-marker")                 <- local-config ConfigMap, base-emitted
+   └─ Construct ("gitops-flux-operator")            <- created by FluxOperatorManifestsUnit.apply()
+      ├─ ApiObject ("helmchart-flux-operator")
+      └─ ApiObject ("group-marker")
 ----
 
 CDK8s tracks everything via parent-child registration, so units never store references — they
-just `new ApiObject(this, …)` and let `app.synth()` walk the tree.
+just `new ApiObject(scope, …)` into the handed-in scope and let `app.synth()` walk the tree.
 
 === C4 L2b: The manifests-world port (host↔OSGi seam)
 
@@ -417,8 +417,9 @@ sequenceDiagram
     Note over Svc,Unit: K8s synthesis — units sorted by manifestUnitId
     loop for each ManifestsUnit
         Svc->>Unit: apply(context) via dependency applier
+        Note over Unit: apply() creates a per-unit Construct scope under the Chart
         Unit->>Ctx: current().bootstrapIdentity() / componentVersions() / ...
-        Unit->>Chart: new ApiObject(this, props)
+        Unit->>Chart: new ApiObject(scope, props) in doSynthesize + group marker
     end
 
     Note over Svc,App: Write files
@@ -430,10 +431,10 @@ sequenceDiagram
 
 === Runtime configuration: ManifestSynthesisContext
 
-Units never receive runtime config through constructors (they are CDK8s Constructs created with
-just `scope, id`). Instead the service publishes a `ManifestSynthesisContext` to a ThreadLocal for
-the duration of one `synthesize` call, and units read it via helper methods on
-`AbstractManifestsUnit`:
+Units never receive runtime config through constructors (their constructor is pure metadata init).
+Instead the service publishes a `ManifestSynthesisContext` to a ThreadLocal for the duration of one
+`synthesize` call, and units read it inside `doSynthesize` via
+`ManifestSynthesisContext.current()`:
 
 [cols="1,3",options="header"]
 |===
@@ -447,13 +448,14 @@ the duration of one `synthesize` call, and units read it via helper methods on
 
 [source,java]
 ----
-// In a unit's constructor or a private create* method:
-final String version = componentVersions().clusterApiOperator();
-final String cluster = bootstrapIdentity().clusterName();
+// Inside doSynthesize(...) or a private create*(scope, ...) helper:
+final ManifestSynthesisContext ctx = ManifestSynthesisContext.current();
+final String version = ctx.componentVersions().clusterApiOperator();
+final String cluster = ctx.bootstrapIdentity().clusterName();
 ----
 
 This is the documented context-access pattern; see
-link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider].
+link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider].
 
 [[ordering-and-coherence]]
 === Visit order and coherence: the resolver-driven type-state
@@ -528,7 +530,7 @@ The synthesised, exploded per-resource tree is delivered to the node's
 auto-applies it. A unit no longer emits systemd installer services: the former
 `synthesizeSystemdUnits` / `SystemdService` `/srv/host` installers were dissolved when the node
 moved to a declarative NixOS substrate (see
-link:../nixos-substrate/target-vision.adoc[the NixOS node-substrate target vision]). The full
+link:../nixos-substrate/substrate-model.adoc[the NixOS node-substrate target vision]). The full
 runtime journey is covered in link:manifest-apply-flow.adoc[Manifest Apply Flow].
 
 [[manifests-core-impl]]
@@ -567,12 +569,11 @@ graph TB
       FSSP["FloxShellSidecarProfile"]
       DSTR["DelveSidecarToggleResolver"]
     end
-    subgraph flox["flox runtime unit"]
+    subgraph flox["flox runtime units"]
       FCMU["FloxControllerManifestsUnit"]
       FFCU["FloxCatalogManifestsUnit"]
       FEMU["FloxEnvManifestsUnit"]
       FWMU["FloxWebhookManifestsUnit"]
-      NRI["NriPluginArchiveAssets"]
     end
     style svc fill:#e1ffe1,stroke:#00cc00
     style regs fill:#e1f5ff,stroke:#0066cc
@@ -625,8 +626,16 @@ cross-domain ordering.
 | `ClusterDomainRegistrar`
 | The cluster domain — `ClusterRuntimeNamespaceManifestsUnit` (runtime namespace setup).
 
+| `ClusterApiDomainRegistrar`
+| The cluster-api domain — Incus-identity Secret, image-state ConfigMap, the CAPI operator and the
+  cluster kubeconfig units.
+
 | `NetworkingDomainRegistrar`
-| The networking domain — Cilium, Envoy Gateway, KDNS units; depends on the cluster domain.
+| The networking domain — Cilium (config + advanced), Envoy Gateway, KDNS units; depends on the
+  cluster domain.
+
+| `GitopsDomainRegistrar`
+| The gitops domain — Flux operator/instance/root/receiver, SOPS-age and GitHub-app secrets.
 
 | `PlatformDomainRegistrar`
 | The platform domain — CertManager and Replicator units.
@@ -637,8 +646,17 @@ cross-domain ordering.
 | `HighAvailabilityDomainRegistrar`
 | The high-availability domain — the KubeVip unit.
 
+| `MeshDomainRegistrar`
+| The mesh domain — system namespace, Headscale, Headplane, Tailscale, funnel cert-restore /
+  state-persistence and tailnet-purge units.
+
+| `RuntimeDomainRegistrar`
+| The runtime domain — the RKE2 config unit plus the flox runtime units (controller, catalog, env,
+  webhook).
+
 | `CicdDomainRegistrar`
-| The cicd domain — the Tekton pipelines + dashboard units (published to workload clusters).
+| The cicd domain — Tekton pipelines, the render pipeline + PAC `Repository`/webhook and the
+  render-signing / PAC secrets (published to workload clusters).
 |===
 
 === Node environment
@@ -732,32 +750,33 @@ Immutable configuration objects the runtime units build their pod specs from.
   exclusion bound the blast radius; the unit renders only when the serving material is present (a
   real seal), matching `FloxControllerManifestsUnit`'s `--enable-webhook` guard. On the `operators`
   layer.
-
-| `NriPluginArchiveAssets`
-| Builds the TAR archive of NRI plugin sources with SHA-256 checksums, Base64 encoding and a JSON
-  integrity manifest.
 |===
 
 == Anti-Patterns
 
-❌ **Create `ApiObject`s with a parent other than the unit.** Passing `chart` (or a helper's
-arbitrary scope) instead of `this` drops the unit out of the tree. Create them in the constructor
-with `this` as parent.
+❌ **Create `ApiObject`s with a parent other than the handed-in scope.** Passing `chart` (or a
+helper's arbitrary scope) instead of the `Construct scope` given to `doSynthesize` drops the unit's
+resources out of its grouping node. Create them on that `scope`.
 
-❌ **Extend `Chart` from a unit.** See <<chart-vs-construct>> — it produces an orphaned output file
-the exploder ignores.
+❌ **Do domain logic in the constructor.** The constructor is pure metadata init (`super(id, deps)`);
+create `ApiObject`s in `doSynthesize`, never at construction time.
+
+❌ **Extend `Chart` from a unit helper.** See <<chart-vs-construct>> — it produces an orphaned output
+file the exploder ignores.
 
 ❌ **Hardcode domain ID strings.** Use `ManifestDomainCatalog` accessors. See
 link:manifest-domain-catalog-pattern.adoc[the catalog pattern].
 
 == Adding a New ManifestsUnit
 
-. Create `units/<domain>/<Name>ManifestsUnit.java` extending `AbstractManifestsUnit` with the
-  canonical `(Construct scope, String id)` constructor. Derive `MANIFEST_UNIT_ID` from a
+. Create `units/<domain>/<Name>ManifestsUnit.java` extending `AbstractManifestsUnit` with a no-arg
+  constructor that calls `super(MANIFEST_UNIT_ID, deps)`. Derive `MANIFEST_UNIT_ID` from a
   `ManifestDomainCatalog` accessor (e.g. `ManifestDomainCatalog.STORAGE + "/minio"`).
-. Create K8s `ApiObject`s in the constructor, stamping
-  `PackageMetadataProfile.packageAnnotations(...)` on each so the exploder routes them.
-. Register the unit in its domain (via the domain's `ManifestsDomainRegistrar`). If it depends on
+. Override `doSynthesize(Construct scope, ManifestsUnitContext context)` and create K8s `ApiObject`s
+  on `scope`, stamping `PackageMetadataProfile.packageAnnotations(...)` on each so the exploder routes
+  them.
+. Register the unit in its domain (via the domain's `ManifestsDomainRegistrar`), instantiating it
+  directly with `new <Name>ManifestsUnit()`. If it depends on
   another unit, declare that in `dependsOnManifestsUnitIds`; if the dependency lives in another
   domain, that domain must be reachable through `dependsOnDomainIds` (the cross-domain rule — see
   <<ordering-and-coherence>>), or `resolve()` will reject it.
@@ -775,7 +794,7 @@ link:manifest-domain-catalog-pattern.adoc[the catalog pattern].
 === Multiple `*.k8s.yaml` files in the synth outdir
 
 Numeric-prefixed files (`2-…k8s.yaml`) mean some Construct accidentally extends `Chart`. Fix the
-base class; only the two top-level Charts may exist.
+base class; only the single top-level `Chart ("manifests")` may exist.
 
 === Systemd service skipped (ConditionPathExists)
 
@@ -807,11 +826,11 @@ domains. The error names both units and both domains.
 Each manifests package carries a `package-info.java` with a short architecture overview and links
 back to this doc — read them next to the code in your IDE. Start points:
 
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/package-info.java[manifests/] — the SPI core (this module's entry point)
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/package-info.java[domain/] — the per-concern `ManifestsDomainRegistrar`s
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/node/package-info.java[node/] — the node environment context
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/profiles/package-info.java[profiles/] — the immutable context records
-* `units/<domain>/` — one overview per domain: link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/networking/package-info.java[networking], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[gitops], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[clusterapi], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/mesh/package-info.java[mesh], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/storage/package-info.java[storage], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/platform/package-info.java[platform], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/cicd/package-info.java[cicd], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/ha/package-info.java[ha], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/cluster/package-info.java[cluster], link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/runtime/package-info.java[runtime]
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/package-info.java[manifests/] — the core package (this module's entry point)
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/package-info.java[domain/] — the per-concern `ManifestsDomainRegistrar`s
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/node/package-info.java[node/] — the node environment context
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/profiles/package-info.java[profiles/] — the immutable context records
+* `units/<domain>/` — one overview per domain: link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/networking/package-info.java[networking], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[gitops], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[clusterapi], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/mesh/package-info.java[mesh], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/storage/package-info.java[storage], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/platform/package-info.java[platform], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/cicd/package-info.java[cicd], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/ha/package-info.java[ha], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/cluster/package-info.java[cluster], link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/runtime/package-info.java[runtime]
 
 [[related-documentation]]
 == Related Documentation
@@ -826,15 +845,15 @@ back to this doc — read them next to the code in your IDE. Start points:
   the per-service Flux Kustomizations that reconcile it (current flat/global-barrier model + the
   planned domain-scoped v2 with derived `CRD → CR` edges)
 * link:manifests-contribution-channels.adoc[Manifests Contribution Channels] — how a domain hands
-  work to the synthesis: the three typed channels (units, node-env, host-assets), their aggregators,
-  and the SCR shape they share
-* link:systemd-architecture.adoc[Systemd Architecture] — target hierarchy, ordering directives,
-  rke2-server drop-in
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] — how units read cluster /
-  infrastructure identity from context
+  work to the synthesis: the surviving manifest-unit channel (the former node-env and host-asset
+  channels were dissolved into the NixOS node substrate), its aggregator, and the SCR shape it uses
+* link:../systemd/systemd-architecture.adoc[Systemd Architecture] — target hierarchy, ordering
+  directives, rke2-server drop-in
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] — how units read
+  cluster / infrastructure identity from context
 * link:../bdd/bdd.adoc[BDD-as-engine] — the seeding expressed as jGiven scenarios on the JUnit
   launcher
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java]
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java]
   — the synthesis orchestrator
-* link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
+* link:../../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
   — the unit interface

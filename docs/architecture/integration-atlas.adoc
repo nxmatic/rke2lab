@@ -29,7 +29,7 @@ ordering (placement) is not tidiness; it is what keeps a solved problem solved.
   *value threads* that cross several models at once, and the two-spaces / two-vocabularies frame every
   view is read against. *Start here.* This is articulation, not detail.
 * *L1 — per-subsystem views (`atlas/*.adoc`).* One file per subsystem (doctor, config, runtime,
-  unit-repo, manifests, host-pipeline): the "container" zoom of each model, with its own monotone
+  unit-repo, manifests, seed, nixos-substrate, cellar-secrets): the "container" zoom of each model, with its own monotone
   before/after figures. You descend here once L0 has told you where the problem lives.
 * *L2 — the figures inside each L1 view.* The additivity proofs themselves.
 

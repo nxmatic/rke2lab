@@ -15,8 +15,7 @@ The whole premise — that the control node consumes host assets delivered under
 is gone. The node moved to a declarative NixOS substrate: its config, systemd
 units, scripts, identity, PKI and toolbox are baked by the `nixos/` modules, so
 there is no `/srv/host` asset root to own, alias, or materialise. See
-link:../nixos-substrate/target-vision.adoc[the NixOS node-substrate target
-vision].
+link:../nixos-substrate/substrate-model.adoc[the NixOS node-substrate model].
 
 What survives on the manifests side is only the Kubernetes payload: the runtime
 domain units (contributed by `RuntimeDomainRegistrar`) synthesise k8s manifests

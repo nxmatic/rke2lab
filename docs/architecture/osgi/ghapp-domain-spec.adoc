@@ -10,7 +10,9 @@
 `WebhookReconcileInput`), `ghapp-edge` (`GithubAppTokenMinter`, `GithubAppWebhookConfigurerEdge`) and
 `ghapp-bdd` (`GithubAppScenario` — a pure rehydrate — + `GithubAppRunbookHandler`, and the grow-sown
 `GithubAppWebhookScenario` + `GithubAppWebhookRunbookHandler` + `GithubAppWebhookAmendReflector`) build
-green, as does the host-side `GithubAppCli` operator command. Still pending: the writer token seal and
+green, as does the host-side `GithubAppCli` operator command. The writer path SHIPPED — as an
+on-demand mint (the `auth` domain's `GithubWriterTokenMint` verb / `GithubWriterTokenMintEdge`, which
+`@References` `GithubAppMinter`), not the durable token seal originally planned here. Still pending:
 the Flux reader render. This is the domain
 realisation of the cross-cutting vision in
 link:../cluster-api/github-credential-model.adoc[GitHub Credential Model].
@@ -206,42 +208,41 @@ below).
 The whole point of the reader is to have something to read: `seed-master` must *push* the rendered
 manifests so the cluster can pull them. That push is the spine, and it is where `GithubAppMinter` runs.
 
-*The mint is in-container, not host-side.* `GithubAppMinter` and `GithubAppCredentials` are
-bundle-wired `type=contract` types — a flat-host `awaitService(GithubAppMinter.class)` resolves the
-host's own class copy, which never matches the bundle's, so the host *cannot* call the minter directly
-(the seam law in link:../../CLAUDE.md[CLAUDE.md]). So the mint runs *in a scenario*: it reveals the
-sealed `GithubAppCredentials`, mints the WRITER token, and *seals the token string* at a cellar
-coordinate; the host reveals *that string* through the broker (JSON only) and hands it to
-`JgitCheckout`. This is the *exact* shape the auth domain already uses today — `AuthSealScenario` →
-sealed `GithubToken` → `JgitCheckout` — so the change is a *source swap* (App mint instead of `gh auth
-token`), not a host rewrite.
+*The mint is in-container, at the point of use — never sealed.* `GithubAppMinter` and
+`GithubAppCredentials` are bundle-wired `type=contract` types — a flat-host
+`awaitService(GithubAppMinter.class)` resolves the host's own class copy, which never matches the
+bundle's, so the host *cannot* call the minter directly (the seam law in
+link:../../CLAUDE.md[CLAUDE.md]). So the mint runs *in the scenario that pushes*
+(`ManifestSynthesisScenario`, and the version-bump `VersionBumpScenario`): at the moment of the push
+it reveals the sealed `GithubAppCredentials` from its own cellar case and mints a FRESH `WRITER` token
+through the `auth` domain's `GithubWriterTokenMint` verb (its `cultivating` edge
+`GithubWriterTokenMintEdge` `@References` `GithubAppMinter`). The token is *ephemeral* (≈1 h) and
+*never sealed* — minting it seconds before the push and discarding it is what keeps it from going
+stale, the trap a durable seal fell into (an installation token filed in the cellar before
+provisioning, revealed for the push after the whole cluster came up, long past its 1 h life). The
+push itself is in-container too, so the token never crosses the host↔OSGi membrane.
 
 [mermaid,ghapp-writer,svg]
 ----
 flowchart LR
   CEL[("cellar<br/>GithubAppCredentials (SEALED)")]
-  subgraph OSGI["ghapp scenario (in-container, under pulumi up)"]
-    MINT["GithubAppMinter.mint(creds, WRITER)<br/>JWT → POST access_tokens (contents:write)"]
-    SEAL["seal the WRITER token string<br/>(short-lived, ≈1 h)"]
-    MINT --> SEAL
-  end
-  subgraph SM["seed-master · pulumi-edge (host)"]
-    REVEAL["reveal the token (broker, JSON)"]
-    PUSH["JgitCheckout push<br/>x-access-token : &lt;token&gt;"]
-    REVEAL --> PUSH
+  subgraph OSGI["push scenario (in-container: ManifestSynthesisScenario / VersionBumpScenario)"]
+    REVEAL["reveal GithubAppCredentials<br/>(from the cellar case)"]
+    MINT["GithubWriterTokenMint.mint(appId, installationId, pem)<br/>edge delegates to GithubAppMinter: JWT → POST access_tokens (contents:write)"]
+    PUSH["JgitCheckout push (in-container)<br/>x-access-token : &lt;fresh token&gt;"]
+    REVEAL --> MINT --> PUSH
   end
   GH[("GitHub · seedmatic/rke2lab")]
-  CEL --> MINT
-  SEAL -->|"broker seam (String only)"| REVEAL
+  CEL --> REVEAL
   PUSH -->|"push manifests/&lt;host&gt;-&lt;role&gt;"| GH
   classDef c fill:#eef,stroke:#88a,stroke-width:1.6px;
-  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
-  class MINT,SEAL c; class REVEAL,PUSH h;
+  class REVEAL,MINT,PUSH c;
 ----
 
-This *replaces* the current `gh auth token` → sealed `GithubToken` → `JgitCheckout` path, atomically —
-the push must never be left without a credential. `GithubAppMinter` is fail-fast: it returns a token or
-throws, never a silent fallback.
+This *replaced* the former `gh auth token` → sealed-token → host-side `JgitCheckout` path (whose
+auth-seal vocabulary — `AuthSealScenario`, `GithubToken`, the `auth` sow — is deleted): the credential
+source is now the org-owned App, the mint is on-demand, and both mint and push live in the scenario.
+`GithubAppMinter` is fail-fast: it returns a token or throws, never a silent fallback.
 
 == The webhook reconcile — pointing the App at the funnel
 
@@ -404,8 +405,9 @@ human ceremony is host-side, out of the pulumi-driven grow.
   this domain realises (why an org-owned App, escaping personal-token governance).
 * link:../cluster-api/manifests-rendered-branches.adoc[Manifests Rendered Branches] — the push/pull
   delivery seam whose auth this domain provides.
-* link:auth-edge-spec.adoc[auth-edge] — the sibling credential domain whose `gh auth token` writer path
-  this supersedes.
+* link:auth-edge-spec.adoc[auth-edge] — the sibling credential domain that now hosts the on-demand
+  `GithubWriterTokenMint` writer verb this domain's `GithubAppMinter` backs (superseding the former
+  `gh auth token` seal).
 * https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-using-url-parameters[Registering
   a GitHub App using URL parameters] — the pre-filled-form mechanism `ghapp create` uses.
 * https://fluxcd.io/blog/2025/04/flux-operator-github-app-bootstrap/[Flux Operator GitHub App bootstrap]

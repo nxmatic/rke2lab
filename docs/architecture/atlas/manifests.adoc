@@ -292,17 +292,21 @@ flowchart LR
 *What holds.* The operation is realm-neutral (it never knows its host) — the same coordinates sown
 under a Pulumi grow, a standalone CLI, or a PaC PipelineRun. The push identity is uniform (the baked
 GitHub App) across all three; only the token's provenance is host-specific, resolved by the
-`ExecutionEnvironment` FACT (OPERATOR mints via `.secrets`; IN_CLUSTER consumes PaC's `git_auth`).
+`ExecutionEnvironment` instance from the `ExecutionEnclosure` FACT (OPERATOR mints via `.secrets`;
+IN_CLUSTER consumes PaC's `git_auth`).
 The render output is secret-blind (real-data secrets ride the NODE_BOOTSTRAP lane, off the branch),
 so the in-cluster `EmptySecretsGateway` holds — the loop closes without descending any operator
 secret into the cluster.
 
 The render *configuration* is uniform the same way, and recorded in the branch. The facet (which
 layers publish, `delivery`) has one authoring source — the Pulumi stack, read at the grow — and the
-render writes it back as a `local-config` resource at the ROOT of `manifests/<cluster>` (a hidden
-dotfile Flux never applies). The in-cluster lane READS that manifest at branch HEAD, so it renders
-exactly what the last grow decided (not a hardcoded CLI default that would diverge — e.g. drop
-`mesh`), and the branch is self-describing (`git show manifests/<cluster>:<the manifest>`). The grow
+render writes it back as a native-YAML `manifest.yaml` doc at the ROOT of `manifests/<cluster>`
+(carrying `source:{sha,dirty}` provenance + the effective `facet:`, NOT a ConfigMap — it sits outside
+every Flux Kustomization path so nothing applies it, and deterministic serialisation keeps the
+empty-commit guard's fixpoint). The in-cluster lane READS that manifest at branch HEAD (the wrapper's
+`git show manifests/<cluster>:manifest.yaml | yq .facet`), so it renders exactly what the last grow
+decided (not a hardcoded CLI default that would diverge — e.g. drop
+`mesh`), and the branch is self-describing. The grow
 is the authority; the in-cluster render is its faithful continuation; the Pipeline stays generic (a
 `facet` param overrides only to intentionally drift). See
 link:../cluster-api/pac-in-cluster-render-spec.adoc#render-config[the facet-follows-the-grow section].

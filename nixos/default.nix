@@ -1,7 +1,7 @@
 # rke2lab node-base — the homogeneous NixOS substrate every RKE2 node shares. This is the aggregator:
 # each concern is a sibling module pulled in via `imports`; the flake imports the directory as
 # `./nixos`. Role (server/agent) and per-node identity (node-ip, hostname, token) are layered on top;
-# this is what is common to all nodes. See docs/architecture/nixos-substrate/target-vision.adoc.
+# this is what is common to all nodes. See docs/architecture/nixos-substrate/substrate-model.adoc.
 #
 # Iteration 1 (path B): stock rke2 server, dual-stack, flox baked. Proven end-to-end by the spike
 # (image builds, boots in Incus, rke2-server + containerd come up). Next iterations add the

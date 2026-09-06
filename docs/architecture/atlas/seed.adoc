@@ -54,7 +54,7 @@ resolved at the collaborator frontier (the `@OsgiService` bridge picks a `Cultiv
 impl by LDAP filter on `rke2lab.gardening`; scenarios are mode-blind), with the render decoupled from
 execution (`PendingMarkingScenarioExecutor` marks steps PENDING, E9). What survives from Diagram P is
 the *named erasure of the seven scattered `isDryRun()` reads* and the whole *output gate* half
-(`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdRuntimeStatusReport`) — the output axis is
+(`PulumiOutputContributor`/`PulumiOutputRegistry`, `SystemdStatusSnapshot`) — the output axis is
 orthogonal to the turn and stays exactly as drawn. Read Diagram P for those; read the turn section for
 the preview mechanism.
 ====
@@ -76,7 +76,7 @@ flowchart LR
     a_gate["LiveGate (state)<br/>gate.through(live, deferred)"]
     a_reg["PulumiOutputRegistry<br/>add()+assemble(): unique keys, 1 flatten"]
     a_spi["PulumiOutputContributor (SPI)<br/>structured in, flat only in contribute()"]
-    a_report["SystemdRuntimeStatusReport<br/>typed record, watcher reads it typed"]
+    a_report["SystemdStatusSnapshot<br/>typed record, watcher reads it typed"]
     a_gate -->|per action| a_reg
     a_spi -->|contributes| a_reg
     a_report -.->|its contributor projects| a_spi
@@ -108,7 +108,7 @@ An honest reading:
   is not a separate fix — it is what the living gate removes by construction: in preview the deferred
   probe is injected, the scenario still renders its runbook shell, but no `waitFor` fires.
 
-. *The seam shrinks the null surface.* `SystemdRuntimeStatusReport` stays a domain-pure record, so the
+. *The seam shrinks the null surface.* `SystemdStatusSnapshot` stays a domain-pure record, so the
   watcher reads `report.snapshot()` typed. The null-safety arc (below) turned WARN→ERROR on the live
   surface; this view keeps the host null-clean at the source rather than annotating consumers.
 
@@ -398,7 +398,7 @@ in the SAME run (§ link:../osgi/host-cellar-realisation-spec.adoc[the reconcile
 .. GIVEN an omniscient `OutputBuilder` pulling each summary by name over raw maps, systemd flattening
    at production so the watcher re-parses an untyped map
 .. WHEN outputs become `PulumiOutputContributor`s assembled by `PulumiOutputRegistry` (unique-key
-   guarantee, single flatten point) and `SystemdRuntimeStatusReport` stays a typed record read by the
+   guarantee, single flatten point) and `SystemdStatusSnapshot` stays a typed record read by the
    watcher
 .. THEN adding an output means implementing the SPI (never editing a hub), a key collision is a named
    failure not a silent overwrite, and the watcher reads typed fields — AND the change is additive: the

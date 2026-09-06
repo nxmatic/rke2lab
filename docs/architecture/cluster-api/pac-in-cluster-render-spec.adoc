@@ -368,18 +368,20 @@ grow decided.* The grow is the authority; the steady-state render is its faithfu
 facet must reach the in-cluster render WITHOUT re-authoring and WITHOUT the render touching Pulumi —
 and the branch should RECORD how it was rendered, inspectable in git.
 
-*The branch records its own render facet, as a `local-config` resource at the root.* Every render
-writes a k8s-format resource carrying the facet, annotated `config.kubernetes.io/local-config: "true"`,
-at the ROOT of the materialised tree (which becomes the root of `manifests/<cluster>`). It is written
-by the synthesis FLOW — `ManifestSynthesisScenario`, which holds the raw `Amendment.FACET` and the
-materialisation root — NOT a CDK8s `ManifestsUnit`: at synthesis time only the *resolved*
-`ManifestDomainPolicy` survives (the raw facet, and `delivery.push`, are not retained), so a unit could
-not echo the original facet, and the exploder nests every rendered resource under
-`<layer>/<domain>/<package>/` with no root path. The scenario writes it directly at the tree root —
-the legitimate root-write location where the exploder already lands `.gitattributes` — with the
-`local-config` annotation so nothing applies it (it also sits outside every Flux `Kustomization` path).
-The branch becomes self-describing: `git show manifests/<cluster>:<the manifest>` shows the facet that
-produced it.
+*The branch records its own render facet, as a native-YAML `manifest.yaml` document at the root.* Every
+render writes a plain YAML doc (`RENDER_FACET_FILE = "manifest.yaml"`) at the ROOT of the materialised
+tree (which becomes the root of `manifests/<cluster>`), carrying two top-level keys — `source:` (the
+render's `sha` + `dirty` provenance) and `facet:` (the resolved facet). It is NOT a Kubernetes resource
+— no `local-config` ConfigMap, no `config.kubernetes.io/local-config` annotation — but a human-legible
+git artefact, written by the synthesis FLOW — `ManifestSynthesisScenario`, which holds the raw
+`Amendment.FACET` and the materialisation root — NOT a CDK8s `ManifestsUnit`: at synthesis time only the
+*resolved* `ManifestDomainPolicy` survives (the raw facet is not retained), so a unit could not echo the
+original facet, and the exploder nests every rendered resource under `<layer>/<domain>/<package>/` with
+no root path. The scenario writes it directly at the tree root — the legitimate root-write location
+where the exploder already lands `.gitattributes` — through a deterministic YAML mapper (stable key
+order, no doc-start marker) so an unchanged render is byte-identical. Being plain YAML at the root it is
+applied by nothing and sits outside every Flux `Kustomization` path. The branch becomes self-describing:
+`git show manifests/<cluster>:manifest.yaml | yq .facet` shows the facet that produced it.
 
 *Transmission — the render reads that manifest from the branch HEAD.* By DEFAULT the render wrapper
 (`nix run .#render-manifests`, shared by the in-cluster PaC step and the operator's standalone
@@ -391,9 +393,12 @@ only, no checkout) and reads the blob with `git show FETCH_HEAD:manifest.yaml`, 
 same token the push uses (an ephemeral `http.extraheader`, no persisted credential). No per-cluster
 value is baked into the Pipeline, which stays generic. The grow WRITES the manifest (from its Pulumi
 facet, bootstrapping the branch); every in-cluster render READS it, renders (reproducing the same
-manifest), and pushes — a *fixpoint*. Only the grow CHANGES the facet. The provenance (source revision,
-timestamp) rides the COMMIT, not the manifest, so an unchanged facet re-renders to an identical
-manifest (no empty-commit churn) while the commit records how the branch moved.
+manifest), and pushes — a *fixpoint*. Only the grow CHANGES the facet. The manifest records the render's
+`source` provenance (`sha` + `dirty`) alongside the facet, and the commit subject echoes it as
+`render <cluster> manifests @ <short-sha>[-dirty]`; an unchanged source+facet re-renders byte-identically,
+so the empty-commit guard (`JgitCheckout.setAllowEmpty(false)`) makes the push a fast-forward no-op,
+while a new source revision updates the recorded `source` and lands a real commit recording how the
+branch moved.
 
 *Drift is an explicit, git-native override.* To render against a DIFFERENT facet without a grow, edit
 the recorded manifest on the branch (`manifests/<cluster>:manifest.yaml`) directly — the next render
@@ -406,7 +411,7 @@ changing it is the whole override surface.
 flowchart TB
   Stack["Pulumi stack — rke2lab:manifests (authored SSOT)"]
   Grow["grow / seed-master — reads facet, FacetContributor"]
-  Man["root local-config manifest in manifests/cluster — the recorded facet"]
+  Man["root manifest.yaml in manifests/cluster — source + facet"]
   Run["in-cluster render — git show manifest.yaml at branch HEAD"]
   Stack --> Grow
   Grow -->|writes the manifest, bootstraps| Man
@@ -426,9 +431,10 @@ flowchart TB
 * ❌ *Bake the facet into the Pipeline as a param default.* It transmits, but buries the config as
   base64 in a `workloads/cicd` manifest (opaque to git introspection) and makes the Pipeline
   per-cluster. Recording it as a root manifest keeps the Pipeline generic and the branch legible.
-* ✅ *A root `local-config` manifest, read at branch HEAD.* Single authoring locus (the stack), the
-  render stays Pulumi-blind, the branch is self-describing, the Pipeline is generic, and it reuses the
-  synthesis's existing `local-config` handling. The param is a deliberate drift override.
+* ✅ *A root `manifest.yaml` doc (native YAML: `source` + `facet`), read at branch HEAD.* Single
+  authoring locus (the stack), the render stays Pulumi-blind, the branch is self-describing, the
+  Pipeline is generic, and the flow writes it directly at the tree root (no `ManifestsUnit`, no
+  `local-config` resource). The param is a deliberate drift override.
 
 `delivery.push` rides the SAME facet: the in-cluster render pushes iff the recorded facet armed it, so
 a grow that disabled delivery yields an in-cluster render that renders-but-does-not-push, coherently.
@@ -494,10 +500,10 @@ commit — determinism + consistency with what an operator would render.
 | The in-cluster render renders the wrong layer set (e.g. no `mesh`), or a source change to a
   non-default layer produces no push
 | The render did not read the recorded facet — it fell back to the `publish` CLI's hardcoded default
-  (which differs from the grow's stack facet). Confirm the root `local-config` manifest exists on
-  `manifests/<cluster>` at HEAD (`git show manifests/<cluster>:<the manifest>`) and that the render
-  reads it (no drift-override param forcing a different source). A branch grown before this landed has
-  no recorded manifest → one re-grow writes it. See <<render-config>>.
+  (which differs from the grow's stack facet). Confirm the root `manifest.yaml` exists on
+  `manifests/<cluster>` at HEAD (`git show manifests/<cluster>:manifest.yaml | yq .facet`) and that the
+  render reads it (no drift-override param forcing a different source). A branch grown before this landed
+  has no recorded manifest → one re-grow writes it. See <<render-config>>.
 | The `publish` step's render narration is invisible in the PipelineRun logs (only the Felix boot
   warnings show)
 | The framework's logging drains to a file (`LogFileSeed` → pax-logging), not stdout, once the OSGi

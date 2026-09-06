@@ -15,7 +15,8 @@ manifests scion**, played in-container through the broker like bbox/incus/system
 cluster — the "graft cultivated fresh" the ClusterSeed map already names.
 
 It is the fifth scion, on the exact trio pattern the four shipped ones share
-(`*Scenario` + `*RunbookHandler` + `*BddScenarios`), with three differences its
+(`*Scenario` + `*RunbookHandler` + `*AmendReflector`, the in-container play delegated
+to the shared `ScenarioPlayer` behind `GenericRunbookHandler`), with three differences its
 nature forces — spelled out below so the implementation does not blindly copy bbox.
 
 === Figure 1 — C4 container: the scion behind the broker door
@@ -31,7 +32,7 @@ flowchart TB
 
   subgraph felix["OSGi realm — manifests-bdd bundle (its own loader)"]
     handler["ManifestsRunbookHandler<br/>serves RunbookCoordinate('manifests')"]
-    front["ManifestsBddScenarios.run(trigger)<br/>in-container JUnit launcher"]
+    front["ScenarioPlayer (shared)<br/>in-container JUnit launcher"]
     scen["ManifestSynthesisScenario<br/>resolves synthesis service from registry (mode-blind)"]
     svc["ManifestSynthesisService (SCR)<br/>synthesises the K8s manifest tree"]
   end
@@ -53,7 +54,8 @@ flowchart TB
 ----
 
 Only host-neutral JSON crosses the broker door (policy in, runbook out). The
-reflection into `ManifestsBddScenarios` stays OSGi-side, in the domain's realm.
+reflection into the scenario (the shared `ScenarioPlayer` selecting `scenarioClass()`)
+stays OSGi-side, in the domain's realm.
 
 == What makes the manifests scion different from the four others
 
@@ -291,27 +293,33 @@ drives both, so a single sow produces the complete master material.
 
 === `ManifestsRunbookHandler` (the `*RunbookHandler`)
 
-Identical shape to `BboxRunbookHandler`: `@Component(service = SeedHandler.class)`,
-serves `RunbookCoordinate("manifests")`, and `handle(trigger)` plays the scenario
-in-container via `ManifestsBddScenarios.run(trigger)`. THE one difference: it reads
-the activation payload off `trigger.payload()` and threads it into the run (bbox's
-handler ignores the trigger; this one needs it).
+Identical shape to `BboxRunbookHandler`: `@Component(service = SeedHandler.class)` extending
+the shared `GenericRunbookHandler`, supplying `coordinate()` (`ManifestsCoordinate.RUNBOOK`) and
+`scenarioClass()` (`ManifestSynthesisScenario`) — the shared `ScenarioPlayer` does the in-container
+play. It overrides `seedFrom(trigger)` to decode the activation facet (`ManifestsRunbookInput` —
+which layers link, which debug) off `trigger.payload()` and route it through the scenario's
+`ManifestSynthesisScenario.INPUT` channel (bbox does the same for its `BboxRunbookInput`), so the
+operator's choice drives the synthesis.
 
-=== `ManifestsBddScenarios` (the `*BddScenarios`)
+=== `ManifestsAmendReflector` (the `*AmendReflector`) + the shared front-door
 
-The in-container front-door, twin of `BboxBddScenarios`: `JUnitLauncherCore` with an
-explicit `selectClass(ManifestSynthesisScenario)`, returning a `RunbookEnvelope`
-(runbook JSON + empty consultations — the manifests scion consults no one) as one
-serialized String across the realm boundary. It accepts the activation payload and
-seeds it where the scenario reads it (a registry service or a scenario static, the
-same scaffolding bbox uses for `lastRunbook`).
+The per-domain front-door class is gone: the in-container play is the SHARED
+`ScenarioPlayer` (a `JUnitLauncherCore` with an explicit `selectClass(scenarioClass())`,
+returning a `RunbookEnvelope` — runbook JSON + empty consultations, the manifests scion
+consults no one — as one serialized String across the realm boundary), invoked by
+`GenericRunbookHandler`; the five per-domain `*BddScenarios` copies were dissolved into it.
+What stays manifests-specific is `ManifestsAmendReflector` (`@Component service=SeedHandler`,
+serving `ManifestsCoordinate.AMEND`, the reconciling twin of `ManifestsShapeReflector`): it
+binds the host's NEUTRAL roles (the mandatory `FACET`, the optional `SOIL`/`IDENTITY`/`WORKTREE`)
+onto the `ManifestsRunbookInput` subtree via the foundation `AmendmentBinder`, returning it under
+the runbook coordinate — so vocabulary reconciliation lives at the amend door, not in the handler.
 
 == The gardening boundary — the scion gardens, the units are cultivated
 
 A load-bearing separation of concern, worth stating so it is not eroded: **the manifests units do
 NOT know the gardening.** The gardening lexicon — broker, coordinates, `Cellar`, sow/reap, scions —
 belongs to the *gardener*: the scion trio (`ManifestSynthesisScenario` + `ManifestsRunbookHandler` +
-`ManifestsBddScenarios`), the composition root. Below it, the `ManifestSynthesisService` and its CDK8s
+`ManifestsAmendReflector`, on the shared `ScenarioPlayer`), the composition root. Below it, the `ManifestSynthesisService` and its CDK8s
 units are **gardening-ignorant** — pure domain synthesis, with no reference to the broker, a
 coordinate, or a cellar. In the gardening metaphor the units are the *cultivated*, not the
 *cultivators*: they receive their soil (the unit context) and grow (synthesise); the gardener did the
@@ -402,7 +410,7 @@ synthesis runbook. Where the synthesis materialises into a soil, the bump READS 
 queries the upstream GitHub releases, and — on `apply` — rewrites the source pin literals, refreshes
 the vendored `release-<version>.yaml` manifests, and COMMITS the change to the worktree as the
 rke2lab bot. It exists as a scion for the same structural reason the synthesis does: its
-collaborators (`Worktree`, `AuthTokenContact`, `NdhKeystoreReader`) register with their `type=contract`
+collaborators (`Worktree`, `GithubWriterTokenMint`, `NdhKeystoreReader`) register with their `type=contract`
 bundle's class copy, so a flat host `awaitService` never matches — sowing through the broker grows
 the work in-container where the `@OsgiService` injections resolve bundle-side.
 
@@ -431,7 +439,8 @@ The host fills the operator's policy onto the neutral `FACET` role — the wire 
 `AmendCoordinate("manifests-versions")` door (the twin of `WorktreeAmendReflector`);
 `VersionsRunbookHandler` serves `ManifestsCoordinate.VERSIONS` and grows `VersionBumpScenario`
 in-container. The scenario `@OsgiService`-injects `Worktree` (jgit stage/commit), the optional
-`AuthTokenContact` (the GitHub token, else the `GITHUB_TOKEN` env), and `NdhKeystoreReader` (the
+`GithubWriterTokenMint` (the `auth` edge that mints a fresh writer token on demand from the App
+credentials revealed at `GhAppCase`, not a long-lived env token), and `NdhKeystoreReader` (the
 tailnet `authorityDomain` the bot email is minted from). On `apply` it rewrites `Component.java`,
 stages the changed paths (including the deleted old `release-<oldPin>.yaml`) through `Worktree`, and
 commits as the identity `GitBotIdentities` mints — `rke2lab:manifests-bumper` /

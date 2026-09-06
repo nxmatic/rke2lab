@@ -15,8 +15,9 @@ codebase↔vision before/after delta is the link:../atlas/nixos-substrate.adoc[a
 
 == The vision in one paragraph
 
-Every RKE2 node runs the *same NixOS substrate*, delivered as an immutable Incus image built by
-`nixos-generators` and published to the Incus image store. A node's *role* is config, not OS:
+Every RKE2 node runs the *same NixOS substrate*, delivered as an immutable Incus image built from the
+`lxc-container` NixOS profile (`config.system.build.{squashfs,metadata}`) and imported into the Incus
+image store. A node's *role* is config, not OS:
 control-plane vs worker is an RKE2 setting, master vs peer is a bootstrap-order handled by CAPRKE2 —
 none of it forks the OS. The imperative `cloud-init`/`distrobuilder` provisioning collapses:
 everything a node needs *before it joins* is baked declaratively into the image; everything *after it
@@ -36,7 +37,7 @@ home, chosen by *when* it must happen and *what* it mutates.
 |===
 | Realm | Owns | Nature
 
-| *OS image* (NixOS, `nixos-generators` → Incus)
+| *OS image* (NixOS `lxc-container` build → Incus)
 | the immutable homogeneous substrate + everything needed *before cluster join*
 | declarative, baked, reproducible
 

@@ -600,7 +600,7 @@ The bootstrap host-asset providers that once delivered `/srv/host` assets — Cl
 and the systemd bundle (units + scripts carried as local-config ConfigMap dotfiles, materialised
 disk-to-disk on the node) — were *dissolved* when the node moved to a declarative NixOS substrate:
 its config, systemd units and scripts are baked by the `nixos/` modules
-(link:../nixos-substrate/target-vision.adoc[target vision]), not synthesised and materialised as
+(link:../nixos-substrate/substrate-model.adoc[target vision]), not synthesised and materialised as
 host assets. The DAEMONSET path
 (link:../patterns/daemonset-host-assets-architecture.adoc[daemonset-host-assets],
 `daemonset-host-asset-materializer.sh`, flox) survives — it brings the flox runtime to the host VIA

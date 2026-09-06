@@ -1149,7 +1149,8 @@ letting load-bearing facts hide in unrendered state.
 == What is already shipped (verified 2026-07-12) — do NOT rebuild
 
 * `Cellar` interface + `Parcel` record — `seed-broker-port` (`type=seam`).
-* Doctor OSGi consumers, both `@Reference Cellar`, fully migrated:
+* Doctor OSGi consumers, both `@Reference OpaqueCellar` (the opaque host-implemented seam; the typed
+  `Cellar` is now an OSGi-only decorator over it — a split this doc otherwise predates), fully migrated:
   ** `JournalMedicalRecordRegistry` — `cellar.fetch(ParcelProjection.parcelOf(patient))` +
      `cellar.neighbours(...)`, folds via `MedicalRecordReader`.
   ** `CellarInterventionLedgerRegistry` — `cellar.fetch(ParcelProjection.LEDGER)` +
@@ -1165,6 +1166,16 @@ letting load-bearing facts hide in unrendered state.
   NOT the Cellar store — left for its real use later.
 
 == What is missing — the exact gap
+
+[NOTE]
+.CLOSED (verified 2026-09) — the gap below is now HISTORICAL
+====
+This gap is closed: the host impl SHIPPED as `PulumiCellar` (`host/pulumi/pulumi-edge`), and the three
+journals named below are RETIRED (no `StackMedicalRecordJournal` / `StackInterventionJournal` /
+`PulumiInterventionLedgerWriter` remain). It landed against the later `OpaqueCellar` seam — the host
+implements `OpaqueCellar`, not `Cellar` (the typed `Cellar` is now an OSGi-only decorator over it), a
+split this doc otherwise predates. Read the fusion map below as the historical record of that step.
+====
 
 ONE class: the host `Cellar` impl over the Pulumi backend, fusing the three stale journals. Plus the
 death of the two leak names it currently carries (`OUTPUT_KEY`, any `FIELD_*` remnant) and the retiring

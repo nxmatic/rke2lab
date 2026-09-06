@@ -238,10 +238,13 @@ must be able to raise it WITHOUT knowing the framework/bundle distinction — on
      onto the launcher via `LogLevelSeed`, read host-side by `BaseWorldExtension` before it boots
      Felix, and threaded into the `LaunchConfig`. (Threaded, not a sysprop — the value is only knowable
      in `Main`, and the seed is the same session-store channel the other run-facts cross on.)
-  ** *Plane B — the host logback root* (the application log): `Main` sets the live `LoggerContext`
-     root level from the same value (`Main.logbackLevelOf`, the host-realm twin of `felixLevelOf`).
-     Programmatic, not a sysprop the XML reads — logback has already initialised by the time the config
-     is knowable, so setting the level on the live context is what takes effect.
+  ** *Plane B — the logback root* (the application log): the same value maps via
+     `LaunchConfig.logbackLevelOf` (the twin of `felixLevelOf`), and `FrameworkLauncher` applies it to
+     pax-logging-logback — the ONE logback in the process (pax embeds its own and exports no package,
+     so the flat host cannot reach logback directly), reflectively through the `pax-logback-config`
+     fragment's `PaxLogbackConfigurer`. Programmatic, not a sysprop the XML reads — logback has already
+     initialised by the time the config is knowable, so setting the level on the live context is what
+     takes effect.
 * *Absent knob ⇒ no override.* `BootstrapConfig.logLevel()` is `Optional`; empty leaves the Felix
   default (a no-op seed) and the `logback.xml` root untouched — the two CLIs, which thread nothing,
   keep the no-arg `embedded()`.

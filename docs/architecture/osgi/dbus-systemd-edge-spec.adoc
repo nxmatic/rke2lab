@@ -151,8 +151,8 @@ thus the first edge *extracted and migrated into OSGi* in one move; only Pulumi 
 == Problem 2 — "systemd" names three different things
 
 The word is overloaded, and conflating its senses is what makes the area feel confusing. Read from
-the code, three concerns hide under it — and, separately, `osgi/systemd/` groups `systemd-contract`
-(runtime status) with `cdk8s-systemd` (unit *synthesis*), two modules that *do not import each other*.
+the code, three concerns hide under it — and, separately, `osgi/domains/systemd/` groups `systemd-contract`
+(runtime status) with `systemd-cdk8s-manifests` (unit *synthesis*), two modules that *do not import each other*.
 
 .Before — one word, three concerns blurred together
 [mermaid]
@@ -362,7 +362,7 @@ below): systemd is one of our domains, so the unit vocabulary is its internal fa
 
 == Decided — what `systemd-contract` is
 
-systemd is *one of our domains* (it owns `systemd-contract` and `cdk8s-systemd`), not merely an external
+systemd is *one of our domains* (it owns `systemd-contract` and `systemd-cdk8s-manifests`), not merely an external
 target. So `systemd-contract` is the *internal face of the systemd domain*: it owns both the readiness
 contract (`SystemdRuntimeProbe` + `SystemdStatusSnapshot`) and the systemd-unit vocabulary (the typed
 identifier of Problem 6). The doctor reads it *cross-domain*; the edge implements it. Nothing migrates
@@ -387,8 +387,10 @@ role; nobody but seed-master readiness imports it today.)
 
 In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) systemd is a
 graft-caller: the host step "the systemd adapter is launched" sows THIS scenario in-container and grafts
-its scion. This one SHIPS — `SystemdAdapterScenario` in the `systemd-bdd` bundle, front-door
-`SystemdBddScenarios.run()`. The host speaks gardening; this scenario speaks the systemd metier (adapter ·
+its scion. This one SHIPS — `SystemdAdapterScenario` in the `systemd-bdd` bundle, played in-container
+by the shared `ScenarioPlayer` behind a `SystemdRunbookHandler` (a `@Component service=SeedHandler`
+extending `GenericRunbookHandler`, supplying `scenarioClass()`), with a `SystemdAmendReflector` for the
+host amendment. The host speaks gardening; this scenario speaks the systemd metier (adapter ·
 endpoint · symptom).
 
 [listing]

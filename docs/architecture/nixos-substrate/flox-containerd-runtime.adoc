@@ -25,8 +25,10 @@ NOTE: "Base closure" scopes to the runtime *shim* — the plugin + OCI hooks + `
 NRI containerd config. The flox *envs* the shim injects are NOT in the base closure: they are
 delivered at runtime as `FloxEnv` CRs reconciled by our flox controller onto the host `/nix/store`
 (link:../patterns/flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime] §Runtime
-env delivery). Baking the *envs* is the LIVE interim, being migrated — a package bump must not
-cold-start the control node.
+env delivery). Baking the *envs* was the interim; that migration is DONE — the env-bake machinery
+(the `environment.d` envs + their per-env GC-roots) is RETIRED, so only the hooks + host-wide
+`/etc/flox.toml` policy remain baked (`nixos/flox-runtime.nix`). Delivering the envs as CRs is what
+keeps a package bump from cold-starting the control node.
 
 == Dev vs prod — runtime now, harden later
 

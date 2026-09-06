@@ -6,7 +6,7 @@
 ====
 Test-scope infrastructure only — no production bundle imports jGiven. jGiven wraps clean as an OSGi
 bundle at a LOCAL cost — one `bootdelegation=sun.misc`, one forced fragment import, no
-`DynamicImport-Package: *` — not viral. A non-regression guard (`JGivenTestkitGuardTest`, palier 2 +
+`DynamicImport-Package: *` — not viral. A non-regression guard (`ScenarioTestkitGuardTest`, palier 2 +
 palier 3) runs on a real embedded Felix 7.0.5.
 ====
 
@@ -18,8 +18,8 @@ package-private types *white-box*, exactly as the host's own code does. It is th
 substrate for the test-fragment model: the in-framework twin of package-private.
 
 jGiven is a *BDD* concern, not a JUnit one: its scenarios run through the host classloader, not
-through JUnit. So the kit lives under `osgi/jgiven/`, depends on the generic JUnit testkit
-(`osgi/testkit`), and is *not owned by it*.
+through JUnit. So the kit lives under `osgi/runtime/` (its assets in `scenario-testkit`), depends on
+the generic JUnit testkit (`osgi/runtime/junit-testkit`), and is *not owned by it*.
 
 The kit exists because testing OSGi-world code from the bare-JVM flat classpath is a
 world-incoherence (it is what produced the doctor `ReferralReplies` Maven cycle). A test *fragment*
@@ -32,24 +32,24 @@ no reverse module edge — no cycle.
 |===
 | Module | Role
 
-| `osgi/jgiven/jgiven-wrap`
+| `osgi/runtime/jgiven-wrap`
 | jGiven (`jgiven-core` + `jgiven-junit5` 2.0.3) wrapped as a first-class OSGi bundle. The bnd
   recipe stamps OSGi headers onto the only two header-less jars and imports the rest (guava, gson,
   paranamer, jansi, jakarta.annotation, byte-buddy — all already bundles) as stock bundles. No
   shade, no relocation, no embed. Test-scope.
 
-| `osgi/jgiven/jgiven-testkit`
+| `osgi/runtime/scenario-testkit`
 | The reusable assets. **(1)** `src/main/resources/jgiven-fragment.bnd` — the shared bnd include
-  carrying the one forced `Import-Package` bnd cannot compute. **(2)** `JGivenTestkit.felix()` — a
+  carrying the one forced `Import-Package` bnd cannot compute. **(2)** `ScenarioTestkit.felix()` — a
   `OutOfContainerFrameworkExtension.Builder` pre-loaded with the jGiven boot closure. Its own `src/test`
   carries the palier-2/3 guard. A plain jar, not a bundle.
 
-| `osgi/jgiven/jgiven-probe`
+| `osgi/runtime/scenario-probe`
 | The guard's host bundle: a pure POJO (`Vault`) with a package-private field and ZERO test
   dependencies — it stands in for a real host like `doctor-core`.
 
-| `osgi/jgiven/jgiven-probe-test`
-| The guard's `-test` fragment, attached to `jgiven-probe`. **This module is the template a real
+| `osgi/runtime/scenario-probe-test`
+| The guard's `-test` fragment, attached to `scenario-probe`. **This module is the template a real
   host copies**: its bnd writes only `Fragment-Host` + a one-line `-include`, and it authors a
   `Stage` + runner in the host's package. Running it in-container is what the guard asserts.
 |===
@@ -59,13 +59,13 @@ no reverse module edge — no cycle.
 [source,mermaid]
 ----
 flowchart TB
-  subgraph testkit["osgi/testkit (generic, jGiven-agnostic)"]
+  subgraph testkit["osgi/runtime/junit-testkit (generic, jGiven-agnostic)"]
     felix["OutOfContainerFrameworkExtension<br/>boots real Felix 7.0.5<br/>has bootDelegation() verb"]
   end
 
-  subgraph jgiven["osgi/jgiven (BDD-in-OSGi)"]
+  subgraph jgiven["osgi/runtime (BDD-in-OSGi)"]
     wrap["jgiven-wrap<br/>(bundle: Export com.tngtech.jgiven.*)"]
-    kit["jgiven-testkit<br/>JGivenTestkit.felix() + jgiven-fragment.bnd"]
+    kit["scenario-testkit<br/>ScenarioTestkit.felix() + jgiven-fragment.bnd"]
   end
 
   subgraph host["any host (e.g. doctor-core)"]
@@ -238,7 +238,7 @@ loses the very capability the model exists for.
 
 [source,bash]
 ----
-flox activate -- ./mvnw -pl :jgiven-testkit -am test \
+flox activate -- ./mvnw -pl :scenario-testkit -am test \
     -Dmaven.build.cache.skipCache=true -DskipTests=false
 ----
 

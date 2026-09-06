@@ -328,7 +328,7 @@ flowchart LR
 In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) cluster is a
 graft-caller: the host step "the cluster becomes ready" (nested under resources) sows THIS scenario
 in-container and grafts its scion. This one SHIPS — `ClusterReadinessScenario` in the `cluster-bdd`
-bundle, front-door `ClusterBddScenarios.run()`. The host speaks gardening; this scenario speaks the cluster
+bundle, grown by `ClusterRunbookHandler` behind the broker's host→scion door. The host speaks gardening; this scenario speaks the cluster
 metier (readiness · phase · observation).
 
 [listing]
@@ -341,7 +341,7 @@ SCENARIO: the cluster's control plane is ready
 ----
 
 The contact is resolved by `context.getServiceReference(ClusterReadinessContact.class)` — the live
-`KubectlClusterContact` bundle when the `RunGate` is open, inert when closed (the real kubectl edge stays
+`Fabric8ClusterContact` bundle when the `RunGate` is open, inert when closed (the real kubectl edge stays
 home, the scion renders PENDING via E9 — NOT a host-side fake; see
 link:seed-broker-spec.adoc#live-preview-rungate[the RunGate section]). Fork B holds: the checkpoint OWNS
 its consult — the domain consults the doctor itself on a failing phase, the host never does. The host reaps

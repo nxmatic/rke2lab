@@ -36,7 +36,7 @@ reachable, and only the serialized result crosses back.
 ----
 flowchart TB
   subgraph host["HOST realm (flat) — names only seed-broker-port + generic JSON"]
-    caller["netplan-cli (NetplanCliScenario)<br/>holds a SOIL (temp export dir)"]
+    caller["plan-cli ('plan network export', PlanCliScenario)<br/>holds a SOIL (temp export dir)"]
     reap["reads SOIL/blueprint.json (generic JSON)<br/>converts JSON→YAML flat, prints to stdout"]
   end
 
@@ -117,16 +117,19 @@ foundation `AmendmentBinder`, which places each role's value in its `@Amendment`
 field. So the vocabulary reconciliation (role → field) lives at the door, never in the
 runbook handler.
 
-== The host adapter (`netplan-cli`)
+== The host adapter (`plan-cli`, `plan network export`)
 
-`netplan-cli` is de-typed off `netplan-contract`: it no longer references
-`ClusterNetworkBlueprint`. The `yamlExport` verb drives `NetplanCliScenario`
-(host-flat, mirror of `ManifestsCliScenario`) on the embedded JUnit launcher: the
-GIVEN opens the gardening over the world connection and publishes an `EphemeralCellar`
-for the ROOT drain; the WHEN sows `netplan` with `{SOIL: tempDir}`; then the host reads
+The former standalone `netplan-cli` has been folded into `plan-cli`, the unified `plan`
+north-adapter that multiplexes two planes over one door: `plan network export` (this
+netplan blueprint) and `plan dataset export` (the ZFS dataset layout). It is de-typed
+off `netplan-contract`: it no longer references `ClusterNetworkBlueprint`. The `network
+export` verb drives `PlanCliScenario` (host-flat, mirror of `ManifestsCliScenario`) on
+the embedded JUnit launcher: the GIVEN opens the gardening over the world connection and
+publishes an `EphemeralCellar` for the ROOT drain; the WHEN sows `netplan` with `{SOIL:
+tempDir}` (dispatched by the `network` plane); then the host reads
 `tempDir/blueprint.json` (generic JSON) and converts it to YAML with flat jackson,
-printing to stdout — the flake's `netplan yamlExport > blueprint.yaml` bridge,
-unchanged in command name and data.
+printing to stdout — the flake's `plan network export > blueprint.yaml` bridge (the
+former `netplan yamlExport`), unchanged in data.
 
 == Related Documentation
 

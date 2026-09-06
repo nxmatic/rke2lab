@@ -46,7 +46,7 @@ On ne le décide pas sur le papier. On construit une maquette compilable, on la 
 . *Moteur = jgiven* (déjà bundle OSGi `jgiven-wrap` ; API programmatique déjà utilisée hors-JUnit
   dans `ClusterReadinessTopic`).
 . *Substrat d'orchestration = le JUnit Platform Launcher*, embarqué au runtime. Ce n'est pas un
-  pari : `InContainerJUnitRunner` (osgi/runtime/junit-testkit) pilote *déjà*
+  pari : `InContainerJUnitRunner` (osgi/runtime/junit-launcher) pilote *déjà*
   `LauncherFactory.create(...)` avec engine explicite, listener et discovery-request, à
   l'intérieur d'OSGi. Le launcher est agnostique du moteur (Jupiter porte jgiven-junit5, déjà
   utilisé : `DoctorScenarioTest extends ScenarioTest`).

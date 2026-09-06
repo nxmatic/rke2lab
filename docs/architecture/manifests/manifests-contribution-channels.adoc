@@ -15,7 +15,7 @@ aggregates them into the Kubernetes payload delivered to the node's
 *dissolved* when the node substrate moved to a declarative NixOS base: the node's
 identity, PKI, containerd/NRI config, dbus and toolbox are now baked by the
 `nixos/` modules, not delivered as synthesised env files or `/srv/host` scripts.
-See link:../nixos-substrate/target-vision.adoc[the NixOS node-substrate target
+See link:../nixos-substrate/substrate-model.adoc[the NixOS node-substrate target
 vision]. What remains here is the one surviving channel — manifest units — plus
 the read-only node context threaded to them.
 ====
@@ -72,5 +72,5 @@ contribution channel: units consume it, they do not publish into it.
   `ManifestDomainPolicy` a registrar reads to include units conditionally.
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] — the
   single source of the `domainId`s the channel keys on.
-* link:../nixos-substrate/target-vision.adoc[NixOS Node-Substrate Target Vision] —
+* link:../nixos-substrate/substrate-model.adoc[NixOS Node-Substrate Target Vision] —
   where the former node-env and host-asset channels now live (baked declaratively).

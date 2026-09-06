@@ -23,7 +23,7 @@ now a proper OSGi domain that mirrors `incus` exactly: one `@Component` that sel
 exposed*, so a consumer couples to the worktree's facts, not to a git library. It is *the one place*
 the "is the worktree clean?" and "what did we provision from?" knowledge lives.
 
-The domain has four modules:
+The domain has three modules:
 
 [cols="1,3",options="header"]
 |===

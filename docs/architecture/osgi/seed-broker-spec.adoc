@@ -1084,7 +1084,7 @@ codec also exposes `toMap(record)` / `fromMap(map, type)` (record ↔ opaque `Ma
 `decode(String)→JsonNode` (opaque tree): these are how the HOST reads a plant BY KEY and assembles a
 seed WITHOUT the class — the opacity path § <<contribution-and-opacity>> generalizes.
 
-The codec (`osgi/foundation/gateway-document-codec`, package
+The codec (`osgi/foundation/seed-broker-codec`, package
 `io.seedmatic.rke2lab.seed.broker.codec`) registers its jackson modules EXPLICITLY (never
 `findAndRegisterModules`, so it stays clear of the `ServiceLoader<Module>` surface): a custom
 `WireEnumModule` (maps every `WireEnum` ↔ slug generically, so seam enums carry no jackson

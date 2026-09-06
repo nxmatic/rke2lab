@@ -11,7 +11,7 @@ RKE2Lab manifests flow through a multi-stage pipeline from CDK8s synthesis to li
 *Partly historical.* The detailed on-node steps below (the `rke2lab-manifests-install.sh` installer
 reading `RKE2LAB_MANIFESTS_PUBLISH_*` flags and symlinking `/srv/host/rke2-manifests.d/<layer>` into
 the server-manifests dir) describe the former `/srv/host` install flow, which was *dissolved* with
-the NixOS node substrate (see link:../nixos-substrate/target-vision.adoc[target vision]). Today the
+the NixOS node substrate (see link:../nixos-substrate/substrate-model.adoc[target vision]). Today the
 synthesised, exploded tree is delivered straight to the node's `server/manifests` and RKE2
 auto-applies it — no install script, no publish-flag gating, no symlink stow.
 ====

@@ -11,7 +11,7 @@ project's answer to a recurring problem: a discipline asked for at review time s
 reviews. A *gate* is seen at every build (impossible to forget) and, once a bundle's debt is cleared,
 its default level locks the rule so the anti-pattern can never silently reappear.
 
-This document specifies the eight gates and the single annotation that governs how each reports.
+This document specifies the seven gates and the single annotation that governs how each reports.
 
 [NOTE]
 ====
@@ -23,7 +23,7 @@ collides with the project's two *runtime* gate senses (readiness gates like
 (it reads the annotation via ASM and cannot link the module — see "Reader side").
 ====
 
-=== The eight gates
+=== The seven gates
 
 [cols="1,3",options="header"]
 |===

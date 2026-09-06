@@ -36,7 +36,7 @@ flowchart TB
     b1 --> b2 --> b3
   end
   subgraph AFTER[After — build once, reference, split by realm]
-    a1["rke2lab flake<br/>nixos-generators, into Incus image store"]
+    a1["rke2lab flake<br/>lxc-container build, into Incus image store"]
     a2["management node seeded by Pulumi thin<br/>all workload nodes grown greenfield by CAPN, same images"]
     a3["Flux in each cluster · controller for host mutation<br/>flox shim baked · envs at runtime (FloxEnv CRD)"]
     a1 --> a2 --> a3
@@ -51,8 +51,8 @@ flowchart TB
 
 Reads: the BEFORE is a long materialisation pipe (OSGi synthesis → 28-script materializer into
 `/srv/host` → jsync promotion into `host.live.d` + checksum → on-node stow then rke2); the AFTER is
-`the closure IS the config` — the flake's node-base/control/worker modules build via
-`nixos-generators` into the image store, the node applies its baked config at boot, and the two
+`the closure IS the config` — the flake's node-base/control/worker modules build via the
+`lxc-container` profile (`config.system.build.{squashfs,metadata}`) into the image store, the node applies its baked config at boot, and the two
 residues arrive on their own channels: the *per-node seed* (hostname·role·token·dataset) and the
 *node-side bootstrap set* (CNI + Flux) both over devlxd, then Flux Kustomizations + a controller
 post-join. The dashed edge `no tree, no stow, no promotion` names the erased apparatus.
@@ -69,7 +69,7 @@ flowchart TB
   end
   subgraph AFTER[After — the closure is the config]
     a1["flake: node-base module<br/>+ control / worker modules"]
-    a2["nixos-generators, into image store"]
+    a2["lxc-container build, into image store"]
     a3["node: declarative config at boot<br/>+ per-node seed: hostname·role·token·dataset (devlxd)"]
     a4["node-side bootstrap set (devlxd):<br/>cilium HelmChartConfig + Flux + secrets<br/>into server/manifests before rke2-server"]
     a5["post-join: Flux Kustomizations · Go controller + CRD"]
@@ -159,7 +159,7 @@ The simplification, stated as removals — each is a red box above with no succe
 | Deleted apparatus | Replaced by
 
 | `distrobuilder` Debian image + its post-unpack/post-files actions
-| `nixos-generators` image build
+| `lxc-container` image build
 
 | `cloud-init` NoCloud seed (user-data + network-config)
 | baked NixOS config + per-node devlxd seed
