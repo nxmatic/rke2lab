@@ -37,6 +37,11 @@ final class JgitLinkedWorktree implements LinkedWorktree {
   }
 
   @Override
+  public Optional<String> readAtHead(String path) {
+    return checkout.readAtHead(path);
+  }
+
+  @Override
   public void stage(List<Path> paths) {
     checkout.stage(paths);
   }

@@ -28,6 +28,14 @@ public interface LinkedWorktree extends AutoCloseable {
   String branch();
 
   /**
+   * The content of {@code path} as committed at {@code HEAD} of this checked-out branch, or empty
+   * when there is no HEAD (a first render, empty branch) or the path is absent. Reads the COMMITTED
+   * blob, NOT the working-tree file — so a render reads the branch's recorded state (e.g. the
+   * recorded facet at {@code manifest.yaml}) before it overwrites the tree. jgit stays sealed.
+   */
+  Optional<String> readAtHead(String path);
+
+  /**
    * Stage the given paths for the next commit — additions/modifications for paths that exist,
    * removals for paths that no longer do. Each path may be absolute or resolved against {@link
    * #path()}. For staging a whole rendered tree (including files a re-render dropped), prefer

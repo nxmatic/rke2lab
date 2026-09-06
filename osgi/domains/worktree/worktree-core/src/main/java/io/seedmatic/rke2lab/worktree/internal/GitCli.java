@@ -58,6 +58,7 @@ final class GitCli {
             });
     run(false, "worktree", "remove", "--force", path);
     run(false, "worktree", "prune");
+    syncLocalBranchToOrigin(branch);
     if (branchExists(branch)) {
       run(true, "worktree", "add", path, branch);
     } else {
@@ -119,6 +120,28 @@ final class GitCli {
 
   private boolean branchExists(String branch) {
     return run(false, "show-ref", "--quiet", "--verify", "refs/heads/" + branch) == 0;
+  }
+
+  /**
+   * Best-effort fast-forward of the LOCAL {@code refs/heads/<branch>} to origin's tip, so a render
+   * accretes on the branch's real (pushed) history instead of orphaning it. A render cut from a
+   * fresh clone (in-cluster the Tekton {@code FETCH_HEAD} checkout) or an operator checkout that
+   * never tracked the manifests branch has only a remote ref — without this the {@link
+   * #branchExists local} check below is false and {@link #worktreeAdd} would {@code --orphan} a
+   * fresh base, LOSING the facet the grow recorded at HEAD (the mesh-drop footgun) and rejecting
+   * the follow-up fast-forward push. Forced ({@code +src:dst}) so a stale/diverged local ref is
+   * reset to origin — the render must sit on origin's tip for that push to land. Silent when there
+   * is no {@code origin} (a pure-local repo / the test ground before its first push) or origin
+   * lacks the branch (the genuine first render) → {@code refs/heads} is left untouched and the
+   * orphan path seeds it. Safe here: any worktree holding the branch was released just above, so
+   * the fetch never targets a checked-out ref.
+   */
+  private void syncLocalBranchToOrigin(String branch) {
+    if (run(false, "remote", "get-url", "origin") != 0) {
+      return;
+    }
+    final String ref = "refs/heads/" + branch;
+    run(false, "fetch", "origin", "+" + ref + ":" + ref);
   }
 
   /**

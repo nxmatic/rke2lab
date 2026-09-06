@@ -243,6 +243,25 @@ final class JgitCheckout {
         .equals(inputsBlock(readTreeFile(repository, newTree, flakePath)));
   }
 
+  /**
+   * The content of {@code path} as committed at {@code HEAD}, or empty when there is no HEAD (a
+   * fresh repo / detached with no commit) or the path is absent from the HEAD tree. Reads the
+   * COMMITTED blob — not the working-tree file — so it is unaffected by a dirty tree the caller is
+   * about to overwrite (the render reads the branch's recorded facet before re-materialising it).
+   */
+  Optional<String> readAtHead(String path) {
+    try (Repository repository = open()) {
+      final ObjectId tree = repository.resolve("HEAD^{tree}");
+      if (tree == null) {
+        return Optional.empty();
+      }
+      final String content = readTreeFile(repository, tree, path);
+      return content.isEmpty() ? Optional.empty() : Optional.of(content);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot read " + path + " at HEAD of " + worktree, ex);
+    }
+  }
+
   private String readTreeFile(Repository repository, ObjectId treeId, String path) {
     try {
       final TreeWalk walk = TreeWalk.forPath(repository, path, treeId);

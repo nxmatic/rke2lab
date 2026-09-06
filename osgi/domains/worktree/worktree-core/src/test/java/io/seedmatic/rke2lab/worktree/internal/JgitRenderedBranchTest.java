@@ -369,6 +369,11 @@ class JgitRenderedBranchTest {
     }
 
     @Override
+    public Optional<String> readAtHead(String path) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean flakeLockCoherent() {
       throw new UnsupportedOperationException();
     }

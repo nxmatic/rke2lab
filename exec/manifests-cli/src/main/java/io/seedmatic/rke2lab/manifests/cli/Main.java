@@ -1,8 +1,6 @@
 // @codebase
 package io.seedmatic.rke2lab.manifests.cli;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -27,8 +25,8 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.engine.JupiterTestEngine;
@@ -79,18 +77,20 @@ public final class Main {
         return commandOf(new HelpCommand.Builder(this).commands(availableCommands()));
       }
       case "synthesize" -> {
-        return commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties()));
+        final Map<String, String> options = optionArgs(args);
+        return commandOf(new SynthesizeCommand.Builder(this).run(run(options, false)));
       }
       case "publish" -> {
-        return commandOf(new PublishCommand.Builder(this).run(runForPublish()));
+        final Map<String, String> options = optionArgs(args);
+        return commandOf(new PublishCommand.Builder(this).run(run(options, true)));
       }
       case "versions" -> {
-        final java.util.Map<String, String> options = optionArgs(args);
+        final Map<String, String> options = optionArgs(args);
         return commandOf(
             new VersionsCommand.Builder(this)
-                .level(versionsOption(options, "level").orElse("minor"))
-                .apply(versionsOption(options, "apply").map(Boolean::parseBoolean).orElse(false))
-                .component(versionsOption(options, "component")));
+                .level(option(options, "level").orElse("minor"))
+                .apply(option(options, "apply").map(Boolean::parseBoolean).orElse(false))
+                .component(option(options, "component")));
       }
       default ->
           throw new IllegalArgumentException(
@@ -100,19 +100,19 @@ public final class Main {
 
   private List<CliCommand> availableCommands() {
     return List.of(
-        commandOf(new SynthesizeCommand.Builder(this).run(runFromSystemProperties())),
-        commandOf(new PublishCommand.Builder(this).run(runFromSystemProperties())),
+        commandOf(new SynthesizeCommand.Builder(this)),
+        commandOf(new PublishCommand.Builder(this)),
         commandOf(new VersionsCommand.Builder(this)),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
 
   /**
    * Parse the verb's trailing {@code key=value} arguments (everything after {@code args[0]}) into a
-   * map, so {@code versions apply=true level=major} works as typed — alongside the {@code
-   * -Drke2lab.manifests.versions.<key>} system-property form.
+   * map, so {@code versions apply=true level=major} or {@code publish cluster=… node=…} work as
+   * typed. Every verb takes its inputs here — there are no system properties or environment reads.
    */
-  private java.util.Map<String, String> optionArgs(String[] args) {
-    final java.util.Map<String, String> options = new java.util.LinkedHashMap<>();
+  private Map<String, String> optionArgs(String[] args) {
+    final Map<String, String> options = new java.util.LinkedHashMap<>();
     for (int i = 1; i < args.length; i++) {
       final int eq = args[i].indexOf('=');
       if (eq > 0) {
@@ -122,160 +122,93 @@ public final class Main {
     return options;
   }
 
-  /**
-   * A {@code versions} option: the trailing {@code key=value} arg wins, else the {@code
-   * -Drke2lab.manifests.versions.<key>} system property, else empty.
-   */
-  private Optional<String> versionsOption(java.util.Map<String, String> options, String key) {
-    final String fromArg = options.get(key);
-    if (fromArg != null && !fromArg.isBlank()) {
-      return Optional.of(fromArg.trim());
-    }
-    return Optional.ofNullable(System.getProperty("rke2lab.manifests.versions." + key))
+  /** A trailing {@code key=value} arg, trimmed; empty when absent or blank. */
+  private Optional<String> option(Map<String, String> options, String key) {
+    return Optional.ofNullable(options.get(key))
         .map(String::trim)
         .filter(value -> !value.isEmpty());
   }
 
   /**
-   * The facts the CLI seeds so it sows a COMPLETE manifests runbook input: the {@code SOIL} (from
-   * {@code -Drke2lab.manifests.outdir}, absent → a temp survey), the {@code IDENTITY}
-   * (cluster/node, absent → the blank {@code unknown} cluster), and the mandatory {@code FACET} —
-   * the CLI is the sower, so it builds the posture itself (no door default).
+   * The facts the CLI seeds so it sows a COMPLETE manifests runbook input: the {@code IDENTITY}
+   * ({@code cluster=}/{@code node=}), the mandatory {@code FACET} the CLI builds itself (the sower
+   * honours the contract, no door default), and — for {@code publish} only — the {@code SOIL}, the
+   * render worktree the exe LOCATES itself from the cluster.
+   *
+   * <p>The cluster names the branch {@code manifests/<cluster>}; it is the SINGLE SOURCE OF TRUTH
+   * the branch is cut from and INLINES the host ({@code <host>-mgmt}). It defaults to this host's
+   * mgmt coordinate ({@code <short-host>-mgmt}, the standalone hostname derivation) — in-cluster
+   * the render pipeline passes it inline from the per-cluster PaC {@code Repository} CR; {@code
+   * node} defaults to the single management node. Override {@code cluster=}/{@code node=} for
+   * another coordinate.
+   *
+   * <p>Only {@code publish} works in the branch: it prepares a linked worktree on {@code
+   * manifests/<cluster>} at {@code .local.d/render/<cluster>} (the exe locates it — never passed
+   * in), follows its HEAD facet, and delivers (signed commit + ff-push). {@code synthesize} is pure
+   * generation — it does not know jgit — so it surveys into a temp dir (empty {@code SOIL}: no
+   * branch, no commit).
    */
-  private ManifestsCliRun runFromSystemProperties() {
-    return ManifestsCliRun.of(
-        sysProperty("rke2lab.manifests.outdir"),
-        identityFrom(
-            sysProperty("rke2lab.manifests.cluster"), sysProperty("rke2lab.manifests.node")),
-        manifestsFacet());
+  private ManifestsCliRun run(Map<String, String> options, boolean armPush) {
+    final String cluster = option(options, "cluster").orElseGet(Main::defaultCluster);
+    final ManifestsCliRun.Identity identity =
+        new ManifestsCliRun.Identity(cluster, option(options, "node").orElse("master"));
+    final Optional<String> worktree =
+        armPush ? Optional.of(".local.d/render/" + cluster) : Optional.empty();
+    return ManifestsCliRun.of(worktree, Optional.of(identity), manifestsFacet(options, armPush));
   }
 
   /**
-   * The facts for {@code publish} — {@code synthesize} PLUS an armed delivery. It REQUIRES the plot
-   * ({@code -Drke2lab.manifests.outdir}) and the identity ({@code .cluster}/{@code .node}): without
-   * them the delivery worktree never prepares and the push is a silent no-op, so a missing one is a
-   * hard fail here, not a survey. The FACET carries {@code delivery.push=true}, the git-push gate
-   * {@code ManifestSynthesisScenario} reads.
+   * The default cluster: {@code <short-host>-mgmt} (e.g. {@code bioskop} → {@code bioskop-mgmt}).
    */
-  private ManifestsCliRun runForPublish() {
-    final Optional<String> outdir = sysProperty("rke2lab.manifests.outdir");
-    if (outdir.isEmpty()) {
-      throw new IllegalArgumentException(
-          "publish needs -Drke2lab.manifests.outdir (the plot to render + deliver from)");
+  private static String defaultCluster() {
+    String host = System.getenv("HOSTNAME");
+    if (host == null || host.isBlank()) {
+      try {
+        host = java.net.InetAddress.getLocalHost().getHostName();
+      } catch (java.net.UnknownHostException ex) {
+        throw new IllegalArgumentException(
+            "cannot resolve the host for the default cluster; pass cluster=<name>", ex);
+      }
     }
-    final Optional<ManifestsCliRun.Identity> identity =
-        identityFrom(
-            sysProperty("rke2lab.manifests.cluster"), sysProperty("rke2lab.manifests.node"));
-    if (identity.isEmpty()) {
-      throw new IllegalArgumentException(
-          "publish needs -Drke2lab.manifests.cluster and -Drke2lab.manifests.node (the branch"
-              + " manifests/<cluster> the render delivers to)");
-    }
-    // The FACET follows the last grow: prefer the render facet the previous render recorded on the
-    // branch (fetched to a file by the render wrapper, -Drke2lab.manifests.facet.file), so the
-    // in-cluster render renders exactly what the grow decided — see
-    // docs/architecture/cluster-api/pac-in-cluster-render-spec.adoc § render-config. Absent (a
-    // first
-    // grow, or a local render with no recorded facet) → the operator posture, with delivery.push
-    // armed (the git-push gate ManifestSynthesisScenario reads). The recorded facet already carries
-    // its own delivery, so it is used verbatim.
-    final JsonNode facet =
-        recordedFacet()
-            .orElseGet(
-                () -> {
-                  final ObjectNode operator = (ObjectNode) manifestsFacet();
-                  operator.putObject("delivery").put("push", true);
-                  return operator;
-                });
-    return ManifestsCliRun.of(outdir, identity, facet);
-  }
-
-  private static final ObjectMapper FACET_MAPPER = new ObjectMapper();
-
-  /**
-   * The render facet the previous render recorded at the branch root, if the render wrapper fetched
-   * it to a file ({@code -Drke2lab.manifests.facet.file} — raw JSON extracted from the branch's
-   * {@code manifest.yaml}). Empty when unset or unreadable → the caller falls back to the operator
-   * posture. The recorded facet already carries its {@code delivery}, so it is used verbatim.
-   */
-  private Optional<JsonNode> recordedFacet() {
-    return sysProperty("rke2lab.manifests.facet.file")
-        .flatMap(
-            path -> {
-              try {
-                final JsonNode facet = FACET_MAPPER.readTree(Path.of(path).toFile());
-                logger.info("Using the render facet recorded on the branch (from {})", path);
-                return Optional.of(facet);
-              } catch (IOException ex) {
-                logger.warn(
-                    "could not read the recorded render facet at {} ({}); using the operator"
-                        + " posture",
-                    path,
-                    ex.getMessage());
-                return Optional.empty();
-              }
-            });
-  }
-
-  private Optional<String> sysProperty(String key) {
-    return Optional.ofNullable(System.getProperty(key))
-        .map(String::trim)
-        .filter(value -> !value.isEmpty());
+    final int dot = host.indexOf('.');
+    return (dot < 0 ? host : host.substring(0, dot)) + "-mgmt";
   }
 
   /**
    * The manifests {@code FACET} the CLI sows — the {@code {publish, debug}} concern the seed flow
    * reads from Pulumi, built here instead. Publish defaults to the operator posture (every layer on
-   * except {@code mesh}); {@code debug} defaults off. Each toggle is overridable via {@code
-   * -Drke2lab.manifests.publish.<layer>} / {@code -Drke2lab.manifests.debug.<toggle>}, so a
-   * management render can e.g. sow {@code -Drke2lab.manifests.publish.mesh=true} for the Tailscale
-   * client. The shape mirrors {@code ManifestsRunbookInput.Facets} — the membrane carries only
-   * JSON.
+   * except {@code mesh}); {@code debug} defaults off. Each toggle is overridable via a trailing
+   * {@code publish.<layer>=…} / {@code debug.<toggle>=…} arg, so a management render can e.g. pass
+   * {@code publish.mesh=true} for the Tailscale client. When {@code armPush} is set the {@code
+   * delivery.push=true} intent is added — the git-push gate {@code ManifestSynthesisScenario}
+   * reads; the render scenario keeps this delivery when it follows the branch HEAD's recorded
+   * facet. The shape mirrors {@code ManifestsRunbookInput.Facets} — the membrane carries only JSON.
    */
-  private JsonNode manifestsFacet() {
+  private ObjectNode manifestsFacet(Map<String, String> options, boolean armPush) {
     final ObjectNode facet = JsonNodeFactory.instance.objectNode();
     final ObjectNode publish = facet.putObject("publish");
-    publish.put("gitops", publishToggle("gitops", true));
-    publish.put("networking", publishToggle("networking", true));
-    publish.put("clusterApi", publishToggle("clusterApi", true));
-    publish.put("storage", publishToggle("storage", true));
-    publish.put("mesh", publishToggle("mesh", false));
-    publish.put("highAvailability", publishToggle("highAvailability", true));
-    publish.put("cicd", publishToggle("cicd", true));
+    publish.put("gitops", toggle(options, "publish.gitops", true));
+    publish.put("networking", toggle(options, "publish.networking", true));
+    publish.put("clusterApi", toggle(options, "publish.clusterApi", true));
+    publish.put("storage", toggle(options, "publish.storage", true));
+    publish.put("mesh", toggle(options, "publish.mesh", false));
+    publish.put("highAvailability", toggle(options, "publish.highAvailability", true));
+    publish.put("cicd", toggle(options, "publish.cicd", true));
     final ObjectNode debug = facet.putObject("debug");
-    debug.putObject("mesh").put("enabled", debugToggle("mesh"));
-    debug.putObject("networking").put("enabled", debugToggle("networking"));
-    debug.putObject("nriPlugins").putObject("flox").put("enabled", debugToggle("nriPlugins.flox"));
+    debug.putObject("mesh").put("enabled", toggle(options, "debug.mesh", false));
+    debug.putObject("networking").put("enabled", toggle(options, "debug.networking", false));
+    debug
+        .putObject("nriPlugins")
+        .putObject("flox")
+        .put("enabled", toggle(options, "debug.nriPlugins.flox", false));
+    if (armPush) {
+      facet.putObject("delivery").put("push", true);
+    }
     return facet;
   }
 
-  private boolean publishToggle(String layer, boolean fallback) {
-    return sysProperty("rke2lab.manifests.publish." + layer)
-        .map(Boolean::parseBoolean)
-        .orElse(fallback);
-  }
-
-  private boolean debugToggle(String toggle) {
-    return sysProperty("rke2lab.manifests.debug." + toggle)
-        .map(Boolean::parseBoolean)
-        .orElse(false);
-  }
-
-  /**
-   * The cluster/node identity the render is keyed on — the CLI's alignment on {@code
-   * ClusterSeedScenario}, where the identity rides the incus FACET. Both {@code -D} properties or
-   * neither: a partial identity is a misuse, not a survey, so it fails loud rather than silently
-   * rendering the blank {@code unknown} cluster.
-   */
-  private Optional<ManifestsCliRun.Identity> identityFrom(
-      Optional<String> clusterName, Optional<String> nodeName) {
-    if (clusterName.isPresent() != nodeName.isPresent()) {
-      throw new IllegalArgumentException(
-          "manifests identity needs BOTH -Drke2lab.manifests.cluster and"
-              + " -Drke2lab.manifests.node, or neither (a bare survey render)");
-    }
-    return clusterName.flatMap(
-        cluster -> nodeName.map(node -> new ManifestsCliRun.Identity(cluster, node)));
+  private boolean toggle(Map<String, String> options, String key, boolean fallback) {
+    return options.containsKey(key) ? Boolean.parseBoolean(options.get(key)) : fallback;
   }
 
   private final class HelpCommand implements CliCommand {
@@ -356,7 +289,7 @@ public final class Main {
 
     @Override
     public String usage() {
-      return "synthesize";
+      return "synthesize [cluster=<host>-mgmt] [node=master] [publish.<layer>=bool] [debug.<x>=bool]";
     }
 
     @Override
@@ -414,7 +347,9 @@ public final class Main {
 
       Builder(Main main) {
         this.main = main;
-        this.run = ManifestsCliRun.of(Optional.empty(), Optional.empty(), main.manifestsFacet());
+        this.run =
+            ManifestsCliRun.of(
+                Optional.empty(), Optional.empty(), main.manifestsFacet(Map.of(), false));
       }
 
       Builder run(ManifestsCliRun run) {
@@ -454,8 +389,7 @@ public final class Main {
 
     @Override
     public String usage() {
-      return "publish  (-Drke2lab.manifests.outdir=… -Drke2lab.manifests.cluster=…"
-          + " -Drke2lab.manifests.node=…)";
+      return "publish [cluster=<host>-mgmt] [node=master] [publish.<layer>=bool] [debug.<x>=bool]";
     }
 
     @Override
@@ -518,7 +452,9 @@ public final class Main {
 
       Builder(Main main) {
         this.main = main;
-        this.run = ManifestsCliRun.of(Optional.empty(), Optional.empty(), main.manifestsFacet());
+        this.run =
+            ManifestsCliRun.of(
+                Optional.empty(), Optional.empty(), main.manifestsFacet(Map.of(), false));
       }
 
       Builder run(ManifestsCliRun run) {

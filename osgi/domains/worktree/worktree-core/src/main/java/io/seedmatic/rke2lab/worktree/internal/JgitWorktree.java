@@ -54,6 +54,11 @@ public final class JgitWorktree implements Worktree {
   }
 
   @Override
+  public Optional<String> readAtHead(String path) {
+    return checkout.readAtHead(path);
+  }
+
+  @Override
   public boolean flakeLockCoherent() {
     return checkout.flakeLockCoherent();
   }

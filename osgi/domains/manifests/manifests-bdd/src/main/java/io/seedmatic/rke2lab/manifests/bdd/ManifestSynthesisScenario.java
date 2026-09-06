@@ -1,5 +1,6 @@
 package io.seedmatic.rke2lab.manifests.bdd;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
@@ -276,6 +277,52 @@ public class ManifestSynthesisScenario
     return Optional.of(renderedBranch.orElseThrow().prepare(worktreePath, BRANCH_PREFIX + cluster));
   }
 
+  // Reads the branch HEAD's recorded facet — a plain YAMLMapper, native record binding (jackson
+  // reads the record component names). Symmetric with the Then's write of the same {source, facet}.
+  private static final YAMLMapper FACET_READER = new YAMLMapper();
+
+  // The name the Then records the facet under at the branch root (Then.RENDER_FACET_FILE).
+  private static final String RENDERED_FACET_FILE = "manifest.yaml";
+
+  /**
+   * The facet a render should USE: the one recorded at the prepared branch's HEAD ({@code
+   * manifest.yaml}) wins over the seeded posture, so the render reproduces the grow's decision
+   * rather than resetting to the operator default (the mesh-drop footgun). Only publish + debug
+   * follow HEAD; the seeded {@code delivery} is kept, as it carries the current verb's push intent
+   * (publish arms it, synthesize does not). Falls back to the seeded facet when there is no
+   * rendered worktree (a survey) or no readable facet at HEAD (a first render, empty branch).
+   */
+  private ManifestsRunbookInput facetFollowingHead(
+      ManifestsRunbookInput seeded, Optional<LinkedWorktree> rendered) {
+    return rendered
+        .flatMap(worktree -> worktree.readAtHead(RENDERED_FACET_FILE))
+        .flatMap(this::recordedFacets)
+        .map(
+            recorded ->
+                new ManifestsRunbookInput(
+                    new ManifestsRunbookInput.Facets(
+                        recorded.publish(), recorded.debug(), seeded.facets().delivery()),
+                    seeded.materializationRoot(),
+                    seeded.identity()))
+        .orElse(seeded);
+  }
+
+  /**
+   * Decode the {@code facet} sub-tree of a recorded {@code manifest.yaml}; empty if
+   * absent/unreadable.
+   */
+  private Optional<ManifestsRunbookInput.Facets> recordedFacets(String manifestYaml) {
+    try {
+      final JsonNode facet = FACET_READER.readTree(manifestYaml).path("facet");
+      if (facet.isMissingNode() || facet.isNull()) {
+        return Optional.empty();
+      }
+      return Optional.of(FACET_READER.treeToValue(facet, ManifestsRunbookInput.Facets.class));
+    } catch (IOException ex) {
+      return Optional.empty();
+    }
+  }
+
   /**
    * The delivery plan for a prepared worktree — the bot identity + signing key the rendered commit
    * carries, whether the operator armed the push, and (only then) the revealed GitHub token. Empty
@@ -435,7 +482,13 @@ public class ManifestSynthesisScenario
     // it, and the THEN seals + delivers it. Empty for a bare survey / the standalone CLI: the
     // synthesis then falls back to a temp dir with no branch, and the delivery THEN is a no-op.
     final Optional<LinkedWorktree> rendered = prepareRenderWorktree(facet);
-    given().the_activation_facet(facet);
+    // The facet FOLLOWS the branch HEAD: once the render worktree is checked out, the recorded
+    // facet at its root manifest.yaml is authoritative (the grow's posture), so a render never
+    // silently resets the branch to the operator default (dropping mesh etc.). The seeded facet's
+    // delivery is kept — that carries the current verb's push intent (publish arms it, synthesize
+    // does not). Absent a worktree / a first render (no HEAD) → the seeded facet stands.
+    final ManifestsRunbookInput effective = facetFollowingHead(facet, rendered);
+    given().the_activation_facet(effective);
     when()
         .the_policy_is_derived_from_the_facet()
         .and()
@@ -450,7 +503,7 @@ public class ManifestSynthesisScenario
         .and()
         .the_manifests_file_is_written()
         .and()
-        .the_rendered_branch_is_delivered(rendered, deliveryPlan(facet, rendered));
+        .the_rendered_branch_is_delivered(rendered, deliveryPlan(effective, rendered));
     fileNodeBootstrap(rendered);
   }
 

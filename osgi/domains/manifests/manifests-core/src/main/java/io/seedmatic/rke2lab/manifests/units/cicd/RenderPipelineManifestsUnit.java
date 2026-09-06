@@ -311,8 +311,8 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           // the source checkout is the ONE render definition (shared with
                           // dev/release, no hand-scripted mvn+java that drifts): it builds
                           // manifests-cli (CRDs staged in), then publish signs + ff-pushes
-                          // manifests/<cluster>. outdir defaults to $PWD/render (workingDir = the
-                          // source workspace).
+                          // manifests/<cluster> — the exe LOCATES its render worktree itself at
+                          // .local.d/render/<cluster> (workingDir = the source workspace).
                           "nix run .#render-manifests -- \"$(params.cluster)\" \"$(params.node)\""))
                 })));
   }

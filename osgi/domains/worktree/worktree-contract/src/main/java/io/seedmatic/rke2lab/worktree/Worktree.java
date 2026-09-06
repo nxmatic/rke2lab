@@ -30,6 +30,15 @@ public interface Worktree {
   WorkingState workingState();
 
   /**
+   * The content of {@code path} as committed at {@code HEAD} ({@code path} worktree-relative), or
+   * empty when there is no HEAD or the path is absent from the HEAD tree. Reads the COMMITTED blob,
+   * NOT the working-tree file — so a caller reads the branch's recorded state even when the working
+   * tree is dirty or about to be overwritten (the render reads its recorded facet before
+   * re-materialising the tree). jgit stays sealed behind the implementation; only JDK types cross.
+   */
+  Optional<String> readAtHead(String path);
+
+  /**
    * Whether the latest commit's flake locks are coherent: {@code false} when a {@code flake.nix}
    * {@code inputs} block changed in {@code HEAD} without a matching {@code flake.lock} change — the
    * incoherence a clean worktree does NOT catch. jgit stays sealed behind the implementation.

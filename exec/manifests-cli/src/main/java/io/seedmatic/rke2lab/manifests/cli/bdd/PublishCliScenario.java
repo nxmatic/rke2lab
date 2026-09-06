@@ -131,17 +131,22 @@ public class PublishCliScenario
       this.gardening = Gardening.over(world);
       this.cellar = cellar;
       // publish REQUIRES a plot + identity: without them the delivery worktree never prepares and
-      // the push is a silent no-op. Main enforces both -D properties; fail loud here on misuse.
+      // the push is a silent no-op. Main always provides both (the render worktree it LOCATES from
+      // the cluster, the cluster/node from args or their host defaults) — so these guard an
+      // internal
+      // misuse, never a user input.
       this.materializationRoot =
           run.materializationRoot()
               .orElseThrow(
-                  () -> new IllegalStateException("publish needs -Drke2lab.manifests.outdir"));
+                  () ->
+                      new IllegalStateException(
+                          "publish needs a render worktree (SOIL) — none was seeded"));
       this.identity =
           run.identity()
               .orElseThrow(
                   () ->
                       new IllegalStateException(
-                          "publish needs -Drke2lab.manifests.cluster and -Drke2lab.manifests.node"));
+                          "publish needs a cluster/node identity — none was seeded"));
       this.facet = run.facet();
       // The Parcel keys the run's cellar — the same plot the three scions store/fetch their sealed
       // anchors under (App credentials, WRITER token). Ephemeral + single-run, so a synthetic
