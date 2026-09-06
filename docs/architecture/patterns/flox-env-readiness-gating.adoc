@@ -66,9 +66,15 @@ solved at the locus that owns it**:
 
 | Deployment cascade
 | *Flux*
-| `spec.timeout` / `spec.retryInterval` calibrated on the FloxEnv-gated Kustomizations. The
-  Job health-check is KEPT (it is what guarantees "purge completes before the operator
-  registers") — only its timeout is tuned. This is the ONLY locus that owns the cascade.
+| A flox-consumer Kustomization `dependsOn` the flox runtime cells (`runtime/flox-webhook` +
+  `runtime/flox-controller`), *auto-derived* by `FluxServiceKustomizationPlanner`: any cell whose
+  pod templates carry a `flox.seedmatic.io/environment.*` or `.../nix-build.*` annotation waits on
+  both. This is the gate that keeps the consumer from being APPLIED before the webhook can gate its
+  pods — necessary because the webhook's `failurePolicy: Ignore` means it cannot itself hold back an
+  un-gated pod (a pod created before the webhook serves is admitted un-gated). On top of that, the
+  `spec.timeout` / `spec.retryInterval` are calibrated and the Job health-check is KEPT (it is what
+  guarantees "purge completes before the operator registers"). This is the ONLY locus that owns the
+  cascade.
 |===
 
 The pod (A/B) and Flux can only *endure* the wait; the controller can *act* on it (reorder
@@ -269,6 +275,12 @@ the cert-manager lifecycle. A distinct chantier; nothing in the single-tier shap
 . *RBAC + webhook scope (rke2lab follow-up)* — grant the controller SA `pods get;list;watch;update`
   and scope the pod `MutatingWebhookConfiguration` to *CREATE* (adding a scheduling gate is illegal
   on update), in `FloxControllerManifestsUnit`.
+. *Flux dependency edge (shipped)* — `FluxServiceKustomizationPlanner` auto-derives a `dependsOn`
+  from every flox-consumer cell (a `flox.seedmatic.io/environment.*` / `nix-build.*` pod-template
+  annotation) to the flox runtime cells (`runtime/flox-webhook` + `runtime/flox-controller`), so a
+  consumer Kustomization is never applied before the webhook is registered and its DaemonSet is
+  serving. Required because the webhook's `failurePolicy: Ignore` cannot hold back an un-gated pod
+  on its own.
 . *Flux calibration (separate)* — tune `timeout`/`retryInterval` on the FloxEnv-gated
   Kustomizations; keep the Job health-check.
 

@@ -1,14 +1,18 @@
 package io.seedmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.seedmatic.rke2lab.manifests.contract.FloxAnnotation;
 import io.seedmatic.rke2lab.manifests.contract.ManifestExplodeResult;
 import io.seedmatic.rke2lab.manifests.units.gitops.FluxRootManifestsUnit;
+import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxControllerManifestsUnit;
+import io.seedmatic.rke2lab.manifests.units.runtime.flox.FloxWebhookManifestsUnit;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,6 +45,11 @@ import org.slf4j.LoggerFactory;
  *       map). The consumer depends on every cell of the provider's coord, so both the CRD and the
  *       controller that serves it are up first. This REPLACES the old global layer barrier: no more
  *       false coupling (a {@code networking} workload no longer waits on {@code cicd}'s operator).
+ *   <li>the FLOX-RUNTIME edge — a cell whose pod templates consume a flox env / nix-build store (a
+ *       {@code flox.seedmatic.io/*} pod-template annotation) waits on the flox-controller runtime
+ *       cells ({@code runtime/flox-webhook} + {@code runtime/flox-controller}). The webhook's
+ *       {@code failurePolicy: Ignore} means it cannot itself hold back an un-gated pod, so the Flux
+ *       edge is the gate that keeps a flox consumer from scheduling before its env can be realised.
  * </ul>
  *
  * <p>The map of runtime installers is the one hand-maintained artifact, but it cannot silently rot:
@@ -85,6 +94,31 @@ final class FluxServiceKustomizationPlanner {
   private static final String STORAGE_CLASS = "StorageClass";
   private static final String IS_DEFAULT_CLASS = "storageclass.kubernetes.io/is-default-class";
   private static final String WAIT_FOR_FIRST_CONSUMER = "WaitForFirstConsumer";
+
+  /**
+   * A pod-template annotation whose key starts with one of these prefixes ({@code
+   * flox.seedmatic.io/environment.<c>} or {@code flox.seedmatic.io/nix-build.<c>}) marks the pod as
+   * a flox consumer — the two capabilities that pull in the flox runtime (the NRI plugin mounts the
+   * env / nix-build store, the controller webhook gates scheduling). The other {@link
+   * FloxAnnotation} keys (HOME/UID/DEBUG…) only modify an existing opt-in, so they do not by
+   * themselves make a cell wait on the runtime. Derived from the enum, never a string literal.
+   */
+  private static final List<String> FLOX_CONSUMER_KEY_PREFIXES =
+      List.of(FloxAnnotation.ENVIRONMENT.key() + ".", FloxAnnotation.NIX_BUILD.key() + ".");
+
+  /**
+   * The flox runtime coords a flox-consumer cell must wait on. The webhook's {@code failurePolicy:
+   * Ignore} means a pod created before the webhook serves is admitted UN-gated (schedules before
+   * its env is realised → {@code CreateContainerError}); the Flux edge is therefore the real gate.
+   * Both cells are needed: {@link FloxWebhookManifestsUnit} registers the {@code
+   * MutatingWebhookConfiguration} + its cert-manager serving cert, and {@link
+   * FloxControllerManifestsUnit} runs the node-agent DaemonSet that both SERVES that webhook (only
+   * under {@code --enable-webhook}) and REALISES the env onto the node. Neither carries a flox
+   * consumer annotation itself, so a consumer cell never loops back onto these.
+   */
+  private static final Set<String> FLOX_RUNTIME_COORDS =
+      Set.of(
+          FloxControllerManifestsUnit.MANIFEST_UNIT_ID, FloxWebhookManifestsUnit.MANIFEST_UNIT_ID);
 
   /** API groups the API server serves natively — always present, never need a CRD provider. */
   private static final Set<String> BUILTIN_GROUPS =
@@ -212,12 +246,15 @@ final class FluxServiceKustomizationPlanner {
 
   /**
    * What the doc scan yields: which cells render each {@code (group,kind)}, the coord that renders
-   * each CRD (keyed by the group+kind the CRD DEFINES), and the cells whose PVC binds WFC.
+   * each CRD (keyed by the group+kind the CRD DEFINES), the cells whose PVC binds WFC, and the
+   * cells whose pod templates consume a flox env / nix-build store (annotation {@link
+   * #FLOX_CONSUMER_ANNOTATION_PREFIX}).
    */
   private record DocScan(
       Map<GroupKind, Set<Cell>> renderedBy,
       Map<GroupKind, String> crdProviderCoord,
-      Set<Cell> wfcPvcCells) {}
+      Set<Cell> wfcPvcCells,
+      Set<Cell> floxConsumerCells) {}
 
   public void plan(final ManifestExplodeResult result) {
     final Path target = result.explodedTargetDir();
@@ -331,6 +368,16 @@ final class FluxServiceKustomizationPlanner {
         }
         // (b) derived CRD -> CR edges.
         dependsOn.addAll(derivedEdges.getOrDefault(cell, Set.of()));
+        // (c) flox runtime edge: a cell whose pod templates consume a flox env / nix-build store
+        //     waits for the flox-controller runtime (webhook + node-agent DaemonSet), since the
+        //     webhook's failurePolicy:Ignore cannot itself hold back an un-gated pod. Skip the flox
+        //     runtime cells themselves (they carry no consumer annotation, but guard regardless).
+        if (scan.floxConsumerCells().contains(cell)
+            && !FLOX_RUNTIME_COORDS.contains(cell.coord())) {
+          for (final String coord : FLOX_RUNTIME_COORDS) {
+            dependsOn.addAll(cellNamesOfCoord(coord, layersByCoord));
+          }
+        }
         dependsOn.remove(name); // never depend on self
 
         final Optional<HealthCheck> healthCheck = Optional.ofNullable(healthCheckByCell.get(cell));
@@ -470,6 +517,7 @@ final class FluxServiceKustomizationPlanner {
     final Map<GroupKind, String> crdProviderCoord = new HashMap<>();
     final Map<String, String> bindingModeByClass = new HashMap<>();
     final Set<String> defaultClasses = new LinkedHashSet<>();
+    final Set<Cell> floxConsumerCells = new LinkedHashSet<>();
     // A PVC may be scanned before the StorageClass it references, so collect (cell, explicit class)
     // and resolve WFC after the full StorageClass picture is known.
     record PvcRef(Cell cell, Optional<String> explicitClass) {}
@@ -484,6 +532,9 @@ final class FluxServiceKustomizationPlanner {
         final String kind = doc.path("kind").asText("");
         if (kind.isEmpty()) {
           continue;
+        }
+        if (rendersFloxConsumer(doc, kind)) {
+          floxConsumerCells.add(cell.get());
         }
         renderedBy
             .computeIfAbsent(
@@ -528,7 +579,40 @@ final class FluxServiceKustomizationPlanner {
           .filter(WAIT_FOR_FIRST_CONSUMER::equals)
           .ifPresent(mode -> wfcPvcCells.add(ref.cell()));
     }
-    return new DocScan(renderedBy, crdProviderCoord, wfcPvcCells);
+    return new DocScan(renderedBy, crdProviderCoord, wfcPvcCells, floxConsumerCells);
+  }
+
+  /**
+   * Whether {@code doc}'s pod template carries a {@link #FLOX_CONSUMER_ANNOTATION_PREFIX}
+   * annotation — the marker the flox NRI plugin + controller webhook key on. Reads the annotation
+   * node at the one location that holds a pod template for the kind (bare {@code Pod}, {@code
+   * CronJob}'s nested job template, else the {@code spec.template} every workload controller and
+   * {@code Job} share).
+   */
+  private boolean rendersFloxConsumer(final JsonNode doc, final String kind) {
+    final JsonNode annotations =
+        switch (kind) {
+          case "Pod" -> doc.path("metadata").path("annotations");
+          case "CronJob" ->
+              doc.path("spec")
+                  .path("jobTemplate")
+                  .path("spec")
+                  .path("template")
+                  .path("metadata")
+                  .path("annotations");
+          default -> doc.path("spec").path("template").path("metadata").path("annotations");
+        };
+    if (!annotations.isObject()) {
+      return false;
+    }
+    final Iterator<String> names = annotations.fieldNames();
+    while (names.hasNext()) {
+      final String key = names.next();
+      if (FLOX_CONSUMER_KEY_PREFIXES.stream().anyMatch(key::startsWith)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** {@code <domain>-<package>}, plus a {@code -<layer>} suffix when the service spans layers. */
