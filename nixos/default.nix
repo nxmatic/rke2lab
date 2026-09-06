@@ -18,6 +18,7 @@
     ./flox-runtime.nix # flox NRI plugin OCI hooks + /etc/flox.toml (workload envs = runtime FloxEnv CRs, not baked)
     ./flox-carrier.nix # the minimal nix OCI base image every flox-injected pod runs (baked → rke2 air-gap import)
     ./flox-controller.nix # the flox-controller node-agent image (baked → rke2 air-gap import; it produces the carriers)
+    ./ndh-bringup-runtime.nix # ndh bringup-runtime profile symlink (manage-tailnet's trampoline command contract, visible in flox pods)
     ./host-access.nix # dbus-over-TCP + mDNS, so the operator reaches the node
     ./nix-env.nix # nix.settings + the node toolbox on PATH
   ];
