@@ -798,8 +798,8 @@ never throw-instead-of-render.
 
 * *`ConsultationSource`* — the pull twin of `CellarReceiver`. A fork-B scenario (bbox · cluster ·
   incus-provision · systemd) consults its own doctor and HOLDS the returned envelopes in a field; the
-  extension PULLS them (`consultations()`) at the boundary. The other three (root, incus-reconcile,
-  manifests) consult no one and do not implement it — the outcome carries an empty list. No push sink,
+  extension PULLS them (`consultations()`) at the boundary. The other three (root, incus-reconcile
+  [designed, not yet wired], manifests) consult no one and do not implement it — the outcome carries an empty list. No push sink,
   no static — the value is read after the body, so a refused row's consultation survives the FAILED
   runbook.
 * *`RunbookEnvelope`* — the reap the handler serialises (runbook JSON + consultations) is ONE record
@@ -1904,8 +1904,8 @@ real harvest a partial run produced — the non-transactional mirror.
 
 . *The sow's default THROWS (fail-fast).* `SowAndGraftStage.the_scion_is_sown_and_grafted` grafts the
   scion's verdict into the runbook, then `assertPassed` PROPAGATES a FAILED scion as a throw. A crossing
-  whose failure makes the rest meaningless (worktree · bbox · cluster-pki seal · incus-provision ·
-  incus-reconcile) uses this default — no point growing an instance whose provisioning failed.
+  whose failure makes the rest meaningless (worktree · bbox · cluster-pki seal · incus-provision;
+  incus-reconcile is designed, not yet wired) uses this default — no point growing an instance whose provisioning failed.
 . *A tolerating variant lets the SOWER keep the hand.* `…_tolerating_failure` grafts the verdict but does
   NOT throw, so the crossings AFTER it still run and their failures ACCUMULATE in the one runbook (§ the
   graft, ACCUMULATE not first-wins). For the TERMINAL independent crossings a sower wants to report

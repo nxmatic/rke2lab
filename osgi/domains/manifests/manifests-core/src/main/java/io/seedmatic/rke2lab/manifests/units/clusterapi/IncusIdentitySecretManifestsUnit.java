@@ -23,10 +23,10 @@ import software.constructs.Construct;
  *
  * <p>The {@code capn-provider} identity material (server address, server cert, client cert, client
  * key) is resolved into the request context by the in-container {@code ManifestSynthesisScenario}
- * and handed across the frontier as {@link IncusIdentityMaterial} on the synthesis request. This unit only RENDERS the {@code
- * <cluster>-incus-identity} Secret in {@code capn-system} from that material — it never reads a
- * host file or classpath resource itself. The Secret's {@code data} is base64-encoded here, as
- * Kubernetes requires.
+ * and handed across the frontier as {@link IncusIdentityMaterial} on the synthesis request. This
+ * unit only RENDERS the {@code <cluster>-incus-identity} Secret in {@code capn-system} from that
+ * material — it never reads a host file or classpath resource itself. The Secret's {@code data} is
+ * base64-encoded here, as Kubernetes requires.
  */
 public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUnit {
 

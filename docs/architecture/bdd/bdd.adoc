@@ -502,9 +502,15 @@ SCENARIO: the cluster seed grows to a ready cluster
   WHEN the entry gates are enforced       THEN we have the right to sow (working state within policy · flake.lock coherent — each config-toggleable)  [preflight, host today → OSGi-side gates + worktree capability, planned]
   WHEN the parcel's state is fetched      THEN I know where I start from (idempotent sowing)   [Cellar.fetch, pure host]
   WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]        [CODED]
+  WHEN the cluster CA is sealed              THEN sow cluster-pki's seal scenario, graft it  [cluster-pki, graft-caller]  [CODED]
+  WHEN the github app is registered          THEN sow ghapp's register scenario, graft it   [ghapp, graft-caller]       [CODED]
+  WHEN the replicator secrets are sealed     THEN sow replicator-secrets' seal scenario, graft it  [replicator-secrets, graft-caller]  [CODED]
+  WHEN the github app webhook is reconciled  THEN sow ghapp's webhook-reconcile scenario, graft it  [ghapp-webhook, graft-caller]  [CODED]
   WHEN the instance is prepared              THEN sow incus's scenario (image·graft·nocloud·secrets·harvest), graft it  [incus, graft-caller]  [CODED; nocloud/secrets beats = VISION]
   WHEN the live tree is reconciled           THEN sow incus's reconcile (diff→PROMOTE staging→host.live.d), graft it   [incus, graft-caller]  [DESIGNED, not wired — no reconcile scenario/handler, no WHEN]
-  WHEN the instance grows                    THEN fetch the harvest, declare the Pulumi graph, bind host.live.d, running=true  [PURE-HOST, com.pulumi]  [VISION, not coded]
+  WHEN the instance grows                    THEN fetch the harvest, declare the Pulumi graph, bind host.live.d, running=true  [PURE-HOST, com.pulumi]  [CODED — the_instance_grows → InstanceGrow.grow]
+  WHEN the operator kubeconfig is published  THEN publish the operator kubeconfig from the grown master  [PURE-HOST]  [CODED]
+  WHEN the readiness budget is tuned         THEN tune the readiness budget to the growth  [PURE-HOST]  [CODED]
   WHEN the instance is verified              THEN sow incus's probe scenario (VM now runs), graft its verdict  [incus, graft-caller]  [VISION, not coded]
   WHEN the systemd adapter is launched       THEN sow systemd's scenario, graft its scion  [systemd, graft-caller]     [CODED]
   WHEN the cluster becomes ready             THEN sow cluster's scenario, graft its scion  [cluster, graft-caller]     [CODED]
@@ -512,15 +518,17 @@ SCENARIO: the cluster seed grows to a ready cluster
 ----
 
 NOTE: *CODED vs VISION (codebase sync 2026-09).* The runbook above marks each beat. What SHIPS in
-`ClusterSeedScenario`: entry-gates · fetch · bbox · incus-prepare (`the_instance_is_provisioned`) ·
-systemd · cluster · store. What is VISION (design graved, not coded): the *incus-reconcile* beat itself
+`ClusterSeedScenario`: worktree · entry-gates · fetch · bbox · cluster-CA-seal · ghapp-register ·
+replicator-secrets · ghapp-webhook-reconcile · incus-prepare (`the_instance_is_provisioned`) · GROW
+(`the_instance_grows`) · operator-kubeconfig · readiness-budget · systemd · cluster · store. What is VISION (design graved, not coded): the *incus-reconcile* beat itself
 (`the_live_tree_is_reconciled` — the RECONCILE cycle that diffs then PROMOTEs) is NOT wired — only the
 routing soil `IncusScenario.RECONCILE("incus-reconcile")` exists as an enum value, with no distinct
 reconcile scenario class, no `RunbookHandler`, no `HostTree*` promoter, and no `the_live_tree_is_reconciled`
 WHEN in `ClusterSeedScenario` (verified 2026-09; see
 link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar § the host tree]);
-the pure-host GROW beat (`com.pulumi` graph + 13 mounts + nocloud→replace) between reconcile and systemd,
-the VERIFY beat, and — inside incus-prepare — the secrets (#10) and nocloud (#2) Thens. The prepare beat's method is `the_instance_is_provisioned`
+the VERIFY beat, and — inside incus-prepare — the secrets (#10) and nocloud (#2) Thens (the GROW beat
+between reconcile and systemd ships as `the_instance_grows`→`InstanceGrow.grow`; its legacy 13-mounts +
+nocloud→replace form is superseded by the NixOS substrate — the shipped GROW only declares the com.pulumi graph). The prepare beat's method is `the_instance_is_provisioned`
 (the map's "prepared" name; the code kept "provisioned"). See
 link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas and
 link:../osgi/host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy].

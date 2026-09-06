@@ -195,7 +195,7 @@ SCENARIO: the live tree is reconciled   (RECONCILE beat — sow-and-graft, in-co
 
   [ ── the pure-host GROW beat (com.pulumi) — NOT a scion, sits HERE, after reconcile/promote ── ]
 
-SCENARIO: the instance grows   (GROW beat — PURE-HOST com.pulumi, NOT a scion)  [host InstanceGrow SHIPPED in incus-ingress; end-to-end wiring VISION]
+SCENARIO: the instance grows   (GROW beat — PURE-HOST com.pulumi, NOT a scion)  [host InstanceGrow SHIPPED + wired via ClusterSeedScenario the_instance_grows → InstanceGrow.grow]
   GIVEN the InstanceGrowPlan fetched from the cellar (Cellar.fetch(INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
         — one immutable record decoded host-side via the dual-realm SeedCodec; no metier, no sow)
     AND the Pulumi Context threaded from Main (SessionSeed<Context> + a receiver)
