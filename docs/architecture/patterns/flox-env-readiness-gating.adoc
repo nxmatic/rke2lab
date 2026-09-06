@@ -1,0 +1,211 @@
+= FloxEnv readiness gating — the three loci
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status: ✅ Implemented (locus A, 2026-09-06) in `github:seedmatic/flox-controller`
+(`develop`).* This records how a flox-injected pod waits for its `FloxEnv` to be
+realised, and where each part of the "waiting problem" is solved. It supersedes the
+earlier pod-polls-the-API sketch AND the shell `flox-wait` init container (both removed).
+Companion to
+link:flox-store-resolved-runtime-and-builder.adoc[flox-store — resolved runtime & builder]
+(the delivery) and link:../nixos-substrate/flox-containerd-runtime.adoc[the flox containerd runtime]
+(the baked foundation).
+
+*What shipped vs. the earlier plan.* The original migration was "B first (Go `flox-wait`
+init container hitting the kube API), A next (scheduling gate)". B was *dropped*: an
+init container runs with the *workload pod's* ServiceAccount (one SA per pod, shared),
+so it cannot get its own `FloxEnv`-read RBAC — the pod-pull model hits a wall. We
+implemented *A directly*. A also absorbed B's intended multi-node role via
+*node-affinity narrowing* (below), so no free-floating fallback is needed.
+====
+
+== Overview — the problem
+
+Workload flox environments are no longer baked into the node image: each is a `FloxEnv`
+custom resource realised at runtime by the flox-controller (node-agent) onto the node's
+`/nix` store, exposed as a GC-root the NRI plugin bind-mounts into the pod. A consuming
+pod must therefore WAIT until its env is realised on its node before its container can
+start. That wait *was* a shell-script `flox-wait` init container polling the GC-root file;
+it is now a scheduling gate the controller removes (locus A below), so the pod never starts
+on a node that cannot mount its env in the first place.
+
+Two distinct problems hide behind "the wait", and — the key insight — **each can only be
+solved at the locus that owns it**:
+
+. *Pod readiness* — is the env realised ON THIS node, at the CURRENT spec generation?
+  (correctness: the GC-root path is deterministic per ref, overwritten on re-realise, so a
+  stale `ready` from a prior generation must not unblock the pod).
+. *Realisation latency* — the controller realises envs SERIALLY (~1/min, each a nix build);
+  at cold-start the critical-path env can queue behind unrelated ones.
+. *The deployment cascade* — Flux gates a dependent Kustomization (`operator dependsOn
+  tailnet-purge`) on a health-check of the gated Job; if realisation is slow the Job stays
+  InProgress past Flux's health-check `timeout`, the Kustomization goes NotReady, and the
+  dependency cascade stalls (self-healing on retry, but noisy).
+
+== The partition — three loci, each owning what only it can
+
+[cols="1,1,3",options="header"]
+|===
+| Problem | Locus | Mechanism
+
+| Pod readiness (node + generation)
+| flox-controller
+| Scheduling-gate *A*: the webhook adds `spec.schedulingGates:[flox.seedmatic.io/env-ready]`
+  so the pod stays unscheduled; the `PodGateReconciler` then *narrows* the pod's required
+  `nodeAffinity` to the nodes where **every** referenced env is realised at the current
+  generation (the intersection) and removes the gate — so the scheduler can only place the
+  pod on a node that can actually mount its envs. Zero pod-side API/node access.
+
+| Realisation latency
+| flox-controller
+| The realiser is *demand-prioritised*: an env that gates a pod (critical path) jumps the
+  serial queue. Only the controller can do this — it both injects the gate (sees the demand)
+  and owns the realisation order.
+
+| Deployment cascade
+| *Flux*
+| `spec.timeout` / `spec.retryInterval` calibrated on the FloxEnv-gated Kustomizations. The
+  Job health-check is KEPT (it is what guarantees "purge completes before the operator
+  registers") — only its timeout is tuned. This is the ONLY locus that owns the cascade.
+|===
+
+The pod (A/B) and Flux can only *endure* the wait; the controller can *act* on it (reorder
+realisation). The cascade mechanism (dependsOn + health-check + timeout) is entirely Flux's,
+so only a Flux-side lever resolves it.
+
+== Figure — the three loci and the shared fact
+
+The `FloxEnv` CR is the single fact everyone observes; the controller is its sole producer.
+Amber dashed nodes are the points still to be settled before coding.
+
+[mermaid]
+....
+flowchart LR
+  classDef brings fill:#e7f6e7,stroke:#2e7d32,color:#1b5e20;
+  classDef uncertain fill:#fff4e5,stroke:#e65100,color:#e65100,stroke-dasharray:5 5;
+  classDef fact fill:#e8eef9,stroke:#1a3a6b,color:#12244a;
+
+  subgraph FLUX["Flux — GitOps (the deployment cascade)"]
+    fapply["applies FloxEnv CR (early layer)"]
+    fdep["dependsOn + healthCheck(Job)<br/>+ timeout / retryInterval"]:::brings
+  end
+
+  subgraph CTRL["flox-controller — node-agent (readiness + latency)"]
+    wh["webhook: adds env-ready<br/>scheduling gate"]:::brings
+    rz["realiser: serial nix build<br/>DEMAND-PRIORITISED"]:::brings
+    gr["gate reconciler: narrow nodeAffinity to<br/>ready-node intersection, then ungate"]:::brings
+  end
+
+  fenv["FloxEnv CR — the shared fact<br/>status.realized(node) = ready + obsGen<br/>status.conditions(Ready) = aggregate"]:::fact
+  pod["consuming Pod<br/>held Pending until its env is ready"]:::brings
+  gc["node /nix GC-root the NRI mounts"]
+
+  fapply --> fenv
+  fenv -->|watched| rz
+  rz -->|writes| gc
+  rz -->|node realisation| fenv
+  wh -->|gate + inject| pod
+  pod -.->|needs env X| rz
+  fenv -->|per-node realized| gr
+  gr -->|narrow + ungate| pod
+  pod -->|mount| gc
+  fdep -.->|waits for Job complete| pod
+
+  u2["? aggregate Ready must become node-aware<br/>(today last-writer-wins, now off the gate path)"]:::uncertain --> fenv
+  u3["? timeout VALUE: a big from-scratch<br/>build can still exceed"]:::uncertain --> fdep
+  u4["? priority collapses the QUEUE,<br/>not the build itself"]:::uncertain --> rz
+....
+
+== Figure — the cold-start timeline
+
+Where the wait sits, and why the cascade risk is a Flux-timeout concern.
+
+[mermaid]
+....
+sequenceDiagram
+  participant FX as Flux
+  participant WH as controller webhook
+  participant RZ as controller realiser
+  participant CR as FloxEnv CR (status)
+  participant GR as gate reconciler
+  participant PO as Pod / node /nix
+
+  FX->>CR: apply FloxEnv (early layer)
+  FX->>WH: admit consuming pod
+  WH->>PO: add scheduling gate (pod stays SchedulingGated)
+  RZ->>CR: watch, pod needs env X, realise X first (demand-priority)
+  RZ->>PO: write GC-root on node /nix
+  RZ->>CR: status.realized per node, ready at obsGen=gen
+  GR->>CR: read realized per node
+  GR->>PO: narrow nodeAffinity to ready nodes, remove gate
+  PO->>PO: scheduler binds to a ready node, NRI mounts GC-root, container runs
+  FX->>PO: dependsOn healthCheck(Job) within timeout, ordering holds
+....
+
+== The readiness predicate (the generation invariant)
+
+A node `n` counts as ready for one env only when:
+
+[source]
+----
+n.ready && n.observedGeneration == floxenv.metadata.generation
+----
+
+The reconciler computes, per referenced env, the set of such nodes, then *intersects* those
+sets across all the pod's envs — the eligible node set. It pins `kubernetes.io/hostname In
+{eligible}` and ungates only when that set is non-empty (else the pod stays gated). The
+generation check is non-negotiable: `gcrootPath` is deterministic per ref (NOT per
+generation), so on a spec bump the controller OVERWRITES the same path — without the check, a
+pod could start against the prior subtree or mid-re-realisation.
+
+== What it brings
+
+* *Pod correctness* — `realized[node] && obsGen==gen`: never a mount on a stale / mid-realise env.
+* *Latency collapsed* — demand-prioritised realisation removes the queueing cost (the dominant
+  cold-start cost); the critical-path env goes from "behind N others" to "one build".
+* *Cascade bounded* — Flux keeps the Job health-check (ordering preserved) with a calibrated
+  timeout + self-healing retry.
+* *One producer, one fact* — the controller writes `realized[]`; pod and Flux only observe.
+
+== Resolved during implementation
+
+* *(u1 — RESOLVED) Node resolution* — a gated pod has no `nodeName` yet, but the reconciler does
+  not need one: while the pod is gated the API server permits *adding* required node-affinity
+  (KEP-3521), so the reconciler pins the pod to the exact ready-node intersection *before*
+  ungating. The scheduler then chooses among those nodes. Single-node mgmt degenerates to "the
+  one node" for free; multi-node is correct by construction (no free-floating fallback needed).
+
+== What stays uncertain
+
+* *(u2) The aggregate `conditions[Ready]`* — still last-writer-wins across nodes. The gate no
+  longer depends on it (it reads per-node `status.realized[]` directly), so this is *no longer on
+  the readiness critical path* — but cluster-wide "rolled out" consumers (e.g. a Flux health-check
+  on the CR) still read the incoherent aggregate. Making it node-aware / target-set-aware remains
+  open, now decoupled from gating.
+* *(u3) The Flux timeout value* — demand-priority shrinks the realisation queue, not the build; a
+  single large from-scratch build can still exceed a modest timeout (a bound, not a guarantee).
+* *(u4) Priority resolves the queue, never the build* — an irreducible floor remains if the
+  critical-path env is heavy and cache-cold.
+
+== Migration path
+
+. *A (shipped)* — the webhook adds the `flox.seedmatic.io/env-ready` scheduling gate (replacing the
+  shell `flox-wait` init container + its hostPath volume, both deleted); the `PodGateReconciler`
+  (cluster-manager, `--enable-webhook`) narrows the pod's `nodeAffinity` to the ready-node
+  intersection and removes the gate on the per-node generation predicate. No init container, no
+  pod-side API/node access. *B (the Go init-container wait) was dropped* — an init container shares
+  the workload pod's SA and so cannot carry its own `FloxEnv`-read RBAC.
+. *RBAC + webhook scope (rke2lab follow-up)* — grant the controller SA `pods get;list;watch;update`
+  and scope the pod `MutatingWebhookConfiguration` to *CREATE* (adding a scheduling gate is illegal
+  on update), in `FloxControllerManifestsUnit`.
+. *Flux calibration (separate)* — tune `timeout`/`retryInterval` on the FloxEnv-gated
+  Kustomizations; keep the Job health-check.
+
+== Related documentation
+
+* link:flox-store-resolved-runtime-and-builder.adoc[flox-store — resolved runtime & builder] - the FloxEnv-CR delivery model this gates on
+* link:../nixos-substrate/flox-containerd-runtime.adoc[The flox containerd runtime] - the baked NRI foundation + `/etc/flox.toml`
+* link:daemonset-host-assets-architecture.adoc[DaemonSet host assets] - the dissolved trampoline the FloxEnv model replaced
+* The `FloxEnv` types, realiser + gating live in `github:seedmatic/flox-controller` (`develop`): `api/v1alpha1/floxenv_types.go` (status.realized), `internal/controller/floxenv_controller.go` (realiser), `internal/provisioner/exec.go` (GC-root write), `internal/webhook/podflox.go` (adds the gate), `internal/controller/podgate_controller.go` (narrows affinity + ungates), `internal/floxenv/floxenv.go` (`RefsFromAnnotations`, `SchedulingGateName`)

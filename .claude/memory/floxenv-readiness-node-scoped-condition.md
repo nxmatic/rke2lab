@@ -1,12 +1,30 @@
 ---
 name: floxenv-readiness-node-scoped-condition
-description: "Design (converged, NOT coded) — flox-wait must gate on FloxEnv realized ON ITS OWN node at the current generation, via status.realized[], not the incoherent aggregate conditions[Ready]"
+description: "IMPLEMENTED 2026-09-06 (flox-controller develop) — locus A scheduling gate: webhook adds flox.seedmatic.io/env-ready gate, PodGateReconciler narrows nodeAffinity to the ready-node intersection then ungates on the per-node generation predicate. B (Go init-container wait) DROPPED (init shares the pod SA, can't hold its own RBAC). Shell flox-wait DELETED. SSOT = docs/architecture/patterns/flox-env-readiness-gating.adoc"
 metadata:
   node_type: memory
   type: project
 ---
 
-**The right readiness condition for flox-wait = "the FloxEnv is realised on the SAME node the pod runs on, at the current spec generation" (design converged 2026-09-06, NOT coded).**
+**★ SHIPPED 2026-09-06 in `github:seedmatic/flox-controller` (`develop`, worktree `/private/var/lib/git/seedmatic/flox-controller.d/develop`, NOT yet committed).** Locus **A** (scheduling gate), implemented directly — B was dropped, the shell `flox-wait` deleted.
+
+- **Webhook** (`internal/webhook/podflox.go`): flox-annotated pod → adds `spec.schedulingGates:[flox.seedmatic.io/env-ready]` (+ still injects flox env/token). Guarded by `pod.Spec.NodeName==""` (can't gate a scheduled pod); the pod `MutatingWebhookConfiguration` MUST be **CREATE-only** (adding a gate on update is rejected). Removed: init container, hostPath volume, `waitScript`, `gcrootsFromAnnotations`, fields `GcrootBase`/`WaitImage`/`TimeoutSeconds`, the `--flox-wait-image` flag.
+- **`PodGateReconciler`** (`internal/controller/podgate_controller.go`, cluster-manager, `--enable-webhook`): for each gated pod, resolves its `RefsFromAnnotations` → FloxEnvs (cluster-wide match on effective-folder+name), computes per-env ready-node set (`ready && obsGen==generation`), **intersects** across all the pod's envs, then — while still gated — **ANDs `kubernetes.io/hostname In {intersection}` into the pod's required nodeAffinity (KEP-3521 permits ADDING affinity to a gated pod)** and removes the gate in one `Update`. Empty intersection ⇒ stays gated. Watches Pods (gate predicate) + FloxEnv (map to gated waiters).
+- **Shared SSOT** (`internal/floxenv/floxenv.go`): `AnnotationPrefix`, `DefaultCategory`, `SchedulingGateName`, `EnvRef`, `RefsFromAnnotations` (splits on the **LAST** slash so a STRUCTURED `spec.folder` like `mesh/base` is recovered whole; name = last segment = the DNS-1123 metadata.name).
+- **Tests** all green (compile-run the test binary directly — the `go test` driver OOM-dies here on the envtest-heavy controller pkg): webhook gate/idempotent/scheduled-skip, `RefsFromAnnotations` (structured/bare/dedup/sort), `PodGate` stays-gated / stale-generation / release+pin / multi-env intersection / no-common-node.
+
+**★ u1 (node resolution) RESOLVED by the affinity narrowing** — a gated pod has no `nodeName`, but the reconciler doesn't need one: it pins the pod to the ready-node intersection BEFORE ungating, so the scheduler binds to a node that can mount the envs. Single-node mgmt degenerates to "the one node"; multi-node correct by construction (this is what B was going to be the fallback for — no longer needed). **NEXT (rke2lab follow-ups):** in `FloxControllerManifestsUnit` grant the controller SA `pods get;list;watch;update` + scope the pod webhook to CREATE; separately (u2) make the aggregate `conditions[Ready]` node-aware (now OFF the gate path, only cluster-wide "rolled out" consumers read it); (u3) calibrate the Flux `timeout` on FloxEnv-gated Kustomizations.
+
+--- (original design rationale, still valid) ---
+
+**The right readiness condition for flox-wait = "the FloxEnv is realised on the SAME node the pod runs on, at the current spec generation".**
+
+**★ CONVERGED FURTHER + GRAVED IN A SPEC (2026-09-06):** the full design (C4 + cold-start-timeline figures) now lives in `docs/architecture/patterns/flox-env-readiness-gating.adoc` — a REAL spec (README-indexed), not the scratch `.claude/claude-preview.adoc`, because it's mature. The model evolved from *pod-polls-the-API* to a **three-loci partition** (each solves what only it can):
+1. **Pod readiness** → flox-controller: **scheduling-gate A** (webhook adds it, a reconciler removes it when the predicate holds) — or a hardened Go **flox-wait B** (`flox-controller wait`, shipped in the existing controller image) as the pod-pull fallback. Predicate below, generation-central.
+2. **Realisation latency** → flox-controller: the realiser **prioritised by demand** — the env gating a pod jumps the serial (~1/min) queue. Only the controller can (it holds BOTH the gate = the demand, AND the realisation order). Collapses the QUEUE, not the build.
+3. **Deployment cascade** → **Flux ONLY** (user's key call): the `dependsOn`+health-check+`timeout` cascade is entirely Flux's model; solve via calibrated `timeout`/`retryInterval` on the FloxEnv-gated Kustomizations. The Job health-check is KEPT — it is what guarantees ordering (e.g. tailnet-purge completes before the tailscale operator registers). Already self-heals (ProgressingWithRetry); calibration, not redesign.
+
+**Migration:** B first (Go exec, delivery-trivial via the baked controller image) → A next (supersedes the init container for node-resolvable pods = all of mgmt single-node; B stays the free-floating multi-node fallback). **Open (u1-u4):** node-resolution at admission (nodeName empty pre-schedule → nodeSelector), the node-aware aggregate `Ready` (today last-writer-wins — prerequisite), the Flux timeout VALUE, the irreducible from-scratch build floor. The spec doc is the SSOT for this now.
 
 **Context.** flox-wait is the gate that blocks a flox-injected pod's container until its env is present, so the NRI plugin's bind-mount of the node's GC-root succeeds. Today it watches the **GC-root FILE** on the node (`/nix/var/nix/gcroots/flox-runtime/env/<folder>/<name>`). Question raised: why not rely on the CONTROLLER's FloxEnv `.status` instead? (User: "je préfère qu'on repose sur le contrôleur … il nous manque le/s node/s sur lesquels ont été réalisés les flox envs pour définir la bonne condition.")
 
