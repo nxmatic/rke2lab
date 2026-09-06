@@ -44,7 +44,14 @@ import java.util.Optional;
 public record ManifestsRunbookInput(
     @Amendment(Amendment.FACET) Facets facets,
     @Amendment(Amendment.SOIL) Optional<String> materializationRoot,
-    @Amendment(Amendment.IDENTITY) Optional<Identity> identity) {
+    @Amendment(Amendment.IDENTITY) Optional<Identity> identity,
+    @Amendment(Amendment.RENDER_MODE) RenderMode renderMode) {
+
+  // render-mode is the one amendment seed-master never sows — its grow applies its Pulumi facet
+  // as-is (GROW). An unsown amendment decodes to null, so coalesce: the scion always reads a mode.
+  public ManifestsRunbookInput {
+    renderMode = renderMode == null ? RenderMode.grow() : renderMode;
+  }
 
   public static Builder builder() {
     return new Builder();
@@ -69,6 +76,7 @@ public record ManifestsRunbookInput(
     private Facets facets = Facets.defaults();
     private Optional<String> materializationRoot = Optional.empty();
     private Optional<Identity> identity = Optional.empty();
+    private RenderMode renderMode = RenderMode.grow();
 
     private Builder() {}
 
@@ -87,8 +95,13 @@ public record ManifestsRunbookInput(
       return this;
     }
 
+    public Builder renderMode(RenderMode renderMode) {
+      this.renderMode = renderMode;
+      return this;
+    }
+
     public ManifestsRunbookInput build() {
-      return new ManifestsRunbookInput(facets, materializationRoot, identity);
+      return new ManifestsRunbookInput(facets, materializationRoot, identity, renderMode);
     }
   }
 

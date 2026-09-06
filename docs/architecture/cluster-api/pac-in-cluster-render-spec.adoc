@@ -383,28 +383,54 @@ order, no doc-start marker) so an unchanged render is byte-identical. Being plai
 applied by nothing and sits outside every Flux `Kustomization` path. The branch becomes self-describing:
 `git show manifests/<cluster>:manifest.yaml | yq .facet` shows the facet that produced it.
 
-*Transmission — the render reads that manifest from the branch HEAD.* By DEFAULT the render wrapper
-(`nix run .#render-manifests`, shared by the in-cluster PaC step and the operator's standalone
-`publish`) reads the root manifest from `manifests/<cluster>` at HEAD (the branch it is about to update)
-and hands its facet to `publish` via `-Drke2lab.manifests.facet.file`; absent, `publish` falls back to
-the operator posture. The read is DECOUPLED from the render worktree (the delivery EMPTIES that to
-stage deletions): `git archive --remote` is disabled on GitHub, so the wrapper fetches the ref (objects
-only, no checkout) and reads the blob with `git show FETCH_HEAD:manifest.yaml`, authenticating with the
-same token the push uses (an ephemeral `http.extraheader`, no persisted credential). No per-cluster
-value is baked into the Pipeline, which stays generic. The grow WRITES the manifest (from its Pulumi
-facet, bootstrapping the branch); every in-cluster render READS it, renders (reproducing the same
-manifest), and pushes — a *fixpoint*. Only the grow CHANGES the facet. The manifest records the render's
-`source` provenance (`sha` + `dirty`) alongside the facet, and the commit subject echoes it as
-`render <cluster> manifests @ <short-sha>[-dirty]`; an unchanged source+facet re-renders byte-identically,
-so the empty-commit guard (`JgitCheckout.setAllowEmpty(false)`) makes the push a fast-forward no-op,
-while a new source revision updates the recorded `source` and lands a real commit recording how the
-branch moved.
+*Transmission — the synthesis reads that manifest from the branch HEAD.* The render prepares its
+linked worktree on `manifests/<cluster>` (`RenderedBranch.prepare`, which first fast-forwards the
+LOCAL branch to origin's tip so a fresh clone — the in-cluster Tekton `--depth 1` checkout — reuses
+the pushed history instead of orphaning it), then the synthesis (`ManifestSynthesisScenario`) reads
+the recorded facet at HEAD THROUGH the worktree edge (`Worktree.readAtHead("manifest.yaml")`) — jgit
+is already in the boat, so there is no wrapper `git show` plumbing and no `-D` facet file. The read is
+robust to the delivery EMPTYING the working tree (it reads the COMMITTED blob, not the checkout). No
+per-cluster value is baked into the Pipeline, which stays generic. The grow WRITES the manifest (from
+its Pulumi facet, bootstrapping the branch); every in-cluster render READS it, renders (reproducing
+the same manifest), and pushes — a *fixpoint*. Only the grow (or a deliberate `edit`) CHANGES the
+facet. The manifest records the render's `source` provenance (`sha` + `dirty`) alongside the facet,
+and the commit subject echoes it as `render <cluster> manifests @ <short-sha>[-dirty]`; an unchanged
+source+facet re-renders byte-identically, so the empty-commit guard
+(`JgitCheckout.setAllowEmpty(false)`) makes the push a fast-forward no-op, while a new source revision
+updates the recorded `source` and lands a real commit recording how the branch moved.
 
-*Drift is an explicit, git-native override.* To render against a DIFFERENT facet without a grow, edit
-the recorded manifest on the branch (`manifests/<cluster>:manifest.yaml`) directly — the next render
-reads the edited facet and renders accordingly; the next grow resets it from the Pulumi SSOT (the grow
-is the authority). No Pipeline param and no hidden knob: the branch manifest IS the render config, so
-changing it is the whole override surface.
+[[render-verbs]]
+=== The render verbs — `RenderMode` (who wins: the grow, the CLI args, or the branch HEAD)
+
+WHETHER the seeded facet or the recorded HEAD facet is authoritative is the sower's intent, carried
+as `RenderMode` (the `render-mode` amendment on `ManifestsRunbookInput`). Its default is `GROW`,
+UNAMENDED — seed-master's grow keeps applying its Pulumi facet unchanged, so the contract addition is
+invisible to the grow; only the `manifests-cli` delivery verbs opt into following HEAD.
+
+[cols="1,3,2",options="header"]
+|===
+| Verb | Facet resolution | Guard
+
+| `GROW`   | the SEEDED facet wins (the grow's Pulumi SSOT) | none — the grow writes or overwrites
+| `INIT`   | the SEEDED facet wins (the CLI args) | the branch MUST be new (no recorded HEAD facet)
+| `UPDATE` | the recorded HEAD facet wins (seeded publish/debug ignored) | the branch MUST exist
+| `EDIT`   | the recorded HEAD facet OVERLAID with sparse operator overrides | the branch MUST exist
+|===
+
+The `manifests-cli` verbs map onto these: `synthesize` surveys (GROW, no branch, a temp dir — it
+does not know jgit); `init`/`update`/`edit` deliver (signed commit + ff-push). The in-cluster PaC
+step and the operator's steady-state re-render both run `update` — the faithful continuation of the
+grow. `edit` carries a SPARSE set of overrides (dotted JSON paths into the facet, e.g. `publish.mesh`
+→ `true`) that overlay HEAD and are re-recorded in ONE shot, so the branch's tree always matches its
+recorded facet. The seeded `delivery` (the push intent) is always kept — only publish/debug follow
+HEAD.
+
+*Drift is an explicit, git-native override.* Two branch-native ways to render against a DIFFERENT
+facet without a grow: run `manifests-cli edit publish.<layer>=…` (overlays the toggle on HEAD,
+re-renders, re-records — one shot, tree matches facet), or hand-edit the recorded manifest on the
+branch (`manifests/<cluster>:manifest.yaml`) and let the next `update` reproduce it. Either way the
+next grow RESETS the facet from the Pulumi SSOT (the grow is the authority). No Pipeline param and no
+hidden knob: the branch manifest IS the render config, so changing it is the whole override surface.
 
 [mermaid]
 ....

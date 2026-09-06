@@ -2,6 +2,7 @@ package io.seedmatic.rke2lab.manifests.bdd;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.tngtech.jgiven.Stage;
@@ -19,6 +20,7 @@ import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
 import io.seedmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import io.seedmatic.rke2lab.manifests.contract.ManifestsRunbookInput;
 import io.seedmatic.rke2lab.manifests.contract.NodeBootstrapArtifact;
+import io.seedmatic.rke2lab.manifests.contract.RenderMode;
 import io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
 import io.seedmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
 import io.seedmatic.rke2lab.manifests.contract.profiles.GithubAppMaterial;
@@ -285,26 +287,91 @@ public class ManifestSynthesisScenario
   private static final String RENDERED_FACET_FILE = "manifest.yaml";
 
   /**
-   * The facet a render should USE: the one recorded at the prepared branch's HEAD ({@code
-   * manifest.yaml}) wins over the seeded posture, so the render reproduces the grow's decision
-   * rather than resetting to the operator default (the mesh-drop footgun). Only publish + debug
-   * follow HEAD; the seeded {@code delivery} is kept, as it carries the current verb's push intent
-   * (publish arms it, synthesize does not). Falls back to the seeded facet when there is no
-   * rendered worktree (a survey) or no readable facet at HEAD (a first render, empty branch).
+   * The facet a render should USE, per the {@link RenderMode} the sower carried:
+   *
+   * <ul>
+   *   <li>{@code GROW}/{@code INIT} — the SEEDED facet is authoritative (the grow's Pulumi stack /
+   *       the CLI args). {@code INIT} additionally GUARDS that the branch is new: a recorded facet
+   *       at HEAD means it already exists, so it fails loud rather than silently reset it.
+   *   <li>{@code UPDATE} — the branch's recorded HEAD facet wins (publish + debug); the seeded
+   *       {@code delivery} is kept, as it carries the verb's push intent. Guards the branch EXISTS.
+   *   <li>{@code EDIT} — the recorded HEAD facet OVERLAID with the sparse operator overrides
+   *       ({@link RenderMode#overrides}); seeded {@code delivery} kept. Guards the branch EXISTS.
+   *       The overlaid facet is what the THEN re-records, so it becomes the new HEAD (one shot).
+   * </ul>
+   *
+   * <p>The recorded facet at HEAD is the presence signal for the guards: a fresh (orphan) branch
+   * carries only the null-base README, no {@code manifest.yaml}, so {@link #recordedFacets} is
+   * empty. Absent a rendered worktree (a survey) the seeded facet always stands (GROW default).
    */
-  private ManifestsRunbookInput facetFollowingHead(
+  private ManifestsRunbookInput resolveFacet(
       ManifestsRunbookInput seeded, Optional<LinkedWorktree> rendered) {
-    return rendered
-        .flatMap(worktree -> worktree.readAtHead(RENDERED_FACET_FILE))
-        .flatMap(this::recordedFacets)
-        .map(
-            recorded ->
-                new ManifestsRunbookInput(
-                    new ManifestsRunbookInput.Facets(
-                        recorded.publish(), recorded.debug(), seeded.facets().delivery()),
-                    seeded.materializationRoot(),
-                    seeded.identity()))
-        .orElse(seeded);
+    final RenderMode.Verb verb = seeded.renderMode().verb();
+    final Optional<ManifestsRunbookInput.Facets> head =
+        rendered
+            .flatMap(worktree -> worktree.readAtHead(RENDERED_FACET_FILE))
+            .flatMap(this::recordedFacets);
+    switch (verb) {
+      case INIT -> {
+        if (head.isPresent()) {
+          throw new IllegalStateException(
+              "init: manifests/<cluster> already has a recorded facet — use update or edit");
+        }
+      }
+      case UPDATE, EDIT -> {
+        if (head.isEmpty()) {
+          throw new IllegalStateException(
+              verb.name().toLowerCase(java.util.Locale.ROOT)
+                  + ": manifests/<cluster> has no recorded facet yet — use init");
+        }
+      }
+      case GROW -> {
+        // No guard: the grow's facet is the SSOT, applied whether the branch is new or not.
+      }
+    }
+    return switch (verb) {
+      case GROW, INIT -> seeded;
+      case UPDATE -> withPublishDebug(seeded, head.orElseThrow());
+      case EDIT ->
+          withPublishDebug(seeded, overlay(head.orElseThrow(), seeded.renderMode().overrides()));
+    };
+  }
+
+  /** A copy of {@code seeded} taking publish+debug from {@code facets}, keeping seeded delivery. */
+  private ManifestsRunbookInput withPublishDebug(
+      ManifestsRunbookInput seeded, ManifestsRunbookInput.Facets facets) {
+    return new ManifestsRunbookInput(
+        new ManifestsRunbookInput.Facets(
+            facets.publish(), facets.debug(), seeded.facets().delivery()),
+        seeded.materializationRoot(),
+        seeded.identity(),
+        seeded.renderMode());
+  }
+
+  /**
+   * Overlay the sparse EDIT overrides onto a base facet: each entry is a dotted JSON path into the
+   * facet ({@code publish.mesh}, {@code debug.networking.enabled}) → boolean. Applied at the JSON
+   * level — the CLI owns the arg → path mapping, here it is generic — then decoded back to a facet.
+   */
+  private ManifestsRunbookInput.Facets overlay(
+      ManifestsRunbookInput.Facets base, java.util.Map<String, Boolean> overrides) {
+    final ObjectNode json = FACET_READER.valueToTree(base);
+    overrides.forEach((path, value) -> setBooleanAtPath(json, path, value));
+    try {
+      return FACET_READER.treeToValue(json, ManifestsRunbookInput.Facets.class);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot overlay the edit facet: " + overrides, ex);
+    }
+  }
+
+  private void setBooleanAtPath(ObjectNode root, String dottedPath, boolean value) {
+    final String[] parts = dottedPath.split("\\.");
+    ObjectNode node = root;
+    for (int i = 0; i < parts.length - 1; i++) {
+      final JsonNode next = node.get(parts[i]);
+      node = (next instanceof ObjectNode object) ? object : node.putObject(parts[i]);
+    }
+    node.put(parts[parts.length - 1], value);
   }
 
   /**
@@ -482,12 +549,12 @@ public class ManifestSynthesisScenario
     // it, and the THEN seals + delivers it. Empty for a bare survey / the standalone CLI: the
     // synthesis then falls back to a temp dir with no branch, and the delivery THEN is a no-op.
     final Optional<LinkedWorktree> rendered = prepareRenderWorktree(facet);
-    // The facet FOLLOWS the branch HEAD: once the render worktree is checked out, the recorded
-    // facet at its root manifest.yaml is authoritative (the grow's posture), so a render never
-    // silently resets the branch to the operator default (dropping mesh etc.). The seeded facet's
-    // delivery is kept — that carries the current verb's push intent (publish arms it, synthesize
-    // does not). Absent a worktree / a first render (no HEAD) → the seeded facet stands.
-    final ManifestsRunbookInput effective = facetFollowingHead(facet, rendered);
+    // Resolve the effective facet per the sower's RenderMode: GROW/INIT keep the seeded facet
+    // (the grow's Pulumi SSOT / the CLI args), UPDATE follows the branch HEAD, EDIT overlays the
+    // sparse operator overrides on HEAD — so a steady-state render never silently resets the branch
+    // to the operator default (the mesh-drop footgun) yet the grow stays authoritative. INIT/UPDATE
+    // /EDIT also guard branch existence. Absent a worktree (a survey) the seeded facet stands.
+    final ManifestsRunbookInput effective = resolveFacet(facet, rendered);
     given().the_activation_facet(effective);
     when()
         .the_policy_is_derived_from_the_facet()

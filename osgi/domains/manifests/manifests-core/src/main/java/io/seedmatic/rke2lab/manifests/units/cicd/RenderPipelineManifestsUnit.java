@@ -28,8 +28,8 @@ import software.constructs.Construct;
  *       .#render-manifests}: the SINGLE render definition (shared with dev/release, no
  *       hand-scripted mvn+java that drifts) builds {@code manifests-cli} with the reactor
  *       discipline and seeds the {@code staging-extension} closure from a nix derivation (no
- *       separate bootstrap task), then runs the {@code publish} verb — render into the plot +
- *       ff-push {@code manifests/<cluster>}.
+ *       separate bootstrap task), then runs the {@code update} verb — re-render following the
+ *       branch HEAD facet + ff-push {@code manifests/<cluster>}.
  * </ul>
  *
  * <p><b>The nix-build capability lives on the PipelineRun stub, not here.</b> Pod annotations are
@@ -310,7 +310,7 @@ public final class RenderPipelineManifestsUnit extends AbstractManifestsUnit {
                           // from
                           // the source checkout is the ONE render definition (shared with
                           // dev/release, no hand-scripted mvn+java that drifts): it builds
-                          // manifests-cli (CRDs staged in), then publish signs + ff-pushes
+                          // manifests-cli (CRDs staged in), then update signs + ff-pushes
                           // manifests/<cluster> — the exe LOCATES its render worktree itself at
                           // .local.d/render/<cluster> (workingDir = the source workspace).
                           "nix run .#render-manifests -- \"$(params.cluster)\" \"$(params.node)\""))

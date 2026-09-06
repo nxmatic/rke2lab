@@ -822,11 +822,13 @@ USAGE
               git config --local "http.https://github.com/.extraheader" "$authHeader"
             fi
 
-            # Render into the plot the exe LOCATES itself (.local.d/render/<cluster>) + signed ff-push
-            # manifests/<cluster>. cluster/node are trailing key=value args (discoverable in `publish`
-            # help); RKE2LAB_SIGNING_KEY + RKE2LAB_PUSH_TOKEN come from the caller's environment (the
-            # Tekton step / the operator).
-            java -jar "$jar" publish cluster="$cluster" node="$node" "$@"
+            # Steady-state re-render: `update` FOLLOWS the branch HEAD facet (the grow's recorded
+            # posture), renders into the plot the exe LOCATES itself (.local.d/render/<cluster>) +
+            # signed ff-push manifests/<cluster>. cluster/node are trailing key=value args
+            # (discoverable in `update` help); RKE2LAB_SIGNING_KEY + RKE2LAB_PUSH_TOKEN come from the
+            # caller's environment (the Tekton step / the operator). A first render of a cluster is
+            # the grow's job (seed-master), not this wrapper.
+            java -jar "$jar" update cluster="$cluster" node="$node" "$@"
           '';
         };
 

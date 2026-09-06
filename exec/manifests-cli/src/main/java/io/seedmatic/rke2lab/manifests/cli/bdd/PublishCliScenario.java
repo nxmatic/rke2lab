@@ -9,6 +9,7 @@ import com.tngtech.jgiven.annotation.As;
 import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.ScenarioState;
+import com.tngtech.jgiven.annotation.ScenarioState.Resolution;
 import com.tngtech.jgiven.base.ScenarioTestBase;
 import com.tngtech.jgiven.impl.Scenario;
 import io.seedmatic.rke2lab.host.runtime.ExecutionEnvironment;
@@ -124,7 +125,15 @@ public class PublishCliScenario
     @ProvidedScenarioState Cellar cellar;
     @ProvidedScenarioState String materializationRoot;
     @ProvidedScenarioState ManifestsCliRun.Identity identity;
-    @ProvidedScenarioState JsonNode facet;
+
+    // Two JsonNode fields — jGiven's type-based injection is ambiguous between them, so both
+    // resolve
+    // by NAME (the same discipline the cluster-pki seal stages use for their twin PEM fields).
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    JsonNode facet;
+
+    @ProvidedScenarioState(resolution = Resolution.NAME)
+    JsonNode renderMode;
 
     public Given i_have_access_to_the_open_gardening(
         @Hidden ManifestsCliRun run, @Hidden OsgiConnection world, @Hidden ScenarioCellar cellar) {
@@ -148,6 +157,7 @@ public class PublishCliScenario
                       new IllegalStateException(
                           "publish needs a cluster/node identity — none was seeded"));
       this.facet = run.facet();
+      this.renderMode = run.renderMode();
       // The Parcel keys the run's cellar — the same plot the three scions store/fetch their sealed
       // anchors under (App credentials, WRITER token). Ephemeral + single-run, so a synthetic
       // coordinate from the cluster identity suffices; it is an addressing key, not a Pulumi stack.
@@ -186,7 +196,13 @@ public class PublishCliScenario
     @ScenarioState Cellar cellar;
     @ScenarioState String materializationRoot;
     @ScenarioState ManifestsCliRun.Identity identity;
-    @ScenarioState JsonNode facet;
+
+    @ScenarioState(resolution = Resolution.NAME)
+    JsonNode facet;
+
+    @ScenarioState(resolution = Resolution.NAME)
+    JsonNode renderMode;
+
     @ProvidedScenarioState String ghappRunbook;
     @ProvidedScenarioState String manifestsRunbook;
 
@@ -197,11 +213,13 @@ public class PublishCliScenario
       // staleable durable token). No amendment (the scion falls back to its own door defaults).
       this.ghappRunbook = gardening.sow("ghapp", Map.of(), cellar);
       // (2) render into the SOIL + deliver: a COMPLETE manifests input — mandatory FACET (with
-      // delivery.push armed), SOIL, IDENTITY. Same amendments the incus crossing sows in the grow.
+      // delivery.push armed), SOIL, IDENTITY, and the RENDER_MODE that carries the verb intent
+      // (init/update/edit) the synthesis resolves the facet against HEAD with.
       final Map<String, JsonNode> amendments = new LinkedHashMap<>();
       amendments.put(Amendment.FACET, facet);
       amendments.put(Amendment.SOIL, TextNode.valueOf(materializationRoot));
       amendments.put(Amendment.IDENTITY, identityNode(identity));
+      amendments.put(Amendment.RENDER_MODE, renderMode);
       this.manifestsRunbook = gardening.sow("manifests", amendments, cellar);
       return self();
     }

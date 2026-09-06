@@ -67,6 +67,14 @@ public @interface Amendment {
    */
   String FUNNEL = "funnel";
 
+  /**
+   * How the render resolves its facet against the branch HEAD — the CLI verb intent (seeded wins /
+   * HEAD wins / HEAD overlaid). The sower fills it; the manifests synthesis reads it. Unamended, it
+   * falls to the manifests scion's default (grow: the seeded facet wins), so seed-master's grow is
+   * unchanged and only the {@code manifests-cli} update/edit verbs opt into following HEAD.
+   */
+  String RENDER_MODE = "render-mode";
+
   /** The neutral gardening role of this amendment (e.g. {@link #SOIL}, {@link #FACET}). */
   String value();
 }

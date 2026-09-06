@@ -1,6 +1,7 @@
 // @codebase
 package io.seedmatic.rke2lab.manifests.cli;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -26,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,6 +56,20 @@ public final class Main {
 
   private Main() {}
 
+  /**
+   * The delivery verbs — the host's OWN copy of the render-mode vocabulary. The name crosses the
+   * broker membrane as the {@code render-mode} amendment's {@code verb} string, matched against
+   * {@code manifests.contract.RenderMode.Verb} BY NAME (the host stays membrane-blind, never
+   * compiling against the domain contract). {@code GROW} is the survey default; {@code INIT}/{@code
+   * UPDATE}/{@code EDIT} are the CLI delivery verbs.
+   */
+  private enum DeliverVerb {
+    GROW,
+    INIT,
+    UPDATE,
+    EDIT
+  }
+
   public static void main(String[] args) throws IOException {
     try {
       new Main().execute(args);
@@ -78,11 +94,15 @@ public final class Main {
       }
       case "synthesize" -> {
         final Map<String, String> options = optionArgs(args);
-        return commandOf(new SynthesizeCommand.Builder(this).run(run(options, false)));
+        return commandOf(new SynthesizeCommand.Builder(this).run(run(options, false, growMode())));
       }
-      case "publish" -> {
+      case "init", "update", "edit" -> {
+        final DeliverVerb verb = DeliverVerb.valueOf(command.toUpperCase(Locale.ROOT));
         final Map<String, String> options = optionArgs(args);
-        return commandOf(new PublishCommand.Builder(this).run(run(options, true)));
+        return commandOf(
+            new DeliverCommand.Builder(this)
+                .verb(verb)
+                .run(run(options, true, renderMode(verb, options))));
       }
       case "versions" -> {
         final Map<String, String> options = optionArgs(args);
@@ -101,7 +121,9 @@ public final class Main {
   private List<CliCommand> availableCommands() {
     return List.of(
         commandOf(new SynthesizeCommand.Builder(this)),
-        commandOf(new PublishCommand.Builder(this)),
+        commandOf(new DeliverCommand.Builder(this).verb(DeliverVerb.INIT)),
+        commandOf(new DeliverCommand.Builder(this).verb(DeliverVerb.UPDATE)),
+        commandOf(new DeliverCommand.Builder(this).verb(DeliverVerb.EDIT)),
         commandOf(new VersionsCommand.Builder(this)),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
@@ -148,13 +170,74 @@ public final class Main {
    * generation — it does not know jgit — so it surveys into a temp dir (empty {@code SOIL}: no
    * branch, no commit).
    */
-  private ManifestsCliRun run(Map<String, String> options, boolean armPush) {
+  private ManifestsCliRun run(Map<String, String> options, boolean armPush, JsonNode renderMode) {
     final String cluster = option(options, "cluster").orElseGet(Main::defaultCluster);
     final ManifestsCliRun.Identity identity =
         new ManifestsCliRun.Identity(cluster, option(options, "node").orElse("master"));
     final Optional<String> worktree =
         armPush ? Optional.of(".local.d/render/" + cluster) : Optional.empty();
-    return ManifestsCliRun.of(worktree, Optional.of(identity), manifestsFacet(options, armPush));
+    return ManifestsCliRun.of(
+        worktree, Optional.of(identity), manifestsFacet(options, armPush), renderMode);
+  }
+
+  // The facet toggles the CLI accepts, mapped to their dotted JSON path in the recorded facet:
+  // publish.* are flat; debug.* wrap the boolean in {enabled}, so the edit overlay path appends it.
+  private static final Map<String, String> FACET_TOGGLE_PATHS =
+      Map.ofEntries(
+          Map.entry("publish.gitops", "publish.gitops"),
+          Map.entry("publish.networking", "publish.networking"),
+          Map.entry("publish.clusterApi", "publish.clusterApi"),
+          Map.entry("publish.storage", "publish.storage"),
+          Map.entry("publish.mesh", "publish.mesh"),
+          Map.entry("publish.highAvailability", "publish.highAvailability"),
+          Map.entry("publish.cicd", "publish.cicd"),
+          Map.entry("debug.mesh", "debug.mesh.enabled"),
+          Map.entry("debug.networking", "debug.networking.enabled"),
+          Map.entry("debug.nriPlugins.flox", "debug.nriPlugins.flox.enabled"));
+
+  /** The default render mode a survey (synthesize) carries — the scion's GROW: the seeded facet. */
+  private ObjectNode growMode() {
+    return verbNode(DeliverVerb.GROW);
+  }
+
+  private ObjectNode verbNode(DeliverVerb verb) {
+    return JsonNodeFactory.instance.objectNode().put("verb", verb.name());
+  }
+
+  /**
+   * The render-mode amendment JSON a delivery verb sows. {@code init}/{@code update} carry only the
+   * verb; {@code edit} also carries the SPARSE overrides — the facet toggles the operator
+   * explicitly set, as dotted JSON paths into the recorded facet ({@code publish.mesh}, {@code
+   * debug.networking.enabled}) → boolean, which the synthesis overlays on the branch HEAD. Fails
+   * loud on an unknown toggle or an {@code edit} that changes nothing.
+   */
+  private ObjectNode renderMode(DeliverVerb verb, Map<String, String> options) {
+    final ObjectNode mode = verbNode(verb);
+    if (verb != DeliverVerb.EDIT) {
+      return mode;
+    }
+    final ObjectNode overrides = mode.putObject("overrides");
+    options.forEach(
+        (key, value) -> {
+          if (key.equals("cluster") || key.equals("node")) {
+            return;
+          }
+          final String path = FACET_TOGGLE_PATHS.get(key);
+          if (path == null) {
+            throw new IllegalArgumentException(
+                "unknown facet toggle for edit: '"
+                    + key
+                    + "' (valid: "
+                    + FACET_TOGGLE_PATHS.keySet()
+                    + ")");
+          }
+          overrides.put(path, Boolean.parseBoolean(value));
+        });
+    if (overrides.isEmpty()) {
+      throw new IllegalArgumentException(
+          "edit needs at least one facet toggle to change, e.g. publish.mesh=true");
+    }
+    return mode;
   }
 
   /**
@@ -349,7 +432,10 @@ public final class Main {
         this.main = main;
         this.run =
             ManifestsCliRun.of(
-                Optional.empty(), Optional.empty(), main.manifestsFacet(Map.of(), false));
+                Optional.empty(),
+                Optional.empty(),
+                main.manifestsFacet(Map.of(), false),
+                main.growMode());
       }
 
       Builder run(ManifestsCliRun run) {
@@ -367,38 +453,65 @@ public final class Main {
     }
   }
 
-  private final class PublishCommand implements CliCommand {
+  /**
+   * The delivery verbs — {@code init}/{@code update}/{@code edit} — one command parameterised by
+   * the {@link DeliverVerb} it carries. All three drive {@link PublishCliScenario} (render into the
+   * plot + signed commit + push {@code manifests/<cluster>}); the verb only changes how the
+   * synthesis resolves the facet against the branch HEAD (the {@code render-mode} amendment) and
+   * the existence guard. It replaces the former single {@code publish} verb, whose implicit
+   * follow-HEAD became explicit: {@code update} IS that behaviour.
+   */
+  private final class DeliverCommand implements CliCommand {
 
+    final DeliverVerb verb;
     final ManifestsCliRun run;
 
     @SuppressWarnings("unused")
-    PublishCommand(Builder builder) {
+    DeliverCommand(Builder builder) {
+      this.verb = builder.verb;
       this.run = builder.run;
     }
 
     @Override
     public String name() {
-      return "publish";
+      return verb.name().toLowerCase(Locale.ROOT);
     }
 
     @Override
     public String description() {
-      return "Render the manifests into the plot AND deliver them — commit (signed) + push the"
-          + " manifests/<cluster> branch, so the Flux webhook reconciles at once";
+      return switch (verb) {
+        case INIT ->
+            "Render a NEW cluster's manifests from the args + deliver (signed commit + push) — fails"
+                + " if manifests/<cluster> already exists (use update/edit)";
+        case UPDATE ->
+            "Re-render manifests/<cluster> from its RECORDED facet (the grow's posture) + deliver —"
+                + " the steady-state render; facet args are ignored";
+        case EDIT ->
+            "Change facet toggles on manifests/<cluster> over its recorded facet, then re-render +"
+                + " deliver — e.g. publish.mesh=true";
+        case GROW -> "(internal) apply the seeded facet, as the grow does";
+      };
     }
 
     @Override
     public String usage() {
-      return "publish [cluster=<host>-mgmt] [node=master] [publish.<layer>=bool] [debug.<x>=bool]";
+      return switch (verb) {
+        case INIT ->
+            "init [cluster=<host>-mgmt] [node=master] [publish.<layer>=bool] [debug.<x>=bool]";
+        case UPDATE -> "update [cluster=<host>-mgmt] [node=master]";
+        case EDIT ->
+            "edit [cluster=<host>-mgmt] [node=master] <publish.<layer>=bool | debug.<x>=bool>…";
+        case GROW -> "grow";
+      };
     }
 
     @Override
     public void run() {
-      // Drive PublishCliScenario on the embedded launcher — synthesize + delivery. It sows ghapp →
+      // Drive PublishCliScenario on the embedded launcher — the render + delivery. It sows ghapp →
       // manifests through the broker: ghapp rehydrates the App credentials from .secrets, then
-      // manifests renders into the SOIL, mints a fresh WRITER token on demand from those
-      // credentials, and pushes manifests/<cluster>.
-      // The same in-container operation the grow drives, minus the Pulumi envelope.
+      // manifests renders into the SOIL (resolving the facet per this verb's render-mode), mints a
+      // fresh WRITER token on demand from those credentials, and pushes manifests/<cluster>. The
+      // same in-container operation the grow drives, minus the Pulumi envelope.
       final String txId = UUID.randomUUID().toString();
       try {
         final ReportModel runbook =
@@ -414,7 +527,9 @@ public final class Main {
                       if (summary.getTotalFailureCount() > 0) {
                         final var first = summary.getFailures().get(0);
                         throw new IllegalStateException(
-                            "the manifests-cli publish scenario failed: "
+                            "the manifests-cli "
+                                + name()
+                                + " scenario failed: "
                                 + first.getTestIdentifier().getDisplayName(),
                             first.getException());
                       }
@@ -424,12 +539,16 @@ public final class Main {
                         .into(run)
                         .andThen(RunRoleSeed.into(RunRole.ROOT))
                         .andThen(TxIdSeed.into(txId))
-                        .andThen(LogFileSeed.into(".local.d/manifests-publish.log")));
+                        .andThen(LogFileSeed.into(".local.d/manifests-" + name() + ".log")));
         final List<?> broken =
             runbook.getScenariosWithStatus(ExecutionStatus.FAILED, ExecutionStatus.ABORTED);
         if (!broken.isEmpty()) {
           throw new IllegalStateException(
-              "the manifests publish did not complete (" + broken.size() + " failed/aborted)");
+              "the manifests "
+                  + name()
+                  + " did not complete ("
+                  + broken.size()
+                  + " failed/aborted)");
         }
         run.identity()
             .ifPresent(
@@ -441,20 +560,29 @@ public final class Main {
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
         throw new IllegalStateException(
-            "the manifests-cli publish run was interrupted", interrupted);
+            "the manifests-cli " + name() + " run was interrupted", interrupted);
       }
     }
 
-    static final class Builder implements CommandBuilder<PublishCommand> {
+    static final class Builder implements CommandBuilder<DeliverCommand> {
       private final Main main;
 
+      private DeliverVerb verb = DeliverVerb.UPDATE;
       private ManifestsCliRun run;
 
       Builder(Main main) {
         this.main = main;
         this.run =
             ManifestsCliRun.of(
-                Optional.empty(), Optional.empty(), main.manifestsFacet(Map.of(), false));
+                Optional.empty(),
+                Optional.empty(),
+                main.manifestsFacet(Map.of(), false),
+                main.growMode());
+      }
+
+      Builder verb(DeliverVerb verb) {
+        this.verb = verb;
+        return this;
       }
 
       Builder run(ManifestsCliRun run) {
@@ -462,12 +590,12 @@ public final class Main {
         return this;
       }
 
-      public PublishCommand build() {
+      public DeliverCommand build() {
         return main.commandOf(this);
       }
 
-      public Class<PublishCommand> commandClass() {
-        return PublishCommand.class;
+      public Class<DeliverCommand> commandClass() {
+        return DeliverCommand.class;
       }
     }
   }

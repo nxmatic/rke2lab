@@ -19,10 +19,17 @@ import java.util.Optional;
  *       (operator defaults + {@code -Drke2lab.manifests.publish.*} / {@code .debug.*} overrides)
  *       rather than leaning on a door default. Carried as opaque JSON so the host speaks only
  *       through the {@code seed.broker.port} membrane.
+ *   <li>{@link #renderMode} — the render intent ({@code {verb, overrides}}) the delivery verbs
+ *       carry ({@code init}/{@code update}/{@code edit}); the survey ({@code synthesize}) leaves it
+ *       at the scion's default. Opaque JSON, mirroring {@code manifests.contract.RenderMode}, for
+ *       the same membrane reason as {@code facet}.
  * </ul>
  */
 public record ManifestsCliRun(
-    Optional<String> materializationRoot, Optional<Identity> identity, JsonNode facet) {
+    Optional<String> materializationRoot,
+    Optional<Identity> identity,
+    JsonNode facet,
+    JsonNode renderMode) {
 
   /**
    * The cluster/node identity the render is keyed on — the CLI twin of {@code
@@ -33,7 +40,10 @@ public record ManifestsCliRun(
   public record Identity(String clusterName, String nodeName) {}
 
   public static ManifestsCliRun of(
-      Optional<String> materializationRoot, Optional<Identity> identity, JsonNode facet) {
-    return new ManifestsCliRun(materializationRoot, identity, facet);
+      Optional<String> materializationRoot,
+      Optional<Identity> identity,
+      JsonNode facet,
+      JsonNode renderMode) {
+    return new ManifestsCliRun(materializationRoot, identity, facet, renderMode);
   }
 }
