@@ -4,7 +4,9 @@
 
 [NOTE]
 ====
-*Status:* IN PROGRESS (2026-07-07). The sixth external edge, second extraction of the
+*Status:* SHIPPED (edge extracted; the `bbox-bdd` scion — `BboxReconciliationScenario` +
+`BboxRunbookHandler` + `BboxAmendReflector` + `BboxReconciliationScenarioInContainerTest` — is in the
+codebase). The sixth external edge, second extraction of the
 control-plane→OSGi sweep (after link:incus-edge-spec.adoc[incus-edge]). Unlike incus (a bare
 `ProcessBuilder`), the bbox contact rides an external library, `java-bbox-api-client` — so this edge
 also proves the *library-backed* edge shape: the library is made an OSGi bundle and IMPORTED (not
@@ -63,7 +65,7 @@ flowchart LR
   class world w;
 ....
 
-== The bbox SCION scenario (target — the metier definition)
+== The bbox SCION scenario (shipped — the metier definition)
 
 In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) bbox is a
 graft-caller: the host step "the network reservations are settled" sows THIS scenario in-container and

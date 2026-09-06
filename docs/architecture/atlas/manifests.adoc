@@ -12,7 +12,7 @@ The fifth subsystem to adopt the ritual, and the FIRST brought in by the design-
 (2026-06-21). The four views above are the OSGi-centric heart of the system; this pass folds in the
 rest of the design, subsystem by subsystem, manifests first as the exemplar. Unlike unitrepo, manifests
 is almost entirely SHIPPED — it is the CDK8s synthesis layer that has run in production for months. Its
-design state is therefore a broad blue base with a thin green target (the unit-lifecycle cleanup). The
+design state is therefore an all-blue base — the unit-lifecycle cleanup (the last green target) has since shipped too. The
 full design is link:../manifests/manifests-architecture.adoc[the manifests architecture]; this view holds
 the inventory, the additivity proof, the capability map, and the scenario map.
 
@@ -64,9 +64,9 @@ convergence unitrepo's verdict already named (a `ManifestsUnit` is the first con
   synthesis via ThreadLocal — the box shared with the (future) bootstrap view's identity provider.
 
 | unit-lifecycle cleanup — plain objects, deferred scope
-| 🟢 Design
-| The target model: units as plain objects with `synthesize(scope)` deferring scope binding, eliminating
-  the `lazy()` factory and emitting group-markers uniformly from the base hook.
+| ✅ Shipped (blue)
+| Units are plain objects; `apply(ManifestsUnitContext)` defers scope binding, the `lazy()` factory is
+  gone, and group-markers are emitted uniformly from the `doSynthesize(Construct, ManifestsUnitContext)` base hook.
 |===
 
 === Diagram M — additivity: BEFORE (the four-view base) vs AFTER + manifests boxes (monotone)
@@ -74,7 +74,7 @@ convergence unitrepo's verdict already named (a `ManifestsUnit` is the first con
 The ritual's test. BEFORE is the constellation as the four OSGi-centric views leave it; AFTER adds the
 manifests boxes. The key additive claim: manifests REUSES the shipped `UnitResolver` /
 `ManifestsUniverse` boxes (drawn as existing blue, not new) — it does not add a resolver, it is read as
-their first consumer. Only the manifests-specific boxes are green.
+their first consumer. The manifests-specific boxes are all shipped (blue).
 
 [mermaid]
 ....
@@ -86,7 +86,7 @@ flowchart TB
     UNIT["ManifestsUnit plus AbstractManifestsUnit<br/>typed CDK8s synthesis"]
     CAT["ManifestDomainCatalog<br/>single source of IDs"]
     POL["conditional inclusion<br/>policy-driven"]
-    LIFE["unit-lifecycle cleanup<br/>plain objects, deferred scope<br/>DESIGN"]
+    LIFE["unit-lifecycle cleanup<br/>plain objects, deferred scope<br/>shipped"]
   end
   subgraph "host space — actualises"
     CTX["ManifestSynthesisContext<br/>ThreadLocal identity"]
@@ -107,8 +107,7 @@ flowchart TB
   classDef shipped fill:#eef,stroke:#88a,stroke-width:1px;
   classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
   class RES,UNIV,COH shipped;
-  class UNIT,CAT,POL,CTX,EXPL,STAGE shipped;
-  class LIFE neu;
+  class UNIT,CAT,POL,CTX,EXPL,STAGE,LIFE shipped;
 ....
 
 === Verdict — does it hold?
@@ -118,8 +117,8 @@ flowchart TB
   units" without changing them — the same boxes the unitrepo view reads as the general oracle. The
   manifests-specific boxes are additions.
 
-. *Almost no green.* Unlike the other views, manifests is shipped-in-bulk: eight of nine boxes are blue.
-  The single green box is the unit-lifecycle cleanup (plain objects + deferred scope), the one design
+. *All blue.* Unlike the other views, manifests is shipped-in-bulk: all nine boxes are blue — the
+  unit-lifecycle cleanup (plain objects + `doSynthesize`) has since shipped, closing the last design
   target. There is no amber — manifests has no exploration horizon, it is a settled subsystem.
 
 . *Two shared boxes are named, not redrawn.* `ManifestSynthesisContext` (identity threading) is the same
@@ -130,12 +129,12 @@ flowchart TB
   unit"; this view is the other end of that claim, reached from the manifests side. The resolver was built
   FOR manifests and generalised INTO unitrepo — the shared boxes are the proof, not an assertion.
 
-Conclusion: the constellation holds; manifests is additive, and mostly already blue.
+Conclusion: the constellation holds; manifests is additive, and now entirely blue.
 
 === The capability map — what the manifests model lets us say
 
 The nine consolidated capabilities (reverse-engineered from the manifests docs during the coverage pass).
-Colored by horizon; all but one are blue.
+Colored by horizon; all nine are blue.
 
 [cols="3,1,2",options="header"]
 |===
@@ -170,15 +169,15 @@ Colored by horizon; all but one are blue.
 | `ManifestSynthesisContext` (ThreadLocal)
 
 | a unit binds its scope at synthesis, no `lazy()` factory
-| next (green)
+| now (blue)
 | unit-lifecycle cleanup
 
 |===
 
 === Design scenarios — the nine capabilities as DSL sentences
 
-The third movement (see <<the-scenario-map>>). Eight playable-and-blue (the shipped synthesis layer —
-the richest playable surface after the runtime view), one green design target.
+The third movement (see <<the-scenario-map>>). All nine playable-and-blue (the shipped synthesis layer —
+the richest playable surface after the runtime view).
 
 . *Manifests synthesise from typed units, not hand-written YAML* — `[playable]` blue +
 .. GIVEN raw Kubernetes YAML hand-authored per resource
@@ -222,14 +221,14 @@ the richest playable surface after the runtime view), one green design target.
 .. THEN synthesis reads identity by context — AND the same context box the bootstrap identity provider
    owns is read here, shared not copied.
 
-. *A unit binds its scope at synthesis, no `lazy()` factory* — `[narrated]` green +
+. *A unit binds its scope at synthesis, no `lazy()` factory* — `[playable]` blue +
 .. GIVEN units wrapped in a `lazy()` factory to defer CDK8s scope binding
-.. WHEN the unit-lifecycle cleanup makes units plain objects with `synthesize(scope)`
+.. WHEN the unit-lifecycle cleanup makes units plain objects with `apply(ManifestsUnitContext)` over a `doSynthesize(Construct, ManifestsUnitContext)` hook
 .. THEN a unit binds its scope at synthesis with no `lazy()` workaround, group-markers emitted uniformly
    from the base hook — AND the change is internal to the unit model, the synthesis seam unchanged.
 
-*Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. Eight
-playable-and-blue (the shipped synthesis layer), one narrated-green (the lifecycle cleanup target).
+*Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. All nine
+playable-and-blue (the shipped synthesis layer, the lifecycle cleanup now landed).
 
 === Diagram N — the contribution seam: how a domain feeds the synthesis
 

@@ -6,15 +6,15 @@
 
 The manifests domain synthesizes the node's material — the K8s manifests, the
 systemd units, the rke2 config, the env-config overlay — from CDK8s units and node
-contributors. Today that synthesis (`ManifestSynthesisService`) survives OSGi-side
-but is driven by nobody in the seed flow: the host cannot resolve it by type across
-the realm boundary, and doing so would be the realm-boundary anti-pattern (see
+contributors. That synthesis (`ManifestSynthesisService`) lives OSGi-side; the host
+cannot resolve it by type across the realm boundary, and doing so would be the
+realm-boundary anti-pattern (see
 link:../bootstrap/provisioning-slice-architecture.adoc[the incus-bootstrap constat]
-§ corroboration). This spec designs the missing piece: **`manifests-bdd`, the
-manifests scion**, played in-container through the broker like bbox/incus/systemd/
-cluster — the "graft cultivated fresh" the ClusterSeed map already names.
+§ corroboration). This spec describes **`manifests-bdd`, the manifests scion**
+(SHIPPED), played in-container through the broker like bbox/incus/systemd/
+cluster — the "graft cultivated fresh" the ClusterSeed map names.
 
-It is the fifth scion, on the exact trio pattern the four shipped ones share
+It is the fifth scion, on the exact trio pattern the four sibling shipped scions share
 (`*Scenario` + `*RunbookHandler` + `*AmendReflector`, the in-container play delegated
 to the shared `ScenarioPlayer` behind `GenericRunbookHandler`), with three differences its
 nature forces — spelled out below so the implementation does not blindly copy bbox.

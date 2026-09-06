@@ -4,13 +4,25 @@
 > *Context:* the read-side (part 1) of Increment E layer 3, sibling to the write-side
 > link:layer3-medical-record-design.adoc[design].
 >
-> *Status:* ✅ IMPLEMENTED (4 commits c8c7116f→daa34928).
+> *Status:* ✅ IMPLEMENTED (originally pre-OSGi, 4 commits c8c7116f→daa34928), then migrated into the
+> OSGi world. Brainstormed + validated section-by-section (2026-06-07). This is the FIRST half of the
+> read-side (runtime enrichment); the write-side is done (the diagnostic layer is filed per-node into
+> the host journal).
 >
 > *Convention:* prose + C4/UML Mermaid, never Java snippets.
->
-> *Status:* design, brainstormed + validated section-by-section (2026-06-07). The write-side is DONE
-> (4 commits; the diagnostic layer is serialized per-node into the Pulumi state). This is the FIRST
-> half of the read-side. No code yet.
+
+[NOTE]
+.OSGi re-baseline
+====
+The mechanism is preserved: the doctor's diagnosis (`⚕` summary + `℞` prescriptions) is injected into
+the JGiven `ReportModel`'s `extendedDescription` so JGiven's AsciiDoc generator renders it into the
+runbook node — no custom renderer, no text post-processing. What migrated is the *ownership*: in the
+OSGi as-built the `scenario-engine` owns the play + the shared `ReportModel`, `ScenarioGraft` grafts
+each played scenario (and its FAILED status) into it, and `RunbookRenderer` renders the enriched model
+to AsciiDoc (into `host.live.d`). The pre-OSGi carriers this doc names — `ConsultationLog`,
+`BootstrapStage`'s `finally`, `render(ReportModel, ConsultationLog)` — are the pre-OSGi shape; the
+join still anchors on the `Checkpoint` enum (`doctor-contract`), `scenarioTitle()`.
+====
 
 == The problem
 

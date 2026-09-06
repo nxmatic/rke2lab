@@ -707,9 +707,9 @@ a separate, larger step, not to be improvised alongside the ephemeral read.
 === Playing a scion scenario is a `sow` — the runbook handler, not reflection
 
 The host wants a domain's scion PLAYED and its runbook back. The tempting shortcut is for the host to
-reach the domain's execution front-door (`*BddScenarios.run()`) reflectively — `Class.forName` on the
-scion bundle's loader, invoke `run()`, take the JSON. *Rejected:* the host would name a domain type
-(`BboxBddScenarios`), and reflection lands it inside a world the gardening register has no business
+reach a scenario's execution front-door reflectively — `Class.forName` on the
+scion bundle's loader, invoke it, take the JSON. *Rejected:* the host would name a domain type
+(a scion scenario class), and reflection lands it inside a world the gardening register has no business
 knowing. It also opens a SECOND execution door beside the broker — the one-door invariant broken.
 
 The correct shape needs NO new port type — a `SeedHandler` is already `SeedEnvelope → SeedEnvelope`,
@@ -746,8 +746,8 @@ So the SOW half of a sow-and-graft caller (link:../bdd/bdd.adoc#clusterseed-scen
 map]) is `broker.sow` at a neutral `RunbookCoordinate`; the GRAFT half is `ScenarioGraft`, run wherever
 the runbook is owned — host-side for the root, in-container for a scion that owns a sub-runbook (the
 incus provisioning scion grafts the manifests scion under its own step through the same gesture).
-The host never names `*BddScenarios` nor a `*Coordinate` enum — only the foundation seam and a soil
-string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
+The host never names a scion scenario type (nor its `*RunbookHandler`) nor a `*Coordinate` enum — only
+the foundation seam and a soil string. The runbook is the HUMAN-channel output above, now reaped THROUGH the same door as every
 verdict.
 
 NOTE: *The host side of the graft is TWO live handles, not one (learnt live).* jGiven
@@ -1710,7 +1710,7 @@ type at the seam is the port interface `Cellar` (module direction: `scenario-eng
 so the port cannot name `ScenarioCellar`). The two handler natures stay: the 5 `*RunbookHandler`s
 (cluster/systemd/incus/manifests/bbox) LAUNCH an in-container run — they cast the crossed cellar to
 `TransactionalCellar` and FLATTEN the transaction at the launcher boundary
-(`TxIdSeed.into(transactionId())` + `WriteSetSeed.into(writeSet())`, both flat strings — the
+(`TxIdSeed.into(transactionId())` + `CellarEntriesSeed.into(entriesEncoded(childCoordinate))`, both flat strings — the
 isolation guard-rail); the 5 reflectors (Amend/Shape/Split/Intervention/Readiness) TRANSFORM and IGNORE the
 cellar.
 
@@ -1776,7 +1776,7 @@ THREE NEUTRAL channels (each a flat JDK value in the launcher session store, eac
 | channel | role | root (Main seeds) | scion (the parent's `*RunbookHandler` relays)
 | `TxIdSeed` | the transaction IDENTITY (a UUID) — correlation/narration, one per run | present (the minted UUID) | present (the SAME UUID, relayed unchanged)
 | `RunRoleSeed` | the DRAIN discriminant (ROOT drains, FRAGMENT does not) — decides atomicity | `ROOT` | `FRAGMENT`
-| `WriteSetSeed` | the inherited WRITE-SET (the parent's in-flight stores) — the ALLER sense | empty (the root is the source) | the parent cellar's `writeSet()`
+| `CellarEntriesSeed` | the inherited WRITE-SET (the parent's in-flight stores) — the ALLER sense | empty (the root is the source) | the parent cellar's `entriesEncoded(childCoordinate)`
 |===
 
 *Why THREE, not fewer — each answers a distinct question, and none derives from another.*
@@ -1787,7 +1787,7 @@ THREE NEUTRAL channels (each a flat JDK value in the launcher session store, eac
   nothing yet (its `store` is the closing `the_harvest_is_stored`), so the first scion inherits an EMPTY
   write-set — deducing "empty ⇒ root" would wrongly make it drain mid-run and shatter atomicity. The role
   is a LAUNCHER fact (who launched knows), seeded explicitly, never inferred.
-* `WriteSetSeed` is the only one that varies by depth; it is the passenger this increment adds.
+* `CellarEntriesSeed` is the only one that varies by depth; it is the passenger this increment adds.
 
 .The transaction context reaches the extension as three neutral channels (never the host `SeedRun`)
 [mermaid]
@@ -1801,15 +1801,15 @@ flowchart TB
   subgraph store["launcher session store (flat JDK values only)"]
     tx["TxIdSeed = UUID"]
     role["RunRoleSeed = ROOT | FRAGMENT"]
-    ws["WriteSetSeed = encoded entries"]
+    ws["CellarEntriesSeed = encoded entries"]
   end
   subgraph engine["scenario-engine (runtime) — cannot see SeedRun"]
     ext["ScenarioCellarExtension.beforeTestExecution"]
-    cellar["new ScenarioCellar(model, durable, txId)<br/>+ inheritWriteSet(writeSet)"]
+    cellar["new ScenarioCellar(model, durable, txId)<br/>+ inheritEntries(entries)"]
     ext --> cellar
   end
   main -->|"TxIdSeed.into · RunRoleSeed.into"| tx & role
-  handler["a parent *RunbookHandler at a sow"] -->|"relays: TxIdSeed · RunRoleSeed=FRAGMENT · WriteSetSeed.into(cellar.writeSet())"| tx & role & ws
+  handler["a parent *RunbookHandler at a sow"] -->|"relays: TxIdSeed · RunRoleSeed=FRAGMENT · CellarEntriesSeed.into(cellar.entriesEncoded(childCoordinate))"| tx & role & ws
   tx & role & ws -->|"read by"| ext
 ....
 
@@ -1840,12 +1840,12 @@ in-flight write. Read-your-transaction's-writes did not hold across crossings.
 
 The correction is the exact twin of the `txId`: whoever SOWS a fragment ALSO hands down the transaction's
 accumulated write-set. The `txId` already descends this channel (`TxIdSeed`) — the write-set is its
-passenger (`WriteSetSeed`, the same session-store idiom). The `ScenarioCellar` is UNCHANGED — it stays a
+passenger (`CellarEntriesSeed`, the same session-store idiom). The `ScenarioCellar` is UNCHANGED — it stays a
 pure VIEW on the caller's `ReportModel` (`model`, `durableReads`, `txId`), no new field, no `Transaction`
-type. What crosses is the VIEW EXTRACTED as flat data: `ScenarioCellar.writeSetOf(model)` returns the
+type. What crosses is the VIEW EXTRACTED as flat data: `ScenarioCellar.entriesEncoded(childCoordinate)` returns the
 encoded `Entry` strings (the raw `Tag.ENTRY` values) off the trunk — the exact ALLER-sense twin of the
 runbook JSON the graft carries the RETURN way. At `BeforeTestExecution` the extension re-posts them onto the
-fragment's OWN model via `cellar.inheritWriteSet(encoded)` (the cellar is the sole tag writer): each becomes
+fragment's OWN model via `cellar.inheritEntries(encoded)` (the cellar is the sole tag writer): each becomes
 an `Entry(inherited=true)` tag, so `fetch` overlays them uniformly — no third read source, the model stays
 the sole carrier. Because they are posted BEFORE the body, they precede the fragment's own stores in tag
 order, so a shared coordinate resolves own {@literal >} inherited {@literal >} durable for free.
@@ -1863,7 +1863,7 @@ flowchart LR
     own["B reads (own > inherited > durable),<br/>decides, stores its OWN"]
     strip["extension STRIPS the inherited<br/>before the model is rendered"]
   end
-  ta --> tb -->|"writeSetOf(trunk) descends as flat List&lt;String&gt;"| inh --> own --> strip
+  ta --> tb -->|"entriesEncoded(childCoordinate) descends as flat List&lt;String&gt;"| inh --> own --> strip
   own -->|"B's OWN tags fold UP — RETURN"| root
   inh -.->|"NEVER folds up (stripped)"| root
 ....
@@ -1887,10 +1887,10 @@ independent axes.
 *The isolation guard-rail (load-bearing).* `scenario-engine` is DUAL-REALM — host-flat AND one copy per
 bundle, SAME version, DIFFERENT classloaders — so a live `ScenarioCellar` or `Entry` object crossing the
 launcher membrane would `ClassCastException`/`LinkageError` (the `JsonNode`-payload trap § the seam types).
-Nothing of the sort crosses: the write-set descends as the VIEW extracted flat — `writeSetOf(trunk)` returns
+Nothing of the sort crosses: the write-set descends as the VIEW extracted flat — `entriesEncoded(childCoordinate)` returns
 already-encoded `Entry` STRINGS, and the session store carries ONLY those flat JDK types (`TxIdSeed` puts a
-`String`, its twin `WriteSetSeed` puts ONE `String`, the JSON array of the encoded entries). The child's
-cellar re-posts them LOCALLY via `inheritWriteSet` — decoding each string into an `Entry` in ITS OWN realm,
+`String`, its twin `CellarEntriesSeed` puts ONE `String`, the JSON array of the encoded entries). The child's
+cellar re-posts them LOCALLY via `inheritEntries` — decoding each string into an `Entry` in ITS OWN realm,
 then re-appending it as a tag on ITS OWN model. Each realm holds its own `Entry` class; none travels. The
 rule that keeps it safe: the channel carries FLAT (encoded strings), the typed `Entry` is born downstream of
 the read, per realm. Never `store.put(aCellar)` nor put a live `Entry` in the session store.

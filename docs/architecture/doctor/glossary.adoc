@@ -40,8 +40,9 @@ of what it meant (`Dossier`) and tightened three others to standard clinical ter
 | The self-observed snapshot a readiness probe produces at a checkpoint: `status`, an optional
   typed `symptom`, a `summary`, and producer `details`. The SOAP "objective". What the patient
   *presents*. (Renamed — see below.)
-| The typed successor of the probe's former `Map<String,Object>` envelope; flows to Pulumi outputs
-  via `toOutputMap()`.
+| The typed successor of the probe's former `Map<String,Object>` envelope. Its serialized shape is
+  produced by `SeedCodec.toMap` through the Cellar graft path (there is no `toOutputMap()`; no
+  Pulumi type crosses the seam).
 
 | *Symptom*
 | A typed readiness-failure kind (e.g. `connection-refused`, `api-not-ready`). The routing key the
@@ -56,8 +57,8 @@ of what it meant (`Dossier`) and tightened three others to standard clinical ter
 | *ConsultationReport*
 | What the doctor documents at one checkpoint within a visit: the observations the patient raised
   there plus the `RemediationPlan` produced. The artifact the `MedicalRecord` aggregates.
-| Serialized per node under the Pulumi output key `observations` + `plan`; read back by
-  `ConsultationReportReader`.
+| Serialized per node into the host journal (the Cellar) via `SeedCodec.toMap`; read back
+  codec-based (`SeedCodec.fromMap`) by `MedicalRecordReader`. There is no `ConsultationReportReader`.
 
 | *Generalist*
 | The doctor's coordinator (≈ GP). Takes the symptom + observation, routes deterministically to
@@ -95,10 +96,12 @@ of what it meant (`Dossier`) and tightened three others to standard clinical ter
   view. (Renamed — see below.)
 | Derived view over the visits; computed, not stored.
 
-| *ConsultationReportReader*
-| Reconstructs `ConsultationReport`s from a snapshot's output maps (tolerant: read-by-key,
-  ignore-unknown, absent = empty). (Renamed — see below.)
-| Reads the `observations`/`plan` output keys back into typed records.
+| *MedicalRecordReader* (codec read-back)
+| Reconstructs a patient's `Visit` / `ConsultationReport`s from the host journal's opaque blobs by
+  decoding each directly with `SeedCodec.fromMap` (tolerant: additive keys ignored, a malformed blob
+  throws so the reader boundary can degrade it). Supersedes the hand-rolled `ConsultationReportReader`
+  / `DiagnosisReader` — no such class exists now; the codec is the read-back path.
+| Decodes the journal blobs back into typed records OSGi-side (no Pulumi type crosses the seam).
 |===
 
 == Roles (not types)
@@ -138,8 +141,10 @@ of what it meant (`Dossier`) and tightened three others to standard clinical ter
 
 | `DiagnosisReader`
 | `ConsultationReportReader`
-| Misnomer fix: it reads `ConsultationReport`s from output maps, not "diagnoses". The rename also
-  frees the word `Diagnosis` for a future return type.
+| Misnomer fix: it read `ConsultationReport`s from output maps, not "diagnoses". The rename also
+  freed the word `Diagnosis` for a future return type. NOTE (OSGi as-built): the hand-rolled reader
+  was itself later retired — read-back is now codec-based (`SeedCodec.fromMap` via
+  `MedicalRecordReader`); no `ConsultationReportReader` class remains.
 |===
 
 == Referral round-trip (built)

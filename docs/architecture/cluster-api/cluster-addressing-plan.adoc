@@ -187,11 +187,15 @@ unambiguous when clusters that share the L2 fabric both run BGP on it.
   (`.128-.223`) plus the reserved `test` slice (`.224`); an unknown host fails fast in `hostId()`
   and a fourth bare-metal host brings its own LAN segment rather than more slices here.
 
-== Before → after (the code delta)
+== Before → after (the code delta — SHIPPED)
+
+The "shipped" column is now the code: `ClusterNetworkBlueprint` derives `clusterId = (hostId << 1) |
+roleId`, per-cluster pod/service CIDRs, `bgpLocalAsn = 64512 + clusterId`, and clustermesh
+`cluster.id = clusterId + 1`. The "before" column is historical.
 
 [cols="1,2,2",options="header"]
 |===
-|Concern |Today (single cluster) |This plan (per `<host>-<role>`)
+|Concern |Before (single-cluster, superseded) |Shipped (per `<host>-<role>`)
 
 |`clusterId` |`ClusterNetworkBlueprint.clusterId(name)` switch `bioskop→0, nikopol→1` (host only) |`(host<<1)\|role`, keyed on `<host>-<role>`
 |Pod / Service CIDR |global constants `POD_CIDR=10.42.0.0/16`, `SERVICE_CIDR=10.43.0.0/16` (+v6) |`10.<44+id>.0.0/16` / `10.<48+id>.0.0/16` (+v6 `fd00:<44+id>`/`fd00:<48+id>`)
@@ -201,8 +205,8 @@ unambiguous when clusters that share the L2 fabric both run BGP on it.
 |Node/VIP/LB, ULA |per-cluster already, keyed on the host-only `clusterId` |same formulae, keyed on the new `clusterId`
 |===
 
-The blueprint stays the single derivation site; `ClusterAsn` and the `POD_CIDR`/`SERVICE_CIDR`
-constants become `clusterId`-indexed derivations, and the cilium `HelmChartConfig` reads
+The blueprint is the single derivation site; `ClusterAsn` and the pod/service CIDRs are
+`clusterId`-indexed derivations, and the cilium `HelmChartConfig` reads
 `cluster.name`/`cluster.id` from identity instead of literals.
 
 == Related Documentation

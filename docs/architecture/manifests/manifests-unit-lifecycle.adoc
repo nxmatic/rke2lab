@@ -24,7 +24,7 @@ A `ManifestsUnit` has two distinct moments that must not be conflated:
 
 == Root cause: a unit should not BE a Construct
 
-The current `AbstractManifestsUnit extends Construct`. A CDK8s `Construct` demands its parent
+Before this shipped, `AbstractManifestsUnit extends Construct` (superseded). A CDK8s `Construct` demands its parent
 scope at `super(scope, id)` time, and units use `this` as the scope for their `ApiObject`s
 (`new ApiObject(this, ...)`). This single inheritance choice causes three coupled problems:
 
@@ -44,7 +44,7 @@ itself or on another unit; inter-unit references go through the applicative
 `ManifestsUnitReferenceRegistry`, and `addDependency(...)` is called on `ApiObject`s, not units.
 So the inheritance buys nothing the model needs.
 
-=== C4 — current (the problem)
+=== C4 — before (superseded — the problem)
 
 [mermaid]
 ....
@@ -68,7 +68,7 @@ graph TB
 Red = the coupling: the unit IS a Construct, so logic runs in the constructor and `lazy`
 exists to defer that constructor.
 
-=== C4 — target (the model)
+=== C4 — after (shipped — the model; `synthesize`/`delegate` = today's `apply`/`scope`)
 
 [mermaid]
 ....
@@ -105,7 +105,7 @@ creates the delegate under the passed-in scope, (2) calls the subclass `doSynthe
 which emits `ApiObject`s into it, (3) emits the group marker into the same delegate. So the
 grouping node and the marker both live on the delegate, with zero per-unit boilerplate.
 
-== Target model: unit is a plain object with `synthesize(scope)`
+== Shipped model: unit is a plain object with `apply(ManifestsUnitContext)`
 
 * `ManifestsUnit` is a plain object holding metadata. Its constructor is pure initialization.
 * `AbstractManifestsUnit.synthesize(Construct scope)` is a *template method*. It owns the

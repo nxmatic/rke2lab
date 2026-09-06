@@ -48,7 +48,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p>Its collaborator — the {@link ClusterReadinessContact} — is INJECTED from its OWN bundle's
  * service registry by the {@link OsgiService} bridge; the scenario is identical live and in test,
- * only who published the contact differs (the live {@code KubectlClusterContact}, or a mock a test
+ * only who published the contact differs (the live {@code Fabric8ClusterContact}, or a mock a test
  * seeds into the registry before playing). The phases form a strict chain (kubeconfig → API →
  * controllers): a not-ready phase throws, jGiven marks it FAILED and skips the downstream chained
  * steps, so the runbook shows exactly where readiness broke.

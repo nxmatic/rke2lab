@@ -5,10 +5,30 @@
 > link:runbook-doctor.adoc[runbook-doctor] and
 > link:pulumi-doctor-integration.adoc[pulumi-doctor-integration].
 >
-> *Status:* ✅ IMPLEMENTED (4 commits 52781714→4e8e71d1). Design validated section-by-section in a
-> brainstorming session (2026-06-07). This
+> *Status:* ✅ IMPLEMENTED (originally pre-OSGi, 4 commits 52781714→4e8e71d1), then migrated into the
+> OSGi world. Design validated section-by-section in a brainstorming session (2026-06-07). This
 > *recadres* (reframes) the layer-3 decisions previously locked in spec Increment E — see
-> "What this changes vs the locked decisions" below. No code written yet.
+> "What this changes vs the locked decisions" below.
+
+[NOTE]
+.OSGi re-baseline — read the write-side mechanism through this
+====
+The *guiding principle* below is unchanged and correct: Pulumi is the authority on what it already
+knows (the graph in stack state, the when/git/config in the update history); the medical record
+persists ONLY the diagnostic delta Pulumi ignores (`Symptom` / `Observation` / `RemediationPlan`),
+per checkpoint. What migrated is *where the delta is filed*:
+
+* As-built, the per-node diagnostic layer is filed into the *host `Cellar` / journal* as a neutral
+  `visit` blob (`SeedCodec.toMap`), NOT as a design-time `registerOutputs` output on a Pulumi
+  `ComponentResource`. It is read back OSGi-side, codec-based, by `doctor-core`'s
+  `MedicalRecordReader` (`SeedCodec.fromMap`). `Observation` / `ConsultationReport` are
+  `doctor-contract` records with no `toOutputMap()`.
+* The `Checkpoint` enum (the join key, identity-only) shipped in `doctor-contract`.
+* The pre-OSGi types this doc names — `OutputBuilder`, `VerificationResult`, `ClusterReadinessResource`
+  / `SystemdAdapterResource`, `ResourceCreationPipeline` — do NOT exist in the OSGi build; the readiness
+  verdict is `ReadinessVerdict` folded by `DefaultReadinessAuthority`, and the host Pulumi bind lives in
+  `pulumi-edge`. The seed-master source links below are pre-OSGi and no longer resolve.
+====
 
 == The problem, as previously framed
 

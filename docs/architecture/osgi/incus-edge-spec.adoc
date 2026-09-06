@@ -4,20 +4,34 @@
 
 [NOTE]
 ====
-*Status:* the two CONTACTS (edge/port) IMPLEMENTED (2026-07-07); PREPARE COMPLETE (2026-07-17) —
-`IncusProvisionScenario` ships image-build + manifests graft + nocloud-unwrap (#2) + secrets (#10) +
-IncusHarvest/HostStaging stores; the PROMOTE landed as its own `IncusReconcileScenario`. Remaining VISION:
-the pure-host GROW beat and the post-grow VERIFY beat (the probe moves there — § the scenarios).
-The incus domain of the frontier-playability model, alongside
+*Status (re-baselined):* the IMAGE-BUILD contact is IMPLEMENTED and re-shaped for the NixOS substrate;
+PREPARE ships as `IncusProvisionScenario` (`IncusScenario.PROVISION`) grown by `IncusRunbookHandler` —
+image-build + manifests graft (which synthesises the cloud-config content) + secrets (#10) +
+`IncusHarvest` store + the `InstanceGrowPlan` publish. Two shifts from the original sweep:
+
+* *The image build is nix, not distrobuilder.* It ships as TWO paired `@Component`s in `incus-edge` —
+  `CultivatingNixosImageBuilder` (cultivate = run) and `SurveyingImageBuilder` (survey = preview) — that
+  run `nix build …#nixosConfigurations.rke2-node-base` to produce `incus.tar.xz` + `rootfs.squashfs`; the
+  recipe is owned by `BuildRecipe` (edge). `DistrobuilderImageBuilder` / distrobuilder are GONE.
+  `ImageBuildException` lives in `incus-edge`.
+* *The reachability contact is pulled back to VISION.* `IncusInstanceContact` /
+  `ProcessBuilderIncusInstanceContact` do NOT exist in the code today; the post-grow VERIFY probe that
+  would use them is designed-not-coded (see § the scenarios). `IncusExecRequest` remains as a
+  contract record.
+
+Remaining VISION: the RECONCILE/PROMOTE beat (only the unwired `IncusScenario.RECONCILE` enum value
+exists — `IncusReconcileScenario`, `HostTreePromoter`, `HostSlotSelector`, `HostStagingEntry`,
+`HostLiveEntry`, `HostDriftEntry`, `NocloudSeedWriter` are NOT built), and the post-grow VERIFY beat.
+The pure-host GROW beat IS shipped, host-side, as `InstanceGrow` in `host/pulumi/incus-ingress` (§ the
+GROW enablement). The incus domain of the frontier-playability model, alongside
 link:pulumi-edge-handoff.adoc[pulumi-edge], link:ssh-to-age-edge-handoff.adoc[ssh-to-age-edge],
 link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge], link:cluster-edge-spec.adoc[cluster-edge],
 link:bbox-edge-spec.adoc[bbox-edge] and link:auth-edge-spec.adoc[auth-edge].
 
-*One domain, one bundle pair, two contacts.* An Incus instance needs an Incus image — reachability
-and image-build are the same concern (talking to an Incus host), so they share `incus-contract` /
-`incus-edge` rather than splitting into a second module pair. The instance-reachability contact was
-the *first* sweep extraction (it validated the working unit); the image-build contact was the *last*
-and heaviest. Both landed here.
+*One domain, one bundle pair.* An Incus instance needs an Incus image — reachability and image-build
+are the same concern (talking to an Incus host), so they share `incus-contract` / `incus-edge` rather
+than splitting into a second module pair. Of the two contacts this doc drafted, only the image-build
+one has shipped; the reachability one is still vision.
 
 The working unit each time: *one external contact, extracted atomically* — the port, the edge, AND
 the re-wiring of the consumer, in one change. The criterion: a type migrates to a bundle only if a
@@ -36,17 +50,20 @@ inlined in the gate, marked `@Transitional(to="incus-edge")` precisely because i
 extraction. The gate's retry loop, deadline, adaptive intervals, and the `ObservationView`/`SymptomKind`
 projection are host orchestration that genuinely stays.
 
-=== Resolution
+=== Resolution (VISION — not shipped)
+
+NOTE: This resolution is DESIGNED, not coded. `IncusInstanceContact` /
+`ProcessBuilderIncusInstanceContact` do not exist in the code today; the reachability probe was pulled
+back to vision and now belongs to the post-grow VERIFY beat (§ the scenarios). Only the
+`IncusExecRequest` contract record is present. The shape below is the target.
 
 * *incus-contract* declares `IncusInstanceContact` — the verb `isReachable(IncusExecRequest) →
   Optional<String>` (empty = reachable, else the failure summary); and `IncusExecRequest`, the flat
   contract record (`sshHost`, `incusProject`, `nodeName`) the host projects out of its config at the call
   site.
-* *incus-edge* provides `ProcessBuilderIncusInstanceContact` (`@Component`) — shells `ssh … incus
-  exec` and nothing else.
-* *seed-master* keeps the orchestration; `SystemdAdapterStage.liveProbe()` resolves
-  `IncusInstanceContact` from the registry (`connection.awaitService`) and passes it to
-  `SeedSystemdAdapterEndpointGate.live`.
+* *incus-edge* provides a reachability `@Component` — shells `ssh … incus exec` and nothing else.
+* the host keeps the orchestration and resolves the contact from the registry to drive its readiness
+  gate. (In the shipped substrate the reachability probe is a VERIFY-beat scion step, not a host gate.)
 
 == Contact 2 — seed image build
 
@@ -67,48 +84,50 @@ recipe script as a classpath resource.
 === Resolution
 
 * *incus-contract* declares `ImageBuilder` — `build(ImageBuildRequest)` (produce the artifacts, throwing
-  `ImageBuildException` on failure) and `recipeDigest()` (a stable digest of the edge-owned recipe).
-  `ImageBuildRequest` is the flat contract record: the builder binary, and two path families — `local*`
-  (drive a local build) and `remote*` (NixOS-translated by the host, drive the ssh recipe). The
-  distrobuilder CONFIG is NOT a field — the edge owns it (see below), so only artifact/workspace
-  placement crosses.
-* *incus-edge* provides `DistrobuilderImageBuilder` (`@Component`) — owns the local-vs-remote decision
-  (`tryResolveExecutable`), the local `distrobuilder build-incus` (+ sudo), and the ssh recipe stream.
-  BOTH recipe resources moved here as *bundle resources* (this edge is their single source): the
-  `remote-build-incus-image.sh` driver AND the `incus-distrobuilder.yaml` distrobuilder config.
-* *seed-master* keeps the Pulumi `Image` resource, the reuse lookup, the cache marker, and the path
-  translation. `PulumiIncusImageProvider` resolves `ImageBuilder` from the registry (`singleSpiProvider`
-  on the held `BootedFramework`) and calls `build` only when a rebuild is needed.
+  an unchecked exception on failure) and `recipeDigest()` (a stable digest of the edge-owned recipe).
+  `ImageBuildRequest` is the flat contract record: the builder binary, `incusProject`, and two path
+  families — `workspaceDir`/`localArtifactDir` (drive a local build) and `remoteHost`/`remoteWorkspaceDir`/
+  `remoteArtifactDir` (NixOS-translated by the host, drive the ssh recipe). The recipe is NOT a field —
+  the edge owns it (see below), so only artifact/workspace placement crosses.
+* *incus-edge* provides TWO paired `@Component`s implementing `ImageBuilder`: `CultivatingNixosImageBuilder`
+  (cultivate = run — it builds) and `SurveyingImageBuilder` (survey = preview — it plans only and returns
+  without touching anything), selected at the collaborator frontier by the gardening mode. The cultivating
+  builder owns the local-vs-remote decision, runs `nix build …#nixosConfigurations.rke2-node-base` to
+  produce `incus.tar.xz` + `rootfs.squashfs` locally when `nix` and `incus` both resolve on `PATH`, else
+  streams the recipe over `ssh` to the builder host. The recipe is owned by `BuildRecipe` (a bundle
+  resource — this edge is its single source). `ImageBuildException` (unchecked) lives HERE in `incus-edge`,
+  not in the contract.
+* *the host* keeps the Pulumi `Image` resource, the reuse lookup, the artifact cache, and the path
+  translation — shipped as `InstanceGrow` in `host/pulumi/incus-ingress` (§ the GROW enablement), which
+  composes `ImageBuilder` from the registry and calls `build` only when a rebuild is needed. (The former
+  seed-master `PulumiIncusImageProvider` is gone.)
 
-==== The recipe is edge-owned end to end (2026-07-17)
+==== The recipe is edge-owned end to end (nix substrate)
 
-The distrobuilder config `incus-distrobuilder.yaml` used to live as a seed-master classpath resource
-handed to the edge by PATH — while the driver script travelled over ssh/stdin. Two resources of the
-SAME recipe delivered by two channels (NFS path vs ssh stream): incoherent, and it forked the recipe's
-ownership. Voie B unifies it: the yaml joins the edge as a bundle resource beside the driver, and the
-edge delivers BOTH over the one ssh channel — a local build materialises the yaml to a temp file, a
-remote build streams both as base64 heredocs into a throwaway dir (`ssh … sh -s`), no NFS hand-off.
+The recipe is the NixOS build (`nix build …#nixosConfigurations.rke2-node-base`), owned entirely by
+`BuildRecipe` as a bundle resource of `incus-edge` — the single source. There is no distrobuilder config
+(`incus-distrobuilder.yaml`) and no distrobuilder invocation any more; the earlier two-channel
+distrobuilder scheme (an NFS-pathed yaml + an ssh-streamed driver) is fully superseded by the substrate.
+A local build runs nix in place; a remote build streams the recipe over the one `ssh` channel.
 
-`recipeDigest()` now folds BOTH resources' bytes (script `\n` config), so a change to EITHER invalidates
-the host's image cache. The host still holds only the digest, never the recipe — it folds
-`recipeDigest()` into its `buildChecksum` exactly where the script bytes used to go. The scion composes
-`buildChecksum` from `recipeDigest` + `imageAlias` + `builderBinary` + `builderHost` (all it holds via
-the image amendment); the config bytes it never sees are already covered by the digest. One owner, one
-channel, behaviour preserved.
+`recipeDigest()` is a stable digest of that edge-owned recipe, so a recipe change invalidates the host's
+image cache. The host still holds only the digest, never the recipe — it folds `recipeDigest()` into its
+`buildChecksum`. The scion composes `buildChecksum` from `recipeDigest` + the image amendment's fields;
+the recipe bytes it never sees are already covered by the digest. One owner, one channel.
 
 == The shared shape
 
 [mermaid]
 ....
 flowchart LR
-  world["EXTERNAL<br/>Incus host: ssh incus exec · distrobuilder / ssh builder"]
-  edge["incus domain — EDGE (incus-edge)<br/>@Component ProcessBuilderIncusInstanceContact<br/>@Component DistrobuilderImageBuilder"]
-  iport["incus domain — PORT (incus-contract)<br/>IncusInstanceContact, IncusExecRequest<br/>ImageBuilder, ImageBuildRequest, ImageBuildException"]
-  gate["control-plane — HOST<br/>SeedSystemdAdapterEndpointGate (retry + ObservationView)<br/>PulumiIncusImageProvider (Pulumi Image + cache + path xlat)"]
-  gate -->|composes each contact| iport
+  world["EXTERNAL<br/>Incus host: nix build / ssh builder ('ssh incus exec' = VISION)"]
+  edge["incus domain — EDGE (incus-edge)<br/>@Component CultivatingNixosImageBuilder + SurveyingImageBuilder<br/>recipe: BuildRecipe · ImageBuildException"]
+  iport["incus domain — PORT (incus-contract)<br/>ImageBuilder, ImageBuildRequest<br/>(IncusInstanceContact, IncusExecRequest = reachability, VISION)"]
+  gate["control-plane — HOST<br/>InstanceGrow (host/pulumi/incus-ingress):<br/>Pulumi Image + cache + path xlat"]
+  gate -->|composes the image-build contact| iport
   gate -->|folds recipeDigest into cache key| iport
   edge -.->|implements| iport
-  edge -->|ssh incus exec · distrobuilder / ssh| world
+  edge -->|nix build · ssh recipe| world
   gate -->|schedules com.pulumi.incus.Image| gate
   classDef e fill:#eef,stroke:#88a,stroke-width:2px;
   classDef p fill:#fde,stroke:#a58,stroke-width:2px;
@@ -143,37 +162,40 @@ be superseded by a rendered runbook (more faithful), but stays the readable targ
 
 [listing]
 ----
-SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-container)  [IncusScenario.PROVISION]
+SCENARIO: the instance is prepared   (PREPARE beat — sow-and-graft, in-container)  [IncusScenario.PROVISION — CODED, grown by IncusRunbookHandler]
   GIVEN the image build request (recipe + digest), the run gate, the broker, the cellar   [CODED]
-    AND the staging slot host.N.staging.d chosen by incus (it owns the tree, HostSlotSelector)   [CODED]
+    AND the seed node + worktree/host tree (the staging-slot selection HostSlotSelector is VISION, not built)  [partial]
   WHEN the_image_is_built — built, or found current by its recipe-digest cache key       [CODED]
     AND the_manifests_are_cultivated — the manifests SUB-SOW (broker.sow AMEND+RUNBOOK → the SOIL, passing the Cellar that carries the tx),
         then GRAFTS the reaped manifests runbook under this step (ScenarioGraft.rebuild + graftUnder) — a scion grafting a sub-scion in-world,
-        so the manifests synthesis renders as a nested sub-tree, faithful in the runbook (§ decision a: every scion played is rendered)  [CODED]
-    AND the_nocloud_seed_is_unwrapped (#2 — read the cloud-config ConfigMap on FS, strip the envelope →
-        user-data/meta-data/network-config in cloud.d/; NO transcode, generic YAML parse)                 [CODED]
-    AND the_secrets_are_written (#10 — resolve AuthTokenContact, upsert gh/flox into <worktree>/.secrets;
-        gated on cultivating — the contact shells gh/flox)                                                [CODED]
+        so the manifests synthesis renders as a nested sub-tree, faithful in the runbook (§ decision a: every scion played is rendered).
+        The cloud-config content (nocloud user-data/meta-data/network-config) is synthesised by manifests here — there is NO separate
+        nocloud-unwrap step in this scenario                                                              [CODED]
+    AND the_secrets_are_written (#10 — resolve the auth token contact, upsert gh/flox into <worktree>/.secrets
+        via LaunchSecretsWriter (incus-core); gated on cultivating)                                        [CODED]
     AND the_network_and_identity_are_resolved — resolve NetplanSynthesisService (@Component), assemble the
-        flat network view (2 NIC hwaddrs + the dnsmasqConfig map) AND the GrowIdentityView (nodeName,
+        GrowNetworkView (2 NIC hwaddrs + the dnsmasqConfig map) AND the GrowIdentityView (nodeName,
         <cluster>-<node> hostname, NodeType.kind(), nodeId) from the one blueprint, OSGi-side           [CODED]
-  THEN the_prep_is_stored — IncusHarvest (recipe digest + soil) stored, the request the host fetches to GROW  [CODED]
-    AND the_staging_is_published — HostStagingEntry (checksums + git provenance) published                    [CODED]
-    AND the_instance_grow_plan_is_published — assemble ONE immutable InstanceGrowPlan {network view, image
-        view (imageAlias, artifact paths, buildChecksum computed OSGi-side), identity view} and store
-        it at INSTANCE_GROW_PLAN — the single record the host GROW fetches (incus-ingress-contract library)  [CODED]
+  THEN the_instance_is_prepared — the prep verdict is folded                                             [CODED]
+    AND the_prep_is_stored — IncusHarvest (recipe digest + soil) stored, the request the host fetches to GROW  [CODED]
+    AND the_instance_grow_plan_is_published — GrowPlanAssembler (incus-core) assembles ONE immutable
+        InstanceGrowPlan {GrowNetworkView, GrowImageView (imageAlias, artifact paths, buildChecksum computed
+        OSGi-side), GrowIdentityView} stored at the plan coordinate — the single record the host GROW fetches
+        (views + plan in incus-ingress-contract)                                                          [CODED]
     AND a build/graft failure surfaces, optionally consulting the doctor                  [CODED]
     AND the instance is NOT started here — GROW is the separate, later pure-host beat
 
-SCENARIO: the live tree is reconciled   (RECONCILE beat — sow-and-graft, in-container)  [IncusScenario.RECONCILE — CODED]
+SCENARIO: the live tree is reconciled   (RECONCILE beat — sow-and-graft, in-container)  [VISION — only IncusScenario.RECONCILE enum value exists, unwired]
   GIVEN the cellar's host-tree entries fetched (fold → pivot liveSyncedFrom + source staging), the run gate
   WHEN change = diff(pivot, source) on checksums is read
-  THEN empty → NO-OP ; gate closed → PENDING ; else HostTreePromoter.promote (jsync staging → host.live.d)
-    AND HostLiveEntry + HostDriftEntry stored, a PROMOTED tag posted   [CODED — §4 pièce 3 landed]
+  THEN empty → NO-OP ; gate closed → PENDING ; else promote (jsync staging → host.live.d)
+    AND the live + drift entries stored, a PROMOTED tag posted
+  NOTE none of HostTreePromoter / HostSlotSelector / Host{Staging,Live,Drift}Entry / IncusReconcileScenario
+       is built — only the IncusScenario.RECONCILE enum constant is present, unwired  [VISION]
 
   [ ── the pure-host GROW beat (com.pulumi) — NOT a scion, sits HERE, after reconcile/promote ── ]
 
-SCENARIO: the instance grows   (GROW beat — PURE-HOST com.pulumi, NOT a scion)  [VISION, not coded]
+SCENARIO: the instance grows   (GROW beat — PURE-HOST com.pulumi, NOT a scion)  [host InstanceGrow SHIPPED in incus-ingress; end-to-end wiring VISION]
   GIVEN the InstanceGrowPlan fetched from the cellar (Cellar.fetch(INSTANCE_GROW_PLAN, InstanceGrowPlan.class)
         — one immutable record decoded host-side via the dual-realm SeedCodec; no metier, no sow)
     AND the Pulumi Context threaded from Main (SessionSeed<Context> + a receiver)
@@ -202,12 +224,13 @@ plan (PENDING, E9) without touching the Incus host. *The recipe-digest subtlety*
 detail owned here, not host-visible. Each scion grafts back under its host step; on failure the transversal
 doctor-consult follows the same pattern as the other scions.
 
-*Migration note (2026-07-17).* PREPARE's materialisations are CODED: `IncusProvisionScenario` ships
-image-build + manifests-sub-sow + nocloud-unwrap (#2) + secrets (#10) + IncusHarvest/HostStaging stores.
-The two materialisations are WHEN steps (they FABRICATE material — § bdd.adoc, the G/W/T phase rule),
-delegating to incus-core instances (`NocloudSeedWriter`, `LaunchSecretsWriter`); the stores are the
-THEN bookend. The PROMOTE is NO LONGER a PREPARE step — it is its own landed scenario
-`IncusReconcileScenario` (`IncusScenario.RECONCILE`, a distinct root WHEN).
+*Migration note (re-baselined).* PREPARE's materialisations are CODED: `IncusProvisionScenario`
+(grown by `IncusRunbookHandler`) ships image-build + manifests-sub-sow + secrets (#10) + `IncusHarvest`
+store + the `InstanceGrowPlan` publish. The materialisation WHEN steps (they FABRICATE material —
+§ bdd.adoc, the G/W/T phase rule) delegate to incus-core instances — the secrets write to
+`LaunchSecretsWriter`; the cloud-config (nocloud) content is synthesised by the manifests sub-sow, so
+there is NO standalone `NocloudSeedWriter` type and no separate nocloud-unwrap step. The PROMOTE beat is
+NOT built: `IncusScenario.RECONCILE` is only an unwired enum constant, no `IncusReconcileScenario` exists.
 
 *The GROW enablement:* PREPARE has `the_network_and_identity_are_resolved` (WHEN)
 + `the_instance_grow_plan_is_published` (THEN) — the scion resolves `NetplanSynthesisService`, computes

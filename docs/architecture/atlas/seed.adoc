@@ -85,7 +85,8 @@ flowchart LR
   classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
   classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
   class b_dry,b_hub,b_flat,b_jgiven gone;
-  class a_gate,a_reg,a_spi,a_report new;
+  class a_reg,a_spi built;
+  class a_gate,a_report new;
 ....
 
 === Verdict — does it hold?
@@ -113,8 +114,10 @@ An honest reading:
   surface; this view keeps the host null-clean at the source rather than annotating consumers.
 
 Conclusion: *additive-with-named-erasure; the pipeline gains one clear responsibility (own both gates)
-and loses four scattered anti-patterns.* Status: DESIGN — the living gate is the first horizon
-(it fixes the hang), then the systemd report, then the output registry.
+and loses four scattered anti-patterns.* Status: PARTLY LANDED — the output-registry SPI
+(`PulumiOutputContributor`/`PulumiOutputRegistry`) has shipped in `host/pulumi/pulumi-edge` (the types
+are present; contributors + `assemble()` wiring are still to come). The living gate is superseded by
+the BDD-as-engine turn (see the note above), and the systemd report is not yet wired as a contributor.
 
 [[the-bdd-as-engine-turn]]
 == The seeding as jGiven scenarios (BDD-as-engine, GO)
@@ -237,7 +240,7 @@ host-side boot are gone — the grammar engine dissolved into manifests-core's i
 boot into `FrameworkLaunch`; the `SCENARIO_STATE_DAG` gate (still to build) is the value-DAG's
 build-time safety. It rests on four invariants (above). The orchestration substrate SHIPPED (increment
 1, `osgi/runtime/scenario-engine`, green) and the ClusterSeed vertical is wired onto it:
-`ClusterSeedScenario` is the live seed runbook (GIVEN + eight WHENs, closed by the harvest-store
+`ClusterSeedScenario` is the live seed runbook (GIVEN + thirteen WHENs, closed by the harvest-store
 THEN), `PendingMarkingScenarioExecutor`
 renders preview, and every domain has its scenario (bbox, incus, systemd, cluster, manifests). No
 pipeline remains on the former Topic/State model — it is deleted from the codebase, not coexisting.
@@ -326,7 +329,7 @@ sequenceDiagram
   L->>S: play — a post-processor sets SeedRun before GIVEN
   Note over S: GIVEN bootstraps (narrated) — consumes the connection, does NOT open it
   S->>S: registerService(RunGate/OpaqueCellar/Parcel) — the RUN layer, from SeedRun
-  Note over S: WHEN — worktree(survey→facts, entry gate) · fetch · bbox · incus-prepare · incus-RECONCILE · host GROW (gated on a live deployment; reads cold/warm Growth, files GrowOutcome on the TRANSIENT bus) · kubeconfig · readiness budget tuned to growth (WARM⇒fail-fast, COLD⇒patient) · systemd + cluster (AWAIT convergence; TOLERATING sows, aggregated) — THEN store→tag, then the closing gate fails the run if any crossing FAILED
+  Note over S: WHEN (13) — worktree(survey→facts, entry gate) · fetch · bbox(network reservations) · cluster-pki(CA seal) · ghapp(register) · replicator-secrets(seal) · ghapp-webhook(reconcile) · incus-provision · host GROW (gated on a live deployment; reads cold/warm Growth, files GrowOutcome on the TRANSIENT bus) · kubeconfig · readiness budget tuned to growth (WARM⇒fail-fast, COLD⇒patient) · systemd + cluster (AWAIT convergence; TOLERATING sows, aggregated) — THEN store→tag, then the closing gate fails the run if any crossing FAILED
   S->>Sc: broker.sow(RunbookCoordinate(soil), txId + writeSetOf(trunk)) — the ALLER sense
   Note over Sc: scion CE poses the write-set as Entry(inherited=true), scion reads own>inherited>durable
   Sc->>Sc: scion CE AfterTestExecution — STRIP the inherited before the front-door serializes
@@ -339,7 +342,7 @@ sequenceDiagram
 graph cannot enter Felix and `isDryRun()` is only knowable there. Layer 2 (the GIVEN) bootstraps the
 gardening as narration. Only the `RunMode` crosses, through the launcher's designed inbound channel — NOT
 the former `HostSeeder` (one value set, none of the executor-swap / model-injection / probe-fan-out
-machinery). Opening the gardening is the GIVEN, never a WHEN; the eight WHENs are the map's runbook.
+machinery). Opening the gardening is the GIVEN, never a WHEN; the thirteen WHENs are the map's runbook.
 
 *The readiness beat — cold/warm conditioned (2026-08-08).* The host GROW does more than actualise the
 plan. At its ENTRY it reads the cold/warm `Growth` from the prior stack state (WARM = a `seed-instance`
@@ -410,7 +413,7 @@ narrated-green. Scenario 1's substrate (launcher, disciplines, connection) SHIPP
 one piece still to design, and the whole flips playable when the ClusterSeed-vertical increment ships.
 Scenario 2 (the output registry) is orthogonal and flips playable when the registry ships.
 
-NOTE: *The full TARGET scenario map — the 6-step root runbook, which step grafts which domain scion, and
+NOTE: *The full TARGET scenario map — the ~13-step root runbook, which step grafts which domain scion, and
 the per-domain G/W/T distribution — lives at link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed
 scenario map] (settled).* This atlas view is the host-pipeline capabilities; the map is the
 concrete scenario instance those capabilities play.
@@ -421,7 +424,7 @@ The host-side realisation of the target: `pulumi-edge` back in the build (the `C
 link:../osgi/host-cellar-realisation-spec.adoc[host Cellar realisation]), and `seed-master` reduced to
 the load-bearing skeleton the scenario map rebuilds on. The links this diagram ties: the
 link:../osgi/gardening-model-spec.adoc[gardening model] (roles), the
-link:../bdd/bdd.adoc#clusterseed-scenario-map[scenario map] (the 6 steps), and the
+link:../bdd/bdd.adoc#clusterseed-scenario-map[scenario map] (the ~13 steps), and the
 link:../osgi/controlplane-to-osgi-migration-spec.adoc[migration spec] (host reaches domains by `sow`).
 
 [mermaid]
@@ -697,8 +700,9 @@ manifests: the host tree (`host.N.staging.d` entire) is what the INCUS INSTANCE 
 the slot, triggers the grow, measures the drift of the WHOLE tree; `rke2-manifests.d` is just one
 folder in it (manifests CONTRIBUTES content, does not own the tree — the same reason only incus can
 VALIDATE the ensemble). So the whole CRUD (publish · fold the head · pick the slot · the two deltas ·
-promote) moves INSIDE the OSGi world as DEDICATED INCUS scenarios (`IncusBddScenarios`, a domain hosts
-N scenarios like doctor), homed in a new `incus-core` (`type=model`, uniform with the other domains'
+promote) moves INSIDE the OSGi world as DEDICATED INCUS scenarios (routed via the `IncusScenario` enum
++ `IncusRunbookHandler` on the shared `ScenarioPlayer`, a domain hosts N scenarios like doctor), homed
+in a new `incus-core` (`type=model`, uniform with the other domains'
 `-core`); `Host*Entry` move to `incus-contract`. The FLOW INVERTS: incus chooses the slot then hands
 `rke2-manifests.d` as the SOIL (the host only passes `nodeRoot`). And incus publishes ALL the entries —
 manifests produces one folder, so it never touches the cellar host-tree; incus checksums the WHOLE tree

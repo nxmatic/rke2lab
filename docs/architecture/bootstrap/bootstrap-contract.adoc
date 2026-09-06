@@ -173,7 +173,7 @@ An earlier draft here modelled scenarios as Pulumi `ComponentResource`s (wrappin
 children, caching results in Pulumi state, drift via `pulumi refresh`/`read()`, publishing 3-format
 actor reports). That model is ABANDONED (it lives in git history). The shipped architecture is
 BDD-as-engine: scenarios are jGiven `Stage`s played on the embedded JUnit launcher, sown through the
-broker (`SeedBroker.sow` → a domain `*BddScenarios` holder), the verdict travelling IN the ReportModel
+broker (`SeedBroker.sow` → a domain `*RunbookHandler` played on the shared `ScenarioPlayer`), the verdict travelling IN the ReportModel
 (`ScenarioGraft` reads `ExecutionStatus.FAILED`), the run rendered as ONE runbook (`RunbookRenderer` →
 AsciiDoc into `host.live.d`). Severity (stop-vs-degraded) lives in the doctor (`DefaultReadinessAuthority`,
 § link:../doctor/runbook-doctor.adoc[runbook-doctor]); the doctor is a CONSULTED sub-step (§

@@ -4,7 +4,8 @@
 
 [NOTE]
 ====
-*Status:* DESIGN (2026-06-23). The third external edge of the
+*Status:* SHIPPED (`DbusSystemdProbe` lives in `dbus-systemd-edge`; `SystemdUnitId` +
+`SystemdStatusSnapshot` in `systemd-contract`). The third external edge of the
 link:../patterns/frontier-playability-model.adoc[frontier-playability model], after
 link:pulumi-edge-handoff.adoc[pulumi-edge] and link:ssh-to-age-edge-handoff.adoc[ssh-to-age-edge].
 

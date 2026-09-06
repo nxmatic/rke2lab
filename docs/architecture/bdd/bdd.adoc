@@ -416,8 +416,8 @@ the neutral port — the language switch.
 
 *A sow-and-graft caller composes TWO gestures in TWO worlds, one per half of the seam:* to *sow* (`sow`)
 is `broker.sow(new RunbookCoordinate(soil), trigger)` — the host holds only a soil NAME (a `String`) and
-reaps the runbook as JSON; the domain's runbook handler plays its scenario in-container (through its own
-front-door `*BddScenarios.run()`, on its own loader — the host never names it) and seals the runbook into
+reaps the runbook as JSON; the domain's runbook handler plays its scenario in-container (the shared
+`ScenarioPlayer` behind its `*RunbookHandler`, on its own loader — the host never names it) and seals the runbook into
 the reaped envelope (see link:../osgi/seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the runbook
 handler]). `RunbookCoordinate` is a neutral value-coordinate in the foundation seam, so the host names no
 domain type. To *graft* (`graft`) is played where the runbook is owned — for the root's four callers,
@@ -439,7 +439,7 @@ flowchart TB
     rc["the parcel's state is fetched (Cellar.fetch) — pure host"]
     r1["the network reservations are settled (bbox) — sow-and-graft"]
     r2a["the instance is prepared (incus) — sow-and-graft [CODED]"]
-    r2r["the live tree is reconciled (incus RECONCILE → PROMOTE) — sow-and-graft [CODED]"]
+    r2r["the live tree is reconciled (incus RECONCILE → PROMOTE) — sow-and-graft [DESIGNED, not wired]"]
     r2b["the instance grows — PURE-HOST (com.pulumi) [VISION, not coded]"]
     r2c["the instance is verified (incus) — sow-and-graft [VISION, not coded]"]
     r3["the systemd adapter is launched — sow-and-graft [CODED]"]
@@ -450,7 +450,7 @@ flowchart TB
   subgraph scions["DOMAIN scenarios (in-container) — ONE node per SCENARIO class"]
     s1["BboxReconciliationScenario (bbox)"]
     s2p["IncusProvisionScenario (incus PREPARE) — IncusScenario.PROVISION"]
-    s2r["IncusReconcileScenario (incus RECONCILE: diff → then PROMOTE) — IncusScenario.RECONCILE"]
+    s2r["incus RECONCILE (diff → then PROMOTE) — IncusScenario.RECONCILE soil (enum value, no distinct scenario class yet)"]
     sman["ManifestSynthesisScenario (manifests) — sub-sown by incus-prepare"]
     s3["SystemdAdapterScenario (systemd)"]
     s4["ClusterReadinessScenario (cluster)"]
@@ -479,15 +479,17 @@ flowchart TB
   class doctor doc;
 ....
 
-NOTE: *the scenario roster (codebase sync 2026-07-16) — ONE holder per domain, `selectClass` of the
-scenario(s):* `BboxBddScenarios` → `BboxReconciliationScenario`; `IncusBddScenarios` → TWO
-(`run`→`IncusProvisionScenario`, `runReconcile`→`IncusReconcileScenario`), enumerated by
-`IncusScenario{PROVISION, RECONCILE}` (the only domain with a scenario enum — it yields each soil's
-`RunbookCoordinate` + `AmendCoordinate`); `ManifestsBddScenarios` → `ManifestSynthesisScenario` (NOT
-sown by a root WHEN — it is the SUB-SOW `IncusProvisionScenario` fires via `consulting_manifests_through`,
-passing the `Cellar` that carries the run's transaction (`ScenarioCellar` — the txId + write-set travel
-IN it, not as a sow param)); `SystemdBddScenarios` → `SystemdAdapterScenario`; `ClusterBddScenarios` →
-`ClusterReadinessScenario`. The other four domains have no scenario enum (a single scenario each).
+NOTE: *the scenario roster (codebase sync 2026-07-16) — ONE `*RunbookHandler` per domain (each
+`extends GenericRunbookHandler`, played by the shared `ScenarioPlayer`), supplying its `scenarioClass()`:*
+`BboxRunbookHandler` → `BboxReconciliationScenario`; `IncusRunbookHandler` → `IncusProvisionScenario`
+(the `incus-provision` soil; the `IncusScenario` enum ALSO defines a `RECONCILE` (`incus-reconcile`) soil —
+an enum value, no distinct reconcile scenario class or handler wired yet — so incus is the only domain with
+a scenario enum, yielding each soil's `RunbookCoordinate` + `AmendCoordinate`); `ManifestsRunbookHandler` →
+`ManifestSynthesisScenario` (NOT sown by a root WHEN — it is the SUB-SOW `IncusProvisionScenario` fires via
+`consulting_manifests_through`, passing the `Cellar` that carries the run's transaction (`ScenarioCellar` —
+the txId + write-set travel IN it, not as a sow param)); `SystemdRunbookHandler` → `SystemdAdapterScenario`;
+`ClusterRunbookHandler` → `ClusterReadinessScenario`. The other four domains have no scenario enum (a single
+scenario each).
 
 *The host runbook, read top to bottom (gardening register — the full sentences):*
 
@@ -501,7 +503,7 @@ SCENARIO: the cluster seed grows to a ready cluster
   WHEN the parcel's state is fetched      THEN I know where I start from (idempotent sowing)   [Cellar.fetch, pure host]
   WHEN the network reservations are settled  THEN sow bbox's scenario, graft its scion     [bbox, graft-caller]        [CODED]
   WHEN the instance is prepared              THEN sow incus's scenario (image·graft·nocloud·secrets·harvest), graft it  [incus, graft-caller]  [CODED; nocloud/secrets beats = VISION]
-  WHEN the live tree is reconciled           THEN sow incus's reconcile (diff→PROMOTE staging→host.live.d), graft it   [incus, graft-caller]  [CODED]
+  WHEN the live tree is reconciled           THEN sow incus's reconcile (diff→PROMOTE staging→host.live.d), graft it   [incus, graft-caller]  [DESIGNED, not wired — no reconcile scenario/handler, no WHEN]
   WHEN the instance grows                    THEN fetch the harvest, declare the Pulumi graph, bind host.live.d, running=true  [PURE-HOST, com.pulumi]  [VISION, not coded]
   WHEN the instance is verified              THEN sow incus's probe scenario (VM now runs), graft its verdict  [incus, graft-caller]  [VISION, not coded]
   WHEN the systemd adapter is launched       THEN sow systemd's scenario, graft its scion  [systemd, graft-caller]     [CODED]
@@ -509,13 +511,16 @@ SCENARIO: the cluster seed grows to a ready cluster
   WHEN the harvest is stored               THEN each reaped végétal is stored to its parcel's cellar  [Cellar.store, pure host]  [CODED]
 ----
 
-NOTE: *CODED vs VISION (codebase sync 2026-07-16).* The runbook above marks each beat. What SHIPS in
+NOTE: *CODED vs VISION (codebase sync 2026-09).* The runbook above marks each beat. What SHIPS in
 `ClusterSeedScenario`: entry-gates · fetch · bbox · incus-prepare (`the_instance_is_provisioned`) ·
-incus-reconcile (`the_live_tree_is_reconciled` — the RECONCILE cycle that diffs then PROMOTEs, §4 pièce 3
-landed) · systemd · cluster ·
-store. What is VISION (design graved, not coded): the pure-host GROW beat (`com.pulumi` graph + 13
-mounts + nocloud→replace) between reconcile and systemd, the VERIFY beat, and — inside incus-prepare —
-the secrets (#10) and nocloud (#2) Thens. The prepare beat's method is `the_instance_is_provisioned`
+systemd · cluster · store. What is VISION (design graved, not coded): the *incus-reconcile* beat itself
+(`the_live_tree_is_reconciled` — the RECONCILE cycle that diffs then PROMOTEs) is NOT wired — only the
+routing soil `IncusScenario.RECONCILE("incus-reconcile")` exists as an enum value, with no distinct
+reconcile scenario class, no `RunbookHandler`, no `HostTree*` promoter, and no `the_live_tree_is_reconciled`
+WHEN in `ClusterSeedScenario` (verified 2026-09; see
+link:../osgi/host-cellar-realisation-spec.adoc#host-tree-provisioning[host-cellar § the host tree]);
+the pure-host GROW beat (`com.pulumi` graph + 13 mounts + nocloud→replace) between reconcile and systemd,
+the VERIFY beat, and — inside incus-prepare — the secrets (#10) and nocloud (#2) Thens. The prepare beat's method is `the_instance_is_provisioned`
 (the map's "prepared" name; the code kept "provisioned"). See
 link:../bootstrap/provisioning-slice-architecture.adoc[provisioning-slice] §deltas and
 link:../osgi/host-cellar-realisation-spec.adoc#the-grow-anatomy[host-cellar § the-grow-anatomy].

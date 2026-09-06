@@ -24,9 +24,10 @@ committed to it.
 
 The read substrate was already done; the proof added one primitive on top:
 
-* `LiveMedicalRecordRegistry.recordFor(Patient)` is *backend-bound, not stack-bound*
-  (`StackHandle.forBackend(backendDir, patient.project(), patient.stack())`) — it already
-  reconstructs ANY patient's record in the same backend. No registry change to read a 2nd patient.
+* `recordFor(Patient)` on the registry (the pre-OSGi `LiveMedicalRecordRegistry`, renamed
+  `JournalMedicalRecordRegistry` in `doctor-core`) is *backend-bound, not stack-bound*
+  (`StackHandle.forBackend(...)`, now host-side in `pulumi-edge`) — it already reconstructs ANY
+  patient's record in the same backend. No registry change to read a 2nd patient.
 * `StackHistoryFixture.at(backendDir, project, stack)` seeds a real-shape history (a failed
   `Observation` + a `Prescription`, `seeded` tag) for any named stack — the "fake failure +
   diagnosis + prescription" for a 2nd patient, in the doctor's test layer (not by mutating dev).
@@ -67,7 +68,11 @@ flowchart TB
 
 == Phase 1 — test-harness proof (fast, isolated, deterministic)
 
-A JUnit test in `controlplane.bdd` (`LiveMedicalRecordRegistryCohortTest`, still in the suite):
+The spike's JUnit test was the pre-OSGi `controlplane.bdd` `LiveMedicalRecordRegistryCohortTest`. It
+did not survive the OSGi migration verbatim: the enumerate-and-fold + grant-filter it proved is now
+covered by `doctor-core-test`'s `ClinicalAccessTest` (`cohort_returns_only_granted_siblings`,
+`an_ungranted_read_degrades_to_empty_and_logs`) and `HealthSystemTest`, over the renamed
+`JournalMedicalRecordRegistry`. The proof narrative below is kept as the historical record:
 
 * `StackHistoryFixture` seeds TWO patients in a `@TempDir` backend:
 ** `dev` — hits `connection-refused` (the patient in the room);
@@ -89,7 +94,8 @@ A JUnit test in `controlplane.bdd` (`LiveMedicalRecordRegistryCohortTest`, still
 
 *Verdict: the architecture handles cross-patient correlation. PROMOTABLE — and since promoted.*
 
-*Phase 1 (isolated unit, `LiveMedicalRecordRegistryCohortTest`):* enumerate-and-fold worked first
+*Phase 1 (isolated unit, the pre-OSGi `LiveMedicalRecordRegistryCohortTest`; now the `doctor-core-test`
+cohort tests):* enumerate-and-fold worked first
 try. Two patients seeded in a temp backend; `cohortFor(dev)` returned both records (current first),
 and the fold read `peer`'s `efficacyOf(connection-refused).everWorked() == true` while `dev`'s own was
 `false` — the benefit comes *only* from the sibling. No surprise in enumeration or `Patient` mapping;

@@ -8,6 +8,23 @@ This document explains the bootstrap identity provider pattern, how to use it in
 
 The bootstrap identity provider is a **thread-local context** that supplies cluster and infrastructure identity to manifest units during synthesis. It prevents parameter proliferation and ensures consistent identity access across all manifest units.
 
+[IMPORTANT]
+.Re-baselined — the request is assembled IN-CONTAINER by the manifests scion, not by seed-master
+====
+This doc's *unit-facing* contract is accurate and current — `BootstrapIdentity`'s fields,
+`ManifestSynthesisContext.current()`, and `AbstractManifestsUnit` all verify against the code. What
+changed is WHERE the `ManifestSynthesisRequest` is built. NO `seed-master` code assembles the request or
+reads `capn-client.crt` / `.secrets` / `~/.config/incus/` any more, and there is no
+`IncusIdentityMaterialAssembler` (removed). The request is assembled in the in-container
+`ManifestSynthesisScenario` scion (`manifests-bdd`): its `the_manifests_are_synthesized` step builds
+`ManifestSynthesisRequest.builder(root, manifestFile).identity(BootstrapIdentity.builder()…)` from the
+activation facet (`ManifestsRunbookInput`, whose `identity()` carries the `BootstrapIdentity`) and calls
+`synthesize(request)`. The `withIncusIdentity(...)` request method still exists but is NEVER called, so
+`incusIdentity()` is empty — the CAPN-Secret material path is defined-not-wired. Read the "host world"
+diagrams and the seed-master "synthesis entry" / setup Step 3 / troubleshooting below as the scion's job
+(and, for the operator setup, as one-time infrastructure steps), not as live host-file reads.
+====
+
 == Architecture
 
 === C4 Context Diagram: Bootstrap Identity Concerns
@@ -15,8 +32,8 @@ The bootstrap identity provider is a **thread-local context** that supplies clus
 [mermaid]
 ----
 graph TB
-    subgraph Synthesis["Manifest Synthesis Process"]
-        Bootstrap[seed-master synthesis entry<br/><i>Builds identity</i>]
+    subgraph Synthesis["Manifest Synthesis Process (in-container, manifests-bdd)"]
+        Bootstrap["ManifestSynthesisScenario scion<br/><i>Builds the request from the facet</i>"]
         Service[DefaultManifestSynthesisService<br/><i>Binds context</i>]
         Context[ManifestSynthesisContext<br/><i>ThreadLocal provider</i>]
         Units[ManifestUnits<br/><i>Consume identity</i>]
@@ -28,24 +45,23 @@ graph TB
         InfraID[Infrastructure Identity<br/>Incus remote, per-cluster<br/>may differ from cluster name]
     end
 
-    subgraph Operator["Operator / host world (seed-master reads here)"]
-        Secrets[.secrets<br/><i>incus.capn.clientKey</i>]
-        IncusConfig[~/.config/incus/<br/><i>remotes, server certs</i>]
-        Resources[seed-master resources<br/><i>capn-client.crt</i>]
+    subgraph Operator["Operator setup (one-time infrastructure, NOT read at synthesis)"]
+        Secrets[".secrets<br/><i>incus.capn.clientKey</i>"]
+        IncusConfig["~/.config/incus/<br/><i>remotes, server certs</i>"]
+        Resources["capn-client.crt<br/><i>Incus trust material</i>"]
     end
 
+    Facet["activation facet<br/>ManifestsRunbookInput.identity()"]
+
+    Facet -->|carries BootstrapIdentity| Bootstrap
+    Bootstrap -->|"builds ManifestSynthesisRequest, calls synthesize()"| Service
     Bootstrap -->|creates| Identity
-    Bootstrap -->|assembles IncusIdentityMaterial,<br/>passes in request| Service
     Service -->|binds to ThreadLocal| Context
     Context -->|provides| ClusterID
     Context -->|provides| NodeID
     Context -->|provides| InfraID
 
     Units -->|reads via current()| Context
-
-    Bootstrap -.->|reads from| Secrets
-    Bootstrap -.->|reads from| IncusConfig
-    Bootstrap -.->|reads from| Resources
 
     style Identity fill:#fff4e6,stroke:#ff9900
     style Context fill:#ccffcc,stroke:#00cc66
@@ -56,9 +72,8 @@ graph TB
 
 * Orange: Identity data (cluster-scoped configuration)
 * Green: Context provider (thread-local, synthesis-scoped)
-* Blue: Operator environment (filesystem-resident)
-* Solid lines: Data flow during synthesis
-* Dashed lines: File reads by seed-master (host side) while assembling the identity material — never by the manifest unit
+* Blue: Operator setup (one-time Incus trust material — NOT read during synthesis; the CAPN-Secret material path is defined-not-wired)
+* Solid lines: Data flow during synthesis (the scion builds the request from the activation facet)
 
 **Key Separation of Concerns:**
 
@@ -73,27 +88,18 @@ graph TB
 [mermaid]
 ----
 sequenceDiagram
-    participant Config as Pulumi Config
-    participant Bootstrap as seed-master synthesis entry
+    participant Facet as activation facet (ManifestsRunbookInput)
+    participant Bootstrap as ManifestSynthesisScenario scion
     participant Request as ManifestSynthesisRequest
     participant Service as ManifestSynthesisService
     participant Context as ManifestSynthesisContext
     participant Unit as ManifestUnit
-    participant FS as Filesystem
 
-    Config->>Bootstrap: clusterName, clusterId, token...
-    Bootstrap->>Bootstrap: Build BootstrapIdentity
+    Facet->>Bootstrap: identity() carries the BootstrapIdentity
+    Bootstrap->>Request: builder(root, manifestFile).identity(BootstrapIdentity.builder()…)
 
-    Note over Bootstrap: Identity is immutable record
+    Note over Bootstrap: withIncusIdentity(...) is NOT called<br/>(defined-not-wired → incusIdentity() empty)
 
-    Bootstrap->>FS: Read .secrets (incus.capn.clientKey)
-    FS-->>Bootstrap: Private key PEM
-    Bootstrap->>FS: Read ~/.config/incus/ (remote addr + server cert)
-    FS-->>Bootstrap: Address + server certificate
-
-    Note over Bootstrap: Assemble IncusIdentityMaterial<br/>(host side reads the filesystem, not the unit)
-
-    Bootstrap->>Request: withBootstrapIdentity(identity)<br/>+ withIncusIdentity(material)
     Bootstrap->>Service: synthesize(request)
 
     Service->>Context: of(request, ...).bind()
@@ -109,9 +115,7 @@ sequenceDiagram
     Context-->>Unit: "bioskop"
 
     Unit->>Context: incusIdentity()
-    Context-->>Unit: IncusIdentityMaterial (PEM + addr)
-
-    Unit->>Unit: Render K8s Secret from material
+    Context-->>Unit: Optional.empty() (material path unwired)
 
     deactivate Context
 
@@ -327,14 +331,18 @@ cp capn-client.crt \
     exec/seed-master/src/main/resources/incus/capn-client.crt
 ----
 
-The `capn-provider` identity is host-owned: seed-master holds it and hands it off to Stage B (it is
-NOT the identity seed-master authenticates with — that is the operator cert in `~/.config/incus/`).
-The host-side `IncusIdentityMaterialAssembler` reads this cert (plus the client key from `.secrets`
-and the server cert + remote address from `~/.config/incus/`), bundles them into an
-`IncusIdentityMaterial`, and passes it across the host→OSGi frontier on the `ManifestSynthesisRequest`.
-The OSGi `IncusIdentitySecretManifestsUnit` only RENDERS the Secret from that material — it never reads
-a host file or classpath resource itself (it cannot: it runs inside an isolated bundle whose
-classloader sees neither the flat classpath nor `~`).
+The `capn-provider` identity is one-time Incus trust material for the CAPN provider. It is NOT the
+identity anything authenticates with at synthesis (that is the operator cert in `~/.config/incus/`).
+
+[NOTE]
+====
+*Re-baselined:* there is no longer an `IncusIdentityMaterialAssembler` (removed), and nothing reads
+`capn-client.crt` / `.secrets` / `~/.config/incus/` during synthesis. The CAPN-Secret material path
+(`withIncusIdentity(...)`) is defined-not-wired, so `IncusIdentitySecretManifestsUnit` sees an empty
+`incusIdentity()` and renders nothing. This step remains as the operator's one-time trust setup; it is
+not consumed by a live host assembler. When the material path is wired, it will be assembled in the
+in-container `ManifestSynthesisScenario` scion, not host-side.
+====
 
 === Step 4: Store Private Key in `.secrets`
 
@@ -384,13 +392,13 @@ incus config trust list
 [mermaid]
 ----
 sequenceDiagram
-    participant Bootstrap as seed-master synthesis entry
+    participant Bootstrap as ManifestSynthesisScenario scion
     participant Service as DefaultManifestSynthesisService
     participant Context as ManifestSynthesisContext
     participant Unit as IncusIdentitySecretManifestsUnit
 
     Bootstrap->>Service: synthesize(request)
-    Note over Bootstrap,Service: Request carries BootstrapIdentity<br/>+ IncusIdentityMaterial (assembled host-side)
+    Note over Bootstrap,Service: Request carries BootstrapIdentity from the facet<br/>(incusIdentity() empty — material path unwired)
 
     Service->>Context: of(request, ...).bind()
     activate Context
@@ -405,36 +413,32 @@ sequenceDiagram
     Context-->>Unit: "bioskop"
 
     Unit->>Context: incusIdentity()
-    Context-->>Unit: IncusIdentityMaterial (PEM + addr)
-
-    Note over Unit: Render from material — no filesystem read
-
-    Unit->>Unit: Create <cluster>-incus-identity Secret
+    Context-->>Unit: Optional.empty() → unit returns (nothing to render)
 
     deactivate Context
 ----
 
-=== Entry Point: the seed-master synthesis entry
+=== Entry Point: the in-container ManifestSynthesisScenario scion
 
-The seed-master synthesis entry point builds the `ManifestSynthesisRequest`, populating its
-`BootstrapIdentity` (and the Incus identity material) before handing it across the host→OSGi
-frontier:
+The `ManifestSynthesisScenario` scion (`manifests-bdd`) builds the `ManifestSynthesisRequest` in-container,
+from the activation facet — NOT seed-master, and no host filesystem read. Its
+`the_manifests_are_synthesized` step:
 
 [source,java]
 ----
-final BootstrapIdentity identity = BootstrapIdentity.builder()
-    .clusterName(config.clusterName())
-    .clusterId(config.clusterId())
-    .clusterToken(config.clusterToken())
-    // ... other fields ...
-    .build();
+final ManifestSynthesisRequest.Builder builder =
+    ManifestSynthesisRequest.builder(root, manifestFile)
+        // identity() carries the BootstrapIdentity from the ManifestsRunbookInput facet
+        .identity(BootstrapIdentity.builder()
+            .clusterName(facet.identity().orElseThrow().clusterName())
+            // ... other fields from the facet ...
+            .build())
+        .componentVersions(versions)
+        .networkTopology(topology);
+// withIncusIdentity(...) is NOT called — the CAPN-Secret material path is defined-not-wired
 
-final ManifestSynthesisRequest request = baseRequest
-    .withBootstrapIdentity(identity)
-    .withComponentVersions(versions)
-    .withNetworkTopology(topology);
-
-synthesisService.synthesize(request);
+final ManifestSynthesisRequest request = builder.build();
+this.result = synthesis.orElseThrow().synthesize(request);
 ----
 
 === Context Binding: DefaultManifestSynthesisService
@@ -514,14 +518,14 @@ public record BootstrapIdentity(
 }
 ----
 
-2. **Update the seed-master synthesis entry point**:
+2. **Update the scion request assembly** (`ManifestSynthesisScenario.the_manifests_are_synthesized`):
 +
 [source,java]
 ----
-final BootstrapIdentity identity = BootstrapIdentity.builder()
-    .clusterName(config.clusterName())
+BootstrapIdentity.builder()
+    .clusterName(facet.identity().orElseThrow().clusterName())
     // ... existing fields ...
-    .newField(config.newField())  // NEW
+    .newField(facet.identity().orElseThrow().newField())  // NEW — carried on the facet
     .build();
 ----
 
@@ -538,14 +542,23 @@ No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapId
 
 == Troubleshooting
 
-=== "Client certificate resource not found"
+[NOTE]
+====
+*Re-baselined:* the material-read symptoms below belonged to the removed host-side
+`IncusIdentityMaterialAssembler` and no longer arise during synthesis (the CAPN-Secret material path is
+unwired — see the Overview note). They are kept as the operator's Incus trust-setup troubleshooting; if
+the material path is re-wired it will read in the in-container scion, not host-side.
+====
+
+=== "Client certificate resource not found" (historical — assembler removed)
 
 **Symptom**: `IllegalStateException: Client certificate resource not found: /incus/capn-client.crt`
 
-**Cause**: Certificate missing from seed-master's host-world resources, where the
-`IncusIdentityMaterialAssembler` reads it.
+**Cause**: This was raised by the former host-side `IncusIdentityMaterialAssembler` (now removed) when
+the certificate was missing from seed-master's resources. It does not occur today.
 
-**Fix**: Copy certificate to `exec/seed-master/src/main/resources/incus/capn-client.crt` and rebuild.
+**Fix**: For the one-time trust setup, copy the certificate to
+`exec/seed-master/src/main/resources/incus/capn-client.crt`.
 
 === "incus.capn.clientKey not found in .secrets"
 

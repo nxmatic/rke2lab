@@ -76,9 +76,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * The ClusterSeed root scenario — the host runbook, spoken in the gardening register, composed on
  * the common {@code seed-bdd} stages (link:docs/architecture/osgi/seed-bdd-module-spec.adoc). It is
  * the concrete instance of link:docs/architecture/bdd/bdd.adoc#clusterseed-scenario-map[the
- * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the WHENs — the
- * worktree survey (harvest + entry gate) → {@code Cellar.fetch} → four sow-and-graft callers (bbox
- * · incus-provision · systemd · cluster) + the host GROW — closed by the {@code Cellar.store} THEN.
+ * ClusterSeed scenario map]: a GIVEN that bootstraps the open gardening, then the thirteen WHENs —
+ * the {@code Cellar.fetch} bookend, the nine sow-and-graft crossings (worktree · bbox · cluster-pki
+ * · ghapp · replicator-secrets · ghapp-webhook · incus-provision · systemd · cluster) and the
+ * host-flat beats interleaved among them (the GROW, the operator kubeconfig, the readiness-budget
+ * tuning) — closed by the {@code Cellar.store} THEN.
  *
  * <p>The amorce is two-layered (§ the amorce): {@code Main} — inside {@code Pulumi.run} — captures
  * the {@link RunMode} (the one fact only it can know) and seeds it through the launcher session
@@ -410,8 +412,10 @@ public class ClusterSeedScenario
   }
 
   /**
-   * The WHENs — the worktree survey (harvest + entry gate), the {@code Cellar.fetch} bookend, the
-   * four sow-and-graft crossings (bbox · incus-provision · systemd · cluster), and the host GROW.
+   * The thirteen WHENs — the worktree survey (harvest + entry gate), the {@code Cellar.fetch}
+   * bookend, the nine sow-and-graft crossings (worktree · bbox · cluster-pki · ghapp ·
+   * replicator-secrets · ghapp-webhook · incus-provision · systemd · cluster), and the host-flat
+   * beats interleaved among them (the GROW, the operator kubeconfig, the readiness-budget tuning).
    * The closing {@code Cellar.store} is the THEN, not a WHEN.
    */
   public static class When extends Stage<When> {

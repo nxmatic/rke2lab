@@ -2,12 +2,39 @@
 :toc: left
 :toclevels: 3
 
-*Status:* ✅ Implemented on `feature/medical-record-accumulator`. This is the settled design and its
-rationale; the as-built code is the `pulumi-automation-ext` module (root package
-`io.seedmatic.rke2lab.pulumi.automation`) plus the doctor records under
-`seed-master/.../controlplane/bdd/`. Where a design-time name and a shipped name differ, the
-mapping is called out inline (see _As-built mapping_ below). The model was grounded on a working
-proof before implementation (the throwaway `wip/sandbox` program; not retained on `main`).
+*Status:* ✅ Implemented, then migrated into the OSGi world. This is the settled design and its
+rationale; where a design-time name and a shipped name differ, the mapping is called out inline
+(see _As-built mapping_ below). The model was grounded on a working proof before implementation (the
+throwaway `wip/sandbox` program; not retained on `main`).
+
+[NOTE]
+.OSGi re-baseline (as-built) — read this before the design body
+====
+The design below was written when the doctor reconstructed the record *directly* from Pulumi
+in-process. That premise is preserved as *vision* (reconstruct on demand from a single source, never
+a stored blob, the four clinical questions, the additive schema, the layered error contract), but the
+as-built code moved:
+
+* The Pulumi self-introspection capability shipped *host-side* as the module
+  **`host/pulumi/pulumi-edge`** (package `io.seedmatic.rke2lab.pulumi.edge`), NOT a top-level
+  `pulumi-automation-ext` module under `io.seedmatic.rke2lab.pulumi.automation`. Its as-built types
+  (`SnapshotSource`, `StackHandle`, `StackHistory`, `StackSnapshot`, `StackCheckpoint`,
+  `StackHandleSnapshotSource`, `PulumiBackendLayout`, the `Stack*`/`Snapshot*` exception hierarchies)
+  live there.
+* The doctor no longer imports a `SnapshotSource` and reconstructs Pulumi state itself. The host
+  reads the snapshots into a *neutral host journal* — the seed-broker `Cellar`, a `List<SeedEnvelope>`
+  of opaque `visit` blobs — and **`doctor-core`'s `MedicalRecordReader`** folds that journal into the
+  `MedicalRecord`, decoding each blob codec-based (`SeedCodec.fromMap`) inside the bundle realm. No
+  Pulumi type crosses the seam.
+* `MedicalRecord` and `ConsultationReport` are `doctor-contract` records; the four questions
+  (`chiefComplaint` / `historyOf` / `efficacyOf` / `comorbiditiesWith`) shipped verbatim on
+  `MedicalRecord` (with `efficacyOf(Symptom, InterventionLedger)` taking the ledger).
+* `ConsultationReportReader` and the offline `MedicalRecordDump` no longer exist — read-back is the
+  codec path via `MedicalRecordReader`. The named integration tests below (`SeededMedicalHistoryTest`,
+  `RealGraphInjectionTest`) migrated with the module.
+
+Read the module/type names in the body through this note.
+====
 
 *Scope:* the longitudinal medical record — what a practitioner can learn about a patient over time.
 This is the _préalable_ before `treats()` / the referral round-trip. It does NOT cover the
@@ -111,68 +138,61 @@ seed-master, so every seed-* reuses it.
 
 *It is NOT under `sdks/`.* In this repo (and in Pulumi's own vocabulary) an `sdks/*` module is a
 *generated provider SDK* — `sdks/incus` is package `com.pulumi.incus` with resource classes
-(`StorageBucket`, `NetworkLb`, …) a program instantiates to *create* resources. Our module creates
-nothing; it *observes* a stack from outside the resource graph via the Automation API. So it is a
-*top-level module* (sibling of `netplan`, `manifests`, …), groupId `io.seedmatic.rke2lab`, named
-*`pulumi-automation-ext`*: `pulumi-automation` = the tech it builds on (the Automation API client,
-anchored on a `LocalWorkspace` handle — see the next section); `-ext` = it *extends Pulumi's
-client-side capability* by re-providing the versioned export the file backend lacks. It is *not* a
-provider and *not* a runtime extension — the `-ext` is about client capability, not the engine.
+(`StorageBucket`, `NetworkLb`, …) a program instantiates to *create* resources. This module creates
+nothing; it *observes* a stack from outside the resource graph via the Automation API. It is *not* a
+provider and *not* a runtime extension — its capability is client-side. *As-built (OSGi):* it shipped
+*host-side* as **`host/pulumi/pulumi-edge`** (package `io.seedmatic.rke2lab.pulumi.edge`), where the
+whole Pulumi seam lives — not the design-time top-level `pulumi-automation-ext`
+(`io.seedmatic.rke2lab.pulumi.automation`). It stays generic and reusable by any host-side seed-*.
 
 So there are *three* layers, each in its place:
 
-* *`pulumi-automation-ext` (new, generic module)* — Pulumi self-introspection: read own state
+* *`host/pulumi/pulumi-edge` (the host Pulumi module)* — Pulumi self-introspection: read own state
   (`exportStack`) and history in-process, and materialize the snapshot of *any* past deployment
   (addressed by its deployment instant) over the checkpoint JSON. Knows Pulumi, knows nothing about
-  the doctor. Reusable by any future seed-* module. Coordinates: groupId `io.seedmatic.rke2lab`,
-  artifactId `pulumi-automation-ext`, root package `io.seedmatic.rke2lab.pulumi.automation` (the `-ext`
-  qualifies the module name, not the package — as `sdks/incus` is artifactId `incus` / package
-  `com.pulumi.incus`). As-built types: `StackHandle` (the workspace anchor), `StackHistory` +
-  `StackHistory.Entry` (the deployment timeline, ordered by instant), `StackSnapshot` /
-  `StackCheckpoint` (one deployment's state), `PulumiBackendLayout` (the single source of truth for
-  the on-disk layout), and the `StackException` / `StackAccessException` / `StackContentException`
-  hierarchy.
-* *the doctor (in seed-master for now)* — the *neutral* clinical model: the `MedicalRecord` (the four
-  questions), reconstructed for one `Patient` from a `SnapshotSource` by `MedicalRecordReader`, with
-  `ConsultationReportReader` doing the tolerant navigate+map of each checkpoint. The doctor's physical
-  extraction into its own module is *deferred* (a separate, larger chantier); until then this lives in
-  seed-master, but it depends only on the generic module, not on Pulumi directly.
-* *seed-master* — wires `StackHandleSnapshotSource` (the `SnapshotSource` impl that adapts the generic
-  module's `StackHandle` to the doctor) and injects the reconstructed `MedicalRecord` into the
-  `Generalist` (instance-passing). The patient is bound once, at `MedicalRecordReader.read(patient)`;
-  the resulting `MedicalRecord` answers the four questions without re-taking a patient argument.
+  the doctor. Coordinates: package `io.seedmatic.rke2lab.pulumi.edge`. As-built types: `StackHandle`
+  (the workspace anchor), `StackHistory` + `StackHistory.Entry` (the deployment timeline, ordered by
+  instant), `StackSnapshot` / `StackCheckpoint` (one deployment's state), `SnapshotSource` /
+  `StackHandleSnapshotSource` (the snapshot seam), `PulumiBackendLayout` (the single source of truth
+  for the on-disk layout), and the `StackException` / `StackAccessException` / `StackContentException`
+  plus `SnapshotException` / `SnapshotAccessException` / `SnapshotContentException` hierarchies.
+* *the doctor (`doctor-core`, OSGi)* — the *neutral* clinical model: the `MedicalRecord` (the four
+  questions, a `doctor-contract` record), reconstructed for one `Patient` by `MedicalRecordReader`,
+  which folds the host `Cellar`'s neutral `visit` journal and decodes each blob codec-based
+  (`SeedCodec.fromMap`) — there is no `ConsultationReportReader`. The doctor imports no Pulumi type;
+  only opaque `SeedEnvelope` blobs cross the seam.
+* *the host / `pulumi-edge`* — reads the snapshots through `StackHandleSnapshotSource` and files them
+  into the `Cellar` as neutral `visit` blobs; the OSGi side folds them. The patient is bound once, at
+  `MedicalRecordReader.read(patient, journal)`; the resulting `MedicalRecord` answers the four
+  questions without re-taking a patient argument.
 
 [mermaid]
 ----
 graph TB
-    subgraph doctor_in_seedmaster
+    subgraph doctor_core["doctor-core (OSGi, no Pulumi type)"]
         GEN["Generalist or Specialist<br/>asks the record while diagnosing"]
         API["MedicalRecord<br/>chiefComplaint, historyOf,<br/>efficacyOf, comorbiditiesWith<br/>NEUTRAL, no Pulumi"]
-        READER["MedicalRecordReader<br/>reconstructs a MedicalRecord for one Patient<br/>fail-at-end over the timeline"]
-        SRC["StackHandleSnapshotSource<br/>the SnapshotSource impl<br/>adapts StackHandle to the doctor"]
+        READER["MedicalRecordReader<br/>folds the Cellar journal for one Patient<br/>codec-decodes each blob · fail-at-end"]
     end
-    subgraph generic_module
-        EXT["pulumi-automation-ext<br/>StackHandle, StackHistory,<br/>StackSnapshot over checkpoints<br/>reusable by any seed-*"]
-    end
-    subgraph other_seeds
-        S2["future seed-X"]
-        S3["future seed-Y"]
+    SEAM["Cellar journal<br/>List of SeedEnvelope 'visit' blobs<br/>opaque — the seam"]
+    subgraph pulumi_edge["host/pulumi/pulumi-edge (host)"]
+        SRC["StackHandleSnapshotSource<br/>the SnapshotSource impl<br/>files snapshots into the Cellar"]
+        EXT["StackHandle, StackHistory,<br/>StackSnapshot over checkpoints<br/>reusable by any host-side seed-*"]
     end
     GEN --> API
     READER --> API
-    READER --> SRC
+    READER -->|reads| SEAM
+    SRC -->|files blobs| SEAM
     SRC --> EXT
-    S2 --> EXT
-    S3 --> EXT
 
-    style doctor_in_seedmaster fill:#e1f5ff,stroke:#0066cc
-    style generic_module fill:#ccffcc,stroke:#00cc66
-    style other_seeds fill:#fff4e6,stroke:#ff9900
+    style doctor_core fill:#e1f5ff,stroke:#0066cc
+    style pulumi_edge fill:#ccffcc,stroke:#00cc66
+    style SEAM fill:#fff4e6,stroke:#ff9900
 ----
 
 The `Generalist` receives a `MedicalRecord` and cannot tell whether it is Pulumi-backed, file-backed,
-or cloud-backed. And the generic `pulumi-automation-ext` capability is available to every
-seed-* module from day one, not re-invented per module. That swappability and reuse are the whole
+or cloud-backed. And the generic `pulumi-edge` capability is available to every host-side seed-*
+module from day one, not re-invented per module. That swappability and reuse are the whole
 point.
 
 === As-built mapping
@@ -184,12 +204,12 @@ navigable against the code. The clinical *questions* (`chiefComplaint`, `history
 
 [cols="1,1,2",options="header"]
 |===
-|Design-time name |Shipped type |Note
-|"diagnosisAt(version)" |`ConsultationReportReader` over a `StackSnapshot`, addressed by `StackHistory.Entry` |the primitive; addressed by *deployment instant*, never a version number
-|"the ordered version sequence" |`StackHistory` / `StackHistory.Entry` |ordered by the filename-nanos deployment instant
-|`MedicalRecord` interface |`MedicalRecord` (a concrete class, patient bound at construction) |the four questions take no patient argument — the patient is fixed by `read(...)`
-|`PulumiMedicalRecord` adapter |split: `MedicalRecordReader` (reconstructs) + `StackHandleSnapshotSource` (the `SnapshotSource` impl) |no single "adapter" type; the reconstruction and the Pulumi-backing are separate, each testable alone
-|"snapshotForVersion over checkpoints" |`StackHandle` + `StackCheckpoint` → `StackSnapshot`, located via `PulumiBackendLayout` |`PulumiBackendLayout` owns the on-disk path (single source of truth)
+|Design-time name |Shipped type (OSGi as-built) |Note
+|"diagnosisAt(version)" |codec decode of one `visit` blob into `ConsultationReport` (`SeedCodec.fromMap`), inside `doctor-core`'s `MedicalRecordReader` |the primitive; there is no `ConsultationReportReader` — the codec is the read-back path; addressed by *deployment instant*, never a version number
+|"the ordered version sequence" |`StackHistory` / `StackHistory.Entry` in `host/pulumi/pulumi-edge` (`io.seedmatic.rke2lab.pulumi.edge`) |ordered by the filename-nanos deployment instant; host-side, feeds the neutral journal
+|`MedicalRecord` interface |`MedicalRecord` (a `doctor-contract` record, patient bound at construction) |the four questions take no patient argument — the patient is fixed by `read(patient, journal)`
+|`PulumiMedicalRecord` adapter |split across the seam: host-side `StackHandleSnapshotSource` (the `SnapshotSource` impl, `pulumi-edge`) produces the neutral `Cellar` journal; `doctor-core`'s `MedicalRecordReader` folds it |no single "adapter" type; the Pulumi-backing (host) and the reconstruction (OSGi) are separate, each testable alone, and only opaque `SeedEnvelope` blobs cross between them
+|"snapshotForVersion over checkpoints" |`StackHandle` + `StackCheckpoint` → `StackSnapshot`, located via `PulumiBackendLayout` — all in `pulumi-edge` |`PulumiBackendLayout` owns the on-disk path (single source of truth)
 |===
 
 === Where the module attaches in the Pulumi model: nowhere in the resource graph
@@ -200,9 +220,10 @@ instances) and participates in the graph. Our module *creates nothing*: it reads
 from *outside* the graph, like an ops script. Its one anchor is
 `LocalWorkspace.createOrSelectStack(stack, workDir)` — a *workspace handle* to an already-deployed
 stack (proven by `wip/sandbox`), reached through the Automation API, not through the runtime. This is
-the same line the project already drew: the doctor is not a Pulumi resource; only the
-`consultationReport` rides the state via `registerOutputs` (Option A). The module is application code
-that *drives* Pulumi, not an extension of the Pulumi runtime.
+the same line the project already drew: the doctor is not a Pulumi resource. (As-built, the
+per-node `consultationReport` is filed into the host `Cellar`/journal as a neutral blob, not carried
+by a design-time `registerOutputs` output on the stack.) The module is application code that *drives*
+Pulumi, not an extension of the Pulumi runtime.
 
 == Realizing the per-deployment diagnosis: one primitive, two backings
 
@@ -249,9 +270,9 @@ path (no other class re-encodes `.pulumi/history/...`), and the `<nanos>` stamp 
 ordering key. The coupling is isolated behind that layout type and the `StackHistory`/`StackHandle`
 pair.
 
-NOTE: The per-node `consultationReport` (already shipped, written via `registerOutputs`) is the
-*substrate this all reads*. It is OUR diagnostic data — Pulumi cannot recompute it. It stays. What
-the abandoned accumulator added on top (a top-level duplicate) is what goes away.
+NOTE: The per-node `consultationReport` (shipped, filed into the host `Cellar`/journal as a neutral
+blob) is the *substrate this all reads*. It is OUR diagnostic data — Pulumi cannot recompute it. It
+stays. What the abandoned accumulator added on top (a top-level duplicate) is what goes away.
 
 == Two consumption moments
 
@@ -309,7 +330,7 @@ Three roles, each with one job (the same discipline as instance-passing — each
 |Layer |Contract
 |*Leaf* (`StackHistory`, `StackHandle`, `StackHandleSnapshotSource`) |throws the *precise* typed exception; never catches-to-empty, never logs. A genuine absence is `Optional.empty()` / empty list, *not* an exception.
 |*Aggregator* (`MedicalRecordReader`) |*fail-at-end*: walks the whole timeline, accumulates entries that read cleanly, and if any entry failed throws *one* `MedicalRecordReconstructionException` carrying the partial result plus every per-entry failure via `addSuppressed` (each enriched with its identity — which patient, which entry). It does not abort on the first bad entry, and it does not hide that one was bad.
-|*Caller* (`MedicalRecordDump`, the in-run doctor) |*decides the policy* with full information. The offline dump is deliberately lenient — it may surface the partial record and report the suppressed failures — because a human is in the loop; an in-run consultation may choose to be strict.
+|*Caller* (the in-run doctor / host-journal fold) |*decides the policy* with full information. An offline consumer may be lenient — surface the partial record and report the suppressed failures because a human is in the loop; an in-run consultation may choose to be strict. (The design-time offline `MedicalRecordDump` entry point was not carried into the OSGi build — the codec fold via `MedicalRecordReader` is the read-back path.)
 |===
 
 [cols="1,2",options="header"]
@@ -407,15 +428,18 @@ losslessly, until a breaking change asks for it.
 
 == Test strategy
 
-* *Unit, no Pulumi (where the risk is).* Feed `.checkpoint.json` fixtures to the navigate+map step
-  and assert the `ConsultationReport`s are extracted; run the aggregations
-  (`historyOf`/`efficacyOf`/`comorbiditiesWith`) over synthetic version sequences; cover the error
-  cases (healthy run, missing version, corrupt checkpoint).
+* *Unit, no Pulumi (where the risk is).* Feed a neutral `visit` journal (opaque blobs) to the fold
+  and assert the `ConsultationReport`s are codec-decoded; run the aggregations
+  (`historyOf`/`efficacyOf`/`comorbiditiesWith`) over synthetic multi-visit timelines; cover the error
+  cases (healthy run, empty journal, malformed blob). As-built, this is `doctor-core`'s
+  `MedicalRecordReaderTest` / `MedicalRecordReaderExpectationTest` + the codec round-trip
+  `ConsultationReportCodecTest`.
 * *Integration, real Pulumi (the seam).* Proven by a throwaway sandbox program before implementation:
   in-process lock-free read of the program's own history+state, and per-node read-back across runs.
-  As-built, the seam is covered by `SeededMedicalHistoryTest` (a synthetic multi-visit timeline,
-  honestly tagged) and `RealGraphInjectionTest` (a tagged report injected into a real dev checkpoint
-  graph, guarded by `assumeTrue` so it runs where the local backend exists and skips cleanly in CI).
+  The host-side snapshot→journal seam lives in `host/pulumi/pulumi-edge` and is exercised by its own
+  tests (checkpoint fixtures under `pulumi-edge`). FLAG: the design-time `SeededMedicalHistoryTest` /
+  `RealGraphInjectionTest` names did not survive the OSGi split verbatim — the reader-side coverage is
+  the `doctor-core` reader tests above; the host-side coverage is `pulumi-edge`'s snapshot tests.
 
 == Non-goals
 

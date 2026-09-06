@@ -4,24 +4,52 @@
 
 [NOTE]
 ====
-*Status:* `PulumiCellar` SHIPPED + `pulumi-edge` GREEN (verified 2026-07-14: the 3 journals fused, no dead
-`doctor.port`/`doctor.records` import, 20 tests pass). The first buildable step below (realise the impl) is
-DONE; what remains is STEP 2 — publish it into Felix by `registerService(Cellar.class)` at boot, the
-prerequisite for § <<every-scion-contributes>> (scions reaching the cellar). This spec realises the *CELLAR role* of
+*Status (verified 2026-09):* SHIPPED and wired. `PulumiCellar` (`host/pulumi/pulumi-edge`) realises the
+durable Pulumi backend and is published into Felix by `registerService(OpaqueCellar.class, …)` at the
+GIVEN of `ClusterSeedScenario`; the OSGi consumers resolve the cellar and reach it (§
+<<every-scion-contributes>>). This spec realises the *CELLAR role* of
 link:gardening-model-spec.adoc[the gardening model] over the Pulumi backend, *for the seed-master
 gardening* — the *how*, not the model (the model owns the roles, the multiplicity rule, the opacity; this
 doc does not re-derive them). It is one realisation of the cellar role among several: the seed-master
 gardening conserves over Pulumi (this doc); the *cluster gardening will conserve over a git-oriented
 storage* — a separate realisation of the SAME role, not covered here. So this is "the Pulumi cellar",
 never "the cellar". It is the sibling of link:seed-broker-spec.adoc[the seed-broker spec] (which realises
-the GARDENER role): both descend from the model, neither from the other. The first buildable step is the host
-`Cellar` impl in `pulumi-edge` (the keystone hit attacking the host top-down: `Main`/`pulumi-edge` do not
-compile because the doctor frontier is half-migrated — OSGi side shipped, host impl missing). But the cellar's
-role is GENERAL: § <<every-scion-contributes>> extends it from "doctor = first consumer" to "every scion
-contributes its harvest, and on Pulumi `store` PRODUCES the resource" — this is where the host's old
-`ResourceManager` dissolves.
+the GARDENER role): both descend from the model, neither from the other. The cellar's role is GENERAL: §
+<<every-scion-contributes>> extends it from "doctor = first consumer" to "every scion contributes its
+harvest, and on Pulumi `store` PRODUCES the resource" — this is where the host's old `ResourceManager`
+dissolves.
+====
 
-The implementation plan lives at the end (§ <<plan>>); it is the NEXT work session's starting point.
+[NOTE]
+.The cellar SPLIT into three faces (shipped) — this doc was written around ONE `Cellar`, read it through the split
+====
+This doc was drafted around a SINGLE `Cellar` interface the host implements and `registerService`s. The
+shipped shape is a *split by realm*, and every mention of "the host `Cellar` impl" below should be read as
+`PulumiCellar implements OpaqueCellar`:
+
+* `OpaqueCellar` (`seed-broker-port`, `type=seam`) — the HOST-implemented face: opaque `SeedEnvelope`
+  verbs only (`store` / `fetch(parcel)` / `fetch(parcel, coordinate)` / `withdraw(parcel, coordinate)` /
+  `neighbours` / `conserve`). The host provides and consumes ONLY this; it never opens a payload.
+  `PulumiCellar` implements it; the tests use `EphemeralCellar` / `InMemoryCellar` / `RefusingCellar`.
+* `Cellar` (`seed-broker-port`, OSGi-only) — the TYPED view: the generic `<T>` overloads, each carrying a
+  `Sensitivity {PLAIN, SEALED}` and (a capability-default) a `Persistence {DURABLE, TRANSIENT}` +
+  `trailOf`. It does NOT extend `OpaqueCellar`. Its `@Component` realisation `CodecCellar`
+  (`seed-broker-runtime`) is a DECORATOR: it takes an `OpaqueCellar` by `@Reference`, holds a `SeedCodec`
+  (`seed-broker-codec`) and a `CellarCipher`, and adds the decode + the seal/reveal.
+* `ScenarioCellar` (`scenario-engine`, `implements TransactionalCellar extends Cellar`) — the UNIVERSAL
+  transactional cellar EVERY scenario is INJECTED (host root AND in-container scion), and the SOLE writer
+  of a tag on the run's `ReportModel`. `store` tags (the within-run write set); only the ROOT drains the
+  folded tags to the durable `OpaqueCellar` at the run boundary (§ seed-broker-spec, cellar-transactional).
+  `TransactionalCellar` + `TxIdSeed` are the shipped transactional overlay — they SUPERSEDE the originally
+  designed `SeedRunLedger`/`SeedRunLedgerExtension` (never built under those names).
+
+Sensitivity is honoured OSGi-side (`CodecCellar`/`ScenarioCellar` seal a `SEALED` value through the
+`CellarCipher` — `PassphraseCellarCipher` mono stand-in, or `AgeCellarCipher` in `cellar-cipher-age` when
+provisioned — BEFORE the payload crosses), so `PulumiCellar` persists only the opaque, MAC-bound coquille.
+See link:../atlas/cellar-secrets.adoc[cellar-secrets] for the clean/smudge vision.
+
+The implementation plan at the end (§ <<plan>>) is the HISTORICAL record of how this shipped; the fusion
+map + open questions there are closed.
 ====
 
 == Why this is the first step (how we got here)
@@ -85,10 +113,13 @@ flowchart TB
   fork1 --> bug["history resurrects a reaped/destroyed CA<br/>seal skips · grow sees none → DIVERGENCE"]
   fork2 --> fixed["one truth, every thread → seal & grow agree"]
 ....
-  ** the INTERFACE (`Cellar`, `Parcel`) is homed in `seed-broker-port` (the neutral fondation seam)
-     because its face must speak gardening; the IMPL is a host object in `pulumi-edge`, laid into Felix at
-     boot by `registerService` (§ open question #4, resolved) — because THIS system realises the gardener
-     as a DS singleton in one Felix, so one gardening = one framework = one laid cellar.
+  ** the SEAM interface (`OpaqueCellar`, `Parcel`) is homed in `seed-broker-port` (the neutral fondation
+     seam) because its face must speak gardening; the IMPL is a host object in `pulumi-edge`
+     (`PulumiCellar implements OpaqueCellar`), laid into Felix at boot by `registerService(OpaqueCellar.class, …)`
+     (§ open question #4, resolved) — because THIS system realises the gardener as a DS singleton in one
+     Felix, so one gardening = one framework = one laid cellar. The TYPED `Cellar` (the `<T>` decode +
+     `Sensitivity`) is a SEPARATE OSGi-only interface its `@Component` decorator `CodecCellar` adds over
+     the opaque one; the host never names it.
   ** the doctor merely PROJECTS onto it (`Patient ↔ Parcel`, `Report ↔ végétal`); the three fusing classes
      carried doctor names, but that WAS the leak the de-seam exposes — all three do the one thing: persist
      onto the Pulumi state. The doctor is the cellar's first consumer, not its owner.
@@ -149,70 +180,76 @@ The middle (`seed`) speaks gardening; two mirror adapters project ONTO it, never
 flowchart TB
   subgraph hostjvm["Host JVM (flat classpath) — the COMMISSIONER"]
     pulumi["Pulumi runtime<br/>(com.pulumi.*)"]
-    edge["pulumi-edge<br/>the CELLAR impl + Stack* helpers"]
+    edge["pulumi-edge<br/>PulumiCellar (OpaqueCellar) + Stack* helpers"]
     backend["file:// Pulumi backend<br/>(stacks, history, checkpoints)"]
     edge --> backend
     pulumi -.-> edge
   end
   subgraph felix["Embedded Felix (OSGi) — SOILS + GARDENER"]
-    broker["DefaultSeedBroker<br/>(the door)"]
-    doctor["doctor-core<br/>@Reference Cellar"]
-    reflector["DoctorSplitReflector<br/>(SeedHandler)"]
-    broker --> reflector
-    doctor --> broker
+    codec["CodecCellar<br/>@Component(Cellar) · @Reference OpaqueCellar"]
+    doctor["doctor-core<br/>@Reference OpaqueCellar"]
+    scenario["ScenarioCellar<br/>(TransactionalCellar, injected per scenario)"]
+    codec --> scenario
   end
-  edge ==>|"registerService(Cellar.class) at boot<br/>(seam type, shared Class)"| doctor
-  edge ==>|"store composite: sow(SplitCoordinate)"| broker
+  edge ==>|"registerService(OpaqueCellar.class) at boot<br/>(seam type, shared Class)"| doctor
+  edge ==>|"registerService(OpaqueCellar.class)"| codec
 
   style hostjvm fill:#fff4e6,stroke:#ff9900
   style felix fill:#eef,stroke:#88a
   style edge fill:#ffe0b2,stroke:#ff9900,stroke-width:2px
   style backend fill:#ffffff,stroke:#ff9900
-  style broker fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+  style codec fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
 ----
 
-*Legend:* the CELLAR impl is a HOST object (it reads the Pulumi backend, so it cannot be a Felix bundle);
-it crosses into Felix as a `type=seam` service via `registerService(Cellar.class, …)` at boot, consumed
-by `doctor-core` `@Reference`. For a composite `store` the edge is itself a broker CLIENT
-(`sow(SplitCoordinate, …)`). Bold edges are the two host→Felix crossings; the backend is host-only.
+*Legend:* the CELLAR impl (`PulumiCellar`) is a HOST object (it reads the Pulumi backend, so it cannot be
+a Felix bundle); it implements the `OpaqueCellar` seam and crosses into Felix as a `type=seam` service via
+`registerService(OpaqueCellar.class, …)` at boot. Two kinds of OSGi consumer bind it: the doctor
+registries `@Reference OpaqueCellar` directly (opaque reads), and `CodecCellar` (`@Component(service =
+Cellar.class)`) decorates it with a `SeedCodec` + `CellarCipher` to serve the TYPED `Cellar`. The
+transactional `ScenarioCellar` (injected per scenario) tags within-run and drains to the same opaque
+backend. Bold edges are the host→Felix crossings; the backend is host-only.
 
 .C4 L4 Code (static) — the types at the seam (what crosses, what stays)
 [mermaid]
 ----
 flowchart LR
   subgraph seam["seed-broker-port (type=seam — shared Class both sides)"]
-    Cellar["«interface» Cellar<br/>store / fetch / withdraw / neighbours"]
+    Opaque["«interface» OpaqueCellar<br/>store / fetch / withdraw / neighbours / conserve"]
     Parcel["«record» Parcel<br/>(project, stack)"]
-    Envelope["«record» SeedEnvelope<br/>(domain, coordinate, payload)"]
-    Role["«const» Role<br/>FRUIT / SOWING (cases)"]
-    Split["«record» SplitCoordinate"]
+    Envelope["«record» SeedEnvelope<br/>(domain, coordinate, payload, trail)"]
+    Cellar["«interface» Cellar (OSGi-only face)<br/>&lt;T&gt; store(…, Sensitivity, Persistence) / fetch / trailOf"]
+    TxCellar["«interface» TransactionalCellar<br/>transactionId / entriesEncoded"]
+    Cipher["«interface» CellarCipher<br/>seal / reveal"]
   end
   subgraph hostcode["pulumi-edge (host only)"]
-    Impl["«class» PulumiCellar<br/>implements Cellar"]
+    Impl["«class» PulumiCellar<br/>implements OpaqueCellar (durable coquille + MAC)"]
     Stack["Stack{Handle,History,Snapshot}"]
     Impl --> Stack
-    Impl -.implements.-> Cellar
+    Impl -.implements.-> Opaque
   end
-  subgraph doctorcode["doctor-contract / doctor-core (OSGi only)"]
-    VisitWire["«record» VisitWire"]
-    Reader["«class» MedicalRecordReader<br/>ASSEMBLES from cases"]
-    Reader --> VisitWire
+  subgraph osgicode["seed-broker-runtime / scenario-engine (OSGi only)"]
+    Codec["«@Component» CodecCellar<br/>implements Cellar · @Reference OpaqueCellar + SeedCodec + CellarCipher"]
+    Scenario["«class» ScenarioCellar<br/>implements TransactionalCellar (sole tag writer)"]
+    Codec -.decorates.-> Opaque
+    Scenario -.implements.-> TxCellar
   end
-  Impl -->|"fetch → opaque cases"| Envelope
-  Envelope -->|"cross the seam"| Reader
+  Impl -->|"fetch → opaque coquilles"| Envelope
+  Envelope -->|"cross the seam"| Codec
   Impl -->|"addresses by"| Parcel
-  Impl -->|"files by case"| Role
+  TxCellar -.extends.-> Cellar
 
   style seam fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
   style hostcode fill:#fff4e6,stroke:#ff9900
-  style doctorcode fill:#eef,stroke:#88a
+  style osgicode fill:#eef,stroke:#88a
 ----
 
-*Legend:* green = the seam types (the ONLY types shared across the frontier — a shared `Class`); orange =
-host-only (`PulumiCellar` + the `Stack*` helpers, never seen by OSGi); blue = OSGi-only (`VisitWire`,
-`MedicalRecordReader` — the doctor types the host must NOT name). The crossing carries only
-`SeedEnvelope`s (opaque) addressed by `Parcel`, filed by neutral `Role` cases. `VisitWire` stays
-OSGi-side — the whole point of moving assembly there.
+*Legend:* green = the seam types (shared `Class` across the frontier — the host implements and consumes
+ONLY `OpaqueCellar`; the typed `Cellar` / `TransactionalCellar` / `CellarCipher` interfaces also live in
+`seed-broker-port` but are exercised OSGi-side only). Orange = host-only (`PulumiCellar` + the `Stack*`
+helpers, never seen by OSGi). Blue = OSGi-only realisations: `CodecCellar` DECORATES an `OpaqueCellar`
+with the `SeedCodec` decode + `CellarCipher` seal to serve `Cellar`; `ScenarioCellar` is the injected
+transactional writer. The crossing carries only opaque `SeedEnvelope`s addressed by `Parcel`; the decode
+and the seal/reveal happen OSGi-side, so no domain type crosses.
 
 .C4 L3 Component (dynamic) — the host returns opaque CASES; the DOMAIN assembles the visit (the corrected direction)
 [mermaid]
@@ -242,35 +279,54 @@ neutral cases opaque, and `MedicalRecordReader` (where `VisitWire` now lives) as
 code step (§ <<plan>>), prerequisite to the host Cellar emerging without re-incarnating the host-side
 recomposition.
 
-== The `Cellar` contract (a FRIDGE — put / peek / take; `seed-broker-port`, `type=seam`)
+== The two contracts (a FRIDGE — put / peek / take) — the OPAQUE seam + the TYPED OSGi face
 
 The cellar is CURRENT STATE (put / peek / take), not an append-only journal — the "append-only" the older
 draft named was the DOCTOR's usage mistaken for a law (correction 2026-07-15, § seed-broker-spec "the
 cellar is a fridge"). The `Parcel` is the fridge (the whole furniture), the `SeedCoordinate` the case
-within it.
+within it. The contract SPLITS by realm: the host implements only the OPAQUE seam, the typed `<T>` face
+is an OSGi-only decorator over it.
+
+*`OpaqueCellar` (`seed-broker-port`, `type=seam`) — the HOST-implemented face, opaque only:*
 
 [cols="1,2",options="header"]
 |===
 | verb | gesture
 | `store(Parcel, SeedEnvelope)` | file the sealed envelope at its coordinate (the case); never reads the payload
 | `fetch(Parcel) : List<SeedEnvelope>` | open the fridge, list what is there — one opaque envelope per readable case
-| `<T> T fetch(Parcel, SeedCoordinate, Class<T>)` | peek ONE case (last-wins) — decode is realm-BUNDLE (see note)
-| `<T> T withdraw(Parcel, SeedCoordinate, Class<T>)` | TAKE one case out — consume it: gone until re-stored (the ring usage justifies this)
+| `fetch(Parcel, SeedCoordinate) : Optional<SeedEnvelope>` | peek ONE case OPAQUE (last-wins)
+| `withdraw(Parcel, SeedCoordinate) : Optional<SeedEnvelope>` | TAKE one case out OPAQUE — gone until re-stored (the ring usage justifies this)
 | `neighbours(Parcel) : List<Parcel>` | the sibling parcels under the same backend soil (the parcel's own first)
+| `conserve(Parcel)` | the end-of-drain flush (default no-op; the run's own stack re-declares its live set)
 |===
 
-`SeedEnvelope(domain, coordinate, payload)` — the shell (`domain`, `coordinate`: neutral `String`s) is
-what the frontier addresses BY; the `payload` (a JSON `String`) is sealed, never read. Each world uses
-its OWN jackson; no jackson type crosses.
+*`Cellar` (`seed-broker-port`, OSGi-only) — the TYPED decorator face, `<T>` + sensitivity:*
 
-NOTE: `PulumiCellar` is a HOST object and stays OPAQUE — it honours the generic `<T>` only for
-`T = SeedEnvelope` and throws otherwise (it cannot materialise a bundle type — the `LinkageError` the
-seam prevents). The real typed decode happens REALM-BUNDLE, on the opaque envelope the host handed back
-(the doctor already does `codec.decode(entry, VisitWire.class)`; that decode moves from the `*Reader`
-into the bundle-side cellar). The three usages — journal (doctor: `store`+`fetch`-list, never
-`withdraw`), current-state (live: `<T> fetch`), ring (staging rotation: `fetch`→`withdraw`+`store`) —
-share this one primitive; only the ring needs `withdraw` (and `HostSlotSelector`'s position truth moves
-FS→cellar, § seed-broker-spec).
+[cols="1,2",options="header"]
+|===
+| verb | gesture
+| `<T> store(Parcel, SeedCoordinate, T, Sensitivity[, Persistence])` | encode + (SEALED) seal via `CellarCipher`, then file — the scion DECLARES the sensitivity/tier
+| `<T> List<T> fetch(Parcel, Class<T>)` | the whole timeline DECODED, fail-at-end (unreadable entries skipped)
+| `<T> Optional<T> fetch(Parcel, SeedCoordinate, Class<T>)` | peek ONE case DECODED (last-wins)
+| `<T> Optional<T> withdraw(Parcel, SeedCoordinate, Class<T>)` | TAKE one case out DECODED
+| `List<Parcel> neighbours(Parcel)` | codec-neutral, delegated verbatim to the `OpaqueCellar`
+| `Optional<Trail> trailOf(Parcel, SeedCoordinate)` | the value's fil d'Ariane, read CLEAR off the envelope (no decode)
+|===
+
+`SeedEnvelope(domain, coordinate, payload, trail)` — the shell (`domain`, `coordinate`: neutral
+`String`s; `trail`: the CLEAR fil d'Ariane) is what the frontier addresses BY; the `payload` (a JSON
+`String`, possibly SEALED) is never read by the host. Each world uses its OWN jackson; no jackson type
+crosses.
+
+NOTE: `PulumiCellar` is a HOST object and implements ONLY `OpaqueCellar` — it never sees the generic
+`<T>` (it cannot materialise a bundle type — the `LinkageError` the seam prevents). The typed decode
+happens OSGi-side in `CodecCellar` (a `@Component(service = Cellar.class)` decorator holding a
+`SeedCodec` + `CellarCipher`, taking the `OpaqueCellar` by `@Reference`), and the transactional
+`ScenarioCellar` overlays the run's write set before the drain reaches the opaque backend. The three
+usages — journal (doctor: `store`+`fetch`-list, never `withdraw`), current-state (live: `<T> fetch`),
+ring (staging rotation: `fetch`→`withdraw`+`store`) — share this one primitive; only the ring needs
+`withdraw` (and `HostSlotSelector`'s position truth would move FS→cellar, § seed-broker-spec —
+DESIGNED, not wired, § the reconcile cycle).
 
 [[every-scion-contributes]]
 == Every scion contributes — the cellar IS the resource producer (the `ResourceManager` dissolution)
@@ -293,10 +349,11 @@ link:seed-broker-spec.adoc#cellar-transactional[seed-broker-spec — cellar tran
 below describe the API contract (what a scion calls); read them with this deferral in mind.
 ====
 
-*The SCION harvests AND stores — it does not return its harvest to the host.* Since the host lays the `Cellar`
-into Felix at boot (`registerService(Cellar.class)`), a scion resolves it in-container via
-`ScenarioRegistry.require(Cellar.class)`, the same way it resolves its contact and the `RunGate`. When it
-harvests, it `store`s — the grower reaps AND puts away (the lexicon law: *the grower draws on the cellar, the
+*The SCION harvests AND stores — it does not return its harvest to the host.* The host lays the durable
+backend into Felix at boot (`registerService(OpaqueCellar.class, …)`); a scion does NOT resolve that
+opaque backend itself — it is INJECTED the UNIVERSAL transactional `ScenarioCellar` (the typed `Cellar`
+view, § the store is TRANSACTIONAL above), whose `store` tags the run's write set and whose reads overlay
+it on the durable fallback. When it harvests, it `store`s — the grower reaps AND puts away (the lexicon law: *the grower draws on the cellar, the
 gardener merely ROUTES*). There is NO harvest field on the `RunbookEnvelope` and no host re-store: routing a
 harvest back out only to call `store` from the host would be an absurd round-trip. The envelope keeps carrying
 `(runbook, consultations)` — the doctor's consultations cross because the host GRAFTS them into the runbook
@@ -894,7 +951,7 @@ module (the settled rule: wrap only at the third genuine reuse). The victools/BS
 here (in-container) — the embed avoids it (the jars are internal to the bundle, never a resolution edge).
 
 *The reconcile scenario — the cycle: fetch the cellar, decide on checksums, commit only if promoted.*
-The reconcile is a DISTINCT incus scion (`IncusReconcileScenario`), not a beat of `prepare` — prepare
+The reconcile is a DISTINCT incus scion (the planned `IncusScenario.RECONCILE` soil), not a beat of `prepare` — prepare
 answers "is the material ready?" (image + manifests), reconcile answers "must the live flip, and onto
 what?". Its GIVEN FETCHES the cellar and folds `HostTreeHead` → the `pivot` (`liveSyncedFrom`) and the
 `source` (the staging to promote, determined FROM the folded entries, never guessed). Prepare must have
@@ -995,8 +1052,8 @@ host-entries are published in the incus `prepare` scenario, upstream of the inst
 instance grow (`com.pulumi`) is the SEPARATE, LATER gesture that mounts an already-current `host.live.d`.
 
 *The shape — dedicated incus scenarios, distinct from the instance grow.* The host-entry lifecycle is
-CRUD over the host tree incus owns. incus carries DEDICATED scenarios (via `IncusBddScenarios`, a domain
-hosts N scenarios like doctor): a `prepare` scenario grafts → publishes `HostStagingEntry` → folds →
+CRUD over the host tree incus owns. incus carries DEDICATED scenarios (routed via the `IncusScenario`
+enum + `IncusRunbookHandler` on the shared `ScenarioPlayer`, a domain hosts N scenarios like doctor): a `prepare` scenario grafts → publishes `HostStagingEntry` → folds →
 promotes (the twin structure of `IncusProvisionScenario`'s graft → harvest → store today). `prepare` and
 the instance grow stay DISTINCT — `prepare` will gain its own steps (cross-run validation, multi-scion
 aggregation) and diverge; the shared trio shape is today's coincidence, not an invariant.
@@ -1129,26 +1186,36 @@ letting load-bearing facts hide in unrendered state.
   `host.N.staging.d/rke2-manifests.d` — a temp dir only when the scalars are blank (a bare survey). The
   intermediate `manifests.yaml` sits a level ABOVE the synthesis root (sibling of `rke2-manifests.d`),
   outside the checksummed/mounted subtree.
-* The reconcile (I6) — LANDED 2026-07-16 (§4 pièce 3): a DISTINCT incus scion `IncusReconcileScenario`
-  (in `incus-bdd`, played through `IncusBddScenarios.runReconcile` behind `IncusReconcileRunbookHandler`
-  serving `RunbookCoordinate("incus-reconcile")`), its promoter `HostTreePromoter` in `incus-core`. It
-  derives its whole state from the cellar — no worktree amendment: the `source` is the run's own
-  `host-staging` entry (prepare published it this run; the cellar's overlay returns the in-flight one,
-  the entries-descend transaction), the `pivot` is the `host-live` entry's `syncedFrom` (empty on a
-  first run), the live root the `host.live.d` sibling of the staging slot. The DECISION is `change =
+* The reconcile (I6) — DESIGNED, NOT YET WIRED (verified 2026-09). The design below is the target; the
+  ONLY thing that ships today is the routing SOIL — `IncusScenario.RECONCILE("incus-reconcile")` is
+  declared as an enum value (`osgi/domains/incus/incus-bdd/IncusScenario`), but NOTHING references it:
+  there is no distinct reconcile scenario class, no `RunbookHandler` serving `RunbookCoordinate("incus-reconcile")`,
+  no promoter, and no `the_live_tree_is_reconciled` WHEN in `ClusterSeedScenario`. The named
+  `IncusReconcileScenario` / `IncusBddScenarios.runReconcile` / `IncusReconcileRunbookHandler` /
+  `HostTreePromoter` / `HostTreeDiffer` / `HostTreeDeltaRenderer` / `Host*Entry` do NOT exist in the
+  tree (no `HostTree*` source at all). *The intended design* (unchanged, to be built): a DISTINCT incus
+  scion played behind `RunbookCoordinate("incus-reconcile")`, its promoter in `incus-core`, deriving
+  its whole state from the cellar — no worktree amendment: the `source` is the run's own `host-staging`
+  entry (prepare would have published it this run; the cellar's overlay returns the in-flight one, the
+  entries-descend transaction), the `pivot` is the `host-live` entry's `syncedFrom` (empty on a first
+  run), the live root the `host.live.d` sibling of the staging slot. The DECISION would be `change =
   source.checksums ≠ pivot.checksums` (checksum maps, no FS touch): empty ⇒ NO-OP; gate closed ⇒
-  PENDING (nothing written); else `HostTreePromoter.promote`. The `drift` (`live ↔ pivot`, via
-  `HostTreeDiffer` + `HostTreeDeltaRenderer`) is OBSERVED on the FS before the sync and reported, never
-  a gate. The THEN commits `HostLiveEntry(syncedFrom=source)` + any `HostDriftEntry` ONLY on a real
-  promotion, and poses the `GraftTag.PROMOTED` narration tag (a projection of the live entry). The
-  crossing sits in `ClusterSeedScenario` AFTER `the_instance_is_provisioned` (which publishes the
-  staging) and BEFORE `the_systemd_adapter_is_launched` (which runs inside the instance mounting the
-  live). `HostSlotSelector` reads the cellar (occupancy + pinned), the FS-scan gone.
+  PENDING (nothing written); else `promote`. The `drift` (`live ↔ pivot`) would be OBSERVED on the FS
+  before the sync and reported, never a gate. The THEN would commit `HostLiveEntry(syncedFrom=source)` +
+  any `HostDriftEntry` ONLY on a real promotion, and pose a `PROMOTED` narration tag (a projection of
+  the live entry). The crossing would sit in `ClusterSeedScenario` AFTER `the_instance_is_provisioned`
+  (which publishes the staging) and BEFORE `the_systemd_adapter_is_launched` (which runs inside the
+  instance mounting the live). `HostSlotSelector` would read the cellar (occupancy + pinned), the
+  FS-scan gone. None of this is coded — the whole host-tree CRUD (§ this section, the CORRECTION and the
+  reconcile cycle) remains a design, tracked as the next increment above the shipped `PulumiCellar`.
 
 [[already-shipped]]
 == What is already shipped (verified 2026-07-12) — do NOT rebuild
 
-* `Cellar` interface + `Parcel` record — `seed-broker-port` (`type=seam`).
+* The cellar seam + `Parcel` record — `seed-broker-port` (`type=seam`). SHIPPED as the SPLIT: the
+  host-implemented `OpaqueCellar` (opaque verbs) is the seam; the typed `Cellar` (the `<T>` decode) is an
+  OSGi-only face its decorator `CodecCellar` adds. (This doc's body predates the split — read "the
+  `Cellar` interface" as `OpaqueCellar`, per the top note.)
 * Doctor OSGi consumers, both `@Reference OpaqueCellar` (the opaque host-implemented seam; the typed
   `Cellar` is now an OSGi-only decorator over it — a split this doc otherwise predates), fully migrated:
   ** `JournalMedicalRecordRegistry` — `cellar.fetch(ParcelProjection.parcelOf(patient))` +

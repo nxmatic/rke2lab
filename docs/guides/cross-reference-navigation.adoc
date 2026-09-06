@@ -2,7 +2,19 @@
 :toc: left
 :toclevels: 2
 
-This document visualizes the bidirectional cross-reference network between code (JavaDoc) and documentation (AsciiDoc).
+This document visualizes the bidirectional cross-reference network between code
+(JavaDoc) and documentation (AsciiDoc).
+
+[NOTE]
+====
+*Paths are relative to this file* (`docs/guides/cross-reference-navigation.adoc`).
+The repository root is two levels up (`../../`), so a link into the code reads
+`../../osgi/domains/manifests/manifests-core/src/main/java/…` and a link to an
+architecture doc reads `../architecture/<area>/…`. The manifests classes moved from
+the old `manifests/src/main/java/…` module root to
+`osgi/domains/manifests/manifests-core/src/main/java/…`; `BootstrapIdentity` moved
+to the `manifests-contract` bundle (package `io.seedmatic.rke2lab.manifests.contract.profiles`).
+====
 
 == Navigation Graph
 
@@ -81,69 +93,70 @@ graph TB
 
 **Starting point**: Reading architecture documentation
 
-1. Read link:manifests-architecture.adoc[manifests-architecture.adoc] (the canonical model and synthesis flow)
-2. Jump to the module's package overview → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/package-info.java[manifests/package-info.java]
-3. Click "See interface" → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
-4. Navigate to a concrete registrar → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java] (actual code)
+1. Read link:../architecture/manifests/manifests-architecture.adoc[manifests-architecture.adoc] (the canonical model and synthesis flow)
+2. Jump to the module's package overview → link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/package-info.java[manifests/package-info.java]
+3. Click "See interface" → link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
+4. Navigate to a concrete registrar → link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java] (actual code)
 
 === Pattern 2: Bottom-Up (Code → Context)
 
 **Starting point**: Working on a specific class
 
-1. Open link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[units/clusterapi/IncusIdentitySecretManifestsUnit.java] in IDE
-2. Read the package's `package-info` → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] (domain overview + doc links)
-3. Click a "Related Documentation" link → link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] for policy context, or
-   link:bootstrap-identity-provider.adoc[bootstrap-identity-provider.adoc] for identity access
+1. Open link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[units/clusterapi/IncusIdentitySecretManifestsUnit.java] in IDE
+2. Read the package's `package-info` → link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] (domain overview + doc links)
+3. Click a "Related Documentation" link → link:../architecture/manifests/manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] for policy context, or
+   link:../architecture/bootstrap/bootstrap-identity-provider.adoc[bootstrap-identity-provider.adoc] for identity access
 
 === Pattern 3: Lateral (Similar Concepts)
 
 **Starting point**: Understanding one domain, need to implement another
 
-1. Read link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain shape
+1. Read link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain shape
 2. Compare with a sibling domain's overview, e.g.
-   link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java]
-3. Both registrars (in `domain/`) follow the `new ManifestsDomain(catalog id, deps, List.of(ManifestsUnit.lazy(...)))` shape
+   link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java]
+3. Both registrars (in `domain/`) return a `ManifestsDomain` whose units are referenced from the domain catalog
 
 === Pattern 4: Interface → Implementation
 
 **Starting point**: Understanding the contract
 
-1. Read link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] (interface with component diagram)
-2. See the package overview → link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/package-info.java[domain/package-info.java]
+1. Read link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] (interface with component diagram)
+2. See the package overview → link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/package-info.java[domain/package-info.java]
 3. IDE "Show Implementations" → all registrars in the `domain/` package
-4. Pick one → e.g., link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java]
+4. Pick one → e.g., link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java]
 
 == Cross-Reference Syntax Reference
 
 === In AsciiDoc → Java Source
 
-**Link to Java file** (GitHub/IDE clickable):
+**Link to a Java file** (GitHub/IDE clickable, from `docs/guides/`):
 ----
-link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java]
+link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java]
 ----
 
 **Link to a unit**:
 ----
-link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java[FluxOperatorManifestsUnit.java]
+link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java[FluxOperatorManifestsUnit.java]
 ----
 
 **Inline code reference**:
 ----
 The `ManifestsDomainRegistrar` interface...
-See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[implementation] for details.
+See link:../../osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[implementation] for details.
 ----
 
 === In JavaDoc → AsciiDoc
 
-**Link to doc** (from JavaDoc):
+**Link to a doc** (from JavaDoc, via a relative `../` climb to the repo root then
+down into `docs/architecture/…`):
 [source,java]
 ----
 /**
  * Related documentation:
  * <ul>
- *   <li><a href="../../../../../../../../../../docs/manifest-conditional-inclusion.adoc">
+ *   <li><a href="../../../../../../../../../../../../../docs/architecture/manifests/manifest-conditional-inclusion.adoc">
  *       Manifest Conditional Inclusion</a> - Pattern overview
- *   <li><a href="../../../../../../../../../../docs/bootstrap-identity-provider.adoc">
+ *   <li><a href="../../../../../../../../../../../../../docs/architecture/bootstrap/bootstrap-identity-provider.adoc">
  *       Bootstrap Identity Provider</a> - Identity flow
  * </ul>
  */
@@ -151,9 +164,13 @@ See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDoma
 
 **Relative path calculation**:
 
-* From `manifests/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java`
-* To `docs/manifest-conditional-inclusion.adoc`
-* Path: `../../../../../../../../../../docs/manifest-conditional-inclusion.adoc` (10 levels up)
+* From `osgi/domains/manifests/manifests-core/src/main/java/io/seedmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java`
+* To `docs/architecture/manifests/manifest-conditional-inclusion.adoc`
+* The `.java` file sits 13 directories below the repo root
+  (`gitops` → `units` → `manifests` → `rke2lab` → `seedmatic` → `io` → `java` →
+  `main` → `src` → `manifests-core` → `manifests` → `domains` → `osgi`), so the
+  path climbs 13 levels then descends:
+  `../../../../../../../../../../../../../docs/architecture/manifests/manifest-conditional-inclusion.adoc`
 
 === In JavaDoc → JavaDoc
 
@@ -163,11 +180,11 @@ See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDoma
 /**
  * @see ManifestsDomainRegistrar
  * @see ManifestDomainPolicy
- * @see io.seedmatic.rke2lab.manifests.profiles.BootstrapIdentity
+ * @see io.seedmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity
  */
 ----
 
-**Link to package**:
+**Link to a package**:
 [source,java]
 ----
 /**
@@ -219,17 +236,17 @@ See link:../manifests/src/main/java/io/seedmatic/rke2lab/manifests/ManifestsDoma
 
 When updating architecture:
 
-- [ ] Update system-level AsciiDoc documentation (start with link:manifests-architecture.adoc[the hub])
-- [ ] Update affected `package-info.java` files (the manifests module has 15 — 5 core + 10 `units/<domain>`)
+- [ ] Update system-level AsciiDoc documentation (start with link:../architecture/manifests/manifests-architecture.adoc[the hub])
+- [ ] Update affected `package-info.java` files (`manifests-core` has 21 — 9 in the core tree + 12 under `units/<domain>`; `manifests-contract` has 3)
 - [ ] Update affected interface and implementation JavaDoc
 - [ ] Verify cross-references are bidirectional
-- [ ] Verify relative paths are correct
+- [ ] Verify relative paths are correct (this doc lives in `docs/guides/`; code is `../../osgi/…`, docs are `../architecture/…`)
 - [ ] Update this navigation map if adding new docs
 - [ ] Test links in IDE and GitHub preview
 
 == Related Documentation
 
-* link:manifests-architecture.adoc[Manifests Architecture] - Canonical manifest-system reference and hub
-* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven inclusion with code cross-references
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
-* link:README.adoc[Documentation Index] - All project documentation
+* link:../architecture/manifests/manifests-architecture.adoc[Manifests Architecture] - Canonical manifest-system reference and hub
+* link:../architecture/manifests/manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven inclusion with code cross-references
+* link:../architecture/bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
+* link:../README.adoc[Documentation Index] - All project documentation

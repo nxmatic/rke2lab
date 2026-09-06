@@ -74,15 +74,15 @@ existing gateway suffices; the sweep added no new machinery.
 | link:dbus-systemd-edge-spec.adoc[spec]
 | cluster
 | `ClusterReadinessContact`
-| `KubectlClusterContact` (`kubectl`)
+| `Fabric8ClusterContact` (typed fabric8 `KubernetesClient`)
 | link:cluster-edge-spec.adoc[spec]
 | incus
-| `IncusInstanceContact` + `ImageBuilder`
-| `ProcessBuilderIncusInstanceContact` (`ssh … incus exec`) + `DistrobuilderImageBuilder` (`distrobuilder` / ssh recipe)
+| `ImageBuilder` (+ `IncusInstanceContact`, reachability = VISION)
+| `CultivatingNixosImageBuilder` + `SurveyingImageBuilder` (`nix build …#nixosConfigurations.rke2-node-base`; recipe owned by `BuildRecipe`)
 | link:incus-edge-spec.adoc[spec]
 | bbox
 | `BboxReconciler`
-| `LiveBboxReconciler` (java-bbox-api-client, bundled + imported)
+| `CultivatingBboxReconciler` + `SurveyingBboxReconciler` (java-bbox-api-client, bundled + imported)
 | link:bbox-edge-spec.adoc[spec]
 | auth
 | `AuthTokenContact`
@@ -100,43 +100,54 @@ image — the same concern, not a reason to split the module.
 
 == What stays host — and why it is NOT a dead-end
 
-The bulk of `controlplane/` is placeable yet stays host, because it is not an external contact:
+[NOTE]
+.Re-baselined — the migration completed past this 2026-07-07 snapshot
+====
+This section was written when the host `controlplane/` still held an orchestration spine. Since then the
+migration LARGELY COMPLETED and re-shaped: the host stage/orchestrator classes named below —
+`IncusResourceBootstrap`, `BboxReconciliationOrchestrator`, `SeedSystemdAdapterEndpointGate`,
+`StageContext`, `SeedProbes`, `SystemdAdapterStage`, `BboxStage`, `IncusStage`, and the
+`Outputs`/`Resources` stages — are all SUPPRESSED. Their metier moved into the domain scions
+(`bbox-bdd`, `incus-bdd`, `systemd-bdd`, `cluster-bdd`), reached by `broker.sow`. `ClusterSeedScenario`
+is now a jGiven scenario whose steps are sow-and-graft callers, not a stage assembly. What genuinely
+stays host is the `com.pulumi` Pulumi edge (the instance GROW, shipped as `InstanceGrow` in
+`host/pulumi/incus-ingress`) and the flat config input. Read the bullets below as the rationale (which
+kinds of code never cross), not as a current inventory of host classes.
+====
 
-* *Orchestration* — `IncusResourceBootstrap` (the 3000-line provisioning graph, `Output<T>` wiring),
-  `BboxReconciliationOrchestrator` (blueprint enumeration + the Pulumi resource graph),
-  `SeedSystemdAdapterEndpointGate` (the retry loop, deadline, `ObservationView` projection). Each now
-  composes its edge from the registry; the orchestration around it never crossed.
+The bulk of `controlplane/` was placeable yet stayed host, because it is not an external contact:
+
+* *Orchestration* — the provisioning graph + `Output<T>` wiring, blueprint enumeration, the readiness
+  retry loop/deadline/`ObservationView` projection. This orchestration never crossed the frontier; in
+  the completed migration it was re-homed as domain scions (metier) + the pure-host Pulumi graph
+  (`InstanceGrow`), not kept as the original host stage classes.
 * *Config input* — `Rke2labConfig`/`BootstrapConfig` read Pulumi config host-side and project flat
   scalars into the edge requests.
-* *The Pulumi edge* — the 17 `com.pulumi` files (resource registration + `Output<T>`).
-* *The scenario spine* — `ClusterSeedScenario`, `StageContext`, `SeedProbes`, the `Outputs`/`Resources`
-  stages: the assembly that runs ON `scenario-engine` and composes the domains. Owner is the
-  seeding-scenario concern, not a leaf domain.
+* *The Pulumi edge* — the `com.pulumi` files (resource registration + `Output<T>`), now in
+  `host/pulumi/incus-ingress` (`InstanceGrow` + `IncusProviderContext` + `IncusImportLookup`).
+* *The scenario spine* — `ClusterSeedScenario` runs ON `scenario-engine` and composes the domains; it is
+  a jGiven scenario of sow-and-graft steps (the former `StageContext`/`SeedProbes`/`Outputs`/`Resources`
+  stage types are gone). Owner is the seeding-scenario concern, not a leaf domain.
 * *Determinism made it moot* — `RuntimeCommandPreflight` (command-availability checks) was deleted, not
   migrated: nodes are provisioned with nix, so their environment is deterministic and the checks
   guarded nothing.
 
-== How the stages consume the edges
+== How the edges are consumed (re-baselined — the stages are gone)
 
-A `Stage` reaches its contact through the registry, never through a host import of the mechanism.
-Read from the imports (2026-07-07):
+The original sweep left host `Stage`s (`SystemdAdapterStage`, `BboxStage`, `IncusStage`) that reached a
+contact through the registry (`awaitService`). Those stages are SUPPRESSED. In the completed migration
+the contact-consuming metier lives in the domain scion, reached by `broker.sow`, and the sole host
+consumer of an edge is the pure-host Pulumi GROW:
 
-[cols="1,3",options="header"]
-|===
-| Stage | How it reaches its contact
-| `SystemdAdapterStage`
-| `awaitService(SystemdRuntimeProbe)` + `awaitService(IncusInstanceContact)` — both edges, composed by
-  the host gate it drives.
-| `BboxStage`
-| `awaitService(BboxReconciler)` — threaded through its probe to the host orchestrator.
-| `IncusStage`
-| stays on the host `IncusResourceBootstrap` (the Pulumi `Image` graph); the incus contacts
-  (`IncusInstanceContact`, `ImageBuilder`) are composed INSIDE that host code via `singleSpiProvider`,
-  not by the stage. The stage consumes only its `BootstrapResult`.
-|===
+* the systemd / bbox / cluster contacts are consumed by their scions (`systemd-bdd`, `bbox-bdd`,
+  `cluster-bdd`), which `@OsgiService`-inject the contact in-container — not by a host stage;
+* the `ImageBuilder` contact is composed by the host `InstanceGrow` (`host/pulumi/incus-ingress`) from
+  the registry, only when a rebuild is needed — the one place a host Pulumi consumer still composes an
+  edge directly.
 
-A migrated contact does not imply a re-pointed stage: the contact moves into an `-edge`, its consumer
-may stay host Pulumi code.
+A migrated contact does not imply a re-pointed stage: a contact moves into an `-edge`, and its consumer
+is either the domain's scion or (for the image build) the host Pulumi GROW. See the IMPORTANT note below
+for why the host reaches domain metier by `sow`, never by `awaitService` on a `type=contract` type.
 
 [IMPORTANT]
 ====
@@ -145,11 +156,12 @@ contact types are `type=contract` — installed bundle-side, wired bundle-to-bun
 are not on the host's flat classpath and the host cannot consume them by `awaitService`. A contact is a
 `SeedHandler` behind the door; the host sows a coordinate and reaps a verdict.
 
-The frontier therefore runs THROUGH `IncusResourceBootstrap`, not around it: the `com.pulumi.*`
-provisioning graph is host (Pulumi cannot enter Felix); the contact-consuming metier (`ImageBuilder`,
-`AuthTokenContact`, the network blueprint) is the domain's in-container scion (`incus-bdd`), reached by
-`sow`. Incus is a graft-caller in link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario
-map] — the host sows the incus scenario and grafts its scion, holding no incus vocabulary.
+The frontier therefore runs THROUGH the host Pulumi GROW (`InstanceGrow`, `host/pulumi/incus-ingress`),
+not around it: the `com.pulumi.*` provisioning graph is host (Pulumi cannot enter Felix); the
+contact-consuming metier (`ImageBuilder`, `AuthTokenContact`, the network blueprint) is the domain's
+in-container scion (`incus-bdd`), reached by `sow`. Incus is a graft-caller in
+link:../bdd/bdd.adoc#clusterseed-scenario-map[the ClusterSeed scenario map] — the host sows the incus
+scenario and grafts its scion, holding no incus vocabulary.
 ====
 
 == The SPEC_COVERAGE ratchet

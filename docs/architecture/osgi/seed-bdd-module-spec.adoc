@@ -114,14 +114,14 @@ gardening type; the vocabulary lives in `seed-bdd`'s stages, which call the engi
 The sow-and-graft caller composes the two halves of the crossing (link:seed-broker-spec.adoc#playing-a-scenario-is-a-sow[the
 runbook handler]): the SOW half is `broker.sow(new RunbookCoordinate(soil), trigger)` — the host holds
 only a soil NAME (a `String`) and reaps the runbook as JSON, never naming a `*Coordinate` enum nor
-reaching a `*BddScenarios` front-door (that reflection lives INSIDE the domain's runbook handler, on its
-own loader). `RunbookCoordinate` is a neutral value-coordinate in `seed-broker-port` (the twin of
+reaching a scenario front-door (the play lives INSIDE the domain's `*RunbookHandler`, delegated to the
+shared `ScenarioPlayer`, on its own loader). `RunbookCoordinate` is a neutral value-coordinate in `seed-broker-port` (the twin of
 `SplitCoordinate`), so the seam names nothing a domain owns. The GRAFT half is
 `ScenarioGraft.rebuild(payload)` + `graftUnder(hostTree, step)`, on the runbook owner's side (host-side
 for the root; a scion owning a sub-runbook grafts in-world — incus grafts manifests). One gesture — one
-door out, one graft home — four times in the root scenario. `seed-bdd` therefore depends on
+door out, one graft home — nine times in the root scenario. `seed-bdd` therefore depends on
 `seed-broker-port` (the `SeedBroker` door + `RunbookCoordinate`) and the neutral `ScenarioGraft` (in the
-engine's exported `.container`), never on a domain's `*BddScenarios` or `*Coordinate`.
+engine's exported `.container`), never on a domain's `*RunbookHandler` or `*Coordinate`.
 
 .C4 L4 Code (static) — the sow/graft split in classes: the realm-agnostic sow, the tree-local graft
 [mermaid]
@@ -155,9 +155,10 @@ classDiagram
 == The root scenario — a per-exec composition on the common stages
 
 `seed-master`'s `ClusterSeedScenario` is the concrete instance: pure-host `Cellar.fetch` opening (read the
-parcel's state — where we start from), four sow-and-graft callers (bbox · incus · systemd · cluster, the
-dependency chain whose terminal fruit is *the cluster answers ready*), pure-host `Cellar.store` closing
-(the harvest filed to its parcel). The cellar at both ends — `fetch` opens, `store` closes; between them
+parcel's state — where we start from), nine sow-and-graft crossings (worktree · bbox · cluster-pki · ghapp ·
+replicator-secrets · ghapp-webhook · incus-provision · systemd · cluster — the dependency chain whose
+terminal fruit is *the cluster answers ready*) interleaved with the host-flat beats (the GROW, the operator
+kubeconfig, the readiness-budget tuning), pure-host `Cellar.store` closing (the harvest filed to its parcel). The cellar at both ends — `fetch` opens, `store` closes; between them
 everything is cultivated fresh (no scion reads the cellar; the manifests graft is grown fresh, not cached).
 
 [[the-amorce]]

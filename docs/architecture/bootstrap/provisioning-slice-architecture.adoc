@@ -2,6 +2,35 @@
 :toc:
 :toclevels: 3
 
+[IMPORTANT]
+.Re-baselined — the NixOS substrate is now PRIMARY; the host-asset materialization apparatus is DISSOLVED
+====
+This document was written for the "materialise a `/srv/host` tree, then mount it" model and its
+`controlplane/` demolition work-list. The node has since moved to a *declarative NixOS substrate*
+(link:../nixos-substrate/substrate-model.adoc[substrate model],
+link:../atlas/nixos-substrate.adoc[atlas L1 — NixOS node substrate]), which is the primary model. Read
+this doc under that lens:
+
+* *The host-asset materialization service is GONE.* `BootstrapHostAssetMaterializer`, the
+  `HostAssetProvider` SPI, `HostAssetContribution`/`HostAssetSlot`/`HostAssetEntry`/`HostAssetDeliveryKind`,
+  `NodeEnvOverlayService`/`writeControlplaneOverlay`, and even `CloudConfigManifestsUnit` do NOT exist in
+  the code. The node's config, systemd units, scripts and env are baked by the `nixos/` modules
+  (`nix-env`, `host-access`, `zfs`, `containerd`, `rke2`, `flox-runtime`, `identity`, `sops`,
+  `bootstrap-manifests`, …); there is no synthesis-into-a-tree and no `/srv/host` staging+promotion. The
+  § "The host-asset materialization service (settled design)" section and its C1/C2/C3 figures + deltas
+  #2–#6 describe a design the substrate SUPERSEDED — kept only as the rationale/history of what was
+  dropped, NOT as the shipped shape.
+* *`IncusResourceBootstrap` is deleted; the GROW shipped.* The Pulumi graph is host-side as `InstanceGrow`
+  (`host/pulumi/incus-ingress`), fed ONE immutable `InstanceGrowPlan` assembled by `GrowPlanAssembler`
+  (incus-core) and stored by the incus PREPARE scion (`IncusProvisionScenario`). So delta #1's "regression"
+  is RESOLVED and the crux's shape (A) is realised.
+* *The per-node residue rides devlxd.* Per-node identity + cluster PKI arrive over devlxd
+  (`nixos/identity.nix`, `nixos/sops.nix`); the node-side CNI/Flux bootstrap set arrives through the
+  `NODE_BOOTSTRAP` lane (see link:../nixos-substrate/node-bootstrap-delivery.adoc[node-bootstrap delivery]).
+
+The two-black-box-frontiers founding rule below still holds — it is the invariant the substrate honours.
+====
+
 == The founding rule of the migration — two black-box frontiers
 
 The seeding sits between two frontiers, and the whole migration obeys one rule:
@@ -233,8 +262,8 @@ translates it into both the `ManifestDomainPolicy` (synth-time: which domains ar
 built) and the `seedVariables` (publish-time: the `RKE2LAB_MANIFESTS_PUBLISH_*` written into
 the overlay). The translation that used to live host-side (the former
 `ManifestLinkPolicy`/`ControlplanePolicy`, now dissolved) lives in the scion, which alone may name its own catalog.
-`writeControlplaneOverlay(root, layerContext, seedVariables)` — already published
-OSGi-side as `NodeEnvOverlayService` — is the sink; it awaits a caller in the scion.
+The former env-overlay SINK (`writeControlplaneOverlay` / `NodeEnvOverlayService`) is GONE — the NixOS
+substrate bakes the node env via the `nixos/` modules, so there is no `/srv/host` overlay to write.
 
 == Current gap — what the demolition removed ahead of its replacement
 
@@ -249,12 +278,12 @@ the replacement scions existed. The result is seven open deltas:
 | # | Delta | Target home
 
 | 1
-| **Pulumi graph** — `Project/Network/Profile/Image/Instance`. Called nowhere
-  outside the generated SDK today. The scion `IncusProvisionScenario` builds the
-  *image* and probes *reachability*, but states itself that "the actual instance
-  provisioning stays host-side" — it does not provision. This is a **regression**:
-  the graph should have stayed host, per the atlas target.
-| host (`seed-master`) — restore
+| **Pulumi graph** — `Project/Network/Profile/Image/Instance`. RESOLVED: the graph shipped host-side
+  as `InstanceGrow` (`host/pulumi/incus-ingress`, with `IncusProviderContext` + `IncusImportLookup`),
+  fed ONE immutable `InstanceGrowPlan` assembled by `GrowPlanAssembler` (incus-core) and stored by the
+  incus PREPARE scion. The earlier "regression" (the scion built the image but nothing provisioned) is
+  closed.
+| host (`host/pulumi/incus-ingress`) — SHIPPED
 
 | 2
 | `cloud-init` materialization — the NoCloud seed (`user-data`/`meta-data`/`network-config`)
@@ -285,11 +314,11 @@ the replacement scions existed. The result is seven open deltas:
 | in-container scion, sow-triggered
 
 | 6
-| `rke2lab-env` overlay — `writeControlplaneOverlay` (published OSGi-side as
-  `NodeEnvOverlayService`) is driven by the manifests scion, which derives the
-  `RKE2LAB_MANIFESTS_PUBLISH_*` publish-time vars from its facet. The former host-side
-  `ManifestLinkPolicy`/`ControlplanePolicy` are dissolved.
-| in-container scion (sink already present)
+| `rke2lab-env` overlay — DISSOLVED by the NixOS substrate. `writeControlplaneOverlay` and
+  `NodeEnvOverlayService` do NOT exist; the node's env is baked by the `nixos/` modules, not synthesised
+  into a `/srv/host` overlay. (The manifests facet still drives which layers publish, but there is no
+  host-asset env sink.)
+| dissolved (NixOS substrate)
 
 | 7
 | **checksum→reload glue** — `TargetChecksumPipeline`, `TargetReloadPolicy`, the
@@ -546,7 +575,17 @@ grow), its material promoted into `host.live.d` so the grow mounts a current tre
 Family 1 (the Pulumi graph) is the GROW beat; Family 4 (promotion + mounts) straddles
 prepare (promote) and grow (bind).
 
-== The host-asset materialization service (settled design)
+== The host-asset materialization service (SUPERSEDED by the NixOS substrate)
+
+[WARNING]
+====
+*This section is design rationale, NOT the shipped shape.* None of the types below —
+`BootstrapHostAssetMaterializer`, `HostAssetProvider`, `HostAssetContribution`, `HostAssetSlot`,
+`HostAssetEntry`, `HostAssetDeliveryKind`, the `CloudConfig`/`EnvConfig`/`SystemdBundle` providers —
+exist in the code. The declarative NixOS substrate dissolved the whole materialise-into-`/srv/host`
+apparatus (see the top-of-doc re-baseline and the paragraph at the end of this section). Kept as the
+record of the design the substrate replaced.
+====
 
 [NOTE]
 ====

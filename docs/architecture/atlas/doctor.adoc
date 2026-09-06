@@ -27,7 +27,7 @@ referral round-trip), the ritual, and the related-documentation links.
 
 | substrate
 | link:../doctor/medical-record-query-api-design.adoc[medical-record-query-api]
-| ✅ Implemented. The record reconstructed on demand from Pulumi — the read substrate.
+| ✅ Implemented. The record reconstructed on demand from the host Cellar/journal (codec read-back) — the read substrate.
 
 | substrate
 | link:../doctor/layer3-medical-record-design.adoc[layer3-medical-record (write-side)]
@@ -478,7 +478,7 @@ additivity.
 
 . *The doctor reconstructs a patient's medical record on demand* — `[playable]` blue +
 .. GIVEN per-node diagnosis serialized into Pulumi (layer3 write-side)
-.. WHEN the medical-record query API reconstructs the record on demand from Pulumi
+.. WHEN the medical-record query API reconstructs the record on demand from the host Cellar/journal
 .. THEN the doctor reads a patient's full history without an accumulator — AND the read substrate is
    additive over the write-side, nothing rewired.
 

@@ -3,13 +3,16 @@
 :toclevels: 3
 
 *Date:* 2026-06-05 (landed in `docs/architecture/doctor/` 2026-06-07) +
-*Status:* ✅ Increments A–D + Increment E (layers 2 + 3 write-side + read-side part 1) IMPLEMENTED on
-`feature/runbook-doctor`; ✅ read-side part 2 — the medical-record *query API* reconstructed on-demand
-from Pulumi — IMPLEMENTED on `feature/medical-record-accumulator` (see
-link:medical-record-query-api-design.adoc[medical-record-query-api-design.adoc]). ⚠️ The medical-model
-extensions (remediator, loop closure, recruitment, the referral round-trip, the closed-loop planner)
-and post-hoc *re-rendering* of the runbook `.adoc` are *Design Only* — seam-level, not yet built. See
-the sibling design docs in this folder.
+*Status:* ✅ Increments A–E shipped (originally in pre-OSGi `seed-master`), and the whole doctor has
+since **migrated into the OSGi world** — `doctor-contract` (the records + coordinates),
+`doctor-core` (the authority + reader + registry), `doctor-spi` (the clinician/specialist SPI), the
+`scenario-engine` (runbook play + graft), and per-domain specialists. The referral round-trip is now
+*built* (see link:glossary.adoc[glossary] and link:../atlas/doctor.adoc[the doctor atlas]). ⚠️ The
+remaining medical-model extensions (remediator administration, loop closure, recruitment, the
+closed-loop what-if planner) and post-hoc *re-rendering* of the runbook `.adoc` are *Design Only* —
+seam-level, not yet built. See the sibling design docs in this folder, and the *OSGi re-baseline*
+note at the head of the increments section for how the pre-OSGi types below map onto the shipped
+OSGi ones.
 
 == Vocabulary
 
@@ -17,7 +20,7 @@ the sibling design docs in this folder.
 |===
 |Term |Meaning
 |*Runbook* |the deliverable artifact — a rendered `.adoc` DAG of the scenarios played during a provisioning, with results and (on failure) diagnosis + remediation. Dynamic, on-demand.
-|*Readiness checkpoint* |the mechanism — an _intermediate_ controlled passage (a sas between provisioning steps) that plays a Given/When/Then scenario, decides stop-vs-degraded, and feeds the runbook. Today's `SystemdAdapterStage`.
+|*Readiness checkpoint* |the mechanism — an _intermediate_ controlled passage (a sas between provisioning steps) that plays a Given/When/Then scenario, decides stop-vs-degraded, and feeds the runbook. In the OSGi as-built it is a jGiven readiness scenario played by the `scenario-engine`; the stop-vs-degraded verdict is folded by `DefaultReadinessAuthority` (the pre-OSGi form was `SystemdAdapterStage`).
 |*Entry gate* |preconditions checked _before_ the domain crossings proceed — the worktree crossing's `GatePolicy` (clean worktree; flake coherence is a planned worktree-domain check), enforced OSGi-side inside the first (worktree) crossing. A different species of door: the front door, not the intermediate landing.
 |*Doctor* |the diagnosis engine the patient consults: Generalist → Specialists → Prescription → RemediationPlan. *Direction (Increment E):* a *generic, pluggable module* (used beyond seed-master), with `Doctor` a supertype of `Generalist`/`Specialist`. See Increment E and its open tensions.
 |*Patient* |(Increment E direction) the *Pulumi stack* (`org/project/stack`, e.g. `bioskop/dev`) — a persistent identity. Several patients = several stacks (dev/prod/clusters). A checkpoint is NOT the patient; the patient self-observes _via_ its checkpoints.
@@ -256,9 +259,10 @@ units:
 === Collecting the DAG: one shared model, dependencies declared once
 
 The runbook is assembled from a *single shared report model* that lives for the duration of
-the provisioning. Today each checkpoint creates a local `new ReportModel()` and discards
-it; instead, one model is created at pipeline start, threaded through `PipelineState`, and
-each checkpoint records its scenario into it (`addScenarioModel`).
+the provisioning. In the OSGi as-built the `scenario-engine` owns that model: each played readiness
+scenario is grafted into it (`ScenarioGraft` / `RunbookEnvelope`), so one model aggregates every
+checkpoint's scenario. (The pre-OSGi form threaded a caller-owned `ReportModel` through a
+`PipelineState` and had each stage record itself into it — the same one-shared-model principle.)
 
 *Edges (dependencies) are not duplicated.* The `dependsOn` fact is _already declared_ at
 checkpoint construction — e.g. `SystemdAdapterResource(name, summary, dependsOnResource)`
@@ -285,18 +289,22 @@ ordered fake incidents).
 [#render-survives-critical]
 ==== The render must survive a CRITICAL stop (constraint, not placement)
 
-A CRITICAL scenario stops provisioning by *throwing* `PipelineStageFailure` from inside the
-stage (`SystemdAdapterStage.launch()`). If the render were wired at the happy-path tail
-(`collectOutputs()` or a terminal `outputs` topic), that throw would unwind _past_ it and
-the runbook would never render — in exactly the failure case the runbook exists for.
+A CRITICAL scenario stops provisioning, and if the render were wired at the happy-path tail that stop
+would unwind _past_ it and the runbook would never render — in exactly the failure case the runbook
+exists for. So the render is *not* an open question of placement; it is a constraint: *the shared
+model is rendered whether the play returns or fails*.
 
-So the render is *not* an open question of placement; it is a constraint: *the shared model
-is created by the caller and rendered in a `finally`*. The caller (`BootstrapStage`, which
-already drives the whole `BootstrapPipeline` chain) owns the model, threads it in, and
-renders it whether the chain returns or throws:
+In the OSGi as-built the `scenario-engine` satisfies this by construction: the readiness scenario is
+played and *grafted* into the shared report model (`ScenarioGraft`, which reads a FAILED
+`ExecutionStatus` from the graft), and `RunbookRenderer` renders that model to AsciiDoc (into
+`host.live.d`) after the graft regardless of the verdict — the CRITICAL verdict travels *in* the
+model, it does not abort the render. (The pre-OSGi form realized the same constraint with a
+caller-owned `ReportModel` rendered in a `finally`, illustrated below — kept as the historical shape,
+not the current wiring:)
 
 [source,java]
 ----
+// PRE-OSGi shape (historical) — the same "render survives a CRITICAL stop" constraint
 final ReportModel runbook = new ReportModel();   // one instance, owned by the caller
 try {
   outputs = BootstrapPipeline.forCluster(config, policy)
@@ -307,21 +315,23 @@ try {
 }
 ----
 
-The throw stays where it is — aborting resource creation is what CRITICAL _means_ — but it
-unwinds _through_ the `finally`. This also satisfies the instance-passing discipline
-(CLAUDE.md): one model, created once, passed down the call graph, never re-created per stage
-nor reached through a static helper. It replaces today's per-stage `new ReportModel()` that
-is built and discarded.
+The principle is the same in both worlds: the CRITICAL stop is honored (it aborts resource creation),
+but it unwinds *through* the render, so the failed runbook is always produced. This also satisfies the
+instance-passing discipline (CLAUDE.md): one model, aggregated once, never re-created per checkpoint
+nor reached through a static helper.
 
 == The Doctor
 
-=== Placement: in the `bdd` package, consulted explicitly by the checkpoint
+=== Placement: consulted explicitly by the checkpoint (OSGi: `doctor-core`)
 
-The doctor lives in the existing `controlplane.bdd` package (with `Severity` and the
-stages — one place for the whole BDD model). The checkpoint calls it *explicitly* on
-failure: "the patient consults." No magic listener, no nesting inside a ComponentResource.
-Package separation is for reuse/readability; the explicit call keeps fidelity to the
-medical model.
+In the OSGi as-built the doctor lives in its own bundles — `doctor-core` (the `Generalist`, the
+readiness authority, the record reader), `doctor-contract` (the records + `Severity`), and
+`doctor-spi` (the `Specialist`/`Clinician` SPI); specialists live in their own domains
+(`DbusTcpSpecialist` in systemd-core, `ClusterSpecialist` in cluster-core, `NetworkSpecialist` in
+netplan-core, `DriftSpecialist` in doctor-core). The checkpoint scenario consults the doctor
+*explicitly* on failure: "the patient consults." No magic listener, no nesting inside a
+ComponentResource; the explicit call keeps fidelity to the medical model. (The pre-OSGi form kept the
+whole BDD model — doctor + `Severity` + stages — in one `controlplane.bdd` package.)
 
 [#consultation-flow]
 === Consultation flow — a referral round-trip on a generalist-owned agenda
@@ -740,6 +750,47 @@ only to the seam — a typed referral addressed to a bounded formulary — never
 
 Think global (this design), deliver incremental. Each increment ships green.
 
+[NOTE]
+.OSGi re-baseline — read the increment narrative through this mapping
+====
+Increments A–E below are the *original delivery history*, and they shipped in pre-OSGi `seed-master`.
+That code has since **migrated into the OSGi world**; the design (the DAG runbook, the four parts,
+the doctor, the layered medical record) is unchanged, but the pre-OSGi type names in the DONE bullets
+map onto the shipped OSGi ones. Read the bullets through this table:
+
+[cols="1,1",options="header"]
+|===
+| Pre-OSGi type (as written below) | OSGi as-built successor
+
+| `BootstrapPipeline` / `BootstrapStage` / `PipelineState`
+| the `scenario-engine` (plays + grafts readiness scenarios into the shared runbook model)
+
+| `SystemdAdapterStage` / `ClusterReadinessStage` (the checkpoint stages)
+| jGiven readiness scenarios played by the `scenario-engine`; the verdict is folded by `DefaultReadinessAuthority` (a `SeedHandler` serving `readiness-verdict`)
+
+| `ClusterBootstrapReadinessVerifier` / `ProductionClusterReadinessProbe` / `ClusterReadinessPhase`
+| the cluster readiness scenario in `cluster-bdd` (`ClusterReadinessScenario`) over `cluster-contract`
+
+| `VerificationResult` / `ReadinessOutputMapper` / `ClusterReadinessResource` / `SystemdAdapterResource`
+| the readiness verdict (`ReadinessVerdict`) + the host Pulumi bind in `pulumi-edge`; the per-checkpoint outputs are filed into the host `Cellar`/journal
+
+| `Generalist` / `Specialist` / `Specialty` / `Prescription` / `RemediationPlan` / `Observation` / `Symptom`
+| `doctor-core` `Generalist` + `doctor-spi` `Specialist`/`Clinician` + `doctor-contract` records (`DbusTcpSpecialist` → systemd-core, `ClusterSpecialist` → cluster-core, `NetworkSpecialist` → netplan-core, `DriftSpecialist` → doctor-core)
+
+| `ConsultationReport` / `ConsultationLog` / `MedicalRecord`
+| `doctor-contract` records; the log/registry is `doctor-core` (`JournalMedicalRecordRegistry`)
+
+| `pulumi-automation-ext` / `MedicalRecordReader` / `ConsultationReportReader` / `MedicalRecordDump` / `OutputBuilder`
+| `host/pulumi/pulumi-edge` (snapshot types) + `doctor-core` `MedicalRecordReader` (codec read-back via `SeedCodec.fromMap`); there is no `ConsultationReportReader`, `MedicalRecordDump`, or `OutputBuilder`
+
+| `RunbookRenderer` / `ReportModel` (JGiven) / `RunbookRenderingTest` / `NestedRunbookTest`
+| `RunbookRenderer` + `ScenarioGraft` + the JGiven `ReportModel` in the `scenario-engine`
+|===
+
+The severity/stop-vs-degraded facts are the ones in the *2026-07-17 severity NOTE* at the top of this
+doc — that note is the current source of truth and is accurate; the DONE bullets predate it.
+====
+
 === Increment A — Runbook (render + fake incident) — DONE
 
 Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
@@ -1014,8 +1065,9 @@ link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enri
 The reconstruction the write-side made possible is shipped: the medical record is rebuilt *on demand*
 from Pulumi (the single source) — current state for the present complaint, the historical checkpoints
 for the past — answering four clinical questions (`chiefComplaint` / `historyOf` / `efficacyOf` /
-`comorbiditiesWith`). It lives in the reusable `pulumi-automation-ext` module plus the doctor's
-`MedicalRecordReader`, with an offline `MedicalRecordDump` (YAML) as the transient entry point. Full
+`comorbiditiesWith`). As-built (OSGi) the snapshot substrate is the host `pulumi-edge` module and the
+reconstruction is `doctor-core`'s `MedicalRecordReader`, folding the neutral host `Cellar` journal
+codec-based (no `pulumi-automation-ext` module, no offline `MedicalRecordDump`). Full
 design + the as-built mapping in
 link:medical-record-query-api-design.adoc[medical-record-query-api-design.adoc]. Note the *accumulator*
 this section's heading anticipated was *abandoned* there: nothing extra is exported; Pulumi is not

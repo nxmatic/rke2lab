@@ -5,6 +5,14 @@
 
 == Overview
 
+[NOTE]
+====
+*Status:* IMPLEMENTED. The design below is substantially in the code — top-level `flake.nix`
+exposes `.#seed-master`, `.#manifests-cli` (the manifests exec jar), `.#flox-nri-plugin` (+`-debug`),
+`.#dataplanJson`, and the `.#deploy` app. What remains "design" here is the transition prose, not the
+shape.
+====
+
 This design makes the top-level `flake.nix` the authoritative *deploy/release*
 build entry point for rke2lab, with Maven kept as the *developer inner loop*.
 The deployable artifacts — the seed-master bootstrap jar, the manifests jar, and
@@ -35,7 +43,8 @@ output (`nix eval .#netplanJar.name` -> `"rke2lab-netplan"`). `networkBlueprintY
 then runs that jar to generate YAML consumed by nix-darwin-home. So "Maven runs
 inside nix, artifact comes from the store" is established here, not novel.
 
-Current outputs: `[ incus-client, netplanJar, networkBlueprintYaml ]`.
+Outputs today (implemented): `[ seed-master, manifests-cli, flox-nri-plugin (+-debug), dataplanJson,
+incus-client, planJar, networkBlueprintYaml, networkBlueprintJson ]`, plus the `.#deploy` app.
 
 Two enabling facts are already true:
 
@@ -43,9 +52,10 @@ Two enabling facts are already true:
   (`/etc/nix/machines`: `ssh-ng://builder@linux-builder aarch64-linux ...`), so
   `nix build .#flox-nri-plugin` for `aarch64-linux` routes there. The
   cross-compile prerequisite is satisfied.
-* The runtime flox flake (`manifests/.../runtime/flox/flake.nix`) already builds
-  `flox-nri-plugin` + `flox-nri-plugin-debug` via `buildGoModule` over
-  `eachSystem [aarch64-darwin aarch64-linux]`.
+* The `flox-nri-plugin` + `flox-nri-plugin-debug` outputs now come from a FORK INPUT —
+  `flox-runtime.url = "github:seedmatic/flox-nri-plugin/develop"` — re-exported here (the in-tree
+  `manifests/.../runtime/flox/flake.nix` is gone). That upstream flake builds them via `buildGoModule`
+  over `eachSystem [aarch64-darwin aarch64-linux]`.
 
 == The core constraint: cross-compilation
 
@@ -82,7 +92,7 @@ deployable artifacts.
 | `.#netplanJar` | netplan jar | exists (Maven-in-nix)
 | `.#manifests` | manifests exec jar | *new* — Maven-in-nix (reactor build)
 | `.#seed-master` | bootstrap exec jar | *new* — Maven-in-nix (reactor build)
-| `.#flox-nri-plugin` (+`-debug`) | NRI plugin, aarch64-linux | *new* — re-export from runtime flake; cross-built via linux-builder
+| `.#flox-nri-plugin` (+`-debug`) | NRI plugin, aarch64-linux | re-export from the `flox-runtime` fork input (`github:seedmatic/flox-nri-plugin/develop`); cross-built via linux-builder
 |===
 
 === seed-master / manifests: build the reactor, not the module

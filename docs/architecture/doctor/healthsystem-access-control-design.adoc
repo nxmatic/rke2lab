@@ -4,13 +4,14 @@
 
 [NOTE]
 ====
-*Status:* MATURED DESIGN — the keystone model, settled 2026-06-10 against the shipped doctor code
-and the cohort-correlation spike. It is a *build-ready* design (Approach A below), not a loose
-vision: the vocabulary is fixed, the seams are named against real types, and the cross-patient read
-half is already proven by the spike. It stays a *design* (no code yet on this doc's own account)
-until promoted on a `feature/` branch. The model is *additive* — it wraps the shipped
-`recordFor(Patient)` and registry without editing the read core (see
-link:../integration-atlas.adoc[the integration atlas], which proves the additivity before/after).
+*Status:* SHIPPED (keystone + interim gate), then migrated into OSGi — settled 2026-06-10 against the
+shipped doctor code and the cohort-correlation spike, and now realized in `doctor-core`
+(`DefaultHealthSystem`, `ClinicalAccess`, `GrantPolicy`, `Grant`) over `doctor-contract`
+(`HealthSystem`, `ClinicianId`, `Patient`) and `doctor-spi` (`Clinician`). The vocabulary is fixed,
+the seams are named against real types, and the cross-patient read half was proven by the spike. The
+model is *additive* — it wraps the shipped `recordFor(Patient)` and registry without editing the read
+core (see link:../integration-atlas.adoc[the integration atlas], which proves the additivity
+before/after). The referral-derivation of grants (step 2) remains the one not-yet-built seam.
 ====
 
 == Overview
@@ -212,24 +213,29 @@ would force a real shared store. Noted as the boundary, not designed.
 
 == Relationship to what is built
 
-* The shipped `MedicalRecordReader` + `SnapshotSource` + `LiveMedicalRecordRegistry` already
-  reconstruct a patient record from a stack's history, backend-bound (not stack-bound) — so the
-  *read* substrate for enumerate-and-fold already exists.
-* `LiveMedicalRecordRegistry.recordFor(Patient)` is the read seam. `ClinicalAccess` wraps it with the
-  grant check; the registry's read core is unchanged.
-* `LiveMedicalRecordRegistry.cohortFor(Patient)` exists today as the spike's `@Spike`-marked
-  enumerate-and-fold. Promotion strips the marker and applies the grant filter.
-* The two duplicated `new Generalist(...)` construction sites and the loose `records` +
-  `currentPatient` pipeline fields collapse into one `HealthSystem` built at the readiness
-  transition — the keystone is the single construction site.
+* As-built (OSGi): `MedicalRecordReader` (`doctor-core`) + the host `SnapshotSource`
+  (`pulumi-edge`) + `JournalMedicalRecordRegistry` (`doctor-core`, renamed from the design-time
+  `LiveMedicalRecordRegistry`) reconstruct a patient record from the host journal, backend-bound (not
+  stack-bound) — so the *read* substrate for enumerate-and-fold exists.
+* `JournalMedicalRecordRegistry.recordFor(Patient)` is the read seam. `ClinicalAccess` (`doctor-core`)
+  wraps it with the grant check (`GrantPolicy.isGranted(boundId, patient)`); the registry's read core
+  is unchanged.
+* `JournalMedicalRecordRegistry.cohortFor(Patient)` is shipped and *promoted* (the `@Spike` marker is
+  gone; the registry-level fold is ungated by design). The `(ClinicianId, Patient)` grant filter is
+  *realized* one layer up, in `ClinicalAccess.cohort()`.
+* The keystone is the single construction site: `DefaultHealthSystem` (`doctor-core`, the
+  `HealthSystem` contract) holds the registry + `GrantPolicy`, employs the clinicians by minting each
+  a `ClinicalAccess`, and admits the current patient — replacing the loose duplicated `Generalist`
+  wiring.
 
 == Build scope
 
-* *Keystone + interim gate (this design):* `HealthSystem`, `Clinician`/`ClinicianId`,
-  `ClinicalAccess`, `GrantPolicy` with explicit interim rules; promote `cohortFor` off `@Spike` and
-  apply the grant filter; collapse the pipeline wiring into the keystone. Exercised by a BDD test
-  (self-grant read; restricted-policy cohort exclusion), live wiring, and the spike's preview proof
-  reframed through the keystone.
+* *Keystone + interim gate — SHIPPED (OSGi):* `HealthSystem` (`DefaultHealthSystem`),
+  `Clinician`/`ClinicianId`, `ClinicalAccess`, `GrantPolicy` + `Grant` with explicit interim rules;
+  `cohortFor` promoted off `@Spike`; the grant filter realized in `ClinicalAccess.cohort()`; the loose
+  wiring collapsed into the keystone. Exercised by `ClinicalAccessTest`
+  (`cohort_returns_only_granted_siblings`, `an_ungranted_read_degrades_to_empty_and_logs`),
+  `HealthSystemTest`, and `GrantPolicyTest` in `doctor-core-test`.
 * *Referral-derivation (later, step 2):* the `GrantPolicy` derives cohort grants from referrals
   recorded in the records — the one seam this design leaves explicit.
 * *What-if correlation (later, step 3):* the granted-cohort query feeds the what-if planner.

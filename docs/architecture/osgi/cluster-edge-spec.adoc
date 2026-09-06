@@ -11,21 +11,34 @@ link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge]. It mirrors the dbus-systemd
 class shells the external tool; everything else consumes a port.
 
 Built in four green steps (Option B): `cluster-contract` (`ClusterReadinessPhase` rapatriated from
-doctor-contract, `ClusterSchemaRef`, `ControllerRef`, the `ClusterReadinessContact` contract); `cluster-core`
-swaps loose literals for `ClusterSchemaRef`; `cluster-edge` = `KubectlClusterContact` `@Component`
-(pure ProcessBuilder, zero embedded jars); `seed-master` injects the contact from the registry and
-thins `ClusterBootstrapReadinessVerifier` to its host orchestration (gate, kubeconfig poll,
-policy→`ControllerRef` projection, retry loops, `VerificationResult`). `EmbeddedBundlesBootTest` proves
-the edge resolves typed from seed-master's deployed embed topology.
+doctor-contract, `ClusterSchemaRef`, `ControllerRef`, the `ClusterReadinessContact` contract);
+`cluster-core` swaps loose literals for `ClusterSchemaRef`; `cluster-edge`; `cluster-bdd`.
+
+*As shipped (re-baselined) — the edge is fabric8-typed and the host orchestration dissolved into a
+scion.* The Option-B exploration below reasoned about a `KubectlClusterContact` shelling `kubectl` over
+`ProcessBuilder` and a host `ProductionClusterReadinessProbe` orchestrating the phases. Neither
+survives verbatim. The shipped edge is `Fabric8ClusterContact` — a `@Component(service =
+ClusterReadinessContact.class)` in `cluster-edge` that reaches the API through a typed fabric8
+`KubernetesClient` built from the published kubeconfig (NO `kubectl` shell, no embedded jars). The two
+point-in-time booleans collapsed into one awaiting verb — `ClusterReadinessContact.awaitReady(kubeconfig,
+List<ControllerRef>, ReadinessBudget) → ClusterReadinessSnapshot` (see the readiness-await note below).
+And the host readiness orchestration MOVED WHOLE into the `cluster-bdd` scion: `ClusterReadinessScenario`
+(the jGiven metier, `@OsgiService`-injecting the contact) grown by `ClusterRunbookHandler` behind the
+broker door. The former host types — `ClusterBootstrapReadinessVerifier`, `ProductionClusterReadinessProbe`,
+`ClusterReadinessStage`, `SeedNodeBootstrapWatcher` — are DELETED, not thinned. The before/after below is
+kept as the design rationale that motivated the extraction; the shipped shape is the scion, not a
+host-side probe.
 
 The cluster domain already has its *core* — `ClusterSpecialist`, a `Specialist` `@Component` in
 `osgi/cluster/cluster-core`, contributed to the doctor's DS-collected roster (the specialist
-distribution, commit `b2a65de0`). What is still missing is the *port* and the *edge*: the cluster
-readiness contract, and the live kubectl contact that satisfies it. They live in `seed-master` today,
-folded into the host orchestration. This document extracts them.
+distribution, commit `b2a65de0`). What was still missing when this was written was the *port* and the
+*edge*: the cluster readiness contract, and the live contact that satisfies it. They lived in
+`seed-master` then, folded into the host orchestration. This document extracts them.
 
 This is a *before / after* document. Each section states one problem, shows it, and shows the
-resolution. The model is read from the code (the surface inventory of 2026-06-26), not imposed on it.
+resolution. The "before" is the host-trapped state of the 2026-06-26 surface inventory (design
+rationale); the as-built end-state is the fabric8 edge + the `cluster-bdd` scion summarised above and in
+§ <<the-cluster-scion-scenario>>.
 ====
 
 == The cluster domain today — a core with no port, an edge trapped in the host
@@ -282,22 +295,30 @@ gains a dependency on cluster-contract (its own domain's port — the natural di
 | `ClusterReadinessPhase` leaves — the doctor stops carrying cluster vocabulary.
 |===
 
-== The whole, after
+== The whole, after (as shipped)
+
+The as-built shape differs from the four-step plan in one load-bearing way: the readiness orchestration
+is NOT a host `ProductionClusterReadinessProbe` composing the edge — it is the `cluster-bdd` scion
+(`ClusterReadinessScenario`), which `@OsgiService`-injects `ClusterReadinessContact`, calls `awaitReady`,
+and consults the doctor ITSELF on a failing phase (Fork B). The host only sows the scion and reaps a
+coarse verdict.
 
 [mermaid]
 ....
 flowchart LR
   world["EXTERNAL<br/>kube-apiserver"]
-  edge["cluster domain — EDGE<br/>cluster-edge (OSGi @Component)"]
-  cport["cluster domain — PORT<br/>cluster-contract (type=contract)"]
+  edge["cluster domain — EDGE<br/>cluster-edge: Fabric8ClusterContact (typed KubernetesClient)"]
+  cport["cluster domain — PORT<br/>cluster-contract (type=contract): ClusterReadinessContact"]
   ccore["cluster domain — CORE<br/>cluster-core: ClusterSpecialist"]
-  host["control-plane — HOST<br/>seed-master: gates, poll, policy, projection, orchestration"]
+  scion["cluster domain — SCION<br/>cluster-bdd: ClusterReadinessScenario / ClusterRunbookHandler"]
+  host["control-plane — HOST<br/>seed-master: sows the scion, reaps a coarse verdict"]
   dport["doctor domain — PORT<br/>doctor-contract: Observation, Symptom"]
   doctor["doctor domain — CORE<br/>HealthSystem, roster by DS"]
-  edge -->|kubectl| world
+  edge -->|"fabric8 client (readyz + rollout)"| world
   edge -.->|implements| cport
-  host -->|composes the contact| cport
-  host -->|translates into a doctor fact| dport
+  host -->|"broker.sow (RUNBOOK)"| scion
+  scion -->|"@OsgiService awaitReady"| cport
+  scion -->|"consults itself on a failing phase"| dport
   ccore -.->|reasons over| dport
   ccore -.->|owns its phase/schema vocab| cport
   doctor -->|collects ClusterSpecialist by DS| ccore
@@ -308,7 +329,7 @@ flowchart LR
   classDef w fill:#eee,stroke:#999,stroke-width:1px;
   class edge e;
   class cport,dport p;
-  class host,doctor,ccore c;
+  class host,doctor,ccore,scion c;
   class world w;
 ....
 
@@ -319,10 +340,13 @@ flowchart LR
 2. *cluster-core* — swap the loose literals for `ClusterSchemaRef`; add the cluster-contract dep. Green.
 3. *cluster-edge* — create the `@Component` edge, extract the kubectl contact from the verifier (the
    chosen grain). Mirror `dbus-systemd-edge` (pom + bnd `type=edge`, no embedded jars). Green.
-4. *seed-master* — refactor `ProductionClusterReadinessProbe` to inject the edge from the registry;
-   thin `ClusterBootstrapReadinessVerifier` down to the host concerns it keeps. Build green through
-   seed-master; an in-container boot test proves the edge `@Component` resolves and the contact works.
+4. *cluster-bdd + seed-master* — the readiness orchestration became the `cluster-bdd` scion
+   (`ClusterReadinessScenario`, `@OsgiService`-injecting `ClusterReadinessContact`), grown by
+   `ClusterRunbookHandler`; the host `ProductionClusterReadinessProbe`/`ClusterBootstrapReadinessVerifier`
+   were deleted (not thinned), and `seed-master` now sows the scion through the broker. An in-container
+   boot test proves the `Fabric8ClusterContact` `@Component` resolves and the contact works.
 
+[[the-cluster-scion-scenario]]
 == The cluster SCION scenario (the metier definition — SHIPS today)
 
 In the ClusterSeed vision (link:../bdd/bdd.adoc#clusterseed-scenario-map[the scenario map]) cluster is a
