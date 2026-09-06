@@ -306,7 +306,8 @@ public class ManifestSynthesisScenario
    */
   private ManifestsRunbookInput resolveFacet(
       ManifestsRunbookInput seeded, Optional<LinkedWorktree> rendered) {
-    final RenderMode.Verb verb = seeded.renderMode().verb();
+    final RenderMode mode = seeded.renderMode().orElseGet(RenderMode::grow);
+    final RenderMode.Verb verb = mode.verb();
     final Optional<ManifestsRunbookInput.Facets> head =
         rendered
             .flatMap(worktree -> worktree.readAtHead(RENDERED_FACET_FILE))
@@ -332,8 +333,7 @@ public class ManifestSynthesisScenario
     return switch (verb) {
       case GROW, INIT -> seeded;
       case UPDATE -> withPublishDebug(seeded, head.orElseThrow());
-      case EDIT ->
-          withPublishDebug(seeded, overlay(head.orElseThrow(), seeded.renderMode().overrides()));
+      case EDIT -> withPublishDebug(seeded, overlay(head.orElseThrow(), mode.overrides()));
     };
   }
 

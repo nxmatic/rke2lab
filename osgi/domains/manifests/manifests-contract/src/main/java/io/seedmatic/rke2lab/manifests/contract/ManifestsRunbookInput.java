@@ -11,7 +11,7 @@ import java.util.Optional;
  * broker door rather than compiling the class (see docs/architecture/osgi/seed-broker-spec.adoc §
  * introspection).
  *
- * <p>Its components carry three kinds of {@link Amendment}, each a SINGLE field its role binds by
+ * <p>Its components carry four kinds of {@link Amendment}, each a SINGLE field its role binds by
  * value (the amont mapping the schema alone cannot express — see seed-broker-spec § @Amendment):
  *
  * <ul>
@@ -31,6 +31,12 @@ import java.util.Optional;
  *       a temp dir; absence is an empty {@link Optional}, never a blank string.
  *   <li>{@link Amendment#IDENTITY} — {@link #identity} carries the cluster/node identity (see the
  *       {@code Identity} note below).
+ *   <li>{@link Amendment#RENDER_MODE} — {@link #renderMode} is the render verb intent (seeded wins
+ *       / HEAD wins / HEAD overlaid). {@link Optional#empty()} when unamended — seed-master's grow
+ *       never sows it, so the scion reads {@code GROW} (its Pulumi facet stays authoritative); only
+ *       the {@code manifests-cli} update/edit verbs sow it. Optional (not a compact-ctor default)
+ *       so the amend door does not make it mandatory — an unsown mode is legitimately absent,
+ *       exactly as for {@code SOIL}/{@code IDENTITY}.
  * </ul>
  *
  * <p>Because the host only fills amendments by role, ALL the domain knowledge lives in the scion
@@ -45,13 +51,7 @@ public record ManifestsRunbookInput(
     @Amendment(Amendment.FACET) Facets facets,
     @Amendment(Amendment.SOIL) Optional<String> materializationRoot,
     @Amendment(Amendment.IDENTITY) Optional<Identity> identity,
-    @Amendment(Amendment.RENDER_MODE) RenderMode renderMode) {
-
-  // render-mode is the one amendment seed-master never sows — its grow applies its Pulumi facet
-  // as-is (GROW). An unsown amendment decodes to null, so coalesce: the scion always reads a mode.
-  public ManifestsRunbookInput {
-    renderMode = renderMode == null ? RenderMode.grow() : renderMode;
-  }
+    @Amendment(Amendment.RENDER_MODE) Optional<RenderMode> renderMode) {
 
   public static Builder builder() {
     return new Builder();
@@ -76,7 +76,7 @@ public record ManifestsRunbookInput(
     private Facets facets = Facets.defaults();
     private Optional<String> materializationRoot = Optional.empty();
     private Optional<Identity> identity = Optional.empty();
-    private RenderMode renderMode = RenderMode.grow();
+    private Optional<RenderMode> renderMode = Optional.empty();
 
     private Builder() {}
 
@@ -96,7 +96,7 @@ public record ManifestsRunbookInput(
     }
 
     public Builder renderMode(RenderMode renderMode) {
-      this.renderMode = renderMode;
+      this.renderMode = Optional.of(renderMode);
       return this;
     }
 

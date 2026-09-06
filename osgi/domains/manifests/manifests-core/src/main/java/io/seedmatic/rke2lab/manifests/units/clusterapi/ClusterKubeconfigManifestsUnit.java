@@ -37,7 +37,11 @@ import software.constructs.Construct;
  *       (data key {@code value}, type {@code cluster.x-k8s.io/secret}, {@code
  *       cluster.x-k8s.io/cluster-name} label) that CAPI reads in-cluster to seed the OTHER nodes
  *       (further control-plane + workers); seed-master itself only bootstraps the master control
- *       node. A visible manifest RKE2 applies.
+ *       node. A real credential, so it rides the NODE_BOOTSTRAP lane (with its namespace) — seeded
+ *       node-side over devlxd at the grow, NEVER on the reconciled branch: a secret-blind
+ *       in-cluster render early-returns here (no material), which would otherwise STRIP a
+ *       branch-rendered Secret and leave CAPI without its kubeconfig. The operator-kubeconfig above
+ *       needs no such lane — it is consumed host-side at the grow, never a cluster resource.
  * </ul>
  *
  * <p>The unit only RENDERS. The manifests scion reveals the cluster-pki {@code AdminCredentials}
@@ -77,19 +81,19 @@ public final class ClusterKubeconfigManifestsUnit extends AbstractManifestsUnit 
     // rke2lab-<cluster>}. The Cluster CR + its Machines + this kubeconfig Secret co-locate here,
     // and
     // CAPI reads the canonical {@code <cluster>-kubeconfig} Secret WITHIN it (the secret name stays
-    // the bare cluster name — CAPI resolves it by name inside the namespace). The Namespace is
-    // cluster-scoped, so the exploder orders it 01- ahead of the 02- Secret and RKE2 applies it
-    // first.
+    // the bare cluster name — CAPI resolves it by name inside the namespace). The Namespace rides
+    // the NODE_BOOTSTRAP lane WITH the CAPI Secret (the Secret dependsOn it, so the bootstrap file
+    // lists the Namespace first), a self-contained set applied node-side before Flux.
     final String clusterNamespace = "rke2lab-" + clusterName;
-    createClusterNamespace(scope, clusterNamespace);
+    final ApiObject namespace = createClusterNamespace(scope, clusterNamespace);
 
     renderOperatorKubeconfig(scope, material, clusterName, clusterNamespace, nodeName);
     renderCapiKubeconfigSecret(
-        scope, material, clusterName, clusterNamespace, topology.vipHostInetAddr());
+        scope, material, clusterName, clusterNamespace, topology.vipHostInetAddr(), namespace);
   }
 
-  private void createClusterNamespace(final Construct scope, final String namespace) {
-    new ApiObject(
+  private ApiObject createClusterNamespace(final Construct scope, final String namespace) {
+    return new ApiObject(
         scope,
         "namespace-" + namespace,
         ApiObjectProps.builder()
@@ -98,7 +102,10 @@ public final class ClusterKubeconfigManifestsUnit extends AbstractManifestsUnit 
             .metadata(
                 ApiObjectMetadata.builder()
                     .name(namespace)
-                    .annotations(packageProfile.packageAnnotations("|Namespace||" + namespace))
+                    .annotations(
+                        packageProfile.packageAnnotations(
+                            "|Namespace||" + namespace,
+                            Map.of(ManifestAnnotation.NODE_BOOTSTRAP.key(), "true")))
                     .build())
             .build());
   }
@@ -139,15 +146,19 @@ public final class ClusterKubeconfigManifestsUnit extends AbstractManifestsUnit 
             "/data", Map.of("kubeconfig.yaml", base64(material.kubeconfig(clusterName, server)))));
   }
 
-  // The canonical CAPI <cluster>-kubeconfig Secret over the VIP, applied in-cluster: CAPI reads it
-  // to
-  // seed the further nodes. Data key `value`, type + cluster-name label per the CAPI contract.
+  // The canonical CAPI <cluster>-kubeconfig Secret over the VIP: CAPI reads it in-cluster to seed
+  // the further nodes. Data key `value`, type + cluster-name label per the CAPI contract. A real
+  // credential → the NODE_BOOTSTRAP lane (seeded node-side over devlxd at the grow), so a
+  // secret-blind in-cluster render — which early-returns here for lack of material — cannot strip
+  // it
+  // off the branch. It dependsOn the namespace so the bootstrap file lists the Namespace first.
   private void renderCapiKubeconfigSecret(
       final Construct scope,
       final OperatorPkiMaterial material,
       final String clusterName,
       final String namespace,
-      final String vipHostInetAddr) {
+      final String vipHostInetAddr,
+      final ApiObject namespaceObject) {
     final String name = clusterName + "-kubeconfig";
     final String server = "https://" + vipHostInetAddr + ":" + APISERVER_PORT;
 
@@ -164,10 +175,13 @@ public final class ClusterKubeconfigManifestsUnit extends AbstractManifestsUnit 
                         .namespace(namespace)
                         .labels(Map.of("cluster.x-k8s.io/cluster-name", clusterName))
                         .annotations(
-                            packageProfile.packageAnnotations("|Secret|" + namespace + "|" + name))
+                            packageProfile.packageAnnotations(
+                                "|Secret|" + namespace + "|" + name,
+                                Map.of(ManifestAnnotation.NODE_BOOTSTRAP.key(), "true")))
                         .build())
                 .build());
 
+    secret.addDependency(namespaceObject);
     secret.addJsonPatch(JsonPatch.add("/type", "cluster.x-k8s.io/secret"));
     secret.addJsonPatch(
         JsonPatch.add("/data", Map.of("value", base64(material.kubeconfig(clusterName, server)))));

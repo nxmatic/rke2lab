@@ -301,6 +301,42 @@ flowchart TB
   SignSrc -.->|env| Skip
 ....
 
+[[secret-delivery]]
+== The two doors for a delivered secret — manifests never carries secret material onto the branch
+
+The output-branch-is-secret-blind rule (above) has a corollary that governs EVERY Secret the
+synthesis emits, not just the render-process secrets: *manifests never carries secret MATERIAL into a
+resource Flux reconciles.* A secret-blind in-cluster render holds no cellar material, so any Secret
+that depended on a reveal would render EMPTY and — pushed to the branch — Flux would prune the grow's
+populated one. The material reaches the cluster by exactly two doors, chosen by whether it is
+IMMUTABLE or ROTATING:
+
+* *Door 1 — the durable NODE_BOOTSTRAP lane (grow-only).* The exploder diverts the Secret OUT of the
+  branch tree into `.bootstrap/rke2lab-bootstrap.yaml` (`NodeBootstrapArtifact`), sealed under
+  `SERVER_MANIFESTS`, posed on the instance's devlxd key at the grow, applied by RKE2's
+  server-manifests oneshot at master bootstrap — once, off-branch. It NEVER participates in an
+  in-cluster reconciliation: Flux's prune is inventory-scoped and these resources carry no Flux
+  inventory label (RKE2 applied them, not Flux), so Flux is blind to them in apply AND prune. Fits
+  *immutable* material — a cluster CA + endpoint, an app credential: `<cluster>-kubeconfig` (CAPI),
+  `githubapp`, `sops-age`, the replicator SOURCE secrets, the `manifests-render-signing` key. The
+  opt-in is a per-resource marker annotation (`ManifestAnnotation.NODE_BOOTSTRAP`), stamped
+  whole-unit via `new PackageMetadataProfile(domain, pkg, true)`, or per-resource for a MIXED unit
+  (the `ReplicatorManifestsUnit` / `ClusterKubeconfigManifestsUnit` shape: only the credential + its
+  namespace ride the lane, the rest stays on the branch).
+* *Door 2 — an in-cluster controller mints it from a durable seed.* manifests emits a CR, NOT a
+  Secret; a controller reconciles the Secret in-cluster, so a secret-blind re-render only re-emits
+  the CR (no material) and nothing is stripped. Fits *rotating / derived* material — cert-manager (a
+  `Certificate` → the controller mints + renews the TLS Secret, `ca-injector` fills a webhook
+  `caBundle`), the mittwald replicator (the durable SOURCE fans out into target namespaces), and the
+  Tailscale operator (provisions the funnel `*.ts.net` cert in-cluster from the tailnet — the
+  `flox-controller` webhook TLS will follow this door via cert-manager, self-signed for its internal
+  `*.svc` SAN).
+
+The doors are complementary, not alternatives: a rotating secret typically uses BOTH — Door 1 for its
+durable seed (the CA, the source), Door 2 for the in-cluster reconciliation that derives the live
+Secret. What is forbidden is the third path — a reveal-populated Secret rendered straight onto the
+reconciled branch, which the in-cluster render silently strips.
+
 [[tekton-in-source]]
 == The Tekton resources are rendered manifests; only a minimal PipelineRun stub is source
 
