@@ -8,6 +8,5 @@ resources:
 - runtime-flox-controller-operators.yml
 - runtime-flox-controller-workloads.yml
 - runtime-flox-envs.yml
-- runtime-flox-webhook-operators.yml
-- runtime-flox-webhook-workloads.yml
+- runtime-flox-webhook.yml
 - runtime-rke2-config.yml

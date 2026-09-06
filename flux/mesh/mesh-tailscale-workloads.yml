@@ -16,6 +16,7 @@ spec:
   - name: mesh-system-namespace-workloads
   - name: mesh-tailnet-purge-operators
   - name: mesh-tailnet-purge-workloads
+  - name: mesh-tailscale-operators
   force: true
   interval: 5m
   path: ./workloads/mesh/tailscale

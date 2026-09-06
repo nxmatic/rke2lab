@@ -29,9 +29,6 @@ spec:
       - args:
         - --gcroot-base=/nix/var/nix/gcroots/flox-runtime/env
         - --env-root=/var/lib/flox-controller/envs
-        - --enable-webhook
-        - --token-secret-name=floxhub-token
-        - --token-secret-key=token
         env:
         - name: NODE_NAME
           valueFrom:
@@ -45,12 +42,6 @@ spec:
           value: /run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin
         - name: CONTAINERD_ADDRESS
           value: /run/k3s/containerd/containerd.sock
-        - name: FLOX_FLOXHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: token
-              name: floxhub-token
-              optional: true
         image: io.seedmatic.flox-controller:0.0.0-develop
         imagePullPolicy: IfNotPresent
         name: controller
@@ -76,9 +67,6 @@ spec:
           name: containerd-sock
         - mountPath: /var/lib/flox-controller/envs
           name: env-root
-        - mountPath: /tmp/k8s-webhook-server/serving-certs
-          name: webhook-certs
-          readOnly: true
       hostPID: true
       nodeSelector:
         flox.seedmatic.io/enabled: "true"
@@ -99,9 +87,6 @@ spec:
           path: /var/lib/flox-controller/envs
           type: DirectoryOrCreate
         name: env-root
-      - name: webhook-certs
-        secret:
-          secretName: flox-controller-webhook-tls
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1
