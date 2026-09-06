@@ -12,6 +12,11 @@ spec:
   dependsOn:
   - name: mesh-tailscale-operators
   - name: mesh-tailscale-workloads
+  - name: runtime-flox-controller-crds
+  - name: runtime-flox-controller-operators
+  - name: runtime-flox-controller-workloads
+  - name: runtime-flox-webhook-operators
+  - name: runtime-flox-webhook-workloads
   force: true
   interval: 5m
   path: ./workloads/mesh/funnel-state

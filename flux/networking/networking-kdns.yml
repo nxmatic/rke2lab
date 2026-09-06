@@ -13,6 +13,11 @@ spec:
   - name: cluster-runtime-system-namespace-foundation
   - name: cluster-runtime-system-namespace-workloads
   - name: networking-cilium-config
+  - name: runtime-flox-controller-crds
+  - name: runtime-flox-controller-operators
+  - name: runtime-flox-controller-workloads
+  - name: runtime-flox-webhook-operators
+  - name: runtime-flox-webhook-workloads
   force: true
   interval: 5m
   path: ./workloads/networking/kdns

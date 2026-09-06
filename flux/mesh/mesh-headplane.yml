@@ -13,6 +13,11 @@ spec:
   - name: mesh-headscale
   - name: mesh-system-namespace-foundation
   - name: mesh-system-namespace-workloads
+  - name: runtime-flox-controller-crds
+  - name: runtime-flox-controller-operators
+  - name: runtime-flox-controller-workloads
+  - name: runtime-flox-webhook-operators
+  - name: runtime-flox-webhook-workloads
   force: true
   interval: 5m
   path: ./workloads/mesh/headplane
