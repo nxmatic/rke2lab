@@ -5,6 +5,8 @@ metadata:
   type: feedback
 ---
 
+> **★ NAMES UPDATED (verified 2026-09-06):** the frontier module `world-gateway` was RENAMED to **`seed-broker-port`** (`io.seedmatic.rke2lab.seed.broker.port`; no `world-gateway` dir remains) and the crossing envelope `Document` → **`SeedEnvelope`** (readiness is now `DefaultReadinessAuthority implements SeedHandler`, `handle(Cellar, SeedEnvelope)`). The DISCIPLINE below is unchanged — only the names moved. Applies across the `[[world-gateway-*]]` / `[[gateway-*]]` memory family (treat their `world-gateway`/`Document` as `seed-broker-port`/`SeedEnvelope`).
+
 **The rule (user, 2026-07-08):** any addition of a term usable in `world-gateway`
 (`io.seedmatic.rke2lab.world.gateway.port`) must be JUSTIFIED FIRST — prove that NO existing word carries
 the need before adding one. Default = do NOT add; reuse.
